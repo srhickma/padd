@@ -1,4 +1,6 @@
 use std::io;
+use std::collections::HashSet;
+use std::collections::HashMap;
 
 fn main() {
     println!("Hello, world!");
@@ -53,9 +55,147 @@ struct Token {
     lexeme: String,
 }
 
-//trait Parser {
-//
-//}
+trait Parser {
+    fn parse<'a>(scan: Vec<Token>, grammar: &Grammar<'a>) -> Option<Vec<Tree>>;
+}
+
+impl Parser for CYKParser {
+    fn parse<'a>(scan: Vec<Token>, grammar: &Grammar<'a>) -> Option<Vec<Tree>> {
+        fn recur<'a>(lhs: &'a[&'a str], from: usize, length: usize,
+                 scan: Vec<Token>,
+                 grammar: &Grammar<'a>,
+                 memo: &'a mut HashMap<(&'a [&'a str], usize, usize), Option<Vec<Tree>>>)
+            -> Option<Vec<Tree>> {
+            let key = (lhs, from, length);
+            if memo.contains_key(&key) {
+                return (*(memo.get(&key).unwrap())).unwrap().clone();
+            }
+            memo.insert(key, None);
+
+            fn return_captor<'a>(result: Option<Vec<Tree>>,
+                key: (&'a [&'a str], usize, usize),
+                memo: &'a mut HashMap<(&'a [&'a str], usize, usize), Option<Vec<Tree>>>)
+                -> Option<Vec<Tree>> {
+                memo.insert(key, result);
+                return result;
+            }
+
+            if lhs.is_empty() {
+                if length == 0 {
+                    return return_captor(Some(vec![]), key, memo);
+                }
+            } else if grammar.terminals.contains(lhs[0]) {
+                let a = lhs[0];
+                let beta = &lhs[1..];
+                if length == 0 || scan[from].kind != a {
+                    return return_captor(None, key, memo);
+                }
+                let res = recur(beta, from + 1, length - 1, scan, grammar, memo);
+                if res.is_some() {
+                    let tree = Tree{
+                        lhs: Token {
+                            kind: lhs[0].to_string(),
+                            lexeme: "".to_string(),
+                        },
+                        children: res.unwrap(),
+                    };
+                    return return_captor(Some(vec![tree]), key, memo);
+                }
+            } else if lhs.len() == 1 && grammar.non_terminals.contains(lhs[0]) {
+                for gamma in grammar.prods_exp.get(lhs[0]).unwrap() {
+                    let res = recur(gamma.rhs, from, length, scan, grammar, memo);
+                    if res.is_some() {
+                        let tree = Tree{
+                            lhs: Token {
+                                kind: lhs[0].to_string(),
+                                lexeme: "".to_string(),
+                            },
+                            children: res.unwrap(),
+                        };
+                        return return_captor(Some(vec![tree]), key, memo);
+                    }
+                }
+            } else {
+                let a_nt = lhs[0];
+                let beta = &lhs[1..];
+                let new_lhs = &[a_nt];
+                for i in 0..(length + 1) {
+                    let res1 = recur(new_lhs, from, i, scan, grammar, memo);
+                    let res2 = recur(beta, from + i, length - i, scan, grammar, memo);
+                    if res1.is_some() && res2.is_some() {
+                        let mut res = res1.unwrap();
+                        res.append(&mut res2.unwrap());
+                        return return_captor(Some(res), key, memo);
+                    }
+                }
+            }
+
+            return return_captor(None, key, memo);
+        }
+
+        let lhs = &[grammar.start];
+        let mut memo = HashMap::new();
+
+        return recur(lhs, 0, scan.len(), scan, grammar, &mut memo);
+    }
+}
+
+struct CYKParser;
+
+struct Tree {
+    lhs: Token,
+    children: Vec<Tree>,
+}
+
+struct Grammar<'a> {
+    productions: &'a [Production<'a>],
+    non_terminals: HashSet<&'a str>,
+    terminals: HashSet<&'a str>,
+    symbols: HashSet<&'a str>,
+    start: &'a str,
+    prods_exp: HashMap<&'a str, Vec<&'a Production<'a>>>
+}
+
+impl<'a> Grammar<'a> {
+    fn from(productions: &'a [Production<'a>]) -> Grammar<'a> {
+        let non_terminals: HashSet<&'a str> = productions.iter()
+            .map(|prod| prod.lhs)
+            .collect();
+        let mut symbols: HashSet<&'a str> = productions.iter()
+            .flat_map(|prod| prod.rhs.iter())
+            .map(|&x| x)
+            .collect();
+        for non_terminal in &non_terminals {
+            symbols.insert(non_terminal);
+        }
+        let terminals = symbols.difference(&non_terminals)
+            .map(|&x| x)
+            .collect();
+
+        let mut prods_exp = HashMap::new();
+
+        for prod in productions {
+            if !prods_exp.contains_key(prod.lhs) {
+                prods_exp.insert(prod.lhs, vec![]);
+            }
+            prods_exp.get_mut(prod.lhs).unwrap().push(prod);
+        }
+
+        return Grammar {
+            productions,
+            non_terminals,
+            terminals,
+            symbols,
+            start: productions[0].lhs,
+            prods_exp,
+        };
+    }
+}
+
+struct Production<'a> {
+    lhs: &'a str,
+    rhs: &'a [&'a str],
+}
 
 trait Scanner {
     fn scan<'a>(input: &'a str, dfa: &'a DFA) -> Vec<Token>;
