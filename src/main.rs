@@ -3,7 +3,63 @@ use std::collections::HashSet;
 use std::collections::HashMap;
 
 fn main() {
-    println!("Hello, world!");
+//    let mut grammar = Grammar::from(&[
+//        Production{
+//            lhs: "S",
+//            rhs: &["BOF", "A", "EOF"],
+//        },
+//        Production{
+//            lhs: "A",
+//            rhs: &["x"],
+//        },
+//        Production{
+//            lhs: "A",
+//            rhs: &["A", "x"],
+//        }
+//    ]);
+//
+//    let scan = vec![
+//        Token{
+//            kind: "BOF".to_string(),
+//            lexeme: "".to_string(),
+//        },
+//        Token{
+//            kind: "x".to_string(),
+//            lexeme: "".to_string(),
+//        },
+//        Token{
+//            kind: "EOF".to_string(),
+//            lexeme: "".to_string(),
+//        }
+//    ];
+
+    let grammar = Grammar::from(&[
+        Production{
+            lhs: "Sentence",
+            rhs: &["Noun", "Verb"],
+        },
+        Production{
+            lhs: "Noun",
+            rhs: &["mary"],
+        },
+        Production{
+            lhs: "Verb",
+            rhs: &["runs"],
+        }
+    ]);
+
+    let scan = vec![
+        Token{
+            kind: "mary".to_string(),
+            lexeme: "".to_string(),
+        },
+        Token{
+            kind: "runs".to_string(),
+            lexeme: "".to_string(),
+        }
+    ];
+
+    let res = EarleyParser::parse(scan, &grammar);
 
     let alphabet = "01";
     let states: [State; 3] = ["start", "0", "not0"];
@@ -50,47 +106,285 @@ fn main() {
     }
 }
 
+fn unbox<T>(value: Box<T>) -> T {
+    *value
+}
+
+#[derive(Clone)]
+struct Tree {
+    lhs: Token,
+    children: Vec<Tree>,
+}
+
+#[derive(Clone)]
 struct Token {
     kind: Kind,
     lexeme: String,
 }
 
-trait Parser {
-    fn parse<'a>(scan: Vec<Token>, grammar: &Grammar<'a>) -> Option<Vec<Tree>>;
+#[derive(PartialEq, Clone)]
+struct Item<'a> {
+    rule: &'a Production<'a>,
+    start: usize,
+    next: usize,
+    completing: Option<Box<Item<'a>>>,
+    previous: Option<Box<Item<'a>>>,
 }
 
-impl Parser for CYKParser {
+impl<'a> Item<'a> {
+    fn next_symbol<'b>(&'b self) -> Option<&'a str> {
+        if self.next >= 0 && self.next < self.rule.rhs.len() {
+            return Some(self.rule.rhs[self.next]);
+        }
+        return None;
+    }
+    fn prev_symbol<'b>(&'b self) -> Option<&'a str> {
+        if self.next > 0 {
+            return Some(self.rule.rhs[self.next - 1]);
+        }
+        return None;
+    }
+}
+
+trait Parser {
+    fn parse<'a>(scan: Vec<Token>, grammar: &Grammar<'a>) -> Option<Tree>;
+}
+
+impl Parser for EarleyParser {
+    fn parse<'a>(scan: Vec<Token>, grammar: &Grammar<'a>) -> Option<Tree> {
+
+        fn append<'a, 'b>(i: usize, item: Item<'a>, chart: &'b mut Vec<Vec<Item<'a>>>) {
+            for j in 0..chart[i].len() {
+                if chart[i][j] == item {
+                    return;
+                }
+            }
+            chart[i].push(item);
+        }
+
+        let mut chart: Vec<Vec<Item>> = vec![vec![]];
+        grammar.productions.iter()
+            .filter(|prod| prod.lhs == grammar.start)
+            .for_each(|prod| {
+                let item = Item{
+                    rule: prod,
+                    start: 0,
+                    next: 0,
+                    completing: None,
+                    previous: None,
+                };
+                chart[0].push(item);
+            });
+
+        let mut i = 0;
+        while i < chart.len() {
+            let mut j = 0;
+            while j < chart[i].len() {
+                let item = chart[i][j].clone();
+                let symbol = (&item).next_symbol();
+                match symbol {
+                    None => {
+                        let index = item.start;
+                        complete_op(item, &chart[index].clone(), &mut chart[i]);
+                    },
+                    Some(sym) => {
+                        if grammar.terminals.contains(&sym) {
+                            scan_op(i, j, sym, &scan, &mut chart);
+                        } else {
+                            predict_op(i, sym, grammar, &mut chart);
+                        }
+                    },
+                }
+                j += 1;
+            }
+            i += 1;
+        }
+
+        fn predict_op<'a, 'b>(i: usize, symbol: &'a str, grammar: &'a Grammar<'a>, chart: &'b mut Vec<Vec<Item<'a>>>) {
+            grammar.productions.iter()
+                .filter(|prod| prod.lhs == symbol)
+                .for_each(|prod| {
+                    let item = Item{
+                        rule: prod,
+                        start: i,
+                        next: 0,
+                        completing: None,
+                        previous: None,
+                    };
+                    append(i, item, chart);
+                });
+        }
+
+        fn scan_op<'a, 'b>(i: usize, j: usize, symbol: &'a str, scan: &'a Vec<Token>, chart: &'b mut Vec<Vec<Item<'a>>>) {
+            if i < scan.len() && scan[i].kind == symbol.to_string() {
+                if chart.len() <= i + 1 {
+                    chart.push(vec![])
+                }
+                let item = chart[i][j].clone();
+                let new_item = Item{
+                    rule: item.rule,
+                    start: item.start,
+                    next: item.next + 1,
+                    completing: None,
+                    previous: None,
+                };
+                chart[i + 1].push(new_item);
+            }
+        }
+
+        fn complete_op<'a, 'b>(item: Item<'a>, src: &'b Vec<Item<'a>>, dest: &'b mut Vec<Item<'a>>){
+            src.iter()
+                .filter(|old_item| {
+                    match old_item.clone().next_symbol() {
+                        None => false,
+                        Some(sym) => sym == item.rule.lhs,
+                    }
+                })
+                .for_each(|old_item| {
+                    let item = Item{
+                        rule: old_item.rule,
+                        start: old_item.start,
+                        next: old_item.next + 1,
+                        completing: Some(Box::new(old_item.clone())),
+                        previous: Some(Box::new(item.clone())),
+                    };
+                    if dest.contains(&item) {
+                        return;
+                    }
+                    dest.push(item);
+                });
+        }
+
+        println!("-----------------------------------------------------");
+        for i in 0..chart.len() {
+            println!("SET {}", i);
+            for j in 0..chart[i].len() {
+                println!("{} : {} : [{},{}]", j, chart[i][j].rule.fmt(), chart[i][j].start, chart[i][j].next);
+            }
+            println!();
+        }
+        println!("-----------------------------------------------------");
+
+        fn has_partial_parse<'a, 'b>(i: usize, grammar: &'a Grammar<'a>, chart: &'b mut Vec<Vec<Item<'a>>>) -> (bool, Vec<Item<'a>>) {
+            let mut complete_parses = vec![];
+            let mut res = false;
+            for j in 0..chart[i].len() {
+                let item = &chart[i][j];
+                if item.rule.lhs == grammar.start && item.next >= item.rule.rhs.len() && item.start == 0 {
+                    complete_parses.push(item.clone());
+                    res = true;
+                }
+            }
+            return (res, complete_parses);
+        }
+
+        let (valid, complete_parses) = has_partial_parse(chart.len() - 1, grammar, &mut chart);
+
+        if !valid {
+            return None;
+        }
+
+
+        let mut parse_trees : Vec<Tree> = vec![];
+        for item in &complete_parses {
+            parse_trees.extend(build_nodes(&item).iter().cloned());
+        }
+
+        fn build_nodes(root: &Item) -> Vec<Tree> {
+            let down = match root.completing.clone() {
+                Some(node) => build_nodes(&unbox(node)),
+                None => vec![Tree{
+                    lhs: Token{
+                        kind: root.prev_symbol().unwrap().to_string(),
+                        lexeme: "INSERT LEXEME HERE".to_string(),
+                    },
+                    children: vec![],
+                }]
+            };
+
+            let prev = root.previous.clone();
+            let mut left = vec![];
+            while prev.is_some() && prev.unwrap().next > 0 {
+                //DO STUFF HERE: https://github.com/n0nick/earley_bird/blob/master/parse_trees.py
+            }
+
+            left.push(down);
+
+            let mut res = vec![];
+
+            for children in left {
+                res.push(Tree{
+                    lhs: Token{
+                        kind: root.rule.lhs.to_string(),
+                        lexeme: "INSERT LEXEME HERE".to_string(),
+                    },
+                    children,
+                });
+            }
+
+            return res;
+        }
+
+
+        println!("HAS PARTIAL PARSE: {} : {} COMPLETE PARSE(S)", valid, complete_parses.len());
+
+        return None;
+    }
+}
+
+struct EarleyParser;
+
+/*impl Parser for CYKParser {
     fn parse<'a>(scan: Vec<Token>, grammar: &Grammar<'a>) -> Option<Vec<Tree>> {
         fn recur<'a>(lhs: &'a[&'a str], from: usize, length: usize,
-                 scan: Vec<Token>,
+                 scan: &'a Vec<Token>,
                  grammar: &Grammar<'a>,
                  memo: &'a mut HashMap<(&'a [&'a str], usize, usize), Option<Vec<Tree>>>)
-            -> Option<Vec<Tree>> {
+            -> (Option<Vec<Tree>>, &'a mut HashMap<(&'a [&'a str], usize, usize), Option<Vec<Tree>>>) {
             let key = (lhs, from, length);
-            if memo.contains_key(&key) {
-                return (*(memo.get(&key).unwrap())).unwrap().clone();
+
+            //match memo.get(&key).clone()
+
+//            let x = match memo.get(&key).clone(){
+//                Some(val) => Some(val),
+//                None => None,
+//            };
+
+            let val: Option<Option<Vec<Tree>>>;
+
+            let has_val = {
+                //val = memo.get(&key).clone();
+                memo.contains_key(&key)
+            };
+
+            if has_val {
+                return (val.unwrap().clone(), memo)
             }
+
             memo.insert(key, None);
 
-            fn return_captor<'a>(result: Option<Vec<Tree>>,
-                key: (&'a [&'a str], usize, usize),
-                memo: &'a mut HashMap<(&'a [&'a str], usize, usize), Option<Vec<Tree>>>)
-                -> Option<Vec<Tree>> {
-                memo.insert(key, result);
-                return result;
-            }
+//            fn return_captor<'a>(result: Option<Vec<Tree>>,
+//                key: (&'a [&'a str], usize, usize),
+//                memo: &'a mut HashMap<(&'a [&'a str], usize, usize), Option<Vec<Tree>>>)
+//                -> Option<Vec<Tree>> {
+//                memo.insert(key, result);
+//                return (memo.get(&key).unwrap()).clone();
+//            }
 
             if lhs.is_empty() {
                 if length == 0 {
-                    return return_captor(Some(vec![]), key, memo);
+                    //return return_captor(Some(vec![]), key, memo);
+                    memo.insert(key, Some(vec![]));
+                    return (Some(vec![]), memo);
                 }
             } else if grammar.terminals.contains(lhs[0]) {
                 let a = lhs[0];
                 let beta = &lhs[1..];
                 if length == 0 || scan[from].kind != a {
-                    return return_captor(None, key, memo);
+                    //return return_captor(None, key, memo);
+                    return (None, memo);
                 }
-                let res = recur(beta, from + 1, length - 1, scan, grammar, memo);
+                let (res, memo) = recur(beta, from + 1, length - 1, scan, grammar, memo);
                 if res.is_some() {
                     let tree = Tree{
                         lhs: Token {
@@ -99,11 +393,14 @@ impl Parser for CYKParser {
                         },
                         children: res.unwrap(),
                     };
-                    return return_captor(Some(vec![tree]), key, memo);
+                    //return return_captor(Some(vec![tree]), key, memo);
+                    let result = tree.clone();
+                    memo.insert(key, Some(vec![tree]));
+                    return (Some(vec![result]), memo);
                 }
             } else if lhs.len() == 1 && grammar.non_terminals.contains(lhs[0]) {
                 for gamma in grammar.prods_exp.get(lhs[0]).unwrap() {
-                    let res = recur(gamma.rhs, from, length, scan, grammar, memo);
+                    let (res, memo) = recur(gamma.rhs, from, length, scan, grammar, memo);
                     if res.is_some() {
                         let tree = Tree{
                             lhs: Token {
@@ -112,7 +409,10 @@ impl Parser for CYKParser {
                             },
                             children: res.unwrap(),
                         };
-                        return return_captor(Some(vec![tree]), key, memo);
+                        //return return_captor(Some(vec![tree]), key, memo);
+                        let result = tree.clone();
+                        memo.insert(key, Some(vec![tree]));
+                        return (Some(vec![result]), memo);
                     }
                 }
             } else {
@@ -120,32 +420,32 @@ impl Parser for CYKParser {
                 let beta = &lhs[1..];
                 let new_lhs = &[a_nt];
                 for i in 0..(length + 1) {
-                    let res1 = recur(new_lhs, from, i, scan, grammar, memo);
-                    let res2 = recur(beta, from + i, length - i, scan, grammar, memo);
+                    let (res1, memo) = recur(new_lhs, from, i, scan, grammar, memo);
+                    let (res2, memo) = recur(beta, from + i, length - i, scan, grammar, memo);
                     if res1.is_some() && res2.is_some() {
                         let mut res = res1.unwrap();
                         res.append(&mut res2.unwrap());
-                        return return_captor(Some(res), key, memo);
+                        //return return_captor(Some(res), key, memo);
+                        let result = res.clone();
+                        memo.insert(key, Some(res));
+                        return (Some(result), memo);
                     }
                 }
             }
 
-            return return_captor(None, key, memo);
+            //return return_captor(None, key, memo);
+            return (None, memo);
         }
 
         let lhs = &[grammar.start];
         let mut memo = HashMap::new();
 
-        return recur(lhs, 0, scan.len(), scan, grammar, &mut memo);
+        let (res, memo) = recur(lhs, 0, scan.len(), &scan, grammar, &mut memo);
+        return res;
     }
 }
 
-struct CYKParser;
-
-struct Tree {
-    lhs: Token,
-    children: Vec<Tree>,
-}
+struct CYKParser;*/
 
 struct Grammar<'a> {
     productions: &'a [Production<'a>],
@@ -192,9 +492,21 @@ impl<'a> Grammar<'a> {
     }
 }
 
+#[derive(PartialEq, Clone)]
 struct Production<'a> {
     lhs: &'a str,
     rhs: &'a [&'a str],
+}
+
+impl<'a> Production<'a> {
+    fn fmt(&self) -> String {
+        let mut rhs: String = "".to_string();
+        for s in self.rhs {
+            rhs.push_str(s);
+            rhs.push(' ');
+        }
+        return format!("{} -> {}", self.lhs, rhs);
+    }
 }
 
 trait Scanner {
