@@ -3,6 +3,72 @@ use std::collections::HashSet;
 use std::collections::HashMap;
 
 fn main() {
+    let mut grammar = Grammar::from(&[
+        Production{
+            lhs: "S",
+            rhs: &["expr"],
+        },
+        Production{
+            lhs: "expr",
+            rhs: &["(", "expr", ")"],
+        },
+        Production{
+            lhs: "expr",
+            rhs: &["expr", "OP", "expr"],
+        },
+        Production{
+            lhs: "expr",
+            rhs: &["ID"],
+        }
+    ]);
+
+    let scan = vec![
+        Token{
+            kind: "(".to_string(),
+            lexeme: "".to_string(),
+        },
+        Token{
+            kind: "ID".to_string(),
+            lexeme: "".to_string(),
+        },
+        Token{
+            kind: "OP".to_string(),
+            lexeme: "".to_string(),
+        },
+        Token{
+            kind: "ID".to_string(),
+            lexeme: "".to_string(),
+        },
+        Token{
+            kind: ")".to_string(),
+            lexeme: "".to_string(),
+        },
+        Token{
+            kind: "OP".to_string(),
+            lexeme: "".to_string(),
+        },
+        Token{
+            kind: "ID".to_string(),
+            lexeme: "".to_string(),
+        },
+        Token{
+            kind: "OP".to_string(),
+            lexeme: "".to_string(),
+        },
+        Token{
+            kind: "(".to_string(),
+            lexeme: "".to_string(),
+        },
+        Token{
+            kind: "ID".to_string(),
+            lexeme: "".to_string(),
+        },
+        Token{
+            kind: ")".to_string(),
+            lexeme: "".to_string(),
+        }
+    ];
+
 //    let mut grammar = Grammar::from(&[
 //        Production{
 //            lhs: "S",
@@ -33,31 +99,31 @@ fn main() {
 //        }
 //    ];
 
-    let grammar = Grammar::from(&[
-        Production{
-            lhs: "Sentence",
-            rhs: &["Noun", "Verb"],
-        },
-        Production{
-            lhs: "Noun",
-            rhs: &["mary"],
-        },
-        Production{
-            lhs: "Verb",
-            rhs: &["runs"],
-        }
-    ]);
-
-    let scan = vec![
-        Token{
-            kind: "mary".to_string(),
-            lexeme: "".to_string(),
-        },
-        Token{
-            kind: "runs".to_string(),
-            lexeme: "".to_string(),
-        }
-    ];
+//    let grammar = Grammar::from(&[
+//        Production{
+//            lhs: "Sentence",
+//            rhs: &["Noun", "Verb"],
+//        },
+//        Production{
+//            lhs: "Noun",
+//            rhs: &["mary"],
+//        },
+//        Production{
+//            lhs: "Verb",
+//            rhs: &["runs"],
+//        }
+//    ]);
+//
+//    let scan = vec![
+//        Token{
+//            kind: "mary".to_string(),
+//            lexeme: "".to_string(),
+//        },
+//        Token{
+//            kind: "runs".to_string(),
+//            lexeme: "".to_string(),
+//        }
+//    ];
 
     let res = EarleyParser::parse(scan, &grammar);
 
@@ -116,6 +182,25 @@ struct Tree {
     children: Vec<Tree>,
 }
 
+impl Tree {
+    fn print(self){
+        self.print_internal("".to_string(), true)
+    }
+    fn print_internal(self, prefix: String, is_tail: bool) {
+        println!("{}{}{}", prefix, if is_tail {"└── "} else {"├── "}, self.lhs.kind);
+        let mut i = 0;
+        let mut len = self.children.len();
+        for child in self.children {
+            if i == len - 1{
+                child.print_internal(format!("{}{}", prefix, if is_tail {"    "} else {"│   "}), true);
+            } else {
+                child.print_internal(format!("{}{}", prefix, if is_tail {"    "} else {"│   "}), false);
+            }
+            i += 1;
+        }
+    }
+}
+
 #[derive(Clone)]
 struct Token {
     kind: Kind,
@@ -143,6 +228,20 @@ impl<'a> Item<'a> {
             return Some(self.rule.rhs[self.next - 1]);
         }
         return None;
+    }
+    fn to_string(&self) -> String {
+        let mut rule_string = format!("{} -> ", self.rule.lhs);
+        for i in 0..self.rule.rhs.len() {
+            if i == self.next {
+                rule_string.push_str(". ");
+            }
+            rule_string.push_str(self.rule.rhs.get(i).unwrap());
+            rule_string.push(' ');
+        }
+        if self.next == self.rule.rhs.len() {
+            rule_string.push_str(". ");
+        }
+        return format!("{}: {} p:{} c:{}", rule_string, self.start, if self.previous.is_some() {"SOME"} else {"NONE"}, if self.completing.is_some() {"SOME"} else {"NONE"});
     }
 }
 
@@ -211,6 +310,7 @@ impl Parser for EarleyParser {
                         completing: None,
                         previous: None,
                     };
+                    println!("PREDICTED: {}", item.to_string());
                     append(i, item, chart);
                 });
         }
@@ -226,8 +326,9 @@ impl Parser for EarleyParser {
                     start: item.start,
                     next: item.next + 1,
                     completing: None,
-                    previous: None,
+                    previous: Some(Box::new(item.clone())),
                 };
+                println!("SCANNED: {} TO {}", item.to_string(), new_item.to_string());
                 chart[i + 1].push(new_item);
             }
         }
@@ -245,9 +346,10 @@ impl Parser for EarleyParser {
                         rule: old_item.rule,
                         start: old_item.start,
                         next: old_item.next + 1,
-                        completing: Some(Box::new(old_item.clone())),
-                        previous: Some(Box::new(item.clone())),
+                        completing: Some(Box::new(item.clone())),
+                        previous: Some(Box::new(old_item.clone())),
                     };
+                    println!("COMPLETED: {} TO {}", old_item.to_string(), item.to_string());
                     if dest.contains(&item) {
                         return;
                     }
@@ -259,7 +361,7 @@ impl Parser for EarleyParser {
         for i in 0..chart.len() {
             println!("SET {}", i);
             for j in 0..chart[i].len() {
-                println!("{} : {} : [{},{}]", j, chart[i][j].rule.fmt(), chart[i][j].start, chart[i][j].next);
+                println!("{}", chart[i][j].to_string());
             }
             println!();
         }
@@ -287,43 +389,109 @@ impl Parser for EarleyParser {
 
         let mut parse_trees : Vec<Tree> = vec![];
         for item in &complete_parses {
-            parse_trees.extend(build_nodes(&item).iter().cloned());
+            parse_trees.push(build_nodes(&item).clone());
+            //parse_trees.extend(build_nodes(&item).iter().cloned());
         }
 
-        fn build_nodes(root: &Item) -> Vec<Tree> {
+        parse_trees.first().unwrap().clone().print();
+
+        fn build_nodes(root: &Item) -> Tree {
+            if root.previous.is_some() {
+                println!("{} prev={}", root.to_string(), unbox(root.previous.clone().unwrap()).to_string());
+            } else {
+                println!("{} prev=NONE", root.to_string());
+            }
             let down = match root.completing.clone() {
-                Some(node) => build_nodes(&unbox(node)),
-                None => vec![Tree{
-                    lhs: Token{
-                        kind: root.prev_symbol().unwrap().to_string(),
-                        lexeme: "INSERT LEXEME HERE".to_string(),
-                    },
-                    children: vec![],
-                }]
+                Some(node) => {
+                    println!("SOME({})", &unbox(node.clone()).to_string());
+                    build_nodes(&unbox(node))
+                },
+                None => {
+                    println!("NONE");
+                    Tree{
+                        lhs: Token{
+                            kind: root.prev_symbol().unwrap().to_string(),
+                            lexeme: "INSERT LEXEME HERE".to_string(),
+                        },
+                        children: vec![],
+                    }
+                }
             };
 
-            let prev = root.previous.clone();
+            let mut prev = root.previous.clone();
             let mut left = vec![];
-            while prev.is_some() && prev.unwrap().next > 0 {
-                //DO STUFF HERE: https://github.com/n0nick/earley_bird/blob/master/parse_trees.py
+            if prev.is_some() {
+                let p: Item = unbox(prev.unwrap());
+                if p.next > 0 {
+                    println!("PUSHING build_nodes({}) TO LEFT of {}", &p.to_string(), root.to_string());
+                    left.extend(build_nodes(&p).children);
+                }
             }
 
             left.push(down);
 
-            let mut res = vec![];
-
-            for children in left {
-                res.push(Tree{
-                    lhs: Token{
-                        kind: root.rule.lhs.to_string(),
-                        lexeme: "INSERT LEXEME HERE".to_string(),
-                    },
-                    children,
-                });
-            }
-
-            return res;
+            return Tree{
+                lhs: Token{
+                    kind: root.rule.lhs.to_string(),
+                    lexeme: "INSERT LEXEME HERE".to_string(),
+                },
+                children: left,
+            };
         }
+
+//        fn build_nodes(root: &Item) -> Vec<Tree> {
+//
+//            if root.previous.is_some() {
+//                println!("{} prev={}", root.to_string(), unbox(root.previous.clone().unwrap()).to_string());
+//            } else {
+//                println!("{} prev=NONE", root.to_string());
+//            }
+//            let down = match root.completing.clone() {
+//                Some(node) => {
+//                    println!("SOME({})", &unbox(node.clone()).to_string());
+//                    build_nodes(&unbox(node))
+//                },
+//                None => {
+//                    println!("NONE");
+//                    vec![Tree{
+//                        lhs: Token{
+//                            kind: root.prev_symbol().unwrap().to_string(),
+//                            lexeme: "INSERT LEXEME HERE".to_string(),
+//                        },
+//                        children: vec![],
+//                    }]
+//                }
+//            };
+//
+//            let mut prev = root.previous.clone();
+//            let mut left = vec![];
+//            while prev.is_some() {
+//                let p: Item = unbox(prev.unwrap());
+//                if p.next <= 0 {
+//                    break;
+//                }
+//                println!("PUSHING build_nodes({}) TO LEFT of {}", &p.to_string(), root.to_string());
+//                left.push(build_nodes(&p));
+//                prev = p.previous;
+//            }
+//
+//            //left.reverse();
+//            left.push(down);
+//
+//            let mut res = vec![];
+//
+//            for children in left {
+//                res.push(Tree{
+//                    lhs: Token{
+//                        kind: root.rule.lhs.to_string(),
+//                        lexeme: "INSERT LEXEME HERE".to_string(),
+//                    },
+//                    children,
+//                });
+//            }
+//
+//            return res;
+//        }
 
 
         println!("HAS PARTIAL PARSE: {} : {} COMPLETE PARSE(S)", valid, complete_parses.len());
@@ -333,119 +501,6 @@ impl Parser for EarleyParser {
 }
 
 struct EarleyParser;
-
-/*impl Parser for CYKParser {
-    fn parse<'a>(scan: Vec<Token>, grammar: &Grammar<'a>) -> Option<Vec<Tree>> {
-        fn recur<'a>(lhs: &'a[&'a str], from: usize, length: usize,
-                 scan: &'a Vec<Token>,
-                 grammar: &Grammar<'a>,
-                 memo: &'a mut HashMap<(&'a [&'a str], usize, usize), Option<Vec<Tree>>>)
-            -> (Option<Vec<Tree>>, &'a mut HashMap<(&'a [&'a str], usize, usize), Option<Vec<Tree>>>) {
-            let key = (lhs, from, length);
-
-            //match memo.get(&key).clone()
-
-//            let x = match memo.get(&key).clone(){
-//                Some(val) => Some(val),
-//                None => None,
-//            };
-
-            let val: Option<Option<Vec<Tree>>>;
-
-            let has_val = {
-                //val = memo.get(&key).clone();
-                memo.contains_key(&key)
-            };
-
-            if has_val {
-                return (val.unwrap().clone(), memo)
-            }
-
-            memo.insert(key, None);
-
-//            fn return_captor<'a>(result: Option<Vec<Tree>>,
-//                key: (&'a [&'a str], usize, usize),
-//                memo: &'a mut HashMap<(&'a [&'a str], usize, usize), Option<Vec<Tree>>>)
-//                -> Option<Vec<Tree>> {
-//                memo.insert(key, result);
-//                return (memo.get(&key).unwrap()).clone();
-//            }
-
-            if lhs.is_empty() {
-                if length == 0 {
-                    //return return_captor(Some(vec![]), key, memo);
-                    memo.insert(key, Some(vec![]));
-                    return (Some(vec![]), memo);
-                }
-            } else if grammar.terminals.contains(lhs[0]) {
-                let a = lhs[0];
-                let beta = &lhs[1..];
-                if length == 0 || scan[from].kind != a {
-                    //return return_captor(None, key, memo);
-                    return (None, memo);
-                }
-                let (res, memo) = recur(beta, from + 1, length - 1, scan, grammar, memo);
-                if res.is_some() {
-                    let tree = Tree{
-                        lhs: Token {
-                            kind: lhs[0].to_string(),
-                            lexeme: "".to_string(),
-                        },
-                        children: res.unwrap(),
-                    };
-                    //return return_captor(Some(vec![tree]), key, memo);
-                    let result = tree.clone();
-                    memo.insert(key, Some(vec![tree]));
-                    return (Some(vec![result]), memo);
-                }
-            } else if lhs.len() == 1 && grammar.non_terminals.contains(lhs[0]) {
-                for gamma in grammar.prods_exp.get(lhs[0]).unwrap() {
-                    let (res, memo) = recur(gamma.rhs, from, length, scan, grammar, memo);
-                    if res.is_some() {
-                        let tree = Tree{
-                            lhs: Token {
-                                kind: lhs[0].to_string(),
-                                lexeme: "".to_string(),
-                            },
-                            children: res.unwrap(),
-                        };
-                        //return return_captor(Some(vec![tree]), key, memo);
-                        let result = tree.clone();
-                        memo.insert(key, Some(vec![tree]));
-                        return (Some(vec![result]), memo);
-                    }
-                }
-            } else {
-                let a_nt = lhs[0];
-                let beta = &lhs[1..];
-                let new_lhs = &[a_nt];
-                for i in 0..(length + 1) {
-                    let (res1, memo) = recur(new_lhs, from, i, scan, grammar, memo);
-                    let (res2, memo) = recur(beta, from + i, length - i, scan, grammar, memo);
-                    if res1.is_some() && res2.is_some() {
-                        let mut res = res1.unwrap();
-                        res.append(&mut res2.unwrap());
-                        //return return_captor(Some(res), key, memo);
-                        let result = res.clone();
-                        memo.insert(key, Some(res));
-                        return (Some(result), memo);
-                    }
-                }
-            }
-
-            //return return_captor(None, key, memo);
-            return (None, memo);
-        }
-
-        let lhs = &[grammar.start];
-        let mut memo = HashMap::new();
-
-        let (res, memo) = recur(lhs, 0, scan.len(), &scan, grammar, &mut memo);
-        return res;
-    }
-}
-
-struct CYKParser;*/
 
 struct Grammar<'a> {
     productions: &'a [Production<'a>],
