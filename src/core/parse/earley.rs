@@ -153,10 +153,20 @@ impl Parser for EarleyParser {
                     build_nodes(&unbox(node))
                 },
                 None => {
-                    Tree{ //Leaf Node Creation
-                        lhs: root.token.unwrap().clone(),
-                        children: vec![],
+                    match root.token { //Leaf Node Creation
+                        Some(t) => Tree{ //Non-empty rhs
+                            lhs: root.token.unwrap().clone(),
+                            children: vec![],
+                        },
+                        None => Tree{ //Empty rhs
+                            lhs: Token{
+                                kind: "".to_string(),
+                                lexeme: "NULL".to_string(),
+                            },
+                            children: vec![],
+                        }
                     }
+
                 }
             };
 

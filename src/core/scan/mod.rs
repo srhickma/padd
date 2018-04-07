@@ -40,3 +40,126 @@ impl<'a> DFA<'a> {
         return (self.tokenizer)(state).to_string();
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn scan_binary() {
+        //setup
+        let alphabet = "01";
+        let states: [State; 3] = ["start", "0", "not0"];
+        let start: State = "start";
+        let accepting: [State; 2] = ["0", "not0"];
+        let delta: fn(State, char) -> State = |state, c| match (state, c) {
+            ("start", '0') => "0",
+            ("start", '1') => "not0",
+            ("not0", _) => "not0",
+            (&_, _) => "",
+        };
+        let tokenizer: fn(State) -> &str = |state| match state {
+            "0" => "ZERO",
+            "not0" => "NZ",
+            _ => "",
+        };
+
+        let dfa = DFA{
+            alphabet: &alphabet,
+            states: &states,
+            start,
+            accepting: &accepting,
+            delta,
+            tokenizer
+        };
+
+        let input = "000011010101";
+
+        let scanner = def_scanner();
+
+        //execute
+        let tokens = scanner.scan(&input, &dfa);
+
+        //verify
+        let ts = tokens_string(&tokens);
+        assert_eq!(ts, "
+kind=ZERO lexeme=0
+kind=ZERO lexeme=0
+kind=ZERO lexeme=0
+kind=ZERO lexeme=0
+kind=NZ lexeme=11010101"
+        );
+    }
+
+    #[test]
+    fn scan_brackets() {
+        //setup
+        let alphabet = "{} \t\n";
+        let states: [State; 4] = ["start", "lbr", "rbr", "ws"];
+        let start: State = "start";
+        let accepting: [State; 3] = ["lbr", "rbr", "ws"];
+        let delta: fn(State, char) -> State = |state, c| match (state, c) {
+            ("start", ' ') => "ws",
+            ("start", '\t') => "ws",
+            ("start", '\n') => "ws",
+            ("start", '{') => "lbr",
+            ("start", '}') => "rbr",
+            ("ws", ' ') => "ws",
+            ("ws", '\t') => "ws",
+            ("ws", '\n') => "ws",
+            (&_, _) => "",
+        };
+        let tokenizer: fn(State) -> &str = |state| match state {
+            "lbr" => "LBRACKET",
+            "rbr" => "RBRACKET",
+            "ws" => "WHITESPACE",
+            _ => "",
+        };
+
+        let dfa = DFA{
+            alphabet: &alphabet,
+            states: &states,
+            start,
+            accepting: &accepting,
+            delta,
+            tokenizer
+        };
+
+        let input = "  {{\n}{}{} \t{} \t{}}";
+
+        let scanner = def_scanner();
+
+        //execute
+        let tokens = scanner.scan(&input, &dfa);
+
+        //verify
+        let ts = tokens_string(&tokens);
+        println!("{}", ts);
+        assert_eq!(ts, "
+kind=WHITESPACE lexeme=  \nkind=LBRACKET lexeme={
+kind=LBRACKET lexeme={
+kind=WHITESPACE lexeme=\n
+kind=RBRACKET lexeme=}
+kind=LBRACKET lexeme={
+kind=RBRACKET lexeme=}
+kind=LBRACKET lexeme={
+kind=RBRACKET lexeme=}
+kind=WHITESPACE lexeme= \t
+kind=LBRACKET lexeme={
+kind=RBRACKET lexeme=}
+kind=WHITESPACE lexeme= \t
+kind=LBRACKET lexeme={
+kind=RBRACKET lexeme=}
+kind=RBRACKET lexeme=}"
+        );
+    }
+
+    fn tokens_string(tokens: &Vec<Token>) -> String {
+        let mut res = String::new();
+
+        for token in tokens {
+            res = format!("{}\nkind={} lexeme={}", res, token.kind, token.lexeme)
+        }
+        return res;
+    }
+}
