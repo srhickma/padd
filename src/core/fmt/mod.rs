@@ -1,12 +1,22 @@
 use core::scan::def_scanner;
+use core::parse::def_parser;
+use core::parse::build_prods;
 use core::scan::DFA;
 use core::scan::State;
 use core::scan::Kind;
-use core::parse::def_parser;
-use core::parse::build_prods;
 use core::parse::Grammar;
 use core::parse::Production;
 use core::parse::Tree;
+
+mod statically_scoped;
+
+pub trait Formatter {
+    fn reconstruct(&self, parse: &Option<Tree>) -> String;
+}
+
+pub fn def_formatter() -> Box<Formatter> {
+    return Box::new(statically_scoped::StaticallyScopedFormatter);
+}
 
 static PATTERN_ALPHABET: &'static str = "{};=1234567890abcdefghijklmnopqrstuvwxyz \n\t";
 static PATTERN_STATES: [State; 9] = ["start", "semi", "eq", "lbrace", "rbrace", "zero", "num", "alpha", "ws"];

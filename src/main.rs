@@ -1,17 +1,12 @@
 #[macro_use]
 extern crate lazy_static;
 
-use std::io;
-use std::collections::HashMap;
 use core::scan::def_scanner;
-use core::scan::DFA;
-use core::scan::Token;
-use core::scan::Kind;
-use core::scan::State;
 use core::parse::def_parser;
 use core::parse::build_prods;
+use core::scan::DFA;
+use core::scan::State;
 use core::parse::Grammar;
-use core::parse::Production;
 use core::parse::Tree;
 
 mod cli;
@@ -81,7 +76,7 @@ fn main() {
     tree.print();
 
     //reconstruct
-    println!("Reconstructed:\n{}", recon(&tree, |prod, cur, next| {
+//    println!("Reconstructed:\n{}", recon(&tree, |prod, cur, next| {
 //        return match (&mk[..], &ck[..]) {
 //            (_, "LBRACKET") => format!("{}{}\n", cur, next),
 //            (_, "RBRACKET") => format!("{}{}\n", cur, next),
@@ -92,21 +87,21 @@ fn main() {
 //            (_, "RBRACKET") => format!("{}{}\n", cur, next),
 //            (_, _) => format!("{}{}", cur, next),
 //        }
-        return String::new();
-    }));
+//        return String::new();
+//    }));
 }
 
-fn recon(tree: &Tree, formatter: fn(&String, &String, String) -> String) -> String {
-    if tree.children.len() == 0 {
-        if tree.lhs.kind == "" {
-            return String::new();
-        }
-        return tree.lhs.lexeme.clone();
-    }
-    let mut res = String::new();
-    for child in &tree.children {
-        println!("{}", tree.production());
-        //res = formatter(&tree.lhs.kind, &child.lhs.kind, &res, recon(child, formatter)); //This is where we add custom formatting
-    }
-    return res;
-}
+//fn recon(tree: &Tree, formatter: fn(&String, &String, String) -> String) -> String {
+//    if tree.children.len() == 0 {
+//        if tree.lhs.kind == "" {
+//            return String::new();
+//        }
+//        return tree.lhs.lexeme.clone();
+//    }
+//    let mut res = String::new();
+//    for child in &tree.children {
+//        println!("{}", tree.production());
+//        //res = formatter(&tree.lhs.kind, &child.lhs.kind, &res, recon(child, formatter)); //This is where we add custom formatting
+//    }
+//    return res;
+//}

@@ -64,7 +64,7 @@ impl Tree {
         }
     }
     pub fn production(&self) -> String {
-        let mut rhs: String = String::new();
+        let rhs: String = String::new();
         let vec: Vec<String> = self.children.iter().map(|s| s.lhs.kind.clone()).collect();
         return format!("{} -> {}", self.lhs.kind, (&vec[..]).join(" "));
     }
