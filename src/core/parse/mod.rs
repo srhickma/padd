@@ -63,6 +63,11 @@ impl Tree {
             return s;
         }
     }
+    pub fn production(&self) -> String {
+        let mut rhs: String = String::new();
+        let vec: Vec<String> = self.children.iter().map(|s| s.lhs.kind.clone()).collect();
+        return format!("{} -> {}", self.lhs.kind, (&vec[..]).join(" "));
+    }
 }
 
 pub struct Grammar<'a> {
@@ -124,6 +129,34 @@ impl<'a> Production<'a> {
             rhs.push(' ');
         }
         return format!("{} -> {}", self.lhs, rhs);
+    }
+}
+
+pub fn build_prods<'a>(strings: &'a[&'a str]) -> Vec<Production<'a>> {
+    let mut productions: Vec<Production> = vec![];
+    for string in strings {
+        productions.push(prod_from_string(string));
+    }
+    return productions;
+}
+
+fn prod_from_string(string: &str) -> Production {
+    let mut i = 0;
+    let mut lhs: &str = "";
+    let mut rhs: Vec<&str> = vec![];
+
+    for s in string.split_whitespace() {
+        if i == 0 {
+            lhs = s;
+        } else {
+            rhs.push(s);
+        }
+        i += 1;
+    }
+
+    return Production{
+        lhs,
+        rhs,
     }
 }
 
@@ -378,33 +411,5 @@ mod tests {
         └── w
             └── WHITESPACE <- xy"
         );
-    }
-
-    fn build_prods<'a>(strings: &'a[&'a str]) -> Vec<Production<'a>> {
-        let mut productions: Vec<Production> = vec![];
-        for string in strings {
-            productions.push(prod_from_string(string));
-        }
-        return productions;
-    }
-
-    fn prod_from_string(string: &str) -> Production {
-        let mut i = 0;
-        let mut lhs: &str = "";
-        let mut rhs: Vec<&str> = vec![];
-
-        for s in string.split_whitespace() {
-            if i == 0 {
-                lhs = s;
-            } else {
-                rhs.push(s);
-            }
-            i += 1;
-        }
-
-        return Production{
-            lhs,
-            rhs,
-        }
     }
 }

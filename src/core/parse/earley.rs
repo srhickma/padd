@@ -115,15 +115,15 @@ impl Parser for EarleyParser {
                 });
         }
 
-        println!("-----------------------------------------------------");
-        for i in 0..chart.len() {
-            println!("SET {}", i);
-            for j in 0..chart[i].len() {
-                println!("{}", chart[i][j].to_string());
-            }
-            println!();
-        }
-        println!("-----------------------------------------------------");
+//        println!("-----------------------------------------------------");
+//        for i in 0..chart.len() {
+//            println!("SET {}", i);
+//            for j in 0..chart[i].len() {
+//                println!("{}", chart[i][j].to_string());
+//            }
+//            println!();
+//        }
+//        println!("-----------------------------------------------------");
 
         fn partial_parse<'a, 'b>(i: usize, grammar: &'a Grammar<'a>, chart: &'b mut Vec<Vec<Item<'a>>>) -> (bool, Vec<Item<'a>>) {
             let mut complete_parses = vec![];
@@ -139,6 +139,8 @@ impl Parser for EarleyParser {
         }
 
         let (valid, complete_parses) = partial_parse(chart.len() - 1, grammar, &mut chart);
+
+        println!("FOUND {} COMPLETE PARSE(S)", complete_parses.len());
 
         if !valid {
             return None;
