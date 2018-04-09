@@ -7,15 +7,17 @@ use core::scan::Kind;
 use core::parse::Grammar;
 use core::parse::Production;
 use core::parse::Tree;
+use core::fmt::statically_scoped::StaticallyScopedFormatter;
+use std::collections::HashMap;
 
 mod statically_scoped;
 
 pub trait Formatter {
-    fn reconstruct(&self, parse: &Option<Tree>) -> String;
+    fn reconstruct(&self, parse: &Tree, patterns: &[PatternPair]) -> String;
 }
 
 pub fn def_formatter() -> Box<Formatter> {
-    return Box::new(statically_scoped::StaticallyScopedFormatter);
+    return Box::new(StaticallyScopedFormatter);
 }
 
 static PATTERN_ALPHABET: &'static str = "{};=1234567890abcdefghijklmnopqrstuvwxyz \n\t";
@@ -117,12 +119,128 @@ lazy_static! {
     };
 }
 
-pub fn parse_pattern(input: &str) -> Option<Tree> {
+fn generate_pattern(input: &str) -> Pattern {
+    return match parse_pattern(input) {
+        Some(root) => {
+            let mut segments: Vec<Segment> = vec![];
+            generate_pattern_internal(&root, &mut segments);
+            return Pattern {
+                segments,
+            }
+        },
+        None => panic!("Failed to parse pattern"),
+    };
+}
+
+fn generate_pattern_internal<'a>(node: &'a Tree, accumulator: &'a mut Vec<Segment>) {
+    match &node.lhs.kind[..] {
+        "WHITESPACE" => { //TODO change when fillers can be more than just whitespace
+            accumulator.push(Segment::Filler(node.lhs.lexeme.clone()));
+        },
+        "capdesc" => {
+            let declarations: Vec<Declaration> = if node.children.len() == 3 {
+                parse_declarations(&node.get_child(2))
+            } else { //No declarations
+                vec![]
+            };
+            accumulator.push(Segment::Capture(Capture{
+                child_index: node.get_child(0).lhs.lexeme.parse::<usize>().unwrap(),
+                declarations,
+            }));
+        },
+        _ => {
+            for child in &node.children {
+                generate_pattern_internal(child, accumulator);
+            }
+        },
+    }
+}
+
+fn parse_declarations<'a>(decls_node: &'a Tree) -> Vec<Declaration> {
+    let mut declarations: Vec<Declaration> = vec![
+        parse_declaration(decls_node.get_child(0)),
+    ];
+    parse_optional_declarations(decls_node.get_child(1), &mut declarations);
+    return declarations;
+}
+
+fn parse_optional_declarations<'a>(declsopt_node: &'a Tree, accumulator: &'a mut Vec<Declaration>) {
+    if declsopt_node.children.len() == 3 {
+        accumulator.push(parse_declaration(declsopt_node.get_child(1)));
+        parse_optional_declarations(declsopt_node.get_child(2), accumulator);
+    }
+}
+
+fn parse_declaration(decl: &Tree) -> Declaration {
+    let mut value = String::new();
+    let val_node = decl.get_child(2).get_child(0);
+    if !val_node.is_null() {
+        value = val_node.get_child(0).lhs.lexeme.clone();
+    }
+    return Declaration{
+        key: decl.get_child(0).lhs.lexeme.clone(),
+        value,
+    }
+}
+
+fn parse_pattern(input: &str) -> Option<Tree> {
     let scanner = def_scanner();
     let parser = def_parser();
 
     let tokens = scanner.scan(input, &PATTERN_DFA);
     return parser.parse(tokens, &PATTERN_GRAMMAR);
+}
+
+struct Pattern {
+    segments: Vec<Segment>,
+}
+
+impl Pattern {
+    fn fill(&self, children: &Vec<Tree>, scope: &HashMap<String, String>) -> String {
+        let mut res: String = String::new();
+        for seg in &self.segments {
+            let seg_val: String = match seg {
+                &Segment::Filler(ref s) => s.clone(),
+                &Segment::Capture(ref c) => c.evaluate(children, scope),
+            };
+            res = format!("{}{}", res, seg_val);
+        }
+        return res;
+    }
+}
+
+enum Segment {
+    Filler(String),
+    Capture(Capture),
+}
+
+struct Capture {
+    child_index: usize,
+    declarations: Vec<Declaration>,
+}
+
+impl Capture {
+    //TODO see if we can avoid cloning so often
+    fn evaluate(&self, children: &Vec<Tree>, outer_scope: &HashMap<String, String>) -> String {
+        let mut inner_scope = outer_scope.clone();
+        for decl in &self.declarations {
+            inner_scope.insert(decl.key.clone(), decl.value.clone());
+        }
+        match children.get(self.child_index) {
+            Some(child) => return StaticallyScopedFormatter::reconstruct_internal(child, &inner_scope),
+            None => panic!("Pattern index out of bounds: index={} children={}", self.child_index, children.len()),
+        }
+    }
+}
+
+struct PatternPair<'a> {
+    production: String,
+    pattern: &'a str,
+}
+
+struct Declaration {
+    key: String,
+    value: String,
 }
 
 #[cfg(test)]
@@ -211,5 +329,49 @@ mod tests {
                 │               └──  <- NULL
                 └── RBRACE <- }"
         );
+    }
+
+    #[test]
+    fn generate_pattern_simple() {
+        //setup
+        let input = "\t \n\n\n\n{1}  {2}  {45;something=\n\n \t} {46;somethinelse=\n\n \t;some=}";
+
+        //execute
+        let pattern = generate_pattern(input);
+
+        //verify
+        assert_eq!(pattern.segments.len(), 8);
+        assert!(match pattern.segments.get(0).unwrap() {
+            &Segment::Filler(ref s) => "\t \n\n\n\n" == *s,
+            &Segment::Capture(_) => false,
+        });
+        assert!(match pattern.segments.get(1).unwrap() {
+            &Segment::Filler(_) => false,
+            &Segment::Capture(ref c) => c.child_index == 1 && c.declarations.len() == 0,
+        });
+        assert!(match pattern.segments.get(2).unwrap() {
+            &Segment::Filler(ref s) => "  " == *s,
+            &Segment::Capture(_) => false,
+        });
+        assert!(match pattern.segments.get(3).unwrap() {
+            &Segment::Filler(_) => false,
+            &Segment::Capture(ref c) => c.child_index == 2 && c.declarations.len() == 0,
+        });
+        assert!(match pattern.segments.get(4).unwrap() {
+            &Segment::Filler(ref s) => "  " == *s,
+            &Segment::Capture(_) => false,
+        });
+        assert!(match pattern.segments.get(5).unwrap() {
+            &Segment::Filler(_) => false,
+            &Segment::Capture(ref c) => c.child_index == 45 && c.declarations.len() == 1,
+        });
+        assert!(match pattern.segments.get(4).unwrap() {
+            &Segment::Filler(ref s) => "  " == *s,
+            &Segment::Capture(_) => false,
+        });
+        assert!(match pattern.segments.get(7).unwrap() {
+            &Segment::Filler(_) => false,
+            &Segment::Capture(ref c) => c.child_index == 46 && c.declarations.len() == 2,
+        });
     }
 }

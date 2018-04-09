@@ -20,26 +20,26 @@ pub struct Tree {
 }
 
 impl Tree {
-    pub fn print(&self){
-        self.print_internal("".to_string(), true)
+    pub fn get_child(&self, i: usize) -> &Tree {
+        return self.children.get(i).unwrap();
     }
-    fn print_internal(&self, prefix: String, is_tail: bool) {
-        if self.children.len() == 0 {
-            println!("{}{}{} <- {}", prefix, if is_tail {"└── "} else {"├── "}, self.lhs.kind, self.lhs.lexeme);
+    pub fn is_leaf(&self) -> bool {
+        return self.children.len() == 0;
+    }
+    pub fn is_null(&self) -> bool {
+        return self.lhs.kind == "";
+    }
+    pub fn null() -> Tree {
+        return Tree{
+            lhs: Token{
+                kind: "".to_string(),
+                lexeme: "NULL".to_string(),
+            },
+            children: vec![],
         }
-        else {
-            println!("{}{}{}", prefix, if is_tail {"└── "} else {"├── "}, self.lhs.kind);
-            let mut i = 0;
-            let len = self.children.len();
-            for child in &self.children {
-                if i == len - 1{
-                    child.print_internal(format!("{}{}", prefix, if is_tail {"    "} else {"│   "}), true);
-                } else {
-                    child.print_internal(format!("{}{}", prefix, if is_tail {"    "} else {"│   "}), false);
-                }
-                i += 1;
-            }
-        }
+    }
+    pub fn print(&self){
+        println!("{}", self.to_string());
     }
     pub fn to_string(&self) -> String {
         return self.to_string_internal("".to_string(), true)

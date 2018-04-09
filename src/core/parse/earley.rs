@@ -160,13 +160,7 @@ impl Parser for EarleyParser {
                             lhs: root.token.unwrap().clone(),
                             children: vec![],
                         },
-                        None => Tree{ //Empty rhs
-                            lhs: Token{
-                                kind: "".to_string(),
-                                lexeme: "NULL".to_string(),
-                            },
-                            children: vec![],
-                        }
+                        None => Tree::null(), //Empty rhs
                     }
 
                 }
