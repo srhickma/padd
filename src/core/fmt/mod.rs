@@ -20,9 +20,9 @@ pub fn def_formatter() -> Box<Formatter> {
     return Box::new(StaticallyScopedFormatter);
 }
 
-static PATTERN_ALPHABET: &'static str = "{};=1234567890abcdefghijklmnopqrstuvwxyz \n\t";
-static PATTERN_STATES: [State; 9] = ["start", "semi", "eq", "lbrace", "rbrace", "zero", "num", "alpha", "ws"];
-static PATTERN_ACCEPTING: [State; 8] = ["semi", "eq", "lbrace", "rbrace", "zero", "num", "alpha", "ws"];
+static PATTERN_ALPHABET: &'static str = "{}[];=1234567890abcdefghijklmnopqrstuvwxyz \n\t";
+static PATTERN_STATES: [State; 11] = ["start", "semi", "eq", "lbrace", "rbrace", "lbracket", "rbracket", "zero", "num", "alpha", "ws"];
+static PATTERN_ACCEPTING: [State; 10] = ["semi", "eq", "lbrace", "rbrace", "lbracket", "rbracket", "zero", "num", "alpha", "ws"];
 
 lazy_static! {
     static ref PATTERN_DFA: DFA<'static> = {
@@ -30,6 +30,8 @@ lazy_static! {
         let delta: fn(State, char) -> State = |state, c| match (state, c) {
             ("start", '{') => "lbrace",
             ("start", '}') => "rbrace",
+            ("start", '[') => "lbracket",
+            ("start", ']') => "rbracket",
             ("start", ';') => "semi",
             ("start", '=') => "eq",
             ("start", '0') => "zero",
@@ -66,6 +68,8 @@ lazy_static! {
             "eq" => "EQ",
             "lbrace" => "LBRACE",
             "rbrace" => "RBRACE",
+            "lbracket" => "LBRACKET",
+            "rbracket" => "RBRACKET",
             "zero" => "NUM",
             "num" => "NUM",
             "alpha" => "ALPHA",
@@ -86,15 +90,18 @@ lazy_static! {
 
     static ref PATTERN_PRODUCTIONS: Vec<Production<'static>> = {
         return build_prods(&[
-            "pattern secs",
+            "pattern segs",
 
-            "secs secs sec",
-            "secs ",
+            "segs segs seg",
+            "segs ",
 
-            "sec filler",
-            "sec cap",
+            "seg filler",
+            "seg sub",
+            "seg cap",
 
             "filler WHITESPACE", //For now, only allow whitespace in filler
+
+            "sub LBRACKET ALPHA RBRACKET",
 
             "cap LBRACE capdesc RBRACE",
 
@@ -195,20 +202,6 @@ struct Pattern {
     segments: Vec<Segment>,
 }
 
-//impl Pattern {
-//    fn fill(&self, children: &Vec<Tree>, scope: &HashMap<String, String>) -> String {
-//        let mut res: String = String::new();
-//        for seg in &self.segments {
-//            let seg_val: String = match seg {
-//                &Segment::Filler(ref s) => s.clone(),
-//                &Segment::Capture(ref c) => c.evaluate(children, scope),
-//            };
-//            res = format!("{}{}", res, seg_val);
-//        }
-//        return res;
-//    }
-//}
-
 enum Segment {
     Filler(String),
     Capture(Capture),
@@ -218,20 +211,6 @@ struct Capture {
     child_index: usize,
     declarations: Vec<Declaration>,
 }
-
-//impl Capture {
-//    //TODO see if we can avoid cloning so often
-//    fn evaluate(&self, children: &Vec<Tree>, outer_scope: &HashMap<String, String>) -> String {
-//        let mut inner_scope = outer_scope.clone();
-//        for decl in &self.declarations {
-//            inner_scope.insert(decl.key.clone(), decl.value.clone());
-//        }
-//        match children.get(self.child_index) {
-//            Some(child) => return StaticallyScopedFormatter::reconstruct_internal(child, &inner_scope),
-//            None => panic!("Pattern index out of bounds: index={} children={}", self.child_index, children.len()),
-//        }
-//    }
-//}
 
 struct Declaration {
     key: String,
@@ -247,7 +226,6 @@ impl<'a> FormatJob<'a> {
     pub fn create(parse: &'a Tree, patterns: &'a [PatternPair]) -> FormatJob<'a> {
         let mut pattern_map = HashMap::new();
         for pattern_pair in patterns {
-            println!("INSERTING {} len={}", &pattern_pair.production[..], pattern_pair.production.len());
             pattern_map.insert(&pattern_pair.production[..], generate_pattern(pattern_pair.pattern));
         }
         return FormatJob{
@@ -268,8 +246,6 @@ impl<'a> FormatJob<'a> {
             return node.lhs.lexeme.clone();
         }
 
-        println!("{} len={}", &node.production(), node.production().len());
-        //let pattern = self.pattern_map.get(&node.production());
         let pattern = self.pattern_map.get(&node.production()[..]);
         return match pattern {
             Some(ref p) => self.fill_pattern(p,&node.children, scope),
