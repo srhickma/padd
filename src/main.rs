@@ -87,7 +87,7 @@ fn main() {
         },
         PatternPair{
             production: "b LBRACKET s RBRACKET".to_string(),
-            pattern: "{0}\n{1}\n{2}\n",
+            pattern: "[prefix]{0}\n\n{1;prefix=\t}[prefix]{2}\n\n",
         }
     ];
 

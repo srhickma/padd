@@ -144,6 +144,9 @@ fn generate_pattern_internal<'a>(node: &'a Tree, accumulator: &'a mut Vec<Segmen
         "WHITESPACE" => { //TODO change when fillers can be more than just whitespace
             accumulator.push(Segment::Filler(node.lhs.lexeme.clone()));
         },
+        "sub" => {
+            accumulator.push(Segment::Substitution(node.get_child(1).lhs.lexeme.clone()));
+        },
         "capdesc" => {
             let declarations: Vec<Declaration> = if node.children.len() == 3 {
                 parse_declarations(&node.get_child(2))
@@ -204,6 +207,7 @@ struct Pattern {
 
 enum Segment {
     Filler(String),
+    Substitution(String),
     Capture(Capture),
 }
 
@@ -265,6 +269,10 @@ impl<'a> FormatJob<'a> {
         for seg in &pattern.segments {
             let seg_val: String = match seg {
                 &Segment::Filler(ref s) => s.clone(),
+                &Segment::Substitution(ref s) => match scope.get(s) {
+                    Some(value) => value.clone(),
+                    None => String::new(),
+                },
                 &Segment::Capture(ref c) => self.evaluate_capture(c, children, scope),
             };
             res = format!("{}{}", res, seg_val);
