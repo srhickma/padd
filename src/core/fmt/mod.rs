@@ -195,19 +195,19 @@ struct Pattern {
     segments: Vec<Segment>,
 }
 
-impl Pattern {
-    fn fill(&self, children: &Vec<Tree>, scope: &HashMap<String, String>) -> String {
-        let mut res: String = String::new();
-        for seg in &self.segments {
-            let seg_val: String = match seg {
-                &Segment::Filler(ref s) => s.clone(),
-                &Segment::Capture(ref c) => c.evaluate(children, scope),
-            };
-            res = format!("{}{}", res, seg_val);
-        }
-        return res;
-    }
-}
+//impl Pattern {
+//    fn fill(&self, children: &Vec<Tree>, scope: &HashMap<String, String>) -> String {
+//        let mut res: String = String::new();
+//        for seg in &self.segments {
+//            let seg_val: String = match seg {
+//                &Segment::Filler(ref s) => s.clone(),
+//                &Segment::Capture(ref c) => c.evaluate(children, scope),
+//            };
+//            res = format!("{}{}", res, seg_val);
+//        }
+//        return res;
+//    }
+//}
 
 enum Segment {
     Filler(String),
@@ -219,28 +219,100 @@ struct Capture {
     declarations: Vec<Declaration>,
 }
 
-impl Capture {
-    //TODO see if we can avoid cloning so often
-    fn evaluate(&self, children: &Vec<Tree>, outer_scope: &HashMap<String, String>) -> String {
-        let mut inner_scope = outer_scope.clone();
-        for decl in &self.declarations {
-            inner_scope.insert(decl.key.clone(), decl.value.clone());
-        }
-        match children.get(self.child_index) {
-            Some(child) => return StaticallyScopedFormatter::reconstruct_internal(child, &inner_scope),
-            None => panic!("Pattern index out of bounds: index={} children={}", self.child_index, children.len()),
-        }
-    }
-}
-
-struct PatternPair<'a> {
-    production: String,
-    pattern: &'a str,
-}
+//impl Capture {
+//    //TODO see if we can avoid cloning so often
+//    fn evaluate(&self, children: &Vec<Tree>, outer_scope: &HashMap<String, String>) -> String {
+//        let mut inner_scope = outer_scope.clone();
+//        for decl in &self.declarations {
+//            inner_scope.insert(decl.key.clone(), decl.value.clone());
+//        }
+//        match children.get(self.child_index) {
+//            Some(child) => return StaticallyScopedFormatter::reconstruct_internal(child, &inner_scope),
+//            None => panic!("Pattern index out of bounds: index={} children={}", self.child_index, children.len()),
+//        }
+//    }
+//}
 
 struct Declaration {
     key: String,
     value: String,
+}
+
+pub struct FormatJob<'a> {
+    parse: &'a Tree,
+    pattern_map: HashMap<&'a str, Pattern>,
+}
+
+impl<'a> FormatJob<'a> {
+    pub fn create(parse: &'a Tree, patterns: &'a [PatternPair]) -> FormatJob<'a> {
+        let mut pattern_map = HashMap::new();
+        for pattern_pair in patterns {
+            println!("INSERTING {} len={}", &pattern_pair.production[..], pattern_pair.production.len());
+            pattern_map.insert(&pattern_pair.production[..], generate_pattern(pattern_pair.pattern));
+        }
+        return FormatJob{
+            parse,
+            pattern_map,
+        }
+    }
+
+    pub fn run(&self) -> String {
+        return self.recur(self.parse, &HashMap::new());
+    }
+
+    fn recur(&self, node: &Tree, scope: &HashMap<String, String>) -> String {
+        if node.is_leaf() {
+            if node.is_null() {
+                return String::new();
+            }
+            return node.lhs.lexeme.clone();
+        }
+
+        println!("{} len={}", &node.production(), node.production().len());
+        //let pattern = self.pattern_map.get(&node.production());
+        let pattern = self.pattern_map.get(&node.production()[..]);
+        return match pattern {
+            Some(ref p) => self.fill_pattern(p,&node.children, scope),
+            None => { //Reconstruct one after the other
+                let mut res = String::new();
+                for child in &node.children {
+                    res = format!("{}{}", res, self.recur(child, scope));
+                }
+                return res;
+            }
+        };
+    }
+
+    fn fill_pattern(&self, pattern: &Pattern, children: &Vec<Tree>, scope: &HashMap<String, String>) -> String {
+        println!("FILLING PATTERN");
+        let mut res: String = String::new();
+        for seg in &pattern.segments {
+            let seg_val: String = match seg {
+                &Segment::Filler(ref s) => s.clone(),
+                &Segment::Capture(ref c) => self.evaluate_capture(c, children, scope),
+            };
+            res = format!("{}{}", res, seg_val);
+        }
+        return res;
+    }
+
+    //TODO see if we can avoid cloning so often
+    fn evaluate_capture(&self, capture: &Capture, children: &Vec<Tree>, outer_scope: &HashMap<String, String>) -> String {
+        println!("EVALUATING CAPTURE");
+        let mut inner_scope = outer_scope.clone();
+        for decl in &capture.declarations {
+            inner_scope.insert(decl.key.clone(), decl.value.clone());
+        }
+        match children.get(capture.child_index) {
+            Some(child) => return self.recur(child, &inner_scope),
+            None => panic!("Pattern index out of bounds: index={} children={}", capture.child_index, children.len()),
+        }
+    }
+}
+
+pub struct PatternPair<'a> {
+    pub production: String,
+    pub pattern: &'a str,
 }
 
 #[cfg(test)]

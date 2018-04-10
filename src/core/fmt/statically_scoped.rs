@@ -7,6 +7,7 @@ pub struct StaticallyScopedFormatter;
 
 impl Formatter for StaticallyScopedFormatter {
     fn reconstruct(&self, parse: &Tree, patterns: &[PatternPair]) -> String {
+        //TODO generate pattern structs from pattern pairs and populate hashmap
         return StaticallyScopedFormatter::reconstruct_internal(parse, &HashMap::new());
     }
 }
@@ -22,8 +23,8 @@ impl StaticallyScopedFormatter {
         }
         let mut res = String::new();
         for child in &node.children {
-            println!("{}", node.production());
-            //res = formatter(&tree.lhs.kind, &child.lhs.kind, &res, recon(child, formatter)); //This is where we add custom formatting
+            //TODO need to somehow capture the production -> pattern map on the formatter so that
+            //recursive calls to reconstruct_internal can access the patterns
         }
         return res;
     }
