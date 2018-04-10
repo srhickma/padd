@@ -115,7 +115,7 @@ lazy_static! {
 
             "decl ALPHA EQ val",
 
-            "val filler",
+            "val pattern",
             "val ",
 
         ]);
@@ -182,14 +182,22 @@ fn parse_optional_declarations<'a>(declsopt_node: &'a Tree, accumulator: &'a mut
 }
 
 fn parse_declaration(decl: &Tree) -> Declaration {
-    let mut value = String::new();
+    //let mut value = String::new();
     let val_node = decl.get_child(2).get_child(0);
-    if !val_node.is_null() {
-        value = val_node.get_child(0).lhs.lexeme.clone();
-    }
+    //if !val_node.is_null() {
+    //    value = val_node.get_child(0).lhs.lexeme.clone();
+    //}
     return Declaration{
         key: decl.get_child(0).lhs.lexeme.clone(),
-        value,
+        value: if val_node.is_null() {
+            None
+        } else {
+            let mut segments: Vec<Segment> = vec![];
+            generate_pattern_internal(val_node.get_child(0), &mut segments);
+            Some(Pattern{
+                segments,
+            })
+        },
     }
 }
 
@@ -218,7 +226,7 @@ struct Capture {
 
 struct Declaration {
     key: String,
-    value: String,
+    value: Option<Pattern>,
 }
 
 pub struct FormatJob<'a> {
@@ -285,7 +293,14 @@ impl<'a> FormatJob<'a> {
         println!("EVALUATING CAPTURE");
         let mut inner_scope = outer_scope.clone();
         for decl in &capture.declarations {
-            inner_scope.insert(decl.key.clone(), decl.value.clone());
+            match &decl.value {
+                &Some(ref pattern) => {
+                    inner_scope.insert(decl.key.clone(), self.fill_pattern(pattern, children, outer_scope));
+                },
+                &None => {
+                    inner_scope.remove(&decl.key);
+                },
+            }
         }
         match children.get(capture.child_index) {
             Some(child) => return self.recur(child, &inner_scope),

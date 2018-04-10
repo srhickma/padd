@@ -18,7 +18,7 @@ mod core;
 
 fn main() {
     //let input = "  {{} \t {{{{{{{{{{\n}}}}\n}}}}}{}}  {}{   }\t { } {\t}{ }}  {}  {}{   } { } {}{ }\n";
-    let input = "  {  {    }  }   {  }  ";
+    let input = "  {  {  {{{}}}  }  }   { {} }  ";
     //let input = "{}";
 
     //setup dfa
@@ -87,7 +87,7 @@ fn main() {
         },
         PatternPair{
             production: "b LBRACKET s RBRACKET".to_string(),
-            pattern: "[prefix]{0}\n\n{1;prefix=\t}[prefix]{2}\n\n",
+            pattern: "[prefix]{0}\n\n{1;prefix=[prefix]\t}[prefix]{2}\n\n",
         }
     ];
 
