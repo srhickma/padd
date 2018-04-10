@@ -12,7 +12,6 @@ pub fn def_parser() -> Box<Parser> {
     return Box::new(earley::EarleyParser);
 }
 
-
 #[derive(Clone)]
 pub struct Tree {
     pub lhs: Token,
@@ -64,7 +63,6 @@ impl Tree {
         }
     }
     pub fn production(&self) -> String {
-        let rhs: String = String::new();
         let vec: Vec<String> = self.children.iter().map(|s| s.lhs.kind.clone()).collect();
         return format!("{} {}", self.lhs.kind, (&vec[..]).join(" "));
     }
@@ -122,6 +120,7 @@ pub struct Production<'a> {
 }
 
 impl<'a> Production<'a> {
+    #[allow(dead_code)]
     fn to_string(&self) -> String {
         let mut rhs: String = "".to_string();
         for s in self.rhs.clone() {

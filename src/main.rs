@@ -7,19 +7,14 @@ use core::parse::build_prods;
 use core::scan::DFA;
 use core::scan::State;
 use core::parse::Grammar;
-use core::parse::Tree;
 use core::fmt::PatternPair;
 use core::fmt::FormatJob;
-
-use std::collections::HashMap;
 
 mod cli;
 mod core;
 
 fn main() {
-    //let input = "  {{} \t {{{{{{{{{{\n}}}}\n}}}}}{}}  {}{   }\t { } {\t}{ }}  {}  {}{   } { } {}{ }\n";
-    let input = "  {  {  {{{}}}  }  }   { {} }  ";
-    //let input = "{}";
+    let input = "  {  {  {{{\t}}}\n {} }  }   { {}\n }  ";
 
     //setup dfa
     let alphabet = "{} \t\n";

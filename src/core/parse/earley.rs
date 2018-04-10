@@ -157,7 +157,7 @@ impl Parser for EarleyParser {
                 None => {
                     match root.token { //Leaf Node Creation
                         Some(t) => Tree{ //Non-empty rhs
-                            lhs: root.token.unwrap().clone(),
+                            lhs: t.clone(),
                             children: vec![],
                         },
                         None => Tree::null(), //Empty rhs
@@ -205,6 +205,8 @@ impl<'a> Item<'a> {
         }
         return None;
     }
+
+    #[allow(dead_code)]
     fn to_string(&self) -> String {
         let mut rule_string = format!("{} -> ", self.rule.lhs);
         for i in 0..self.rule.rhs.len() {
