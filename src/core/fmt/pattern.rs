@@ -66,7 +66,6 @@ lazy_static! {
 
         let dfa = DFA{
             alphabet: PATTERN_ALPHABET,
-            states: &PATTERN_STATES,
             start,
             accepting: &PATTERN_ACCEPTING,
             delta,
@@ -224,7 +223,7 @@ mod tests {
 
         //verify
         assert_eq!(tree.unwrap().to_string(),
-                   "└── pattern
+"└── pattern
     └── segs
         ├── segs
         │   ├── segs
@@ -234,77 +233,80 @@ mod tests {
         │   │   │   │   │   ├── segs
         │   │   │   │   │   │   ├── segs
         │   │   │   │   │   │   │   ├── segs
-        │   │   │   │   │   │   │   │   └──  <- NULL
+        │   │   │   │   │   │   │   │   └──  <- 'NULL'
         │   │   │   │   │   │   │   └── seg
         │   │   │   │   │   │   │       └── filler
-        │   │   │   │   │   │   │           └── WHITESPACE <- \t \n\n\n\n
+        │   │   │   │   │   │   │           └── WHITESPACE <- '\\t \\n\\n\\n\\n'
         │   │   │   │   │   │   └── seg
         │   │   │   │   │   │       └── cap
-        │   │   │   │   │   │           ├── LBRACE <- {
+        │   │   │   │   │   │           ├── LBRACE <- '{'
         │   │   │   │   │   │           ├── capdesc
-        │   │   │   │   │   │           │   └── NUM <- 1
-        │   │   │   │   │   │           └── RBRACE <- }
+        │   │   │   │   │   │           │   └── NUM <- '1'
+        │   │   │   │   │   │           └── RBRACE <- '}'
         │   │   │   │   │   └── seg
         │   │   │   │   │       └── filler
-        │   │   │   │   │           └── WHITESPACE <-   \n        │   │   │   │   └── seg
+        │   │   │   │   │           └── WHITESPACE <- '  '
+        │   │   │   │   └── seg
         │   │   │   │       └── cap
-        │   │   │   │           ├── LBRACE <- {
+        │   │   │   │           ├── LBRACE <- '{'
         │   │   │   │           ├── capdesc
-        │   │   │   │           │   └── NUM <- 2
-        │   │   │   │           └── RBRACE <- }
+        │   │   │   │           │   └── NUM <- '2'
+        │   │   │   │           └── RBRACE <- '}'
         │   │   │   └── seg
         │   │   │       └── filler
-        │   │   │           └── WHITESPACE <-   \n        │   │   └── seg
+        │   │   │           └── WHITESPACE <- '  '
+        │   │   └── seg
         │   │       └── cap
-        │   │           ├── LBRACE <- {
+        │   │           ├── LBRACE <- '{'
         │   │           ├── capdesc
-        │   │           │   ├── NUM <- 45
-        │   │           │   ├── SEMI <- ;
+        │   │           │   ├── NUM <- '45'
+        │   │           │   ├── SEMI <- ';'
         │   │           │   └── decls
         │   │           │       ├── decl
-        │   │           │       │   ├── ALPHA <- something
-        │   │           │       │   ├── EQ <- =
+        │   │           │       │   ├── ALPHA <- 'something'
+        │   │           │       │   ├── EQ <- '='
         │   │           │       │   └── val
         │   │           │       │       └── pattern
         │   │           │       │           └── segs
         │   │           │       │               ├── segs
-        │   │           │       │               │   └──  <- NULL
+        │   │           │       │               │   └──  <- 'NULL'
         │   │           │       │               └── seg
         │   │           │       │                   └── filler
-        │   │           │       │                       └── WHITESPACE <- \n\n \t
+        │   │           │       │                       └── WHITESPACE <- '\\n\\n \\t'
         │   │           │       └── declsopt
-        │   │           │           └──  <- NULL
-        │   │           └── RBRACE <- }
+        │   │           │           └──  <- 'NULL'
+        │   │           └── RBRACE <- '}'
         │   └── seg
         │       └── filler
-        │           └── WHITESPACE <-  \n        └── seg
+        │           └── WHITESPACE <- ' '
+        └── seg
             └── cap
-                ├── LBRACE <- {
+                ├── LBRACE <- '{'
                 ├── capdesc
-                │   ├── NUM <- 46
-                │   ├── SEMI <- ;
+                │   ├── NUM <- '46'
+                │   ├── SEMI <- ';'
                 │   └── decls
                 │       ├── decl
-                │       │   ├── ALPHA <- somethinelse
-                │       │   ├── EQ <- =
+                │       │   ├── ALPHA <- 'somethinelse'
+                │       │   ├── EQ <- '='
                 │       │   └── val
                 │       │       └── pattern
                 │       │           └── segs
                 │       │               ├── segs
-                │       │               │   └──  <- NULL
+                │       │               │   └──  <- 'NULL'
                 │       │               └── seg
                 │       │                   └── filler
-                │       │                       └── WHITESPACE <- \n\n \t
+                │       │                       └── WHITESPACE <- '\\n\\n \\t'
                 │       └── declsopt
-                │           ├── SEMI <- ;
+                │           ├── SEMI <- ';'
                 │           ├── decl
-                │           │   ├── ALPHA <- some
-                │           │   ├── EQ <- =
+                │           │   ├── ALPHA <- 'some'
+                │           │   ├── EQ <- '='
                 │           │   └── val
-                │           │       └──  <- NULL
+                │           │       └──  <- 'NULL'
                 │           └── declsopt
-                │               └──  <- NULL
-                └── RBRACE <- }"
+                │               └──  <- 'NULL'
+                └── RBRACE <- '}'"
         );
     }
 

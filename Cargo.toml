@@ -3,5 +3,9 @@ name = "padd"
 version = "0.1.0"
 authors = ["Shane Hickman <srhickma@edu.uwaterloo.ca>"]
 
+[lib]
+name = "padd"
+
 [dependencies]
 lazy_static = "1.0"
+stopwatch = "0.0.7"

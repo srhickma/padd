@@ -45,7 +45,7 @@ impl Tree {
     }
     fn to_string_internal(&self, prefix: String, is_tail: bool) -> String {
         if self.children.len() == 0 {
-            return format!("{}{}{} <- {}", prefix, if is_tail {"└── "} else {"├── "}, self.lhs.kind, self.lhs.lexeme);
+            return format!("{}{}{}", prefix, if is_tail {"└── "} else {"├── "}, self.lhs.to_string());
         }
         else {
             let mut s = format!("{}{}{}", prefix, if is_tail {"└── "} else {"├── "}, self.lhs.kind);
@@ -193,9 +193,9 @@ mod tests {
         assert_eq!(tree.unwrap().to_string(),
 "└── Sentence
     ├── Noun
-    │   └── mary <- Hello
+    │   └── mary <- 'Hello'
     └── Verb
-        └── runs <- World!"
+        └── runs <- 'World!'"
         );
     }
 
@@ -232,10 +232,10 @@ mod tests {
         //verify
         assert_eq!(tree.unwrap().to_string(),
 "└── S
-    ├── BOF <- a
+    ├── BOF <- 'a'
     ├── A
-    │   └── x <- b
-    └── EOF <- c"
+    │   └── x <- 'b'
+    └── EOF <- 'c'"
         );
     }
 
@@ -267,23 +267,23 @@ mod tests {
     └── expr
         ├── expr
         │   ├── expr
-        │   │   ├── ( <- xy
+        │   │   ├── ( <- 'xy'
         │   │   ├── expr
         │   │   │   ├── expr
-        │   │   │   │   └── ID <- xy
-        │   │   │   ├── OP <- xy
+        │   │   │   │   └── ID <- 'xy'
+        │   │   │   ├── OP <- 'xy'
         │   │   │   └── expr
-        │   │   │       └── ID <- xy
-        │   │   └── ) <- xy
-        │   ├── OP <- xy
+        │   │   │       └── ID <- 'xy'
+        │   │   └── ) <- 'xy'
+        │   ├── OP <- 'xy'
         │   └── expr
-        │       └── ID <- xy
-        ├── OP <- xy
+        │       └── ID <- 'xy'
+        ├── OP <- 'xy'
         └── expr
-            ├── ( <- xy
+            ├── ( <- 'xy'
             ├── expr
-            │   └── ID <- xy
-            └── ) <- xy"
+            │   └── ID <- 'xy'
+            └── ) <- 'xy'"
         );
     }
 
@@ -319,28 +319,28 @@ mod tests {
     │   └── Product
     │       └── Factor
     │           └── Number
-    │               └── NUM <- xy
-    ├── AS <- xy
+    │               └── NUM <- 'xy'
+    ├── AS <- 'xy'
     └── Product
         └── Factor
-            ├── LPAREN <- xy
+            ├── LPAREN <- 'xy'
             ├── Sum
             │   ├── Sum
             │   │   └── Product
             │   │       ├── Product
             │   │       │   └── Factor
             │   │       │       └── Number
-            │   │       │           └── NUM <- xy
-            │   │       ├── MD <- xy
+            │   │       │           └── NUM <- 'xy'
+            │   │       ├── MD <- 'xy'
             │   │       └── Factor
             │   │           └── Number
-            │   │               └── NUM <- xy
-            │   ├── AS <- xy
+            │   │               └── NUM <- 'xy'
+            │   ├── AS <- 'xy'
             │   └── Product
             │       └── Factor
             │           └── Number
-            │               └── NUM <- xy
-            └── RPAREN <- xy"
+            │               └── NUM <- 'xy'
+            └── RPAREN <- 'xy'"
         );
     }
 
@@ -374,41 +374,41 @@ mod tests {
     │   ├── s
     │   │   ├── s
     │   │   │   ├── s
-    │   │   │   │   └──  <- NULL
+    │   │   │   │   └──  <- 'NULL'
     │   │   │   └── b
     │   │   │       └── w
-    │   │   │           └── WHITESPACE <- xy
+    │   │   │           └── WHITESPACE <- 'xy'
     │   │   └── b
-    │   │       ├── LBRACKET <- xy
+    │   │       ├── LBRACKET <- 'xy'
     │   │       ├── s
     │   │       │   ├── s
     │   │       │   │   ├── s
     │   │       │   │   │   ├── s
-    │   │       │   │   │   │   └──  <- NULL
+    │   │       │   │   │   │   └──  <- 'NULL'
     │   │       │   │   │   └── b
     │   │       │   │   │       └── w
-    │   │       │   │   │           └── WHITESPACE <- xy
+    │   │       │   │   │           └── WHITESPACE <- 'xy'
     │   │       │   │   └── b
-    │   │       │   │       ├── LBRACKET <- xy
+    │   │       │   │       ├── LBRACKET <- 'xy'
     │   │       │   │       ├── s
     │   │       │   │       │   ├── s
-    │   │       │   │       │   │   └──  <- NULL
+    │   │       │   │       │   │   └──  <- 'NULL'
     │   │       │   │       │   └── b
     │   │       │   │       │       └── w
-    │   │       │   │       │           └── WHITESPACE <- xy
-    │   │       │   │       └── RBRACKET <- xy
+    │   │       │   │       │           └── WHITESPACE <- 'xy'
+    │   │       │   │       └── RBRACKET <- 'xy'
     │   │       │   └── b
     │   │       │       └── w
-    │   │       │           └── WHITESPACE <- xy
-    │   │       └── RBRACKET <- xy
+    │   │       │           └── WHITESPACE <- 'xy'
+    │   │       └── RBRACKET <- 'xy'
     │   └── b
-    │       ├── LBRACKET <- xy
+    │       ├── LBRACKET <- 'xy'
     │       ├── s
-    │       │   └──  <- NULL
-    │       └── RBRACKET <- xy
+    │       │   └──  <- 'NULL'
+    │       └── RBRACKET <- 'xy'
     └── b
         └── w
-            └── WHITESPACE <- xy"
+            └── WHITESPACE <- 'xy'"
         );
     }
 }

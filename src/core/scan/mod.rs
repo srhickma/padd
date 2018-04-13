@@ -5,7 +5,7 @@ pub trait Scanner {
 }
 
 pub fn def_scanner() -> Box<Scanner> {
-    return Box::new(maximal_munch::MaximalMunchScanner);
+    Box::new(maximal_munch::MaximalMunchScanner)
 }
 
 #[derive(PartialEq, Clone)]
@@ -14,12 +14,17 @@ pub struct Token {
     pub lexeme: String,
 }
 
+impl Token {
+    pub fn to_string(&self) -> String {
+        format!("{} <- '{}'", self.kind, self.lexeme.replace('\n', "\\n").replace('\t', "\\t"))
+    }
+}
+
 pub type Kind = String;
 pub type State<'a> = &'a str;
 
 pub struct DFA<'a> {
     pub alphabet: &'a str,
-    pub states: &'a [State<'a>],
     pub start: State<'a>,
     pub accepting: &'a [State<'a>],
     pub delta: fn(State, char) -> State,
@@ -28,7 +33,7 @@ pub struct DFA<'a> {
 
 impl<'a> DFA<'a> {
     fn has_transition(&self, c: char, state: State) -> bool {
-        return self.alphabet.chars().any(|x| c == x) && self.transition(state, c) != "";
+        self.alphabet.chars().any(|x| c == x) && self.transition(state, c) != ""
     }
     fn accepts(&self, state: State) -> bool {
         return self.accepting.contains(&state);
@@ -49,7 +54,6 @@ mod tests {
     fn scan_binary() {
         //setup
         let alphabet = "01";
-        let states: [State; 3] = ["start", "0", "not0"];
         let start: State = "start";
         let accepting: [State; 2] = ["0", "not0"];
         let delta: fn(State, char) -> State = |state, c| match (state, c) {
@@ -66,7 +70,6 @@ mod tests {
 
         let dfa = DFA{
             alphabet: &alphabet,
-            states: &states,
             start,
             accepting: &accepting,
             delta,
@@ -95,7 +98,6 @@ kind=NZ lexeme=11010101"
     fn scan_brackets() {
         //setup
         let alphabet = "{} \t\n";
-        let states: [State; 4] = ["start", "lbr", "rbr", "ws"];
         let start: State = "start";
         let accepting: [State; 3] = ["lbr", "rbr", "ws"];
         let delta: fn(State, char) -> State = |state, c| match (state, c) {
@@ -118,7 +120,6 @@ kind=NZ lexeme=11010101"
 
         let dfa = DFA{
             alphabet: &alphabet,
-            states: &states,
             start,
             accepting: &accepting,
             delta,
