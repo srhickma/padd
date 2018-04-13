@@ -7,9 +7,11 @@ use core::parse::Tree;
 use core::scan::State;
 use core::scan::DFA;
 use core::scan::CompileTransitionDelta;
+use core::scan::RuntimeTransitionDelta;
+use std::collections::HashMap;
 
 static SPEC_ALPHABET: &'static str = "`-=~!@#$%^&*()_+{}|[]\\;':\"<>?,./QWERTYUIOPASDFGHJKLZXCVBNM1234567890abcdefghijklmnopqrstuvwxyz \n\t";
-static SPEC_ACCEPTING: [State; 16] = ["hat", "arrow", "bslash", "pattc", "cilc", "comment", "ws", "id", "def", "uchar", "minus", "newline", "tab", "escbslash", "escsquote", "semi"];
+static DEF_MATCHER: char = '_';
 
 thread_local! {
     static SPEC_DFA: DFA<'static> = {
@@ -99,7 +101,6 @@ thread_local! {
         DFA{
             alphabet: SPEC_ALPHABET,
             start,
-            accepting: &SPEC_ACCEPTING,
             td: Box::new(CompileTransitionDelta{
                 delta,
                 tokenizer,
@@ -169,9 +170,57 @@ fn generate_spec(input: &str){
     }
 }
 
-//fn generate_dfa(tree: &Tree) -> DFA {
-//
-//}
+fn generate_dfa(tree: &Tree) -> DFA<'static> {
+    let mut delta: HashMap<State, HashMap<char, State>> = HashMap::new();
+    let mut tokenizer: HashMap<State, &str> = HashMap::new();
+
+    generate_dfa_internal(tree, &mut delta, &mut tokenizer);
+
+    DFA {
+        alphabet: "",
+        start: "",
+        td: Box::new(RuntimeTransitionDelta{
+            delta,
+            tokenizer,
+        }),
+    }
+}
+
+fn generate_dfa_internal<'a>(state_node: &Tree, delta: &mut HashMap<State<'a>, HashMap<char, State<'a>>>, tokenizer: &mut HashMap<State<'a>, &'a str>) {
+
+}
+
+fn generate_dfa_state<'a>(state_node: &'a Tree, delta: &mut HashMap<State<'a>, HashMap<char, State<'a>>>, tokenizer: &mut HashMap<State<'a>, &'a str>) {
+    let sdec_node = state_node.get_child(1);
+    let trans_node = state_node.get_child(2);
+
+    let state: State = &sdec_node.get_child(0).lhs.lexeme[..];
+    if sdec_node.children.len() == 5 {
+        tokenizer.insert(state, &sdec_node.get_child(4).lhs.lexeme[..]);
+    }
+}
+
+fn generate_dfa_trans<'a>(trans_node: &'a Tree, state_delta: &mut HashMap<char, State<'a>>) {
+    if !trans_node.is_leaf() {
+        let tran_node = trans_node.get_child(1);
+
+        let dest: State = &tran_node.get_child(5).lhs.lexeme[..];
+        let matcher = tran_node.get_child(1);
+        match &matcher.lhs.kind[..] {
+            "CILC" => {
+
+            },
+            "DEF" => {
+                if state_delta.contains_key(&DEF_MATCHER) {
+                    panic!("DFA generation failed, more than one default matcher");
+                }
+                state_delta.insert(DEF_MATCHER, dest);
+            },
+            &_ => panic!("Transition map input is neither CILC or DEF"),
+        }
+        generate_dfa_trans(trans_node.get_child(0), state_delta)
+    }
+}
 
 //fn generate_grammar(tree: &Tree) -> Grammar {
 //

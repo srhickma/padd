@@ -10,10 +10,6 @@ pub fn def_scanner() -> Box<Scanner> {
     Box::new(maximal_munch::MaximalMunchScanner)
 }
 
-lazy_static! {
-    static ref NULL_STATE: &'static str = "";
-}
-
 #[derive(PartialEq, Clone)]
 pub struct Token {
     pub kind: Kind,
@@ -29,10 +25,11 @@ impl Token {
 pub type Kind = String;
 pub type State<'a> = &'a str;
 
+static NULL_STATE: &'static str = "";
+
 pub struct DFA<'a> {
     pub alphabet: &'a str,
     pub start: State<'a>,
-    pub accepting: &'a [State<'a>],
     pub td: Box<TransitionDelta<'a>>,
 }
 
@@ -41,7 +38,7 @@ impl<'a> DFA<'a> {
         self.alphabet.chars().any(|x| c == x) && self.transition(state, c) != ""
     }
     fn accepts(&self, state: State) -> bool {
-        self.accepting.contains(&state)
+        self.td.tokenize(state).len() > 0
     }
     fn transition(&self, state: State<'a>, c: char) -> State<'a> {
         self.td.transition(state, c)
@@ -80,9 +77,9 @@ impl<'a> TransitionDelta<'a> for RuntimeTransitionDelta<'a> {
         match self.delta.get(state) {
             Some(hm) => match hm.get(&c) {
                 Some(s) => s,
-                None => *NULL_STATE,
+                None => NULL_STATE,
             },
-            None => *NULL_STATE,
+            None => NULL_STATE,
         }
     }
     fn tokenize(&self, state: State) -> Kind {
@@ -118,7 +115,6 @@ mod tests {
         let dfa = DFA{
             alphabet: &alphabet,
             start,
-            accepting: &accepting,
             td: Box::new(CompileTransitionDelta{
                 delta,
                 tokenizer,
@@ -170,7 +166,6 @@ kind=NZ lexeme=11010101"
         let dfa = DFA{
             alphabet: &alphabet,
             start,
-            accepting: &accepting,
             td: Box::new(CompileTransitionDelta{
                 delta,
                 tokenizer,

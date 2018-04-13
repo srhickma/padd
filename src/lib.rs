@@ -32,7 +32,6 @@ pub fn test() {
     //setup dfa
     let alphabet = "{} \t\n";
     let start: State = "start";
-    let accepting: [State; 3] = ["lbr", "rbr", "ws"];
     let delta: fn(State, char) -> State = |state, c| match (state, c) {
         ("start", ' ') => "ws",
         ("start", '\t') => "ws",
@@ -54,7 +53,6 @@ pub fn test() {
     let dfa = DFA{
         alphabet: &alphabet,
         start,
-        accepting: &accepting,
         td: Box::new(CompileTransitionDelta{
             delta,
             tokenizer,

@@ -11,8 +11,6 @@ use core::scan::CompileTransitionDelta;
 use std::cell::RefCell;
 
 static PATTERN_ALPHABET: &'static str = "{}[];=1234567890abcdefghijklmnopqrstuvwxyz \n\t";
-static PATTERN_STATES: [State; 11] = ["start", "semi", "eq", "lbrace", "rbrace", "lbracket", "rbracket", "zero", "num", "alpha", "ws"];
-static PATTERN_ACCEPTING: [State; 10] = ["semi", "eq", "lbrace", "rbrace", "lbracket", "rbracket", "zero", "num", "alpha", "ws"];
 
 thread_local! {
     static PATTERN_DFA: DFA<'static> = {
@@ -70,7 +68,6 @@ thread_local! {
         let dfa = DFA{
             alphabet: PATTERN_ALPHABET,
             start,
-            accepting: &PATTERN_ACCEPTING,
             td: Box::new(CompileTransitionDelta{
                 delta,
                 tokenizer,
