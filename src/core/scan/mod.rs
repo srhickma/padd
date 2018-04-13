@@ -1,11 +1,17 @@
+use std::collections::HashMap;
+
 pub mod maximal_munch;
 
 pub trait Scanner {
-    fn scan<'a>(&self, input: &'a str, dfa: &'a DFA) -> Vec<Token>;
+    fn scan<'a, 'b, 'c>(&self, input: &'a str, dfa: &'b DFA<'c>) -> Vec<Token>;
 }
 
 pub fn def_scanner() -> Box<Scanner> {
     Box::new(maximal_munch::MaximalMunchScanner)
+}
+
+lazy_static! {
+    static ref NULL_STATE: &'static str = "";
 }
 
 #[derive(PartialEq, Clone)]
@@ -27,22 +33,63 @@ pub struct DFA<'a> {
     pub alphabet: &'a str,
     pub start: State<'a>,
     pub accepting: &'a [State<'a>],
+    pub td: Box<TransitionDelta<'a>>,
+}
+
+impl<'a> DFA<'a> {
+    fn has_transition(&self, c: char, state: State<'a>) -> bool {
+        self.alphabet.chars().any(|x| c == x) && self.transition(state, c) != ""
+    }
+    fn accepts(&self, state: State) -> bool {
+        self.accepting.contains(&state)
+    }
+    fn transition(&self, state: State<'a>, c: char) -> State<'a> {
+        self.td.transition(state, c)
+    }
+    fn tokenize(&self, state: State) -> Kind {
+        self.td.tokenize(state)
+    }
+}
+
+pub trait TransitionDelta<'a> {
+    fn transition(&self, state: State<'a>, c: char) -> State<'a>;
+    fn tokenize(&self, state: State) -> Kind;
+}
+
+pub struct CompileTransitionDelta {
     pub delta: fn(State, char) -> State,
     pub tokenizer: fn(State) -> &str,
 }
 
-impl<'a> DFA<'a> {
-    fn has_transition(&self, c: char, state: State) -> bool {
-        self.alphabet.chars().any(|x| c == x) && self.transition(state, c) != ""
-    }
-    fn accepts(&self, state: State) -> bool {
-        return self.accepting.contains(&state);
-    }
+impl<'a> TransitionDelta<'a> for CompileTransitionDelta {
     fn transition(&self, state: State<'a>, c: char) -> State<'a> {
-        return (self.delta)(state, c);
+        (self.delta)(state, c)
     }
     fn tokenize(&self, state: State) -> Kind {
-        return (self.tokenizer)(state).to_string();
+        (self.tokenizer)(state).to_string()
+    }
+}
+
+pub struct RuntimeTransitionDelta<'a> {
+    pub delta: HashMap<State<'a>, HashMap<char, State<'a>>>,
+    pub tokenizer: HashMap<State<'a>, &'a str>,
+}
+
+impl<'a> TransitionDelta<'a> for RuntimeTransitionDelta<'a> {
+    fn transition(&self, state: State<'a>, c: char) -> State<'a> {
+        match self.delta.get(state) {
+            Some(hm) => match hm.get(&c) {
+                Some(s) => s,
+                None => *NULL_STATE,
+            },
+            None => *NULL_STATE,
+        }
+    }
+    fn tokenize(&self, state: State) -> Kind {
+        match self.tokenizer.get(state) {
+            Some(s) => s.to_string(),
+            None => String::new(),
+        }
     }
 }
 
@@ -72,8 +119,10 @@ mod tests {
             alphabet: &alphabet,
             start,
             accepting: &accepting,
-            delta,
-            tokenizer
+            td: Box::new(CompileTransitionDelta{
+                delta,
+                tokenizer,
+            }),
         };
 
         let input = "000011010101";
@@ -122,8 +171,10 @@ kind=NZ lexeme=11010101"
             alphabet: &alphabet,
             start,
             accepting: &accepting,
-            delta,
-            tokenizer
+            td: Box::new(CompileTransitionDelta{
+                delta,
+                tokenizer,
+            }),
         };
 
         let input = "  {{\n}{}{} \t{} \t{}}";

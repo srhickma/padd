@@ -6,9 +6,9 @@ use core::scan::Scanner;
 pub struct MaximalMunchScanner;
 
 impl Scanner for MaximalMunchScanner {
-    fn scan<'a>(&self, input: &'a str, dfa: &'a DFA) -> Vec<Token> {
+    fn scan<'a, 'b, 'c>(&self, input: &'a str, dfa: &'b DFA<'c>) -> Vec<Token> {
 
-        fn scan_one<'a>(input: &'a [char], state: State<'a>, backtrack: (&'a [char], State<'a>), dfa: &'a DFA) -> (&'a [char], State<'a>)
+        fn scan_one<'a, 'b, 'c>(input: &'a [char], state: State<'c>, backtrack: (&'a [char], State<'c>), dfa: &'b DFA<'c>) -> (&'a [char], State<'c>)
         {
             if input.is_empty() || !dfa.has_transition(input[0], state) {
                 if dfa.accepts(state) {
@@ -28,7 +28,7 @@ impl Scanner for MaximalMunchScanner {
             }
         }
 
-        fn recur<'a>(input: &'a [char], accumulator: &'a mut Vec<Token>, dfa: &'a DFA) {
+        fn recur<'a, 'b, 'c>(input: &'a [char], accumulator: &'a mut Vec<Token>, dfa: &'b DFA<'c>) {
             if input.is_empty() {
                 return
             }

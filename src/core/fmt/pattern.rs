@@ -5,14 +5,17 @@ use core::parse::Grammar;
 use core::parse::Production;
 use core::parse::Tree;
 use core::scan::State;
+use core::scan::Token;
 use core::scan::DFA;
+use core::scan::CompileTransitionDelta;
+use std::cell::RefCell;
 
 static PATTERN_ALPHABET: &'static str = "{}[];=1234567890abcdefghijklmnopqrstuvwxyz \n\t";
 static PATTERN_STATES: [State; 11] = ["start", "semi", "eq", "lbrace", "rbrace", "lbracket", "rbracket", "zero", "num", "alpha", "ws"];
 static PATTERN_ACCEPTING: [State; 10] = ["semi", "eq", "lbrace", "rbrace", "lbracket", "rbracket", "zero", "num", "alpha", "ws"];
 
-lazy_static! {
-    static ref PATTERN_DFA: DFA<'static> = {
+thread_local! {
+    static PATTERN_DFA: DFA<'static> = {
         let start: State = "start";
         let delta: fn(State, char) -> State = |state, c| match (state, c) {
             ("start", '{') => "lbrace",
@@ -68,12 +71,16 @@ lazy_static! {
             alphabet: PATTERN_ALPHABET,
             start,
             accepting: &PATTERN_ACCEPTING,
-            delta,
-            tokenizer,
+            td: Box::new(CompileTransitionDelta{
+                delta,
+                tokenizer,
+            }),
         };
-        return dfa;
+        dfa
     };
+}
 
+lazy_static! {
     static ref PATTERN_PRODUCTIONS: Vec<Production<'static>> = {
         return build_prods(&[
             "pattern segs",
@@ -205,8 +212,12 @@ fn parse_pattern(input: &str) -> Option<Tree> {
     let scanner = def_scanner();
     let parser = def_parser();
 
-    let tokens = scanner.scan(input, &PATTERN_DFA);
-    return parser.parse(tokens, &PATTERN_GRAMMAR);
+    let mut parse: Option<Tree> = None;
+    PATTERN_DFA.with(|f| {
+        let tokens = scanner.scan(input, f);
+        parse = parser.parse(tokens, &PATTERN_GRAMMAR);
+    });
+    parse
 }
 
 #[cfg(test)]

@@ -6,12 +6,13 @@ use core::parse::Production;
 use core::parse::Tree;
 use core::scan::State;
 use core::scan::DFA;
+use core::scan::CompileTransitionDelta;
 
 static SPEC_ALPHABET: &'static str = "`-=~!@#$%^&*()_+{}|[]\\;':\"<>?,./QWERTYUIOPASDFGHJKLZXCVBNM1234567890abcdefghijklmnopqrstuvwxyz \n\t";
 static SPEC_ACCEPTING: [State; 16] = ["hat", "arrow", "bslash", "pattc", "cilc", "comment", "ws", "id", "def", "uchar", "minus", "newline", "tab", "escbslash", "escsquote", "semi"];
 
-lazy_static! {
-    static ref SPEC_DFA: DFA<'static> = {
+thread_local! {
+    static SPEC_DFA: DFA<'static> = {
         let start: State = "start";
         let delta: fn(State, char) -> State = |state, c| match (state, c) {
             ("start", '^') => "hat",
@@ -99,11 +100,15 @@ lazy_static! {
             alphabet: SPEC_ALPHABET,
             start,
             accepting: &SPEC_ACCEPTING,
-            delta,
-            tokenizer,
+            td: Box::new(CompileTransitionDelta{
+                delta,
+                tokenizer,
+            }),
         }
     };
+}
 
+lazy_static! {
     static ref SPEC_PRODUCTIONS: Vec<Production<'static>> = build_prods(&[
             "spec dfa gram w",
 
@@ -176,8 +181,13 @@ fn parse_spec(input: &str) -> Option<Tree> {
     let scanner = def_scanner();
     let parser = def_parser();
 
-    let tokens = scanner.scan(input, &SPEC_DFA);
-    parser.parse(tokens, &SPEC_GRAMMAR)
+    let mut parse: Option<Tree> = None;
+    SPEC_DFA.with(|f| {
+        let tokens = scanner.scan(input, f);
+        parse = parser.parse(tokens, &SPEC_GRAMMAR)
+    });
+    parse
+
 }
 
 #[cfg(test)]
