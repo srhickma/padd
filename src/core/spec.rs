@@ -312,7 +312,6 @@ fn parse_spec(input: &str) -> Option<Tree> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use stopwatch::{Stopwatch};
 
     #[test]
     fn parse_spec_spaces() {

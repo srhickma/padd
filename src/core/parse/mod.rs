@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::collections::HashSet;
 use core::scan::Token;
 
@@ -40,12 +39,15 @@ impl Tree {
             children: vec![],
         }
     }
+    #[allow(dead_code)]
     pub fn print(&self){
         println!("{}", self.to_string());
     }
+    #[allow(dead_code)]
     pub fn to_string(&self) -> String {
         return self.to_string_internal("".to_string(), true)
     }
+    #[allow(dead_code)]
     fn to_string_internal(&self, prefix: String, is_tail: bool) -> String {
         if self.children.len() == 0 {
             return format!("{}{}{}", prefix, if is_tail {"└── "} else {"├── "}, self.lhs.to_string());
@@ -73,8 +75,10 @@ impl Tree {
 
 pub struct Grammar<'a> {
     pub productions: Vec<Production<'a>>,
+    #[allow(dead_code)]
     non_terminals: HashSet<&'a str>,
     terminals: HashSet<&'a str>,
+    #[allow(dead_code)]
     symbols: HashSet<&'a str>,
     start: &'a str,
 }

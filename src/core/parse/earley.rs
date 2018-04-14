@@ -9,14 +9,13 @@ pub struct EarleyParser;
 impl Parser for EarleyParser {
     fn parse<'a>(&self, scan: Vec<Token>, grammar: &Grammar<'a>) -> Option<Tree> {
 
-        fn append<'a, 'b>(i: usize, item: Item<'a>, chart: &'b mut Vec<Vec<Item<'a>>>) -> bool {
+        fn append<'a, 'b>(i: usize, item: Item<'a>, chart: &'b mut Vec<Vec<Item<'a>>>) {
             for j in 0..chart[i].len() {
                 if chart[i][j] == item {
-                    return false;
+                    return;
                 }
             }
             chart[i].push(item);
-            true
         }
 
         let mut chart: Vec<Vec<Item>> = vec![vec![]];
@@ -53,9 +52,9 @@ impl Parser for EarleyParser {
                         },
                         Some(sym) => {
                             if grammar.terminals.contains(&sym) {
-                                changed |= scan_op(i, j, sym, &scan, &mut chart);
+                                scan_op(i, j, sym, &scan, &mut chart);
                             } else {
-                                changed |= predict_op(i, sym, grammar, &mut chart);
+                                predict_op(i, sym, grammar, &mut chart);
                             }
                         },
                     }
@@ -66,8 +65,7 @@ impl Parser for EarleyParser {
             i += 1;
         }
 
-        fn predict_op<'a, 'b>(i: usize, symbol: &'a str, grammar: &'a Grammar<'a>, chart: &'b mut Vec<Vec<Item<'a>>>) -> bool {
-            let mut changed = false;
+        fn predict_op<'a, 'b>(i: usize, symbol: &'a str, grammar: &'a Grammar<'a>, chart: &'b mut Vec<Vec<Item<'a>>>) {
             grammar.productions.iter()
                 .filter(|prod| prod.lhs == symbol)
                 .for_each(|prod| {
@@ -81,10 +79,9 @@ impl Parser for EarleyParser {
                     };
                     append(i, item, chart);
                 });
-            changed
         }
 
-        fn scan_op<'a, 'b>(i: usize, j: usize, symbol: &'a str, scan: &'a Vec<Token>, chart: &'b mut Vec<Vec<Item<'a>>>) -> bool {
+        fn scan_op<'a, 'b>(i: usize, j: usize, symbol: &'a str, scan: &'a Vec<Token>, chart: &'b mut Vec<Vec<Item<'a>>>) {
             if i < scan.len() && scan[i].kind == symbol.to_string() {
                 if chart.len() <= i + 1 {
                     chart.push(vec![])
@@ -98,10 +95,8 @@ impl Parser for EarleyParser {
                     completing: None,
                     previous: Some(Box::new(item.clone())),
                 };
-                return append(i + 1, new_item, chart);
+                append(i + 1, new_item, chart);
             }
-
-            return false;
         }
 
         fn complete_op<'a, 'b>(item: Item<'a>, src: &'b Vec<Item<'a>>, dest: &'b mut Vec<Item<'a>>) -> bool {
