@@ -400,4 +400,39 @@ mod tests {
             └── WHITESPACE <- 'xy'"
         );
     }
+
+    #[test]
+    fn parse_deep_epsilon() {
+        //setup
+        let productions = build_prods(&[
+            "s w w w w",
+            "w WHITESPACE",
+            "w ",
+        ]);
+        let grammar = Grammar::from(productions);
+
+        let scan = "WHITESPACE".split_whitespace()
+            .map(|kind| Token{
+                kind: kind.to_string(),
+                lexeme: "xy".to_string(),
+            },).collect();
+
+        let parser = def_parser();
+
+        //execute
+        let tree = parser.parse(scan, &grammar);
+
+        //verify
+        assert_eq!(tree.unwrap().to_string(),
+"└── s
+    ├── w
+    │   └──  <- 'NULL'
+    ├── w
+    │   └──  <- 'NULL'
+    ├── w
+    │   └──  <- 'NULL'
+    └── w
+        └── WHITESPACE <- 'xy'"
+        );
+    }
 }

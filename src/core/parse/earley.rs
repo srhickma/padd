@@ -9,13 +9,14 @@ pub struct EarleyParser;
 impl Parser for EarleyParser {
     fn parse<'a>(&self, scan: Vec<Token>, grammar: &Grammar<'a>) -> Option<Tree> {
 
-        fn append<'a, 'b>(i: usize, item: Item<'a>, chart: &'b mut Vec<Vec<Item<'a>>>) {
+        fn append<'a, 'b>(i: usize, item: Item<'a>, chart: &'b mut Vec<Vec<Item<'a>>>) -> bool {
             for j in 0..chart[i].len() {
                 if chart[i][j] == item {
-                    return;
+                    return false;
                 }
             }
             chart[i].push(item);
+            true
         }
 
         let mut chart: Vec<Vec<Item>> = vec![vec![]];
@@ -35,29 +36,38 @@ impl Parser for EarleyParser {
 
         let mut i = 0;
         while i < chart.len() {
-            let mut j = 0;
-            while j < chart[i].len() {
-                let item = chart[i][j].clone();
-                let symbol = (&item).next_symbol();
-                match symbol {
-                    None => {
-                        let index = item.start;
-                        complete_op(item, &chart[index].clone(), &mut chart[i]);
-                    },
-                    Some(sym) => {
-                        if grammar.terminals.contains(&sym) {
-                            scan_op(i, j, sym, &scan, &mut chart);
-                        } else {
-                            predict_op(i, sym, grammar, &mut chart);
-                        }
-                    },
+
+            let mut changed = true;
+
+            while changed {
+                changed = false;
+
+                let mut j = 0;
+                while j < chart[i].len() {
+                    let item = chart[i][j].clone();
+                    let symbol = (&item).next_symbol();
+                    match symbol {
+                        None => {
+                            let index = item.start;
+                            changed |= complete_op(item, &chart[index].clone(), &mut chart[i]);
+                        },
+                        Some(sym) => {
+                            if grammar.terminals.contains(&sym) {
+                                changed |= scan_op(i, j, sym, &scan, &mut chart);
+                            } else {
+                                changed |= predict_op(i, sym, grammar, &mut chart);
+                            }
+                        },
+                    }
+                    j += 1;
                 }
-                j += 1;
             }
+
             i += 1;
         }
 
-        fn predict_op<'a, 'b>(i: usize, symbol: &'a str, grammar: &'a Grammar<'a>, chart: &'b mut Vec<Vec<Item<'a>>>) {
+        fn predict_op<'a, 'b>(i: usize, symbol: &'a str, grammar: &'a Grammar<'a>, chart: &'b mut Vec<Vec<Item<'a>>>) -> bool {
+            let mut changed = false;
             grammar.productions.iter()
                 .filter(|prod| prod.lhs == symbol)
                 .for_each(|prod| {
@@ -71,9 +81,10 @@ impl Parser for EarleyParser {
                     };
                     append(i, item, chart);
                 });
+            changed
         }
 
-        fn scan_op<'a, 'b>(i: usize, j: usize, symbol: &'a str, scan: &'a Vec<Token>, chart: &'b mut Vec<Vec<Item<'a>>>) {
+        fn scan_op<'a, 'b>(i: usize, j: usize, symbol: &'a str, scan: &'a Vec<Token>, chart: &'b mut Vec<Vec<Item<'a>>>) -> bool {
             if i < scan.len() && scan[i].kind == symbol.to_string() {
                 if chart.len() <= i + 1 {
                     chart.push(vec![])
@@ -87,11 +98,14 @@ impl Parser for EarleyParser {
                     completing: None,
                     previous: Some(Box::new(item.clone())),
                 };
-                chart[i + 1].push(new_item);
+                return append(i + 1, new_item, chart);
             }
+
+            return false;
         }
 
-        fn complete_op<'a, 'b>(item: Item<'a>, src: &'b Vec<Item<'a>>, dest: &'b mut Vec<Item<'a>>){
+        fn complete_op<'a, 'b>(item: Item<'a>, src: &'b Vec<Item<'a>>, dest: &'b mut Vec<Item<'a>>) -> bool {
+            let mut changed = false;
             src.iter()
                 .filter(|old_item| {
                     match old_item.clone().next_symbol() {
@@ -112,7 +126,9 @@ impl Parser for EarleyParser {
                         return;
                     }
                     dest.push(item);
+                    changed = true;
                 });
+            changed
         }
 
 //        println!("-----------------------------------------------------");
