@@ -108,7 +108,7 @@ lazy_static! {
     };
 
     static ref PATTERN_GRAMMAR: Grammar<'static> = {
-        return Grammar::from(&PATTERN_PRODUCTIONS[..]);
+        return Grammar::from(PATTERN_PRODUCTIONS.clone());
     };
 }
 

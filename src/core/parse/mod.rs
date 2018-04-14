@@ -25,6 +25,9 @@ impl Tree {
     pub fn is_leaf(&self) -> bool {
         return self.children.len() == 0;
     }
+    pub fn is_empty(&self) -> bool {
+        return self.children.len() == 1 && self.get_child(0).is_null();
+    }
     pub fn is_null(&self) -> bool {
         return self.lhs.kind == "";
     }
@@ -69,16 +72,15 @@ impl Tree {
 }
 
 pub struct Grammar<'a> {
-    productions: &'a [Production<'a>],
+    productions: Vec<Production<'a>>,
     non_terminals: HashSet<&'a str>,
     terminals: HashSet<&'a str>,
     symbols: HashSet<&'a str>,
     start: &'a str,
-    prods_exp: HashMap<&'a str, Vec<&'a Production<'a>>>
 }
 
 impl<'a> Grammar<'a> {
-    pub fn from(productions: &'a [Production<'a>]) -> Grammar<'a> {
+    pub fn from(productions: Vec<Production<'a>>) -> Grammar<'a> {
         let non_terminals: HashSet<&'a str> = productions.iter()
             .map(|prod| prod.lhs)
             .collect();
@@ -93,22 +95,14 @@ impl<'a> Grammar<'a> {
             .map(|&x| x)
             .collect();
 
-        let mut prods_exp = HashMap::new();
-
-        for prod in productions {
-            if !prods_exp.contains_key(prod.lhs) {
-                prods_exp.insert(prod.lhs, vec![]);
-            }
-            prods_exp.get_mut(prod.lhs).unwrap().push(prod);
-        }
+        let start = productions[0].lhs;
 
         return Grammar {
             productions,
             non_terminals,
             terminals,
             symbols,
-            start: productions[0].lhs,
-            prods_exp,
+            start,
         };
     }
 }
@@ -121,7 +115,7 @@ pub struct Production<'a> {
 
 impl<'a> Production<'a> {
     #[allow(dead_code)]
-    fn to_string(&self) -> String {
+    pub fn to_string(&self) -> String {
         let mut rhs: String = "".to_string();
         for s in self.rhs.clone() {
             rhs.push_str(s);
@@ -171,7 +165,7 @@ mod tests {
             "Noun mary",
             "Verb runs"
         ]);
-        let grammar = Grammar::from(&productions[..]);
+        let grammar = Grammar::from(productions);
 
         let scan = vec![
             Token{
@@ -207,7 +201,7 @@ mod tests {
             "A x",
             "A A x"
         ]);
-        let grammar = Grammar::from(&productions[..]);
+        let grammar = Grammar::from(productions);
 
         let scan = vec![
             Token{
@@ -248,7 +242,7 @@ mod tests {
             "expr expr OP expr",
             "expr ID",
         ]);
-        let grammar = Grammar::from(&productions[..]);
+        let grammar = Grammar::from(productions);
 
         let scan = "( ID OP ID ) OP ID OP ( ID )".split_whitespace()
             .map(|kind| Token{
@@ -299,7 +293,7 @@ mod tests {
             "Factor Number",
             "Number NUM",
         ]);
-        let grammar = Grammar::from(&productions[..]);
+        let grammar = Grammar::from(productions);
 
         let scan = "NUM AS LPAREN NUM MD NUM AS NUM RPAREN".split_whitespace()
             .map(|kind| Token{
@@ -354,7 +348,7 @@ mod tests {
             "b w",
             "w WHITESPACE",
         ]);
-        let grammar = Grammar::from(&productions[..]);
+        let grammar = Grammar::from(productions);
 
         let scan = "WHITESPACE LBRACKET WHITESPACE LBRACKET WHITESPACE RBRACKET WHITESPACE RBRACKET LBRACKET RBRACKET WHITESPACE".split_whitespace()
             .map(|kind| Token{
