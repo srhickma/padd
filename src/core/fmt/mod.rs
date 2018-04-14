@@ -49,35 +49,40 @@ impl<'a> FormatJob<'a> {
     fn fill_pattern(&self, pattern: &Pattern, children: &Vec<Tree>, scope: &HashMap<String, String>) -> String {
         let mut res: String = String::new();
         for seg in &pattern.segments {
-            let seg_val: String = match seg {
-                &Segment::Filler(ref s) => s.clone(),
+            match seg {
+                &Segment::Filler(ref s) => res = format!("{}{}", res, s),
                 &Segment::Substitution(ref s) => match scope.get(s) {
-                    Some(value) => value.clone(),
-                    None => String::new(),
+                    Some(value) => res = format!("{}{}", res, value),
+                    None => {},
                 },
-                &Segment::Capture(ref c) => self.evaluate_capture(c, children, scope),
+                &Segment::Capture(ref c) => res = format!("{}{}", res, self.evaluate_capture(c, children, scope)),
             };
-            res = format!("{}{}", res, seg_val);
         }
         return res;
     }
 
-    //TODO see if we can avoid cloning so often
     fn evaluate_capture(&self, capture: &Capture, children: &Vec<Tree>, outer_scope: &HashMap<String, String>) -> String {
-        let mut inner_scope = outer_scope.clone();
-        for decl in &capture.declarations {
-            match &decl.value {
-                &Some(ref pattern) => {
-                    inner_scope.insert(decl.key.clone(), self.fill_pattern(pattern, children, outer_scope));
-                },
-                &None => {
-                    inner_scope.remove(&decl.key);
-                },
+        if capture.declarations.len() > 0 {
+            let mut inner_scope = outer_scope.clone();
+            for decl in &capture.declarations {
+                match &decl.value {
+                    &Some(ref pattern) => {
+                        inner_scope.insert(decl.key.clone(), self.fill_pattern(pattern, children, outer_scope));
+                    },
+                    &None => {
+                        inner_scope.remove(&decl.key);
+                    },
+                }
             }
-        }
-        match children.get(capture.child_index) {
-            Some(child) => return self.recur(child, &inner_scope),
-            None => panic!("Pattern index out of bounds: index={} children={}", capture.child_index, children.len()),
+            match children.get(capture.child_index) {
+                Some(child) => return self.recur(child, &inner_scope),
+                None => panic!("Pattern index out of bounds: index={} children={}", capture.child_index, children.len()),
+            }
+        } else {
+            match children.get(capture.child_index) {
+                Some(child) => return self.recur(child, outer_scope),
+                None => panic!("Pattern index out of bounds: index={} children={}", capture.child_index, children.len()),
+            }
         }
     }
 }
