@@ -13,7 +13,7 @@ impl<'a> FormatJob<'a> {
     pub fn create(parse: &'a Tree, patterns: &'a [PatternPair]) -> FormatJob<'a> {
         let mut pattern_map = HashMap::new();
         for pattern_pair in patterns {
-            pattern_map.insert(&pattern_pair.production[..], generate_pattern(pattern_pair.pattern));
+            pattern_map.insert(&pattern_pair.production[..], generate_pattern(&pattern_pair.pattern[..]));
         }
         return FormatJob{
             parse,
@@ -87,7 +87,7 @@ impl<'a> FormatJob<'a> {
     }
 }
 
-pub struct PatternPair<'a> {
+pub struct PatternPair {
     pub production: String,
-    pub pattern: &'a str,
+    pub pattern: String,
 }

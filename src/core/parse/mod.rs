@@ -72,7 +72,7 @@ impl Tree {
 }
 
 pub struct Grammar<'a> {
-    productions: Vec<Production<'a>>,
+    pub productions: Vec<Production<'a>>,
     non_terminals: HashSet<&'a str>,
     terminals: HashSet<&'a str>,
     symbols: HashSet<&'a str>,
@@ -116,12 +116,7 @@ pub struct Production<'a> {
 impl<'a> Production<'a> {
     #[allow(dead_code)]
     pub fn to_string(&self) -> String {
-        let mut rhs: String = "".to_string();
-        for s in self.rhs.clone() {
-            rhs.push_str(s);
-            rhs.push(' ');
-        }
-        return format!("{} -> {}", self.lhs, rhs);
+        format!("{} {}", self.lhs, (&self.rhs[..]).join(" "))
     }
 }
 

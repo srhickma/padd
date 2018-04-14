@@ -101,7 +101,7 @@ lazy_static! {
     static ref SPEC_PRODUCTIONS: Vec<Production<'static>> = build_prods(&[
             "spec dfa gram w",
 
-            "dfa states",
+            "dfa w CILC states",
 
             "states states state",
             "states ",
@@ -121,7 +121,7 @@ lazy_static! {
 
             "gram prods",
 
-            "prods prods prod",
+            "prods prod prods",
             "prods ",
 
             "prod w ID rhss w SEMI",
@@ -136,7 +136,7 @@ lazy_static! {
             "pattopt w PATTC",
             "pattopt ",
 
-            "ids ids w ID",
+            "ids w ID ids",
             "ids ",
 
             "w WHITESPACE",
@@ -158,11 +158,17 @@ fn generate_dfa(tree: &Tree) -> DFA {
     let mut delta: HashMap<State, HashMap<char, State>> = HashMap::new();
     let mut tokenizer: HashMap<State, Kind> = HashMap::new();
 
-    generate_dfa_states(tree.get_child(0), &mut delta, &mut tokenizer);
+    let alphabet_string = tree.get_child(1).lhs.lexeme.trim_matches('\'');
+    let alphabet = alphabet_string.replace("\\n", "\n")
+        .replace("\\t", "\t")
+        .replace("\\\'", "\'")
+        .replace("\\\\", "\\"); //TODO separate, more performant function
+
+    let (start, _) = generate_dfa_states(tree.get_child(2), &mut delta, &mut tokenizer);
 
     DFA {
-        alphabet: "".to_string(),
-        start: "".to_string(),
+        alphabet,
+        start,
         td: Box::new(RuntimeTransitionDelta{
             delta,
             tokenizer,
@@ -170,7 +176,7 @@ fn generate_dfa(tree: &Tree) -> DFA {
     }
 }
 
-fn generate_dfa_states<'a>(states_node: &Tree, delta: &mut HashMap<State, HashMap<char, State>>, tokenizer: &mut HashMap<State, Kind>) {
+fn generate_dfa_states<'a>(states_node: &Tree, delta: &mut HashMap<State, HashMap<char, State>>, tokenizer: &mut HashMap<State, Kind>) -> (String, bool) {
     if !states_node.is_empty() {
         let state_node = states_node.get_child(1);
 
@@ -185,8 +191,13 @@ fn generate_dfa_states<'a>(states_node: &Tree, delta: &mut HashMap<State, HashMa
         generate_dfa_trans(trans_node, &mut state_delta);
         delta.insert(state.clone(), state_delta);
 
-        generate_dfa_states(states_node.get_child(0), delta, tokenizer);
+        let (start, is_first) = generate_dfa_states(states_node.get_child(0), delta, tokenizer);
+        if is_first {
+            return (state.clone(), false);
+        }
+        return (start, is_first);
     }
+    return (String::new(), true);
 }
 
 fn generate_dfa_trans<'a>(trans_node: &'a Tree, state_delta: &mut HashMap<char, State>) {
@@ -197,9 +208,16 @@ fn generate_dfa_trans<'a>(trans_node: &'a Tree, state_delta: &mut HashMap<char, 
         let matcher = tran_node.get_child(1);
         match &matcher.lhs.kind[..] {
             "CILC" => {
-
+                let mut matcher_string = matcher.lhs.lexeme.trim_matches('\'');
+                let matcher_cleaned = matcher_string.replace("\\n", "\n")
+                    .replace("\\t", "\t")
+                    .replace("\\\'", "\'")
+                    .replace("\\\\", "\\"); //TODO separate, more performant function
+                for c in matcher_cleaned.chars() {
+                    state_delta.insert(c, dest.clone());
+                }
             },
-            "DEF" => {
+            "DEF" => { //TODO need to incorporate def matcher into dfa in the RuntimeTransitionDelta
                 if state_delta.contains_key(&DEF_MATCHER) {
                     panic!("DFA generation failed, more than one default matcher");
                 }
@@ -219,21 +237,21 @@ fn generate_grammar(tree: &Tree) -> (Grammar, Vec<PatternPair>) {
     (Grammar::from(productions), pattern_pairs)
 }
 
-fn generate_grammar_prods<'a, 'b>(prods_node: &'a Tree, accumulator: &'b mut Vec<Production<'a>>, pp_accumulator: &'b mut Vec<PatternPair<'a>>){
+fn generate_grammar_prods<'a, 'b>(prods_node: &'a Tree, accumulator: &'b mut Vec<Production<'a>>, pp_accumulator: &'b mut Vec<PatternPair>){
     if !prods_node.is_empty() {
-        let prod_node = prods_node.get_child(1);
+        let prod_node = prods_node.get_child(0);
 
-        let id = &prods_node.get_child(1).lhs.lexeme;
+        let id = &prod_node.get_child(1).lhs.lexeme;
 
         let rhss_node = prod_node.get_child(2);
         generate_grammar_rhssopt(rhss_node.get_child(0), id, accumulator, pp_accumulator);
         generate_grammar_rhs(rhss_node.get_child(1), id, accumulator, pp_accumulator);
 
-        generate_grammar_prods(prods_node.get_child(0), accumulator, pp_accumulator);
+        generate_grammar_prods(prods_node.get_child(1), accumulator, pp_accumulator);
     }
 }
 
-fn generate_grammar_rhssopt<'a, 'b>(rhssopt_node: &'a Tree, lhs: &'a String, accumulator: &'b mut Vec<Production<'a>>, pp_accumulator: &'b mut Vec<PatternPair<'a>>){
+fn generate_grammar_rhssopt<'a, 'b>(rhssopt_node: &'a Tree, lhs: &'a String, accumulator: &'b mut Vec<Production<'a>>, pp_accumulator: &'b mut Vec<PatternPair>){
     if !rhssopt_node.is_empty() {
         generate_grammar_rhs(rhssopt_node.get_child(1), lhs, accumulator, pp_accumulator);
 
@@ -241,10 +259,9 @@ fn generate_grammar_rhssopt<'a, 'b>(rhssopt_node: &'a Tree, lhs: &'a String, acc
     }
 }
 
-fn generate_grammar_rhs<'a, 'b>(rhs_node: &'a Tree, lhs: &'a String, accumulator: &'b mut Vec<Production<'a>>, pp_accumulator: &'b mut Vec<PatternPair<'a>>){
+fn generate_grammar_rhs<'a, 'b>(rhs_node: &'a Tree, lhs: &'a String, accumulator: &'b mut Vec<Production<'a>>, pp_accumulator: &'b mut Vec<PatternPair>){
     let mut ids: Vec<&str> = vec![];
     generate_grammar_ids(rhs_node.get_child(2), &mut ids);
-    ids.reverse();
 
     let production = Production{
         lhs: &lhs[..],
@@ -256,7 +273,11 @@ fn generate_grammar_rhs<'a, 'b>(rhs_node: &'a Tree, lhs: &'a String, accumulator
     let pattopt_node = rhs_node.get_child(3);
     if !pattopt_node.is_empty() {
         let pattc = &pattopt_node.get_child(1).lhs.lexeme;
-        let pattern = &pattc[..].trim_matches('`');
+        let pattern_string = &pattc[..].trim_matches('`');
+        let pattern = pattern_string.replace("\\n", "\n")
+            .replace("\\t", "\t")
+            .replace("\\\'", "\'")
+            .replace("\\\\", "\\"); //TODO separate, more performant function
 
         pp_accumulator.push(PatternPair{
             production: accumulator.last().unwrap().to_string(),
@@ -267,11 +288,11 @@ fn generate_grammar_rhs<'a, 'b>(rhs_node: &'a Tree, lhs: &'a String, accumulator
 
 fn generate_grammar_ids<'a, 'b>(ids_node: &'a Tree, accumulator: &'b mut Vec<&'a str>){
     if !ids_node.is_empty() {
-        let id = &ids_node.get_child(2).lhs.lexeme;
+        let id = &ids_node.get_child(1).lhs.lexeme;
 
         accumulator.push(&id[..]);
 
-        generate_grammar_ids(ids_node.get_child(0), accumulator)
+        generate_grammar_ids(ids_node.get_child(2), accumulator)
     }
 }
 
@@ -282,6 +303,9 @@ fn parse_spec(input: &str) -> Option<Tree> {
     let mut parse: Option<Tree> = None;
     SPEC_DFA.with(|f| {
         let tokens = scanner.scan(input, f);
+        for token in &tokens {
+            println!("{}", token.to_string());
+        }
         parse = parser.parse(tokens, &SPEC_GRAMMAR)
     });
     parse
@@ -293,10 +317,27 @@ mod tests {
     use super::*;
     use stopwatch::{Stopwatch};
 
+//    #[test]
+//    fn parse_spec_spaces() {
+//        //setup
+//        let input = "' '
+//s -> s b
+//;
+//
+//        ";
+//
+//        //execute
+//        let tree = parse_spec(input);
+//
+//        //verify
+//        tree.unwrap().print();
+//    }
+
     #[test]
     fn parse_spec_simple() {
         //setup
         let input = "
+' \t\n{}'
 # dfa
 start ' ' -> ws
  '\t' -> ws
@@ -331,6 +372,9 @@ w -> WHITESPACE `[prefix]{0}\n\n{1;prefix=[prefix]\t}[prefix]{2}\n\n`
         assert_eq!(tree.unwrap().to_string(),
 "└── spec
     ├── dfa
+    │   ├── w
+    │   │   └── WHITESPACE <- '\\n'
+    │   ├── CILC <- '' \\t\\n{}''
     │   └── states
     │       ├── states
     │       │   ├── states
@@ -606,31 +650,23 @@ w -> WHITESPACE `[prefix]{0}\n\n{1;prefix=[prefix]\t}[prefix]{2}\n\n`
     fn generate_spec_simple() {
         //setup
         let spec = "
+' \\t\\n{}'
+
 # dfa
-start ' ' -> ws
- '\t' -> ws
- '\n' -> ws
+start ' \\t\\n' -> ws
  '{' -> lbr
- '}' -> rbr
-;
+ '}' -> rbr;
 ws^WHITESPACE
- ' ' -> ws
- '\t' -> ws
- '\n' -> ws
-;
-lbr^LBRACKET
-;
-rbr^RBRACKET
-;
+ ' \\t\\n' -> ws;
+lbr^LBRACKET;
+rbr^RBRACKET;
+
 # grammar
 s -> s b
-  ->
-;
-b -> LBRACKET s RBRACKET ``
-  -> w
-;
-w -> WHITESPACE `[prefix]{0}\n\n{1;prefix=[prefix]\t}[prefix]{2}\n\n`
-;
+  -> ;
+b -> LBRACKET s RBRACKET `[prefix]{0}\\n\\n{1;prefix=[prefix]\\t}[prefix]{2}\\n\\n`
+  -> w ;
+w -> WHITESPACE ``;
         ";
 
         let input = "  {  {  {{{\t}}}\n {} }  }   { {}\n } ";
