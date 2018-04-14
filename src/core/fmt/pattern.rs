@@ -5,17 +5,16 @@ use core::parse::Grammar;
 use core::parse::Production;
 use core::parse::Tree;
 use core::scan::State;
-use core::scan::Token;
 use core::scan::DFA;
 use core::scan::CompileTransitionDelta;
-use std::cell::RefCell;
 
 static PATTERN_ALPHABET: &'static str = "{}[];=1234567890abcdefghijklmnopqrstuvwxyz \n\t";
+static PATTERN_STATES: [&'static str; 12] = ["start", "semi", "eq", "lbrace", "rbrace", "lbracket", "rbracket", "zero", "num", "alpha", "ws", ""];
 
 thread_local! {
-    static PATTERN_DFA: DFA<'static> = {
-        let start: State = "start";
-        let delta: fn(State, char) -> State = |state, c| match (state, c) {
+    static PATTERN_DFA: DFA = {
+        let start: State = "start".to_string();
+        let delta: fn(&str, char) -> &str = |state, c| match (state, c) {
             ("start", '{') => "lbrace",
             ("start", '}') => "rbrace",
             ("start", '[') => "lbracket",
@@ -51,7 +50,7 @@ thread_local! {
 
             (&_, _) => "",
         };
-        let tokenizer: fn(State) -> &str = |state| match state {
+        let tokenizer: fn(&str) -> &'static str = |state| match state {
             "semi" => "SEMI",
             "eq" => "EQ",
             "lbrace" => "LBRACE",
@@ -66,12 +65,9 @@ thread_local! {
         };
 
         let dfa = DFA{
-            alphabet: PATTERN_ALPHABET,
+            alphabet: PATTERN_ALPHABET.to_string(),
             start,
-            td: Box::new(CompileTransitionDelta{
-                delta,
-                tokenizer,
-            }),
+            td: Box::new(CompileTransitionDelta::build(&PATTERN_STATES, delta, tokenizer)),
         };
         dfa
     };

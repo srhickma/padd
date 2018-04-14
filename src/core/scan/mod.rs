@@ -3,7 +3,7 @@ use std::collections::HashMap;
 pub mod maximal_munch;
 
 pub trait Scanner {
-    fn scan<'a, 'b, 'c>(&self, input: &'a str, dfa: &'b DFA<'c>) -> Vec<Token>;
+    fn scan<'a, 'b>(&self, input: &'a str, dfa: &'b DFA) -> Vec<Token>;
 }
 
 pub fn def_scanner() -> Box<Scanner> {
@@ -23,68 +23,85 @@ impl Token {
 }
 
 pub type Kind = String;
-pub type State<'a> = &'a str;
+pub type State = String;
 
-static NULL_STATE: &'static str = "";
-
-pub struct DFA<'a> {
-    pub alphabet: &'a str,
-    pub start: State<'a>,
-    pub td: Box<TransitionDelta<'a>>,
+lazy_static! {
+    static ref NULL_STATE: String = String::new();
 }
 
-impl<'a> DFA<'a> {
-    fn has_transition(&self, c: char, state: State<'a>) -> bool {
+pub struct DFA {
+    pub alphabet: String,
+    pub start: State,
+    pub td: Box<TransitionDelta>,
+}
+
+impl DFA {
+    fn has_transition(&self, c: char, state: &State) -> bool {
         self.alphabet.chars().any(|x| c == x) && self.transition(state, c) != ""
     }
-    fn accepts(&self, state: State) -> bool {
+    fn accepts(&self, state: &State) -> bool {
         self.td.tokenize(state).len() > 0
     }
-    fn transition(&self, state: State<'a>, c: char) -> State<'a> {
+    fn transition<'a>(&'a self, state: &'a State, c: char) -> &'a State {
         self.td.transition(state, c)
     }
-    fn tokenize(&self, state: State) -> Kind {
+    fn tokenize(&self, state: &State) -> Kind {
         self.td.tokenize(state)
     }
 }
 
-pub trait TransitionDelta<'a> {
-    fn transition(&self, state: State<'a>, c: char) -> State<'a>;
-    fn tokenize(&self, state: State) -> Kind;
+pub trait TransitionDelta {
+    fn transition<'a>(&'a self, state: &'a State, c: char) -> &'a State;
+    fn tokenize(&self, state: &State) -> Kind;
 }
 
 pub struct CompileTransitionDelta {
-    pub delta: fn(State, char) -> State,
-    pub tokenizer: fn(State) -> &str,
+    pub state_map: HashMap<String, String>,
+    pub delta: fn(&str, char) -> &str,
+    pub tokenizer: fn(&str) -> &str,
 }
 
-impl<'a> TransitionDelta<'a> for CompileTransitionDelta {
-    fn transition(&self, state: State<'a>, c: char) -> State<'a> {
-        (self.delta)(state, c)
+impl TransitionDelta for CompileTransitionDelta {
+    fn transition<'a>(&'a self, state: &'a State, c: char) -> &'a State {
+        self.state_map.get(&(self.delta)(&state[..], c).to_string()).unwrap()
     }
-    fn tokenize(&self, state: State) -> Kind {
-        (self.tokenizer)(state).to_string()
+    fn tokenize(&self, state: &State) -> Kind {
+        (self.tokenizer)(&state[..]).to_string()
     }
 }
 
-pub struct RuntimeTransitionDelta<'a> {
-    pub delta: HashMap<State<'a>, HashMap<char, State<'a>>>,
-    pub tokenizer: HashMap<State<'a>, &'a str>,
+impl CompileTransitionDelta {
+    pub fn build(states: &[&str], delta: fn(&str, char) -> &str, tokenizer: fn(&str) -> &str) -> CompileTransitionDelta {
+        let mut state_map = HashMap::new();
+        for state in states {
+            state_map.insert(state.to_string(), state.to_string());
+        }
+        CompileTransitionDelta{
+            state_map,
+            delta,
+            tokenizer,
+        }
+    }
 }
 
-impl<'a> TransitionDelta<'a> for RuntimeTransitionDelta<'a> {
-    fn transition(&self, state: State<'a>, c: char) -> State<'a> {
+pub struct RuntimeTransitionDelta {
+    pub delta: HashMap<State, HashMap<char, State>>,
+    pub tokenizer: HashMap<State, Kind>,
+}
+
+impl TransitionDelta for RuntimeTransitionDelta {
+    fn transition<'a>(&'a self, state: &'a State, c: char) -> &'a State {
         match self.delta.get(state) {
             Some(hm) => match hm.get(&c) {
                 Some(s) => s,
-                None => NULL_STATE,
+                None => &NULL_STATE,
             },
-            None => NULL_STATE,
+            None => &NULL_STATE,
         }
     }
-    fn tokenize(&self, state: State) -> Kind {
+    fn tokenize(&self, state: &State) -> Kind {
         match self.tokenizer.get(state) {
-            Some(s) => s.to_string(),
+            Some(s) => s.clone(),
             None => String::new(),
         }
     }
@@ -97,28 +114,25 @@ mod tests {
     #[test]
     fn scan_binary() {
         //setup
-        let alphabet = "01";
-        let start: State = "start";
-        let accepting: [State; 2] = ["0", "not0"];
-        let delta: fn(State, char) -> State = |state, c| match (state, c) {
+        let alphabet = "01".to_string();
+        let states: [&str; 4] = ["start", "0", "not0", ""];
+        let start: State = "start".to_string();
+        let delta: fn(&str, char) -> &str = |state, c| match (state, c) {
             ("start", '0') => "0",
             ("start", '1') => "not0",
             ("not0", _) => "not0",
             (&_, _) => "",
         };
-        let tokenizer: fn(State) -> &str = |state| match state {
+        let tokenizer: fn(&str) -> &'static str = |state| match state {
             "0" => "ZERO",
             "not0" => "NZ",
             _ => "",
         };
 
         let dfa = DFA{
-            alphabet: &alphabet,
+            alphabet,
             start,
-            td: Box::new(CompileTransitionDelta{
-                delta,
-                tokenizer,
-            }),
+            td: Box::new(CompileTransitionDelta::build(&states, delta, tokenizer)),
         };
 
         let input = "000011010101";
@@ -142,10 +156,10 @@ kind=NZ lexeme=11010101"
     #[test]
     fn scan_brackets() {
         //setup
-        let alphabet = "{} \t\n";
-        let start: State = "start";
-        let accepting: [State; 3] = ["lbr", "rbr", "ws"];
-        let delta: fn(State, char) -> State = |state, c| match (state, c) {
+        let alphabet = "{} \t\n".to_string();
+        let states: [&str; 5] = ["start", "lbr", "rbr", "ws", ""];
+        let start: State = "start".to_string();
+        let delta: fn(&str, char) -> &str = |state, c| match (state, c) {
             ("start", ' ') => "ws",
             ("start", '\t') => "ws",
             ("start", '\n') => "ws",
@@ -156,7 +170,7 @@ kind=NZ lexeme=11010101"
             ("ws", '\n') => "ws",
             (&_, _) => "",
         };
-        let tokenizer: fn(State) -> &str = |state| match state {
+        let tokenizer: fn(&str) -> &'static str = |state| match state {
             "lbr" => "LBRACKET",
             "rbr" => "RBRACKET",
             "ws" => "WHITESPACE",
@@ -164,12 +178,9 @@ kind=NZ lexeme=11010101"
         };
 
         let dfa = DFA{
-            alphabet: &alphabet,
+            alphabet,
             start,
-            td: Box::new(CompileTransitionDelta{
-                delta,
-                tokenizer,
-            }),
+            td: Box::new(CompileTransitionDelta::build(&states, delta, tokenizer)),
         };
 
         let input = "  {{\n}{}{} \t{} \t{}}";
@@ -181,7 +192,6 @@ kind=NZ lexeme=11010101"
 
         //verify
         let ts = tokens_string(&tokens);
-        println!("{}", ts);
         assert_eq!(ts, "
 kind=WHITESPACE lexeme=  \nkind=LBRACKET lexeme={
 kind=LBRACKET lexeme={

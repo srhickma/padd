@@ -5,18 +5,20 @@ use core::parse::Grammar;
 use core::parse::Production;
 use core::parse::Tree;
 use core::scan::State;
+use core::scan::Kind;
 use core::scan::DFA;
 use core::scan::CompileTransitionDelta;
 use core::scan::RuntimeTransitionDelta;
 use std::collections::HashMap;
 
 static SPEC_ALPHABET: &'static str = "`-=~!@#$%^&*()_+{}|[]\\;':\"<>?,./QWERTYUIOPASDFGHJKLZXCVBNM1234567890abcdefghijklmnopqrstuvwxyz \n\t";
+static SPEC_STATES: [&'static str; 14] = ["hat", "minus", "patt", "cil", "comment", "semi", "def", "ws", "id", "arrow", "pattc", "cilc", "cilbs", ""];
 static DEF_MATCHER: char = '_';
 
 thread_local! {
-    static SPEC_DFA: DFA<'static> = {
-        let start: State = "start";
-        let delta: fn(State, char) -> State = |state, c| match (state, c) {
+    static SPEC_DFA: DFA = {
+        let start: State = "start".to_string();
+        let delta: fn(&str, char) -> &str = |state, c| match (state, c) {
             ("start", '^') => "hat",
             ("start", '-') => "minus",
             ("start", '\\') => "bslash",
@@ -39,14 +41,8 @@ thread_local! {
             ("start", 'X') | ("start", 'D') | ("start", 'J') | ("start", 'O') | ("start", 'T') |
             ("start", 'Y') | ("start", 'E') | ("start", 'K') | ("start", 'P') | ("start", 'U') |
             ("start", 'Z') | ("start", 'F') => "id",
-            ("start", _) => "uchar",
 
             ("minus", '>') => "arrow",
-
-            ("bslash", 'n') => "newline",
-            ("bslash", 't') => "tab",
-            ("bslash", '\\') => "escbslash",
-            ("bslash", '\'') => "escsquote",
 
             ("id", '0') | ("id", '1') | ("id", '2') | ("id", '3') | ("id", '4') |
             ("id", '5') | ("id", '6') | ("id", '7') | ("id", '8') | ("id", '9') |
@@ -78,33 +74,23 @@ thread_local! {
 
             (&_, _) => "",
         };
-        let tokenizer: fn(State) -> &str = |state| match state {
+        let tokenizer: fn(&str) -> &'static str = |state| match state {
             "hat" => "HAT",
             "arrow" => "ARROW",
-            "bslash" => "UCHAR",
             "pattc" => "PATTC",
             "cilc" => "CILC",
             "comment" => "COMMENT",
             "ws" => "WHITESPACE",
             "id" => "ID",
             "def" => "DEF",
-            "uchar" => "UCHAR",
-            "minus" => "UCHAR",
-            "newline" => "NEWLINE",
-            "tab" => "TAB",
-            "escbslash" => "ESCBSLASH",
-            "escsquote" => "ESCSQUOTE",
             "semi" => "SEMI",
             _ => "",
         };
 
         DFA{
-            alphabet: SPEC_ALPHABET,
+            alphabet: SPEC_ALPHABET.to_string(),
             start,
-            td: Box::new(CompileTransitionDelta{
-                delta,
-                tokenizer,
-            }),
+            td: Box::new(CompileTransitionDelta::build(&SPEC_STATES, delta, tokenizer)),
         }
     };
 }
@@ -170,15 +156,15 @@ fn generate_spec(input: &str){
     }
 }
 
-fn generate_dfa(tree: &Tree) -> DFA<'static> {
+fn generate_dfa(tree: &Tree) -> DFA {
     let mut delta: HashMap<State, HashMap<char, State>> = HashMap::new();
-    let mut tokenizer: HashMap<State, &str> = HashMap::new();
+    let mut tokenizer: HashMap<State, Kind> = HashMap::new();
 
     generate_dfa_internal(tree, &mut delta, &mut tokenizer);
 
     DFA {
-        alphabet: "",
-        start: "",
+        alphabet: "".to_string(),
+        start: "".to_string(),
         td: Box::new(RuntimeTransitionDelta{
             delta,
             tokenizer,
@@ -186,25 +172,25 @@ fn generate_dfa(tree: &Tree) -> DFA<'static> {
     }
 }
 
-fn generate_dfa_internal<'a>(state_node: &Tree, delta: &mut HashMap<State<'a>, HashMap<char, State<'a>>>, tokenizer: &mut HashMap<State<'a>, &'a str>) {
+fn generate_dfa_internal<'a>(state_node: &Tree, delta: &mut HashMap<State, HashMap<char, State>>, tokenizer: &mut HashMap<State, Kind>) {
 
 }
 
-fn generate_dfa_state<'a>(state_node: &'a Tree, delta: &mut HashMap<State<'a>, HashMap<char, State<'a>>>, tokenizer: &mut HashMap<State<'a>, &'a str>) {
+fn generate_dfa_state<'a>(state_node: &Tree, delta: &mut HashMap<State, HashMap<char, State>>, tokenizer: &mut HashMap<State, Kind>) {
     let sdec_node = state_node.get_child(1);
     let trans_node = state_node.get_child(2);
 
-    let state: State = &sdec_node.get_child(0).lhs.lexeme[..];
+    let state: &State = &sdec_node.get_child(0).lhs.lexeme;
     if sdec_node.children.len() == 5 {
-        tokenizer.insert(state, &sdec_node.get_child(4).lhs.lexeme[..]);
+        tokenizer.insert(state.clone(), sdec_node.get_child(4).lhs.lexeme.clone());
     }
 }
 
-fn generate_dfa_trans<'a>(trans_node: &'a Tree, state_delta: &mut HashMap<char, State<'a>>) {
+fn generate_dfa_trans<'a>(trans_node: &'a Tree, state_delta: &mut HashMap<char, State>) {
     if !trans_node.is_leaf() {
         let tran_node = trans_node.get_child(1);
 
-        let dest: State = &tran_node.get_child(5).lhs.lexeme[..];
+        let dest: &State = &tran_node.get_child(5).lhs.lexeme;
         let matcher = tran_node.get_child(1);
         match &matcher.lhs.kind[..] {
             "CILC" => {
@@ -214,7 +200,7 @@ fn generate_dfa_trans<'a>(trans_node: &'a Tree, state_delta: &mut HashMap<char, 
                 if state_delta.contains_key(&DEF_MATCHER) {
                     panic!("DFA generation failed, more than one default matcher");
                 }
-                state_delta.insert(DEF_MATCHER, dest);
+                state_delta.insert(DEF_MATCHER, dest.clone());
             },
             &_ => panic!("Transition map input is neither CILC or DEF"),
         }
@@ -276,8 +262,6 @@ w -> WHITESPACE `[prefix]{0}\n\n{1;prefix=[prefix]\t}[prefix]{2}\n\n`
         ";
 
         //execute
-        let sw = Stopwatch::start_new();
-
         let tree = parse_spec(input);
 
         //verify

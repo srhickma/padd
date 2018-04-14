@@ -6,9 +6,9 @@ use core::scan::Scanner;
 pub struct MaximalMunchScanner;
 
 impl Scanner for MaximalMunchScanner {
-    fn scan<'a, 'b, 'c>(&self, input: &'a str, dfa: &'b DFA<'c>) -> Vec<Token> {
+    fn scan<'a, 'b>(&self, input: &'a str, dfa: &'b DFA) -> Vec<Token> {
 
-        fn scan_one<'a, 'b, 'c>(input: &'a [char], state: State<'c>, backtrack: (&'a [char], State<'c>), dfa: &'b DFA<'c>) -> (&'a [char], State<'c>)
+        fn scan_one<'a, 'b>(input: &'a [char], state: &'b State, backtrack: (&'a [char], &'b State), dfa: &'b DFA) -> (&'a [char], &'b State)
         {
             if input.is_empty() || !dfa.has_transition(input[0], state) {
                 if dfa.accepts(state) {
@@ -28,12 +28,12 @@ impl Scanner for MaximalMunchScanner {
             }
         }
 
-        fn recur<'a, 'b, 'c>(input: &'a [char], accumulator: &'a mut Vec<Token>, dfa: &'b DFA<'c>) {
+        fn recur<'a, 'b>(input: &'a [char], accumulator: &'a mut Vec<Token>, dfa: &'b DFA) {
             if input.is_empty() {
                 return
             }
 
-            let (r_input, end_state) = scan_one(input, dfa.start, (input, dfa.start), dfa);
+            let (r_input, end_state) = scan_one(input, &dfa.start, (input, &dfa.start), dfa);
             let scanned_chars: &[char] = &input[0..(input.len() - r_input.len())];
             if scanned_chars.is_empty() {
                 panic!("Error scanning input");
