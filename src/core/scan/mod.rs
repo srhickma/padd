@@ -143,7 +143,7 @@ mod tests {
         let tokens = scanner.scan(&input, &dfa);
 
         //verify
-        let ts = tokens_string(&tokens);
+        let ts = tokens_string(&tokens.unwrap());
         assert_eq!(ts, "
 kind=ZERO lexeme=0
 kind=ZERO lexeme=0
@@ -191,7 +191,7 @@ kind=NZ lexeme=11010101"
         let tokens = scanner.scan(&input, &dfa);
 
         //verify
-        let ts = tokens_string(&tokens);
+        let ts = tokens_string(&tokens.unwrap());
         assert_eq!(ts, "
 kind=WHITESPACE lexeme=  \nkind=LBRACKET lexeme={
 kind=LBRACKET lexeme={

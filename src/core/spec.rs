@@ -714,7 +714,7 @@ w -> WHITESPACE ``;
 
         //execute input
         let tokens = scanner.scan(input, &dfa);
-        let tree = parser.parse(tokens, &grammar);
+        let tree = parser.parse(tokens.unwrap(), &grammar);
         let parse = tree.unwrap();
 
         //execute
