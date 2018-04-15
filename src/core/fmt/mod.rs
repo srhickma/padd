@@ -4,24 +4,37 @@ use std::collections::HashMap;
 
 mod pattern;
 
-pub struct FormatJob<'a> {
-    parse: &'a Tree,
-    pattern_map: HashMap<&'a str, Pattern>,
+pub struct Formatter {
+    pattern_map: HashMap<String, Pattern>,
 }
 
-impl<'a> FormatJob<'a> {
-    pub fn create(parse: &'a Tree, patterns: &'a [PatternPair]) -> FormatJob<'a> {
+impl Formatter {
+    pub fn create(patterns: Vec<PatternPair>) -> Formatter {
         let mut pattern_map = HashMap::new();
         for pattern_pair in patterns {
-            pattern_map.insert(&pattern_pair.production[..], generate_pattern(&pattern_pair.pattern[..]));
+            pattern_map.insert(pattern_pair.production, generate_pattern(&pattern_pair.pattern[..]));
         }
-        return FormatJob{
-            parse,
+        return Formatter{
             pattern_map,
         }
     }
 
-    pub fn run(&self) -> String {
+    pub fn format<'a>(&self, parse: &'a Tree) -> String {
+        let format_job = FormatJob{
+            parse,
+            pattern_map: &self.pattern_map,
+        };
+        format_job.run()
+    }
+}
+
+struct FormatJob<'a> {
+    parse: &'a Tree,
+    pattern_map: &'a HashMap<String, Pattern>,
+}
+
+impl<'a> FormatJob<'a> {
+    fn run(&self) -> String {
         return self.recur(self.parse, &HashMap::new());
     }
 

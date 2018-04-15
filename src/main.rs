@@ -1,9 +1,11 @@
 extern crate padd;
 
-mod cli;
-
+use cli::run;
 use padd::test;
+
+mod cli;
 
 fn main() {
     test();
+    run();
 }

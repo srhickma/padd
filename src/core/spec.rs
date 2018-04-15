@@ -2,7 +2,7 @@ use core::parse::build_prods;
 use core::scan::def_scanner;
 use core::parse::def_parser;
 use core::fmt::PatternPair;
-use core::fmt::FormatJob;
+use core::fmt::Formatter;
 use core::parse::Grammar;
 use core::parse::Production;
 use core::parse::Tree;
@@ -148,10 +148,11 @@ lazy_static! {
     static ref SPEC_GRAMMAR: Grammar<'static> = Grammar::from(SPEC_PRODUCTIONS.clone());
 }
 
-fn generate_spec(parse: &Tree) -> (DFA, Grammar, Vec<PatternPair>) {
+pub fn generate_spec(parse: &Tree) -> (DFA, Grammar, Formatter) {
     let dfa = generate_dfa(parse.get_child(1));
     let (grammar, pattern_pairs) = generate_grammar(parse.get_child(2));
-    (dfa, grammar, pattern_pairs)
+    let formatter = Formatter::create(pattern_pairs);
+    (dfa, grammar, formatter)
 }
 
 fn generate_dfa(tree: &Tree) -> DFA {
@@ -296,7 +297,7 @@ fn generate_grammar_ids<'a, 'b>(ids_node: &'a Tree, accumulator: &'b mut Vec<&'a
     }
 }
 
-fn parse_spec(input: &str) -> Option<Tree> {
+pub fn parse_spec(input: &str) -> Option<Tree> {
     let scanner = def_scanner();
     let parser = def_parser();
 
@@ -709,16 +710,49 @@ w -> WHITESPACE ``;
         //execute specification
         let tree = parse_spec(spec);
         let parse = tree.unwrap();
-        let (dfa, grammar, pattern_pairs) = generate_spec(&parse);
+        let (dfa, grammar, formatter) = generate_spec(&parse);
 
         //execute input
         let tokens = scanner.scan(input, &dfa);
         let tree = parser.parse(tokens, &grammar);
         let parse = tree.unwrap();
 
-        let format_job = FormatJob::create(&parse, &pattern_pairs[..]);
+        //execute
+        let res = formatter.format(&parse);
 
         //verify
-        println!("{}", format_job.run())
+        assert_eq!(res,
+"{
+
+	{
+
+		{
+
+			{
+
+				{
+
+				}
+
+			}
+
+		}
+
+		{
+
+		}
+
+	}
+
+}
+
+{
+
+	{
+
+	}
+
+}\n\n"
+        );
     }
 }
