@@ -13,7 +13,7 @@ use core::spec;
 
 mod core;
 
-struct FormatJobRunner {
+pub struct FormatJobRunner {
     dfa: DFA,
     grammar: Grammar,
     formatter: Formatter,
@@ -35,12 +35,15 @@ impl FormatJobRunner {
         }
     }
 
-    pub fn format(&self, input: &String) -> Option<String> {
+    pub fn format(&self, input: &String) -> Result<String, &str> {
         let tokens = self.scanner.scan(input, &self.dfa);
-        let tree = self.parser.parse(tokens, &self.grammar);
+        if tokens.is_none() {
+            return Err("Failed to scan input");
+        }
+        let tree = self.parser.parse(tokens.unwrap(), &self.grammar);
         match tree {
-            Some(parse) => Some(self.formatter.format(&parse)),
-            None => None,
+            Some(parse) => Ok(self.formatter.format(&parse)),
+            None => Err("Failed to parse input"),
         }
     }
 }

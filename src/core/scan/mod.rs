@@ -3,7 +3,7 @@ use std::collections::HashMap;
 pub mod maximal_munch;
 
 pub trait Scanner {
-    fn scan<'a, 'b>(&self, input: &'a str, dfa: &'b DFA) -> Vec<Token>;
+    fn scan<'a, 'b>(&self, input: &'a str, dfa: &'b DFA) -> Option<Vec<Token>>;
 }
 
 pub fn def_scanner() -> Box<Scanner> {

@@ -208,7 +208,7 @@ fn parse_pattern(input: &str) -> Option<Tree> {
     let mut parse: Option<Tree> = None;
     PATTERN_DFA.with(|f| {
         let tokens = scanner.scan(input, f);
-        parse = parser.parse(tokens, &PATTERN_GRAMMAR);
+        parse = parser.parse(tokens.unwrap(), &PATTERN_GRAMMAR);
     });
     parse
 }

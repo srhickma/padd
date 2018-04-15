@@ -304,7 +304,7 @@ pub fn parse_spec(input: &str) -> Option<Tree> {
     let mut parse: Option<Tree> = None;
     SPEC_DFA.with(|f| {
         let tokens = scanner.scan(input, f);
-        parse = parser.parse(tokens, &SPEC_GRAMMAR)
+        parse = parser.parse(tokens.unwrap(), &SPEC_GRAMMAR)
     });
     parse
 

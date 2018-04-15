@@ -6,7 +6,7 @@ use core::scan::Scanner;
 pub struct MaximalMunchScanner;
 
 impl Scanner for MaximalMunchScanner {
-    fn scan<'a, 'b>(&self, input: &'a str, dfa: &'b DFA) -> Vec<Token> {
+    fn scan<'a, 'b>(&self, input: &'a str, dfa: &'b DFA) -> Option<Vec<Token>> {
 
         fn scan_one<'a, 'b>(input: &'a [char], state: &'b State, backtrack: (&'a [char], &'b State), dfa: &'b DFA) -> (&'a [char], &'b State)
         {
@@ -28,15 +28,15 @@ impl Scanner for MaximalMunchScanner {
             }
         }
 
-        fn recur<'a, 'b>(input: &'a [char], accumulator: &'a mut Vec<Token>, dfa: &'b DFA) {
+        fn recur<'a, 'b>(input: &'a [char], accumulator: &'a mut Vec<Token>, dfa: &'b DFA) -> bool {
             if input.is_empty() {
-                return
+                return true;
             }
 
             let (r_input, end_state) = scan_one(input, &dfa.start, (input, &dfa.start), dfa);
             let scanned_chars: &[char] = &input[0..(input.len() - r_input.len())];
             if scanned_chars.is_empty() {
-                panic!("Error scanning input");
+                return false;
             }
 
             let token = Token {
@@ -44,7 +44,7 @@ impl Scanner for MaximalMunchScanner {
                 lexeme: scanned_chars.iter().cloned().collect::<String>(),
             };
             accumulator.push(token);
-            recur(r_input, accumulator, dfa);
+            recur(r_input, accumulator, dfa)
         }
 
         let chars : Vec<char> = input.chars().map(|c| {
@@ -52,7 +52,11 @@ impl Scanner for MaximalMunchScanner {
         }).collect();
 
         let mut tokens: Vec<Token> = vec![];
-        recur(&chars, &mut tokens, dfa);
-        return tokens;
+        let valid = recur(&chars, &mut tokens, dfa);
+        return if valid {
+            Some(tokens)
+        } else {
+            None
+        }
     }
 }
