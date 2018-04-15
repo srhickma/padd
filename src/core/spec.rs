@@ -98,7 +98,7 @@ thread_local! {
 }
 
 lazy_static! {
-    static ref SPEC_PRODUCTIONS: Vec<Production<'static>> = build_prods(&[
+    static ref SPEC_PRODUCTIONS: Vec<Production> = build_prods(&[
             "spec w dfa gram w",
 
             "dfa CILC states",
@@ -145,7 +145,7 @@ lazy_static! {
             "w ",
         ]);
 
-    static ref SPEC_GRAMMAR: Grammar<'static> = Grammar::from(SPEC_PRODUCTIONS.clone());
+    static ref SPEC_GRAMMAR: Grammar = Grammar::from(SPEC_PRODUCTIONS.clone());
 }
 
 pub fn generate_spec(parse: &Tree) -> (DFA, Grammar, Formatter) {
@@ -238,7 +238,7 @@ fn generate_grammar(tree: &Tree) -> (Grammar, Vec<PatternPair>) {
     (Grammar::from(productions), pattern_pairs)
 }
 
-fn generate_grammar_prods<'a, 'b>(prods_node: &'a Tree, accumulator: &'b mut Vec<Production<'a>>, pp_accumulator: &'b mut Vec<PatternPair>){
+fn generate_grammar_prods<'a, 'b>(prods_node: &'a Tree, accumulator: &'b mut Vec<Production>, pp_accumulator: &'b mut Vec<PatternPair>){
     if !prods_node.is_empty() {
         let prod_node = prods_node.get_child(0);
 
@@ -252,7 +252,7 @@ fn generate_grammar_prods<'a, 'b>(prods_node: &'a Tree, accumulator: &'b mut Vec
     }
 }
 
-fn generate_grammar_rhssopt<'a, 'b>(rhssopt_node: &'a Tree, lhs: &'a String, accumulator: &'b mut Vec<Production<'a>>, pp_accumulator: &'b mut Vec<PatternPair>){
+fn generate_grammar_rhssopt<'a, 'b>(rhssopt_node: &'a Tree, lhs: &'a String, accumulator: &'b mut Vec<Production>, pp_accumulator: &'b mut Vec<PatternPair>){
     if !rhssopt_node.is_empty() {
         generate_grammar_rhs(rhssopt_node.get_child(1), lhs, accumulator, pp_accumulator);
 
@@ -260,12 +260,12 @@ fn generate_grammar_rhssopt<'a, 'b>(rhssopt_node: &'a Tree, lhs: &'a String, acc
     }
 }
 
-fn generate_grammar_rhs<'a, 'b>(rhs_node: &'a Tree, lhs: &'a String, accumulator: &'b mut Vec<Production<'a>>, pp_accumulator: &'b mut Vec<PatternPair>){
-    let mut ids: Vec<&str> = vec![];
+fn generate_grammar_rhs<'a, 'b>(rhs_node: &'a Tree, lhs: &'a String, accumulator: &'b mut Vec<Production>, pp_accumulator: &'b mut Vec<PatternPair>){
+    let mut ids: Vec<String> = vec![];
     generate_grammar_ids(rhs_node.get_child(2), &mut ids);
 
     let production = Production{
-        lhs: &lhs[..],
+        lhs: lhs.clone(),
         rhs: ids,
     };
 
@@ -287,11 +287,11 @@ fn generate_grammar_rhs<'a, 'b>(rhs_node: &'a Tree, lhs: &'a String, accumulator
     }
 }
 
-fn generate_grammar_ids<'a, 'b>(ids_node: &'a Tree, accumulator: &'b mut Vec<&'a str>){
+fn generate_grammar_ids<'a, 'b>(ids_node: &'a Tree, accumulator: &'b mut Vec<String>){
     if !ids_node.is_empty() {
-        let id = &ids_node.get_child(1).lhs.lexeme;
+        let id = ids_node.get_child(1).lhs.lexeme.clone();
 
-        accumulator.push(&id[..]);
+        accumulator.push(id);
 
         generate_grammar_ids(ids_node.get_child(2), accumulator)
     }

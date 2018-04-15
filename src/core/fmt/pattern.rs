@@ -74,7 +74,7 @@ thread_local! {
 }
 
 lazy_static! {
-    static ref PATTERN_PRODUCTIONS: Vec<Production<'static>> = {
+    static ref PATTERN_PRODUCTIONS: Vec<Production> = {
         return build_prods(&[
             "pattern segs",
 
@@ -107,7 +107,7 @@ lazy_static! {
         ]);
     };
 
-    static ref PATTERN_GRAMMAR: Grammar<'static> = {
+    static ref PATTERN_GRAMMAR: Grammar = {
         return Grammar::from(PATTERN_PRODUCTIONS.clone());
     };
 }

@@ -4,7 +4,7 @@ use core::scan::Token;
 mod earley;
 
 pub trait Parser {
-    fn parse<'a>(&self, scan: Vec<Token>, grammar: &Grammar<'a>) -> Option<Tree>;
+    fn parse(&self, scan: Vec<Token>, grammar: &Grammar) -> Option<Tree>;
 }
 
 pub fn def_parser() -> Box<Parser> {
@@ -73,33 +73,33 @@ impl Tree {
     }
 }
 
-pub struct Grammar<'a> {
-    pub productions: Vec<Production<'a>>,
+pub struct Grammar {
+    pub productions: Vec<Production>,
     #[allow(dead_code)]
-    non_terminals: HashSet<&'a str>,
-    terminals: HashSet<&'a str>,
+    non_terminals: HashSet<String>,
+    terminals: HashSet<String>,
     #[allow(dead_code)]
-    symbols: HashSet<&'a str>,
-    start: &'a str,
+    symbols: HashSet<String>,
+    start: String,
 }
 
-impl<'a> Grammar<'a> {
-    pub fn from(productions: Vec<Production<'a>>) -> Grammar<'a> {
-        let non_terminals: HashSet<&'a str> = productions.iter()
+impl Grammar {
+    pub fn from(productions: Vec<Production>) -> Grammar {
+        let non_terminals: HashSet<String> = productions.iter().cloned()
             .map(|prod| prod.lhs)
             .collect();
-        let mut symbols: HashSet<&'a str> = productions.iter()
+        let mut symbols: HashSet<String> = productions.iter()
             .flat_map(|prod| prod.rhs.iter())
-            .map(|&x| x)
+            .map(|x| x.clone())
             .collect();
         for non_terminal in &non_terminals {
-            symbols.insert(non_terminal);
+            symbols.insert(non_terminal.clone());
         }
         let terminals = symbols.difference(&non_terminals)
-            .map(|&x| x)
+            .map(|x| x.clone())
             .collect();
 
-        let start = productions[0].lhs;
+        let start = productions[0].lhs.clone();
 
         return Grammar {
             productions,
@@ -112,19 +112,19 @@ impl<'a> Grammar<'a> {
 }
 
 #[derive(PartialEq, Clone)]
-pub struct Production<'a> {
-    pub lhs: &'a str,
-    pub rhs: Vec<&'a str>,
+pub struct Production {
+    pub lhs: String,
+    pub rhs: Vec<String>,
 }
 
-impl<'a> Production<'a> {
+impl Production {
     #[allow(dead_code)]
     pub fn to_string(&self) -> String {
         format!("{} {}", self.lhs, (&self.rhs[..]).join(" "))
     }
 }
 
-pub fn build_prods<'a>(strings: &'a[&'a str]) -> Vec<Production<'a>> {
+pub fn build_prods<'a>(strings: &'a[&'a str]) -> Vec<Production> {
     let mut productions: Vec<Production> = vec![];
     for string in strings {
         productions.push(prod_from_string(string));
@@ -134,14 +134,14 @@ pub fn build_prods<'a>(strings: &'a[&'a str]) -> Vec<Production<'a>> {
 
 fn prod_from_string(string: &str) -> Production {
     let mut i = 0;
-    let mut lhs: &str = "";
-    let mut rhs: Vec<&str> = vec![];
+    let mut lhs = String::new();
+    let mut rhs: Vec<String> = vec![];
 
     for s in string.split_whitespace() {
         if i == 0 {
-            lhs = s;
+            lhs = s.to_string();
         } else {
-            rhs.push(s);
+            rhs.push(s.to_string());
         }
         i += 1;
     }

@@ -7,7 +7,7 @@ use core::scan::Token;
 pub struct EarleyParser;
 
 impl Parser for EarleyParser {
-    fn parse<'a>(&self, scan: Vec<Token>, grammar: &Grammar<'a>) -> Option<Tree> {
+    fn parse(&self, scan: Vec<Token>, grammar: &Grammar) -> Option<Tree> {
 
         fn append<'a, 'b>(i: usize, item: Item<'a>, chart: &'b mut Vec<Vec<Item<'a>>>) {
             for j in 0..chart[i].len() {
@@ -51,7 +51,7 @@ impl Parser for EarleyParser {
                             changed |= complete_op(item, &chart[index].clone(), &mut chart[i]);
                         },
                         Some(sym) => {
-                            if grammar.terminals.contains(&sym) {
+                            if grammar.terminals.contains(sym) {
                                 scan_op(i, j, sym, &scan, &mut chart);
                             } else {
                                 predict_op(i, sym, grammar, &mut chart);
@@ -65,7 +65,7 @@ impl Parser for EarleyParser {
             i += 1;
         }
 
-        fn predict_op<'a, 'b>(i: usize, symbol: &'a str, grammar: &'a Grammar<'a>, chart: &'b mut Vec<Vec<Item<'a>>>) {
+        fn predict_op<'a, 'b>(i: usize, symbol: &'a str, grammar: &'a Grammar, chart: &'b mut Vec<Vec<Item<'a>>>) {
             grammar.productions.iter()
                 .filter(|prod| prod.lhs == symbol)
                 .for_each(|prod| {
@@ -136,7 +136,7 @@ impl Parser for EarleyParser {
 //        }
 //        println!("-----------------------------------------------------");
 
-        fn partial_parse<'a, 'b>(i: usize, grammar: &'a Grammar<'a>, chart: &'b mut Vec<Vec<Item<'a>>>) -> (bool, Vec<Item<'a>>) {
+        fn partial_parse<'a, 'b>(i: usize, grammar: &'a Grammar, chart: &'b mut Vec<Vec<Item<'a>>>) -> (bool, Vec<Item<'a>>) {
             let mut complete_parses = vec![];
             let mut res = false;
             for j in 0..chart[i].len() {
@@ -201,7 +201,7 @@ impl Parser for EarleyParser {
 
 #[derive(PartialEq, Clone)]
 struct Item<'a> {
-    rule: &'a Production<'a>,
+    rule: &'a Production,
     start: usize,
     next: usize,
     token: Option<&'a Token>,
@@ -212,7 +212,7 @@ struct Item<'a> {
 impl<'a> Item<'a> {
     fn next_symbol<'b>(&'b self) -> Option<&'a str> {
         if self.next < self.rule.rhs.len() {
-            return Some(self.rule.rhs[self.next]);
+            return Some(&self.rule.rhs[self.next][..]);
         }
         return None;
     }
