@@ -94,7 +94,10 @@ impl TransitionDelta for RuntimeTransitionDelta {
         match self.delta.get(state) {
             Some(hm) => match hm.get(&c) {
                 Some(s) => s,
-                None => &NULL_STATE,
+                None => match hm.get(&'_') {
+                    Some(s) => s,
+                    None => &NULL_STATE,
+                },
             },
             None => &NULL_STATE,
         }

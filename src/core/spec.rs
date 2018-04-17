@@ -707,17 +707,17 @@ w -> WHITESPACE ``;
         let scanner = def_scanner();
         let parser = def_parser();
 
-        //execute specification
+        //specification
         let tree = parse_spec(spec);
         let parse = tree.unwrap();
         let (dfa, grammar, formatter) = generate_spec(&parse);
 
-        //execute input
+        //input
         let tokens = scanner.scan(input, &dfa);
         let tree = parser.parse(tokens.unwrap(), &grammar);
         let parse = tree.unwrap();
 
-        //execute
+        //exercise
         let res = formatter.format(&parse);
 
         //verify

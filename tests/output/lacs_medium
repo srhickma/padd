@@ -1,0 +1,14 @@
+def main(a: Int, b: Int): Int = {
+	var operator: (Int) => Int;
+
+	def increaseBy(increment: Int): (Int) => Int = {
+		def procedure(x: Int): Int = {
+			x + increment
+		}
+
+		procedure
+	}
+
+	operator = increaseBy(2);
+	operator(4) + increaseBy(3)(5)
+}

@@ -1,0 +1,209 @@
+'<>=+-*/%(){},;:! \t\nABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+
+# lacs dfa
+
+start
+    '(' -> lparen
+    ')' -> rparen
+    '{' -> lbrace
+    '}' -> rbrace
+    '+' -> plus
+    '-' -> minus
+    '*' -> star
+    '%' -> pct
+    ',' -> comma
+    ';' -> semi
+    ':' -> colon
+    ' \t\n' -> ws
+    '=' -> eq
+    '!' -> ne
+    '<' -> lt
+    '>' -> gt
+    '/' -> slash
+    '0' -> 0
+    '123456789' -> num
+    'd' -> kd
+    'v' -> kv
+    'I' -> kI
+    'i' -> ki
+    'e' -> ke
+    _ -> id;
+
+kd      ^ID
+    'e' -> kde
+    '<>=+-*/%(){},;:! \n\t' -> fail
+    _ -> id;
+kde     ^ID
+    'f' -> def
+    '<>=+-*/%(){},;:! \n\t' -> fail
+    _ -> id;
+
+kv      ^ID
+    'a' -> kva
+    '<>=+-*/%(){},;:! \n\t' -> fail
+    _ -> id;
+kva     ^ID
+    'r' -> var
+    '<>=+-*/%(){},;:! \n\t' -> fail
+    _ -> id;
+
+kI      ^ID
+    'n' -> kIn
+    '<>=+-*/%(){},;:! \n\t' -> fail
+    _ -> id;
+kIn     ^ID
+    't' -> Int
+    '<>=+-*/%(){},;:! \n\t' -> fail
+    _ -> id;
+
+ki      ^ID
+    'f' -> if
+    '<>=+-*/%(){},;:! \n\t' -> fail
+    _ -> id;
+
+ke      ^ID
+    'l' -> kel
+    '<>=+-*/%(){},;:! \n\t' -> fail
+    _ -> id;
+kel     ^ID
+    's' -> kels
+    '<>=+-*/%(){},;:! \n\t' -> fail
+    _ -> id;
+kels    ^ID
+    'e' -> else
+    '<>=+-*/%(){},;:! \n\t' -> fail
+    _ -> id;
+
+id      ^ID
+    '<>=+-*/%(){},;:! \n\t' -> fail
+    _ -> id;
+def     ^DEF
+    '<>=+-*/%(){},;:! \n\t' -> fail
+    _ -> id;
+var     ^VAR
+    '<>=+-*/%(){},;:! \n\t' -> fail
+    _ -> id;
+Int     ^INT
+    '<>=+-*/%(){},;:! \n\t' -> fail
+    _ -> id;
+if      ^IF
+    '<>=+-*/%(){},;:! \n\t' -> fail
+    _ -> id;
+else    ^ELSE
+    '<>=+-*/%(){},;:! \n\t' -> fail
+    _ -> id;
+
+num     ^NUM
+    '0123456789' -> num;
+
+slash   ^SLASH
+    '/' -> comment;
+
+comment ^COMMENT
+    '\n' -> fail
+    _ -> comment;
+
+eq      ^BECOMES
+    '=' -> eeq
+    '>' -> arrow;
+
+ne
+    '=' -> neq;
+
+lt      ^LT
+    '=' -> le;
+
+gt      ^GT
+    '=' -> ge;
+
+
+lparen  ^LPAREN;
+rparen  ^RPAREN;
+lbrace  ^LBRACE;
+rbrace  ^RBRACE;
+plus    ^PLUS;
+minus   ^MINUS;
+star    ^STAR;
+pct     ^PCT;
+comma   ^COMMA;
+semi    ^SEMI;
+colon   ^COLON;
+ws      ^WHITESPACE;
+eeq     ^EQ;
+arrow   ^ARROW;
+neq     ^NE;
+le      ^LE;
+ge      ^GE;
+0       ^NUM;
+
+# lacs grammar
+
+S
+    -> defdefs;
+defdefs
+    -> defdef defdefs `{0}\n\n{1}`
+    -> defdef;
+defdef
+    -> w DEF w ID w LPAREN parmsopt w RPAREN w COLON type w BECOMES w LBRACE vardefsopt defdefsopt expras w RBRACE
+        `[prefix]{1} {3}{5}{6}{8}{10} {11} {13} {15}\n{16;prefix=[prefix]\t}{17;prefix=[prefix]\t}{18;prefix=[prefix]\t}[prefix]{20}`;
+parmsopt
+    -> parms
+    -> ;
+parms
+    -> vardef w COMMA parms `{0}{2} {3}`
+    -> vardef;
+vardef
+    -> w ID w COLON type `{1}{3} {4}`;
+type
+    -> w INT
+    -> w LPAREN typesopt w RPAREN w ARROW type `{1}{2}{4} {6} {7}`;
+typesopt
+    -> types
+    -> ;
+types
+    -> type w COMMA types `{0}{2} {3}`
+    -> type;
+vardefsopt
+    -> w VAR vardef w SEMI vardefsopt `[prefix]{1} {2}{4}\n{5}\n`
+    -> ;
+defdefsopt
+    -> defdefs `{0}\n\n`
+    -> ;
+expras
+    -> expra w SEMI expras `[prefix]{0}{2}\n{3}`
+    -> expra `[prefix]{0}\n`;
+expra
+    -> w ID w BECOMES expr `{1} {3} {4}`
+    -> expr;
+expr
+    -> w IF w LPAREN test w RPAREN w LBRACE expras w RBRACE w ELSE w LBRACE expras w RBRACE `{1} {3}{4}{6} {8}\n{9;prefix=[prefix]\t}[prefix]{11} {13} {15}\n{16;prefix=[prefix]\t}[prefix]{18}`
+    -> term
+    -> expr w PLUS term `{0} {2} {3}`
+    -> expr w MINUS term `{0} {2} {3}`;
+term
+    -> factor
+    -> term w STAR factor `{0} {2} {3}`
+    -> term w SLASH factor `{0} {2} {3}`
+    -> term w PCT factor `{0} {2} {3}`;
+factor
+    -> w ID
+    -> w NUM
+    -> w LPAREN expr w RPAREN
+    -> factor w LPAREN argsopt w RPAREN;
+test
+    -> expr w NE expr `{0} {2} {3}`
+    -> expr w LT expr `{0} {2} {3}`
+    -> expr w LE expr `{0} {2} {3}`
+    -> expr w GE expr `{0} {2} {3}`
+    -> expr w GT expr `{0} {2} {3}`
+    -> expr w EQ expr `{0} {2} {3}`;
+argsopt
+    -> args
+    -> ;
+args
+    -> expr w COMMA args `{0}{2} {3}`
+    -> expr;
+w
+    -> WHITESPACE w `{1}`
+    -> COMMENT w `{0}\n{1}`
+    -> ;
