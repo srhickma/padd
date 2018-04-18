@@ -39,11 +39,15 @@ impl Scanner for MaximalMunchScanner {
                 return false;
             }
 
-            let token = Token {
-                kind: dfa.tokenize(end_state),
-                lexeme: scanned_chars.iter().cloned().collect::<String>(),
-            };
-            accumulator.push(token);
+            let accept_as = dfa.tokenize(end_state);
+            if accept_as != "_" {
+                let token = Token {
+                    kind: accept_as,
+                    lexeme: scanned_chars.iter().cloned().collect::<String>(),
+                };
+                accumulator.push(token);
+            }
+
             recur(r_input, accumulator, dfa)
         }
 

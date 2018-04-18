@@ -81,8 +81,8 @@ thread_local! {
             "arrow" => "ARROW",
             "pattc" => "PATTC",
             "cilc" => "CILC",
-            "comment" => "COMMENT",
-            "ws" => "WHITESPACE",
+            "comment" => "_",
+            "ws" => "_",
             "id" => "ID",
             "def" => "DEF",
             "semi" => "SEMI",
@@ -99,58 +99,53 @@ thread_local! {
 
 lazy_static! {
     static ref SPEC_PRODUCTIONS: Vec<Production> = build_prods(&[
-            "spec w dfa gram w",
+            "spec dfa gram",
 
             "dfa CILC states",
 
             "states states state",
-            "states ",
+            "states state",
 
-            "state w sdec trans w SEMI ",
+            "state sdec transopt SEMI ",
 
             "sdec ID",
-            "sdec ID w HAT w ID",
-            "sdec DEF",
-            "sdec DEF w HAT w ID",
+            "sdec ID HAT ID",
+            "sdec ID HAT DEF",
+
+            "transopt trans",
+            "transopt ",
 
             "trans trans tran",
-            "trans ",
+            "trans tran",
 
-            "tran w CILC w ARROW w ID",
-            "tran w DEF w ARROW w ID",
+            "tran CILC ARROW ID",
+            "tran DEF ARROW ID",
 
             "gram prods",
 
             "prods prod prods",
-            "prods ",
+            "prods prod",
 
-            "prod w ID rhss w SEMI",
+            "prod ID rhss SEMI",
 
-            "rhss rhssopt rhs",
+            "rhss rhss rhs",
+            "rhss rhs",
 
-            "rhssopt rhssopt rhs",
-            "rhssopt ",
+            "rhs ARROW ids pattopt",
 
-            "rhs w ARROW ids pattopt",
-
-            "pattopt w PATTC",
+            "pattopt PATTC",
             "pattopt ",
 
-            "ids w ID ids",
+            "ids ID ids",
             "ids ",
-
-            "w WHITESPACE",
-            "w COMMENT WHITESPACE",
-            "w WHITESPACE COMMENT WHITESPACE",
-            "w ",
         ]);
 
     static ref SPEC_GRAMMAR: Grammar = Grammar::from(SPEC_PRODUCTIONS.clone());
 }
 
 pub fn generate_spec(parse: &Tree) -> (DFA, Grammar, Formatter) {
-    let dfa = generate_dfa(parse.get_child(1));
-    let (grammar, pattern_pairs) = generate_grammar(parse.get_child(2));
+    let dfa = generate_dfa(parse.get_child(0));
+    let (grammar, pattern_pairs) = generate_grammar(parse.get_child(1));
     let formatter = Formatter::create(pattern_pairs);
     (dfa, grammar, formatter)
 }
@@ -165,7 +160,7 @@ fn generate_dfa(tree: &Tree) -> DFA {
         .replace("\\\'", "\'")
         .replace("\\\\", "\\"); //TODO separate, more performant function
 
-    let (start, _) = generate_dfa_states(tree.get_child(1), &mut delta, &mut tokenizer);
+    let start = generate_dfa_states(tree.get_child(1), &mut delta, &mut tokenizer);
 
     DFA {
         alphabet,
@@ -177,55 +172,53 @@ fn generate_dfa(tree: &Tree) -> DFA {
     }
 }
 
-fn generate_dfa_states<'a>(states_node: &Tree, delta: &mut HashMap<State, HashMap<char, State>>, tokenizer: &mut HashMap<State, Kind>) -> (String, bool) {
-    if !states_node.is_empty() {
-        let state_node = states_node.get_child(1);
+fn generate_dfa_states<'a>(states_node: &Tree, delta: &mut HashMap<State, HashMap<char, State>>, tokenizer: &mut HashMap<State, Kind>) -> String {
+    let state_node = states_node.get_child(states_node.children.len() - 1);
 
-        let sdec_node = state_node.get_child(1);
-        let state: &State = &sdec_node.get_child(0).lhs.lexeme;
-        if sdec_node.children.len() == 5 {
-            tokenizer.insert(state.clone(), sdec_node.get_child(4).lhs.lexeme.clone());
-        }
-
-        let trans_node = state_node.get_child(2);
-        let mut state_delta: HashMap<char, State> = HashMap::new();
-        generate_dfa_trans(trans_node, &mut state_delta);
-        delta.insert(state.clone(), state_delta);
-
-        let (start, is_first) = generate_dfa_states(states_node.get_child(0), delta, tokenizer);
-        if is_first {
-            return (state.clone(), false);
-        }
-        return (start, is_first);
+    let sdec_node = state_node.get_child(0);
+    let state: &State = &sdec_node.get_child(0).lhs.lexeme;
+    if sdec_node.children.len() == 3 {
+        tokenizer.insert(state.clone(), sdec_node.get_child(2).lhs.lexeme.clone());
     }
-    return (String::new(), true);
+
+    let transopt_node = state_node.get_child(1);
+    if !transopt_node.is_empty() {
+        let mut state_delta: HashMap<char, State> = HashMap::new();
+        generate_dfa_trans(transopt_node.get_child(0), &mut state_delta);
+        delta.insert(state.clone(), state_delta);
+    }
+
+    if states_node.children.len() == 2 {
+        return generate_dfa_states(states_node.get_child(0), delta, tokenizer);
+    }
+    state.clone()
 }
 
 fn generate_dfa_trans<'a>(trans_node: &'a Tree, state_delta: &mut HashMap<char, State>) {
-    if !trans_node.is_empty() {
-        let tran_node = trans_node.get_child(1);
+    let tran_node = trans_node.get_child(trans_node.children.len() - 1);
 
-        let dest: &State = &tran_node.get_child(5).lhs.lexeme;
-        let matcher = tran_node.get_child(1);
-        match &matcher.lhs.kind[..] {
-            "CILC" => {
-                let mut matcher_string = matcher.lhs.lexeme.trim_matches('\'');
-                let matcher_cleaned = matcher_string.replace("\\n", "\n")
-                    .replace("\\t", "\t")
-                    .replace("\\\'", "\'")
-                    .replace("\\\\", "\\"); //TODO separate, more performant function
-                for c in matcher_cleaned.chars() {
-                    state_delta.insert(c, dest.clone());
-                }
-            },
-            "DEF" => { //TODO need to incorporate def matcher into dfa in the RuntimeTransitionDelta
-                if state_delta.contains_key(&DEF_MATCHER) {
-                    panic!("DFA generation failed, more than one default matcher");
-                }
-                state_delta.insert(DEF_MATCHER, dest.clone());
-            },
-            &_ => panic!("Transition map input is neither CILC or DEF"),
-        }
+    let dest: &State = &tran_node.get_child(2).lhs.lexeme;
+    let matcher = tran_node.get_child(0);
+    match &matcher.lhs.kind[..] {
+        "CILC" => {
+            let mut matcher_string = matcher.lhs.lexeme.trim_matches('\'');
+            let matcher_cleaned = matcher_string.replace("\\n", "\n")
+                .replace("\\t", "\t")
+                .replace("\\\'", "\'")
+                .replace("\\\\", "\\"); //TODO separate, more performant function
+            for c in matcher_cleaned.chars() {
+                state_delta.insert(c, dest.clone());
+            }
+        },
+        "DEF" => { //TODO need to incorporate def matcher into dfa in the RuntimeTransitionDelta
+            if state_delta.contains_key(&DEF_MATCHER) {
+                panic!("DFA generation failed, more than one default matcher");
+            }
+            state_delta.insert(DEF_MATCHER, dest.clone());
+        },
+        &_ => panic!("Transition map input is neither CILC or DEF"),
+    }
+    if trans_node.children.len() == 2 {
         generate_dfa_trans(trans_node.get_child(0), state_delta)
     }
 }
@@ -239,30 +232,22 @@ fn generate_grammar(tree: &Tree) -> (Grammar, Vec<PatternPair>) {
 }
 
 fn generate_grammar_prods<'a, 'b>(prods_node: &'a Tree, accumulator: &'b mut Vec<Production>, pp_accumulator: &'b mut Vec<PatternPair>){
-    if !prods_node.is_empty() {
-        let prod_node = prods_node.get_child(0);
+    let prod_node = prods_node.get_child(0);
 
-        let id = &prod_node.get_child(1).lhs.lexeme;
+    let id = &prod_node.get_child(0).lhs.lexeme;
 
-        let rhss_node = prod_node.get_child(2);
-        generate_grammar_rhssopt(rhss_node.get_child(0), id, accumulator, pp_accumulator);
-        generate_grammar_rhs(rhss_node.get_child(1), id, accumulator, pp_accumulator);
+    generate_grammar_rhss(prod_node.get_child(1), id, accumulator, pp_accumulator);
 
+    if prods_node.children.len() == 2 {
         generate_grammar_prods(prods_node.get_child(1), accumulator, pp_accumulator);
     }
 }
 
-fn generate_grammar_rhssopt<'a, 'b>(rhssopt_node: &'a Tree, lhs: &'a String, accumulator: &'b mut Vec<Production>, pp_accumulator: &'b mut Vec<PatternPair>){
-    if !rhssopt_node.is_empty() {
-        generate_grammar_rhs(rhssopt_node.get_child(1), lhs, accumulator, pp_accumulator);
+fn generate_grammar_rhss<'a, 'b>(rhss_node: &'a Tree, lhs: &'a String, accumulator: &'b mut Vec<Production>, pp_accumulator: &'b mut Vec<PatternPair>){
+    let rhs_node = rhss_node.get_child(rhss_node.children.len() - 1);
 
-        generate_grammar_rhssopt(rhssopt_node.get_child(0), lhs, accumulator, pp_accumulator);
-    }
-}
-
-fn generate_grammar_rhs<'a, 'b>(rhs_node: &'a Tree, lhs: &'a String, accumulator: &'b mut Vec<Production>, pp_accumulator: &'b mut Vec<PatternPair>){
     let mut ids: Vec<String> = vec![];
-    generate_grammar_ids(rhs_node.get_child(2), &mut ids);
+    generate_grammar_ids(rhs_node.get_child(1), &mut ids);
 
     let production = Production{
         lhs: lhs.clone(),
@@ -271,9 +256,9 @@ fn generate_grammar_rhs<'a, 'b>(rhs_node: &'a Tree, lhs: &'a String, accumulator
 
     accumulator.push(production);
 
-    let pattopt_node = rhs_node.get_child(3);
+    let pattopt_node = rhs_node.get_child(2);
     if !pattopt_node.is_empty() {
-        let pattc = &pattopt_node.get_child(1).lhs.lexeme;
+        let pattc = &pattopt_node.get_child(0).lhs.lexeme;
         let pattern_string = &pattc[..].trim_matches('`');
         let pattern = pattern_string.replace("\\n", "\n")
             .replace("\\t", "\t")
@@ -285,15 +270,19 @@ fn generate_grammar_rhs<'a, 'b>(rhs_node: &'a Tree, lhs: &'a String, accumulator
             pattern,
         });
     }
+
+    if rhss_node.children.len() == 2 {
+        generate_grammar_rhss(rhss_node.get_child(0), lhs, accumulator, pp_accumulator);
+    }
 }
 
 fn generate_grammar_ids<'a, 'b>(ids_node: &'a Tree, accumulator: &'b mut Vec<String>){
     if !ids_node.is_empty() {
-        let id = ids_node.get_child(1).lhs.lexeme.clone();
+        let id = ids_node.get_child(0).lhs.lexeme.clone();
 
         accumulator.push(id);
 
-        generate_grammar_ids(ids_node.get_child(2), accumulator)
+        generate_grammar_ids(ids_node.get_child(1), accumulator)
     }
 }
 
@@ -317,52 +306,39 @@ mod tests {
     #[test]
     fn parse_spec_spaces() {
         //setup
-        let input = "' 's->s b;";
+        let input = "' 'start;s->s b;";
 
         //execute
         let tree = parse_spec(input);
 
         //verify
         assert_eq!(tree.unwrap().to_string(),
-                   "└── spec
-    ├── w
-    │   └──  <- 'NULL'
+"└── spec
     ├── dfa
     │   ├── CILC <- '' ''
     │   └── states
-    │       └──  <- 'NULL'
-    ├── gram
-    │   └── prods
-    │       ├── prod
-    │       │   ├── w
-    │       │   │   └──  <- 'NULL'
-    │       │   ├── ID <- 's'
-    │       │   ├── rhss
-    │       │   │   ├── rhssopt
-    │       │   │   │   └──  <- 'NULL'
-    │       │   │   └── rhs
-    │       │   │       ├── w
-    │       │   │       │   └──  <- 'NULL'
-    │       │   │       ├── ARROW <- '->'
-    │       │   │       ├── ids
-    │       │   │       │   ├── w
-    │       │   │       │   │   └──  <- 'NULL'
-    │       │   │       │   ├── ID <- 's'
-    │       │   │       │   └── ids
-    │       │   │       │       ├── w
-    │       │   │       │       │   └── WHITESPACE <- ' '
-    │       │   │       │       ├── ID <- 'b'
-    │       │   │       │       └── ids
-    │       │   │       │           └──  <- 'NULL'
-    │       │   │       └── pattopt
-    │       │   │           └──  <- 'NULL'
-    │       │   ├── w
-    │       │   │   └──  <- 'NULL'
-    │       │   └── SEMI <- ';'
-    │       └── prods
-    │           └──  <- 'NULL'
-    └── w
-        └──  <- 'NULL'"
+    │       └── state
+    │           ├── sdec
+    │           │   └── ID <- 'start'
+    │           ├── transopt
+    │           │   └──  <- 'NULL'
+    │           └── SEMI <- ';'
+    └── gram
+        └── prods
+            └── prod
+                ├── ID <- 's'
+                ├── rhss
+                │   └── rhs
+                │       ├── ARROW <- '->'
+                │       ├── ids
+                │       │   ├── ID <- 's'
+                │       │   └── ids
+                │       │       ├── ID <- 'b'
+                │       │       └── ids
+                │       │           └──  <- 'NULL'
+                │       └── pattopt
+                │           └──  <- 'NULL'
+                └── SEMI <- ';'"
         );
     }
 
@@ -404,278 +380,142 @@ w -> WHITESPACE `[prefix]{0}\n\n{1;prefix=[prefix]\t}[prefix]{2}\n\n`
         //verify
         assert_eq!(tree.unwrap().to_string(),
 "└── spec
-    ├── w
-    │   └── WHITESPACE <- '\\n'
     ├── dfa
     │   ├── CILC <- '' \\t\\n{}''
     │   └── states
     │       ├── states
     │       │   ├── states
     │       │   │   ├── states
-    │       │   │   │   ├── states
-    │       │   │   │   │   └──  <- 'NULL'
     │       │   │   │   └── state
-    │       │   │   │       ├── w
-    │       │   │   │       │   ├── WHITESPACE <- '\\n'
-    │       │   │   │       │   ├── COMMENT <- '# dfa'
-    │       │   │   │       │   └── WHITESPACE <- '\\n'
     │       │   │   │       ├── sdec
     │       │   │   │       │   └── ID <- 'start'
-    │       │   │   │       ├── trans
-    │       │   │   │       │   ├── trans
-    │       │   │   │       │   │   ├── trans
-    │       │   │   │       │   │   │   ├── trans
-    │       │   │   │       │   │   │   │   ├── trans
-    │       │   │   │       │   │   │   │   │   ├── trans
-    │       │   │   │       │   │   │   │   │   │   └──  <- 'NULL'
-    │       │   │   │       │   │   │   │   │   └── tran
-    │       │   │   │       │   │   │   │   │       ├── w
-    │       │   │   │       │   │   │   │   │       │   └── WHITESPACE <- ' '
-    │       │   │   │       │   │   │   │   │       ├── CILC <- '' ''
-    │       │   │   │       │   │   │   │   │       ├── w
-    │       │   │   │       │   │   │   │   │       │   └── WHITESPACE <- ' '
-    │       │   │   │       │   │   │   │   │       ├── ARROW <- '->'
-    │       │   │   │       │   │   │   │   │       ├── w
-    │       │   │   │       │   │   │   │   │       │   └── WHITESPACE <- ' '
-    │       │   │   │       │   │   │   │   │       └── ID <- 'ws'
-    │       │   │   │       │   │   │   │   └── tran
-    │       │   │   │       │   │   │   │       ├── w
-    │       │   │   │       │   │   │   │       │   └── WHITESPACE <- '\\n '
-    │       │   │   │       │   │   │   │       ├── CILC <- ''\\t''
-    │       │   │   │       │   │   │   │       ├── w
-    │       │   │   │       │   │   │   │       │   └── WHITESPACE <- ' '
-    │       │   │   │       │   │   │   │       ├── ARROW <- '->'
-    │       │   │   │       │   │   │   │       ├── w
-    │       │   │   │       │   │   │   │       │   └── WHITESPACE <- ' '
-    │       │   │   │       │   │   │   │       └── ID <- 'ws'
-    │       │   │   │       │   │   │   └── tran
-    │       │   │   │       │   │   │       ├── w
-    │       │   │   │       │   │   │       │   └── WHITESPACE <- '\\n '
-    │       │   │   │       │   │   │       ├── CILC <- ''\\n''
-    │       │   │   │       │   │   │       ├── w
-    │       │   │   │       │   │   │       │   └── WHITESPACE <- ' '
-    │       │   │   │       │   │   │       ├── ARROW <- '->'
-    │       │   │   │       │   │   │       ├── w
-    │       │   │   │       │   │   │       │   └── WHITESPACE <- ' '
-    │       │   │   │       │   │   │       └── ID <- 'ws'
-    │       │   │   │       │   │   └── tran
-    │       │   │   │       │   │       ├── w
-    │       │   │   │       │   │       │   └── WHITESPACE <- '\\n '
-    │       │   │   │       │   │       ├── CILC <- ''{''
-    │       │   │   │       │   │       ├── w
-    │       │   │   │       │   │       │   └── WHITESPACE <- ' '
-    │       │   │   │       │   │       ├── ARROW <- '->'
-    │       │   │   │       │   │       ├── w
-    │       │   │   │       │   │       │   └── WHITESPACE <- ' '
-    │       │   │   │       │   │       └── ID <- 'lbr'
-    │       │   │   │       │   └── tran
-    │       │   │   │       │       ├── w
-    │       │   │   │       │       │   └── WHITESPACE <- '\\n '
-    │       │   │   │       │       ├── CILC <- ''}''
-    │       │   │   │       │       ├── w
-    │       │   │   │       │       │   └── WHITESPACE <- ' '
-    │       │   │   │       │       ├── ARROW <- '->'
-    │       │   │   │       │       ├── w
-    │       │   │   │       │       │   └── WHITESPACE <- ' '
-    │       │   │   │       │       └── ID <- 'rbr'
-    │       │   │   │       ├── w
-    │       │   │   │       │   └── WHITESPACE <- '\\n'
+    │       │   │   │       ├── transopt
+    │       │   │   │       │   └── trans
+    │       │   │   │       │       ├── trans
+    │       │   │   │       │       │   ├── trans
+    │       │   │   │       │       │   │   ├── trans
+    │       │   │   │       │       │   │   │   ├── trans
+    │       │   │   │       │       │   │   │   │   └── tran
+    │       │   │   │       │       │   │   │   │       ├── CILC <- '' ''
+    │       │   │   │       │       │   │   │   │       ├── ARROW <- '->'
+    │       │   │   │       │       │   │   │   │       └── ID <- 'ws'
+    │       │   │   │       │       │   │   │   └── tran
+    │       │   │   │       │       │   │   │       ├── CILC <- ''\\t''
+    │       │   │   │       │       │   │   │       ├── ARROW <- '->'
+    │       │   │   │       │       │   │   │       └── ID <- 'ws'
+    │       │   │   │       │       │   │   └── tran
+    │       │   │   │       │       │   │       ├── CILC <- ''\\n''
+    │       │   │   │       │       │   │       ├── ARROW <- '->'
+    │       │   │   │       │       │   │       └── ID <- 'ws'
+    │       │   │   │       │       │   └── tran
+    │       │   │   │       │       │       ├── CILC <- ''{''
+    │       │   │   │       │       │       ├── ARROW <- '->'
+    │       │   │   │       │       │       └── ID <- 'lbr'
+    │       │   │   │       │       └── tran
+    │       │   │   │       │           ├── CILC <- ''}''
+    │       │   │   │       │           ├── ARROW <- '->'
+    │       │   │   │       │           └── ID <- 'rbr'
     │       │   │   │       └── SEMI <- ';'
     │       │   │   └── state
-    │       │   │       ├── w
-    │       │   │       │   └── WHITESPACE <- '\\n'
     │       │   │       ├── sdec
     │       │   │       │   ├── ID <- 'ws'
-    │       │   │       │   ├── w
-    │       │   │       │   │   └──  <- 'NULL'
     │       │   │       │   ├── HAT <- '^'
-    │       │   │       │   ├── w
-    │       │   │       │   │   └──  <- 'NULL'
     │       │   │       │   └── ID <- 'WHITESPACE'
-    │       │   │       ├── trans
-    │       │   │       │   ├── trans
-    │       │   │       │   │   ├── trans
-    │       │   │       │   │   │   ├── trans
-    │       │   │       │   │   │   │   └──  <- 'NULL'
-    │       │   │       │   │   │   └── tran
-    │       │   │       │   │   │       ├── w
-    │       │   │       │   │   │       │   └── WHITESPACE <- '\\n '
-    │       │   │       │   │   │       ├── CILC <- '' ''
-    │       │   │       │   │   │       ├── w
-    │       │   │       │   │   │       │   └── WHITESPACE <- ' '
-    │       │   │       │   │   │       ├── ARROW <- '->'
-    │       │   │       │   │   │       ├── w
-    │       │   │       │   │   │       │   └── WHITESPACE <- ' '
-    │       │   │       │   │   │       └── ID <- 'ws'
-    │       │   │       │   │   └── tran
-    │       │   │       │   │       ├── w
-    │       │   │       │   │       │   └── WHITESPACE <- '\\n '
-    │       │   │       │   │       ├── CILC <- ''\\t''
-    │       │   │       │   │       ├── w
-    │       │   │       │   │       │   └── WHITESPACE <- ' '
-    │       │   │       │   │       ├── ARROW <- '->'
-    │       │   │       │   │       ├── w
-    │       │   │       │   │       │   └── WHITESPACE <- ' '
-    │       │   │       │   │       └── ID <- 'ws'
-    │       │   │       │   └── tran
-    │       │   │       │       ├── w
-    │       │   │       │       │   └── WHITESPACE <- '\\n '
-    │       │   │       │       ├── CILC <- ''\\n''
-    │       │   │       │       ├── w
-    │       │   │       │       │   └── WHITESPACE <- ' '
-    │       │   │       │       ├── ARROW <- '->'
-    │       │   │       │       ├── w
-    │       │   │       │       │   └── WHITESPACE <- ' '
-    │       │   │       │       └── ID <- 'ws'
-    │       │   │       ├── w
-    │       │   │       │   └── WHITESPACE <- '\\n'
+    │       │   │       ├── transopt
+    │       │   │       │   └── trans
+    │       │   │       │       ├── trans
+    │       │   │       │       │   ├── trans
+    │       │   │       │       │   │   └── tran
+    │       │   │       │       │   │       ├── CILC <- '' ''
+    │       │   │       │       │   │       ├── ARROW <- '->'
+    │       │   │       │       │   │       └── ID <- 'ws'
+    │       │   │       │       │   └── tran
+    │       │   │       │       │       ├── CILC <- ''\\t''
+    │       │   │       │       │       ├── ARROW <- '->'
+    │       │   │       │       │       └── ID <- 'ws'
+    │       │   │       │       └── tran
+    │       │   │       │           ├── CILC <- ''\\n''
+    │       │   │       │           ├── ARROW <- '->'
+    │       │   │       │           └── ID <- 'ws'
     │       │   │       └── SEMI <- ';'
     │       │   └── state
-    │       │       ├── w
-    │       │       │   └── WHITESPACE <- '\\n'
     │       │       ├── sdec
     │       │       │   ├── ID <- 'lbr'
-    │       │       │   ├── w
-    │       │       │   │   └──  <- 'NULL'
     │       │       │   ├── HAT <- '^'
-    │       │       │   ├── w
-    │       │       │   │   └──  <- 'NULL'
     │       │       │   └── ID <- 'LBRACKET'
-    │       │       ├── trans
+    │       │       ├── transopt
     │       │       │   └──  <- 'NULL'
-    │       │       ├── w
-    │       │       │   └── WHITESPACE <- '\\n'
     │       │       └── SEMI <- ';'
     │       └── state
-    │           ├── w
-    │           │   └── WHITESPACE <- '\\n'
     │           ├── sdec
     │           │   ├── ID <- 'rbr'
-    │           │   ├── w
-    │           │   │   └──  <- 'NULL'
     │           │   ├── HAT <- '^'
-    │           │   ├── w
-    │           │   │   └──  <- 'NULL'
     │           │   └── ID <- 'RBRACKET'
-    │           ├── trans
+    │           ├── transopt
     │           │   └──  <- 'NULL'
-    │           ├── w
-    │           │   └── WHITESPACE <- '\\n'
     │           └── SEMI <- ';'
-    ├── gram
-    │   └── prods
-    │       ├── prod
-    │       │   ├── w
-    │       │   │   ├── WHITESPACE <- '\\n'
-    │       │   │   ├── COMMENT <- '# grammar'
-    │       │   │   └── WHITESPACE <- '\\n'
-    │       │   ├── ID <- 's'
-    │       │   ├── rhss
-    │       │   │   ├── rhssopt
-    │       │   │   │   ├── rhssopt
-    │       │   │   │   │   └──  <- 'NULL'
-    │       │   │   │   └── rhs
-    │       │   │   │       ├── w
-    │       │   │   │       │   └── WHITESPACE <- ' '
-    │       │   │   │       ├── ARROW <- '->'
-    │       │   │   │       ├── ids
-    │       │   │   │       │   ├── w
-    │       │   │   │       │   │   └── WHITESPACE <- ' '
-    │       │   │   │       │   ├── ID <- 's'
-    │       │   │   │       │   └── ids
-    │       │   │   │       │       ├── w
-    │       │   │   │       │       │   └── WHITESPACE <- ' '
-    │       │   │   │       │       ├── ID <- 'b'
-    │       │   │   │       │       └── ids
-    │       │   │   │       │           └──  <- 'NULL'
-    │       │   │   │       └── pattopt
-    │       │   │   │           └──  <- 'NULL'
-    │       │   │   └── rhs
-    │       │   │       ├── w
-    │       │   │       │   └── WHITESPACE <- '\\n  '
-    │       │   │       ├── ARROW <- '->'
-    │       │   │       ├── ids
-    │       │   │       │   └──  <- 'NULL'
-    │       │   │       └── pattopt
-    │       │   │           └──  <- 'NULL'
-    │       │   ├── w
-    │       │   │   └── WHITESPACE <- '\\n'
-    │       │   └── SEMI <- ';'
-    │       └── prods
-    │           ├── prod
-    │           │   ├── w
-    │           │   │   └── WHITESPACE <- '\\n'
-    │           │   ├── ID <- 'b'
-    │           │   ├── rhss
-    │           │   │   ├── rhssopt
-    │           │   │   │   ├── rhssopt
-    │           │   │   │   │   └──  <- 'NULL'
-    │           │   │   │   └── rhs
-    │           │   │   │       ├── w
-    │           │   │   │       │   └── WHITESPACE <- ' '
-    │           │   │   │       ├── ARROW <- '->'
-    │           │   │   │       ├── ids
-    │           │   │   │       │   ├── w
-    │           │   │   │       │   │   └── WHITESPACE <- ' '
-    │           │   │   │       │   ├── ID <- 'LBRACKET'
-    │           │   │   │       │   └── ids
-    │           │   │   │       │       ├── w
-    │           │   │   │       │       │   └── WHITESPACE <- ' '
-    │           │   │   │       │       ├── ID <- 's'
-    │           │   │   │       │       └── ids
-    │           │   │   │       │           ├── w
-    │           │   │   │       │           │   └── WHITESPACE <- ' '
-    │           │   │   │       │           ├── ID <- 'RBRACKET'
-    │           │   │   │       │           └── ids
-    │           │   │   │       │               └──  <- 'NULL'
-    │           │   │   │       └── pattopt
-    │           │   │   │           ├── w
-    │           │   │   │           │   └── WHITESPACE <- ' '
-    │           │   │   │           └── PATTC <- '``'
-    │           │   │   └── rhs
-    │           │   │       ├── w
-    │           │   │       │   └── WHITESPACE <- '\\n  '
-    │           │   │       ├── ARROW <- '->'
-    │           │   │       ├── ids
-    │           │   │       │   ├── w
-    │           │   │       │   │   └── WHITESPACE <- ' '
-    │           │   │       │   ├── ID <- 'w'
-    │           │   │       │   └── ids
-    │           │   │       │       └──  <- 'NULL'
-    │           │   │       └── pattopt
-    │           │   │           └──  <- 'NULL'
-    │           │   ├── w
-    │           │   │   └── WHITESPACE <- '\\n'
-    │           │   └── SEMI <- ';'
-    │           └── prods
-    │               ├── prod
-    │               │   ├── w
-    │               │   │   └── WHITESPACE <- '\\n'
-    │               │   ├── ID <- 'w'
-    │               │   ├── rhss
-    │               │   │   ├── rhssopt
-    │               │   │   │   └──  <- 'NULL'
-    │               │   │   └── rhs
-    │               │   │       ├── w
-    │               │   │       │   └── WHITESPACE <- ' '
-    │               │   │       ├── ARROW <- '->'
-    │               │   │       ├── ids
-    │               │   │       │   ├── w
-    │               │   │       │   │   └── WHITESPACE <- ' '
-    │               │   │       │   ├── ID <- 'WHITESPACE'
-    │               │   │       │   └── ids
-    │               │   │       │       └──  <- 'NULL'
-    │               │   │       └── pattopt
-    │               │   │           ├── w
-    │               │   │           │   └── WHITESPACE <- ' '
-    │               │   │           └── PATTC <- '`[prefix]{0}\\n\\n{1;prefix=[prefix]\\t}[prefix]{2}\\n\\n`'
-    │               │   ├── w
-    │               │   │   └── WHITESPACE <- '\\n'
-    │               │   └── SEMI <- ';'
-    │               └── prods
-    │                   └──  <- 'NULL'
-    └── w
-        └── WHITESPACE <- '\\n        '"
+    └── gram
+        └── prods
+            ├── prod
+            │   ├── ID <- 's'
+            │   ├── rhss
+            │   │   ├── rhss
+            │   │   │   └── rhs
+            │   │   │       ├── ARROW <- '->'
+            │   │   │       ├── ids
+            │   │   │       │   ├── ID <- 's'
+            │   │   │       │   └── ids
+            │   │   │       │       ├── ID <- 'b'
+            │   │   │       │       └── ids
+            │   │   │       │           └──  <- 'NULL'
+            │   │   │       └── pattopt
+            │   │   │           └──  <- 'NULL'
+            │   │   └── rhs
+            │   │       ├── ARROW <- '->'
+            │   │       ├── ids
+            │   │       │   └──  <- 'NULL'
+            │   │       └── pattopt
+            │   │           └──  <- 'NULL'
+            │   └── SEMI <- ';'
+            └── prods
+                ├── prod
+                │   ├── ID <- 'b'
+                │   ├── rhss
+                │   │   ├── rhss
+                │   │   │   └── rhs
+                │   │   │       ├── ARROW <- '->'
+                │   │   │       ├── ids
+                │   │   │       │   ├── ID <- 'LBRACKET'
+                │   │   │       │   └── ids
+                │   │   │       │       ├── ID <- 's'
+                │   │   │       │       └── ids
+                │   │   │       │           ├── ID <- 'RBRACKET'
+                │   │   │       │           └── ids
+                │   │   │       │               └──  <- 'NULL'
+                │   │   │       └── pattopt
+                │   │   │           └── PATTC <- '``'
+                │   │   └── rhs
+                │   │       ├── ARROW <- '->'
+                │   │       ├── ids
+                │   │       │   ├── ID <- 'w'
+                │   │       │   └── ids
+                │   │       │       └──  <- 'NULL'
+                │   │       └── pattopt
+                │   │           └──  <- 'NULL'
+                │   └── SEMI <- ';'
+                └── prods
+                    └── prod
+                        ├── ID <- 'w'
+                        ├── rhss
+                        │   └── rhs
+                        │       ├── ARROW <- '->'
+                        │       ├── ids
+                        │       │   ├── ID <- 'WHITESPACE'
+                        │       │   └── ids
+                        │       │       └──  <- 'NULL'
+                        │       └── pattopt
+                        │           └── PATTC <- '`[prefix]{0}\\n\\n{1;prefix=[prefix]\\t}[prefix]{2}\\n\\n`'
+                        └── SEMI <- ';'"
         );
     }
 

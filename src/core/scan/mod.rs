@@ -214,6 +214,61 @@ kind=RBRACKET lexeme=}"
         );
     }
 
+    #[test]
+    fn scan_ignore() {
+        //setup
+        let alphabet = "{} \t\n".to_string();
+        let states: [&str; 5] = ["start", "lbr", "rbr", "ws", ""];
+        let start: State = "start".to_string();
+        let delta: fn(&str, char) -> &str = |state, c| match (state, c) {
+            ("start", ' ') => "ws",
+            ("start", '\t') => "ws",
+            ("start", '\n') => "ws",
+            ("start", '{') => "lbr",
+            ("start", '}') => "rbr",
+            ("ws", ' ') => "ws",
+            ("ws", '\t') => "ws",
+            ("ws", '\n') => "ws",
+            (&_, _) => "",
+        };
+        let tokenizer: fn(&str) -> &'static str = |state| match state {
+            "lbr" => "LBRACKET",
+            "rbr" => "RBRACKET",
+            "ws" => "_",
+            _ => "",
+        };
+
+        let dfa = DFA{
+            alphabet,
+            start,
+            td: Box::new(CompileTransitionDelta::build(&states, delta, tokenizer)),
+        };
+
+        let input = "  {{\n}{}{} \t{} \t{}}";
+
+        let scanner = def_scanner();
+
+        //execute
+        let tokens = scanner.scan(&input, &dfa);
+
+        //verify
+        let ts = tokens_string(&tokens.unwrap());
+        assert_eq!(ts, "
+kind=LBRACKET lexeme={
+kind=LBRACKET lexeme={
+kind=RBRACKET lexeme=}
+kind=LBRACKET lexeme={
+kind=RBRACKET lexeme=}
+kind=LBRACKET lexeme={
+kind=RBRACKET lexeme=}
+kind=LBRACKET lexeme={
+kind=RBRACKET lexeme=}
+kind=LBRACKET lexeme={
+kind=RBRACKET lexeme=}
+kind=RBRACKET lexeme=}"
+        );
+    }
+
     fn tokens_string(tokens: &Vec<Token>) -> String {
         let mut res = String::new();
 

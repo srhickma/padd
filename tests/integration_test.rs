@@ -53,8 +53,38 @@ fn test_lacs_medium(){
 }
 
 #[test]
-fn test_lacs_complex(){
+fn test_lacs_complex() {
     test_fjr("lacs_complex", "lacs");
+}
+
+#[test]
+fn test_ignore_tokens() {
+    //setup
+    let spec = "
+'a \n\t'
+
+start 'a' -> a
+' \n\t' -> ws;
+
+a^ACC
+'a' -> a
+_ -> fail;
+
+ws^_;
+
+s -> acc s `{0} {1}`
+-> acc;
+
+acc -> ACC;
+    ".to_string();
+
+    let fjr = FormatJobRunner::build(&spec);
+
+    //exercise
+    let res = fjr.format(&"aaaa \t \n  a aa  aa ".to_string()).unwrap();
+
+    //verify
+    assert_eq!(res, "aaaa a aa aa");
 }
 
 fn test_fjr(case_name: &str, spec_name: &str){

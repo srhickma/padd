@@ -30,7 +30,12 @@ fn load_spec(spec_path: &String) {
     let spec_file = File::open(spec_path);
     match spec_file {
         Ok(_) => {
-            spec_file.unwrap().read_to_string(&mut spec);
+            match spec_file.unwrap().read_to_string(&mut spec) {
+                Ok(_) => {},
+                Err(e) => {
+                    error(format!("Could't read specification file \"{}\": {}", &spec_path, e));
+                },
+            }
         },
         Err(e) => error(format!("Could't find specification file \"{}\": {}", spec_path, e)),
     }
@@ -45,7 +50,7 @@ fn load_spec(spec_path: &String) {
         match io::stdin().read_line(&mut target_path){
             Ok(_) => {},
             Err(e) => {
-                println!("Failed to read target file path");
+                println!("Failed to read target file \"{}\": {}", target_path, e);
                 continue;
             },
         }
@@ -54,10 +59,16 @@ fn load_spec(spec_path: &String) {
 
         let mut input = String::new();
 
-        let mut target_file = File::open(&target_path);
+        let target_file = File::open(&target_path);
         match target_file {
             Ok(_) => {
-                target_file.unwrap().read_to_string(&mut input);
+                match target_file.unwrap().read_to_string(&mut input) {
+                    Ok(_) => {},
+                    Err(e) => {
+                        println!("Could't read target file \"{}\": {}", &target_path, e);
+                        continue;
+                    },
+                }
             },
             Err(e) => {
                 println!("Could't find target file \"{}\": {}", &target_path, e);
