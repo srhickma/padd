@@ -163,10 +163,7 @@ fn generate_dfa(tree: &Tree) -> DFA {
     let mut tokenizer: HashMap<State, Kind> = HashMap::new();
 
     let alphabet_string = tree.get_child(0).lhs.lexeme.trim_matches('\'');
-    let alphabet = alphabet_string.replace("\\n", "\n")
-        .replace("\\t", "\t")
-        .replace("\\\'", "\'")
-        .replace("\\\\", "\\"); //TODO separate, more performant function
+    let alphabet = replace_escapes(&alphabet_string);
 
     let start = generate_dfa_states(tree.get_child(1), &mut delta, &mut tokenizer);
 
@@ -239,10 +236,7 @@ fn generate_dfa_trans<'a>(trans_node: &'a Tree, state_delta: &mut HashMap<char, 
     match &matcher.lhs.kind[..] {
         "CILC" => {
             let mut matcher_string = matcher.lhs.lexeme.trim_matches('\'');
-            let matcher_cleaned = matcher_string.replace("\\n", "\n")
-                .replace("\\t", "\t")
-                .replace("\\\'", "\'")
-                .replace("\\\\", "\\"); //TODO separate, more performant function
+            let matcher_cleaned = replace_escapes(&matcher_string);
             for c in matcher_cleaned.chars() {
                 state_delta.insert(c, dest.clone());
             }
@@ -302,10 +296,7 @@ fn generate_grammar_rhss<'a, 'b>(rhss_node: &'a Tree, lhs: &'a String, accumulat
     if !pattopt_node.is_empty() {
         let pattc = &pattopt_node.get_child(0).lhs.lexeme;
         let pattern_string = &pattc[..].trim_matches('`');
-        let pattern = pattern_string.replace("\\n", "\n")
-            .replace("\\t", "\t")
-            .replace("\\\'", "\'")
-            .replace("\\\\", "\\"); //TODO separate, more performant function
+        let pattern = replace_escapes(pattern_string);
 
         pp_accumulator.push(PatternPair{
             production: accumulator.last().unwrap().to_string(),
@@ -338,7 +329,35 @@ pub fn parse_spec(input: &str) -> Option<Tree> {
         parse = parser.parse(tokens.unwrap(), &SPEC_GRAMMAR)
     });
     parse
+}
 
+fn replace_escapes(input: &str) -> String {
+    let mut res = String::with_capacity(input.as_bytes().len() / 2);
+    let mut i = 0;
+    let mut last_char: char = ' ';
+    for c in input.chars() {
+        let mut hit_double_slash = false;
+        if i != 0 && last_char == '\\' {
+            res.push(match c {
+                'n' => '\n',
+                't' => '\t',
+                '\'' => '\'',
+                '\\' => {
+                    last_char = ' '; //Stop \\\\ -> \\\ rather than \\
+                    hit_double_slash = true;
+                    '\\'
+                },
+                _ => c,
+            });
+        } else if c != '\\' {
+            res.push(c);
+        }
+        if !hit_double_slash {
+            last_char = c;
+        }
+        i += 1;
+    }
+    res
 }
 
 #[cfg(test)]
@@ -769,5 +788,17 @@ w -> WHITESPACE ``;
                 │           └──  <- 'NULL'
                 └── SEMI <- ';'"
         );
+    }
+
+    #[test]
+    fn test_replace_escapes() {
+        //setup
+        let input = "ffffnt\'ff\\n\\t\\\\\\\\ffff\\ff\'\\f\\\'fff";
+
+        //execute
+        let res = replace_escapes(input);
+
+        //verify
+        assert_eq!(res, "ffffnt\'ff\n\t\\\\ffffff\'f\'fff");
     }
 }
