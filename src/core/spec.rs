@@ -14,7 +14,7 @@ use core::scan::RuntimeTransitionDelta;
 use std::collections::HashMap;
 
 static SPEC_ALPHABET: &'static str = "`-=~!@#$%^&*()_+{}|[]\\;':\"<>?,./QWERTYUIOPASDFGHJKLZXCVBNM1234567890abcdefghijklmnopqrstuvwxyz \n\t";
-static SPEC_STATES: [&'static str; 14] = ["hat", "minus", "patt", "cil", "comment", "semi", "def", "ws", "id", "arrow", "pattc", "cilc", "cilbs", ""];
+static SPEC_STATES: [&'static str; 15] = ["hat", "minus", "patt", "cil", "comment", "semi", "def", "ws", "id", "arrow", "pattc", "cilc", "cilbs", "or", ""];
 static DEF_MATCHER: char = '_';
 
 thread_local! {
@@ -29,6 +29,7 @@ thread_local! {
             ("start", '#') => "comment",
             ("start", ';') => "semi",
             ("start", '_') => "def",
+            ("start", '|') => "or",
             ("start", ' ') | ("start", '\t') | ("start", '\n') => "ws",
             ("start", '0') | ("start", '1') | ("start", '2') | ("start", '3') | ("start", '4') |
             ("start", '5') | ("start", '6') | ("start", '7') | ("start", '8') | ("start", '9') |
@@ -86,6 +87,7 @@ thread_local! {
             "id" => "ID",
             "def" => "DEF",
             "semi" => "SEMI",
+            "or" => "OR",
             _ => "",
         };
 
@@ -108,9 +110,12 @@ lazy_static! {
 
             "state sdec transopt SEMI ",
 
-            "sdec ID",
-            "sdec ID HAT ID",
-            "sdec ID HAT DEF",
+            "sdec targets",
+            "sdec targets HAT ID",
+            "sdec targets HAT DEF",
+
+            "targets ID",
+            "targets ID OR targets",
 
             "transopt trans",
             "transopt ",
@@ -118,8 +123,11 @@ lazy_static! {
             "trans trans tran",
             "trans tran",
 
-            "tran CILC ARROW ID",
-            "tran DEF ARROW ID",
+            "tran CILC ARROW hatopt ID",
+            "tran DEF ARROW hatopt ID",
+
+            "hatopt HAT",
+            "hatopt ",
 
             "gram prods",
 
@@ -176,28 +184,57 @@ fn generate_dfa_states<'a>(states_node: &Tree, delta: &mut HashMap<State, HashMa
     let state_node = states_node.get_child(states_node.children.len() - 1);
 
     let sdec_node = state_node.get_child(0);
-    let state: &State = &sdec_node.get_child(0).lhs.lexeme;
+
+    let targets_node = sdec_node.get_child(0);
+    let head_state = &targets_node.get_child(0).lhs.lexeme;
+    let mut tail_states: Vec<&State> = vec![];
+    if targets_node.children.len() == 3 {
+        generate_dfa_targets(targets_node.get_child(2), &mut tail_states);
+    }
+
     if sdec_node.children.len() == 3 {
-        tokenizer.insert(state.clone(), sdec_node.get_child(2).lhs.lexeme.clone());
+        let end = &sdec_node.get_child(2).lhs.lexeme;
+        tokenizer.insert(head_state.clone(), end.clone());
+        for state in &tail_states {
+            tokenizer.insert((*state).clone(), end.clone());
+        }
     }
 
     let transopt_node = state_node.get_child(1);
     if !transopt_node.is_empty() {
         let mut state_delta: HashMap<char, State> = HashMap::new();
-        generate_dfa_trans(transopt_node.get_child(0), &mut state_delta);
-        delta.insert(state.clone(), state_delta);
+        generate_dfa_trans(transopt_node.get_child(0), &mut state_delta, tokenizer);
+        for state in &tail_states {
+            extend_delta((*state), state_delta.clone(), delta);
+        }
+        extend_delta(head_state, state_delta, delta);
     }
 
     if states_node.children.len() == 2 {
         return generate_dfa_states(states_node.get_child(0), delta, tokenizer);
     }
-    state.clone()
+    head_state.clone()
 }
 
-fn generate_dfa_trans<'a>(trans_node: &'a Tree, state_delta: &mut HashMap<char, State>) {
+fn extend_delta(state: &State, state_delta: HashMap<char, State>, delta: &mut HashMap<State, HashMap<char, State>>){
+    if delta.contains_key(state) {
+        delta.get_mut(state).unwrap().extend(state_delta);
+    } else {
+        delta.insert(state.clone(), state_delta);
+    }
+}
+
+fn generate_dfa_targets<'a>(targets_node: &'a Tree, accumulator: &mut Vec<&'a State>){
+    accumulator.push(&targets_node.get_child(0).lhs.lexeme);
+    if targets_node.children.len() == 3 {
+        generate_dfa_targets(targets_node.get_child(2), accumulator);
+    }
+}
+
+fn generate_dfa_trans<'a>(trans_node: &'a Tree, state_delta: &mut HashMap<char, State>, tokenizer: &mut HashMap<State, Kind>) {
     let tran_node = trans_node.get_child(trans_node.children.len() - 1);
 
-    let dest: &State = &tran_node.get_child(2).lhs.lexeme;
+    let dest: &State = &tran_node.get_child(3).lhs.lexeme;
     let matcher = tran_node.get_child(0);
     match &matcher.lhs.kind[..] {
         "CILC" => {
@@ -210,7 +247,7 @@ fn generate_dfa_trans<'a>(trans_node: &'a Tree, state_delta: &mut HashMap<char, 
                 state_delta.insert(c, dest.clone());
             }
         },
-        "DEF" => { //TODO need to incorporate def matcher into dfa in the RuntimeTransitionDelta
+        "DEF" => {
             if state_delta.contains_key(&DEF_MATCHER) {
                 panic!("DFA generation failed, more than one default matcher");
             }
@@ -218,8 +255,13 @@ fn generate_dfa_trans<'a>(trans_node: &'a Tree, state_delta: &mut HashMap<char, 
         },
         &_ => panic!("Transition map input is neither CILC or DEF"),
     }
+
+    if !tran_node.get_child(2).is_empty() { //Immediate state pass-through
+        tokenizer.insert(dest.clone(), dest.clone());
+    }
+
     if trans_node.children.len() == 2 {
-        generate_dfa_trans(trans_node.get_child(0), state_delta)
+        generate_dfa_trans(trans_node.get_child(0), state_delta, tokenizer)
     }
 }
 
@@ -319,7 +361,8 @@ mod tests {
     │   └── states
     │       └── state
     │           ├── sdec
-    │           │   └── ID <- 'start'
+    │           │   └── targets
+    │           │       └── ID <- 'start'
     │           ├── transopt
     │           │   └──  <- 'NULL'
     │           └── SEMI <- ';'
@@ -388,7 +431,8 @@ w -> WHITESPACE `[prefix]{0}\n\n{1;prefix=[prefix]\t}[prefix]{2}\n\n`
     │       │   │   ├── states
     │       │   │   │   └── state
     │       │   │   │       ├── sdec
-    │       │   │   │       │   └── ID <- 'start'
+    │       │   │   │       │   └── targets
+    │       │   │   │       │       └── ID <- 'start'
     │       │   │   │       ├── transopt
     │       │   │   │       │   └── trans
     │       │   │   │       │       ├── trans
@@ -398,27 +442,38 @@ w -> WHITESPACE `[prefix]{0}\n\n{1;prefix=[prefix]\t}[prefix]{2}\n\n`
     │       │   │   │       │       │   │   │   │   └── tran
     │       │   │   │       │       │   │   │   │       ├── CILC <- '' ''
     │       │   │   │       │       │   │   │   │       ├── ARROW <- '->'
+    │       │   │   │       │       │   │   │   │       ├── hatopt
+    │       │   │   │       │       │   │   │   │       │   └──  <- 'NULL'
     │       │   │   │       │       │   │   │   │       └── ID <- 'ws'
     │       │   │   │       │       │   │   │   └── tran
     │       │   │   │       │       │   │   │       ├── CILC <- ''\\t''
     │       │   │   │       │       │   │   │       ├── ARROW <- '->'
+    │       │   │   │       │       │   │   │       ├── hatopt
+    │       │   │   │       │       │   │   │       │   └──  <- 'NULL'
     │       │   │   │       │       │   │   │       └── ID <- 'ws'
     │       │   │   │       │       │   │   └── tran
     │       │   │   │       │       │   │       ├── CILC <- ''\\n''
     │       │   │   │       │       │   │       ├── ARROW <- '->'
+    │       │   │   │       │       │   │       ├── hatopt
+    │       │   │   │       │       │   │       │   └──  <- 'NULL'
     │       │   │   │       │       │   │       └── ID <- 'ws'
     │       │   │   │       │       │   └── tran
     │       │   │   │       │       │       ├── CILC <- ''{''
     │       │   │   │       │       │       ├── ARROW <- '->'
+    │       │   │   │       │       │       ├── hatopt
+    │       │   │   │       │       │       │   └──  <- 'NULL'
     │       │   │   │       │       │       └── ID <- 'lbr'
     │       │   │   │       │       └── tran
     │       │   │   │       │           ├── CILC <- ''}''
     │       │   │   │       │           ├── ARROW <- '->'
+    │       │   │   │       │           ├── hatopt
+    │       │   │   │       │           │   └──  <- 'NULL'
     │       │   │   │       │           └── ID <- 'rbr'
     │       │   │   │       └── SEMI <- ';'
     │       │   │   └── state
     │       │   │       ├── sdec
-    │       │   │       │   ├── ID <- 'ws'
+    │       │   │       │   ├── targets
+    │       │   │       │   │   └── ID <- 'ws'
     │       │   │       │   ├── HAT <- '^'
     │       │   │       │   └── ID <- 'WHITESPACE'
     │       │   │       ├── transopt
@@ -428,19 +483,26 @@ w -> WHITESPACE `[prefix]{0}\n\n{1;prefix=[prefix]\t}[prefix]{2}\n\n`
     │       │   │       │       │   │   └── tran
     │       │   │       │       │   │       ├── CILC <- '' ''
     │       │   │       │       │   │       ├── ARROW <- '->'
+    │       │   │       │       │   │       ├── hatopt
+    │       │   │       │       │   │       │   └──  <- 'NULL'
     │       │   │       │       │   │       └── ID <- 'ws'
     │       │   │       │       │   └── tran
     │       │   │       │       │       ├── CILC <- ''\\t''
     │       │   │       │       │       ├── ARROW <- '->'
+    │       │   │       │       │       ├── hatopt
+    │       │   │       │       │       │   └──  <- 'NULL'
     │       │   │       │       │       └── ID <- 'ws'
     │       │   │       │       └── tran
     │       │   │       │           ├── CILC <- ''\\n''
     │       │   │       │           ├── ARROW <- '->'
+    │       │   │       │           ├── hatopt
+    │       │   │       │           │   └──  <- 'NULL'
     │       │   │       │           └── ID <- 'ws'
     │       │   │       └── SEMI <- ';'
     │       │   └── state
     │       │       ├── sdec
-    │       │       │   ├── ID <- 'lbr'
+    │       │       │   ├── targets
+    │       │       │   │   └── ID <- 'lbr'
     │       │       │   ├── HAT <- '^'
     │       │       │   └── ID <- 'LBRACKET'
     │       │       ├── transopt
@@ -448,7 +510,8 @@ w -> WHITESPACE `[prefix]{0}\n\n{1;prefix=[prefix]\t}[prefix]{2}\n\n`
     │       │       └── SEMI <- ';'
     │       └── state
     │           ├── sdec
-    │           │   ├── ID <- 'rbr'
+    │           │   ├── targets
+    │           │   │   └── ID <- 'rbr'
     │           │   ├── HAT <- '^'
     │           │   └── ID <- 'RBRACKET'
     │           ├── transopt
@@ -593,6 +656,118 @@ w -> WHITESPACE ``;
 	}
 
 }\n\n"
+        );
+    }
+
+    #[test]
+    fn parse_spec_olap_trans() {
+        //setup
+        let input = "
+        'inj '
+        start
+            'i' -> ki
+            _ -> ^ID;
+        ki
+            'n' -> ^IN;
+        ID | ki
+            ' ' -> fail
+            _ -> ID;
+        s
+            -> ID s
+            -> ID;";
+
+        //execute
+        let tree = parse_spec(input);
+
+        //verify
+        assert_eq!(tree.unwrap().to_string(),
+"└── spec
+    ├── dfa
+    │   ├── CILC <- ''inj ''
+    │   └── states
+    │       ├── states
+    │       │   ├── states
+    │       │   │   └── state
+    │       │   │       ├── sdec
+    │       │   │       │   └── targets
+    │       │   │       │       └── ID <- 'start'
+    │       │   │       ├── transopt
+    │       │   │       │   └── trans
+    │       │   │       │       ├── trans
+    │       │   │       │       │   └── tran
+    │       │   │       │       │       ├── CILC <- ''i''
+    │       │   │       │       │       ├── ARROW <- '->'
+    │       │   │       │       │       ├── hatopt
+    │       │   │       │       │       │   └──  <- 'NULL'
+    │       │   │       │       │       └── ID <- 'ki'
+    │       │   │       │       └── tran
+    │       │   │       │           ├── DEF <- '_'
+    │       │   │       │           ├── ARROW <- '->'
+    │       │   │       │           ├── hatopt
+    │       │   │       │           │   └── HAT <- '^'
+    │       │   │       │           └── ID <- 'ID'
+    │       │   │       └── SEMI <- ';'
+    │       │   └── state
+    │       │       ├── sdec
+    │       │       │   └── targets
+    │       │       │       └── ID <- 'ki'
+    │       │       ├── transopt
+    │       │       │   └── trans
+    │       │       │       └── tran
+    │       │       │           ├── CILC <- ''n''
+    │       │       │           ├── ARROW <- '->'
+    │       │       │           ├── hatopt
+    │       │       │           │   └── HAT <- '^'
+    │       │       │           └── ID <- 'IN'
+    │       │       └── SEMI <- ';'
+    │       └── state
+    │           ├── sdec
+    │           │   └── targets
+    │           │       ├── ID <- 'ID'
+    │           │       ├── OR <- '|'
+    │           │       └── targets
+    │           │           └── ID <- 'ki'
+    │           ├── transopt
+    │           │   └── trans
+    │           │       ├── trans
+    │           │       │   └── tran
+    │           │       │       ├── CILC <- '' ''
+    │           │       │       ├── ARROW <- '->'
+    │           │       │       ├── hatopt
+    │           │       │       │   └──  <- 'NULL'
+    │           │       │       └── ID <- 'fail'
+    │           │       └── tran
+    │           │           ├── DEF <- '_'
+    │           │           ├── ARROW <- '->'
+    │           │           ├── hatopt
+    │           │           │   └──  <- 'NULL'
+    │           │           └── ID <- 'ID'
+    │           └── SEMI <- ';'
+    └── gram
+        └── prods
+            └── prod
+                ├── ID <- 's'
+                ├── rhss
+                │   ├── rhss
+                │   │   └── rhs
+                │   │       ├── ARROW <- '->'
+                │   │       ├── ids
+                │   │       │   ├── ID <- 'ID'
+                │   │       │   └── ids
+                │   │       │       ├── ID <- 's'
+                │   │       │       └── ids
+                │   │       │           └──  <- 'NULL'
+                │   │       └── pattopt
+                │   │           └──  <- 'NULL'
+                │   └── rhs
+                │       ├── ARROW <- '->'
+                │       ├── ids
+                │       │   ├── ID <- 'ID'
+                │       │   └── ids
+                │       │       └──  <- 'NULL'
+                │       └── pattopt
+                │           └──  <- 'NULL'
+                └── SEMI <- ';'"
         );
     }
 }

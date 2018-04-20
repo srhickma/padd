@@ -3,95 +3,60 @@
 # lacs dfa
 
 start
-    '(' -> lparen
-    ')' -> rparen
-    '{' -> lbrace
-    '}' -> rbrace
-    '+' -> plus
-    '-' -> minus
-    '*' -> star
-    '%' -> pct
-    ',' -> comma
-    ';' -> semi
-    ':' -> colon
+    '(' -> ^LPAREN
+    ')' -> ^RPAREN
+    '{' -> ^LBRACE
+    '}' -> ^RBRACE
+    '+' -> ^PLUS
+    '-' -> ^MINUS
+    '*' -> ^STAR
+    '%' -> ^PCT
+    ',' -> ^COMMA
+    ';' -> ^SEMI
+    ':' -> ^COLON
     ' \t\n' -> ws
     '=' -> eq
     '!' -> ne
     '<' -> lt
     '>' -> gt
     '/' -> slash
-    '0' -> 0
+    '0' -> ^NUM
     '123456789' -> num
     'd' -> kd
     'v' -> kv
     'I' -> kI
     'i' -> ki
     'e' -> ke
-    _ -> id;
+    _ -> ^ID;
 
 kd      ^ID
-    'e' -> kde
-    '<>=+-*/%(){},;:! \n\t' -> fail
-    _ -> id;
+    'e' -> kde;
 kde     ^ID
-    'f' -> def
-    '<>=+-*/%(){},;:! \n\t' -> fail
-    _ -> id;
+    'f' -> ^DEF;
 
 kv      ^ID
-    'a' -> kva
-    '<>=+-*/%(){},;:! \n\t' -> fail
-    _ -> id;
+    'a' -> kva;
 kva     ^ID
-    'r' -> var
-    '<>=+-*/%(){},;:! \n\t' -> fail
-    _ -> id;
+    'r' -> ^VAR;
 
 kI      ^ID
-    'n' -> kIn
-    '<>=+-*/%(){},;:! \n\t' -> fail
-    _ -> id;
+    'n' -> kIn;
 kIn     ^ID
-    't' -> Int
-    '<>=+-*/%(){},;:! \n\t' -> fail
-    _ -> id;
+    't' -> ^INT;
 
 ki      ^ID
-    'f' -> if
-    '<>=+-*/%(){},;:! \n\t' -> fail
-    _ -> id;
+    'f' -> ^IF;
 
 ke      ^ID
-    'l' -> kel
-    '<>=+-*/%(){},;:! \n\t' -> fail
-    _ -> id;
+    'l' -> kel;
 kel     ^ID
-    's' -> kels
-    '<>=+-*/%(){},;:! \n\t' -> fail
-    _ -> id;
+    's' -> kels;
 kels    ^ID
-    'e' -> else
-    '<>=+-*/%(){},;:! \n\t' -> fail
-    _ -> id;
+    'e' -> ^ELSE;
 
-id      ^ID
+ELSE | IF | INT | VAR | DEF | ID | kels | kel | ke | ki | kIn | kI | kva | kv | kde | kd
     '<>=+-*/%(){},;:! \n\t' -> fail
-    _ -> id;
-def     ^DEF
-    '<>=+-*/%(){},;:! \n\t' -> fail
-    _ -> id;
-var     ^VAR
-    '<>=+-*/%(){},;:! \n\t' -> fail
-    _ -> id;
-Int     ^INT
-    '<>=+-*/%(){},;:! \n\t' -> fail
-    _ -> id;
-if      ^IF
-    '<>=+-*/%(){},;:! \n\t' -> fail
-    _ -> id;
-else    ^ELSE
-    '<>=+-*/%(){},;:! \n\t' -> fail
-    _ -> id;
+    _ -> ID;
 
 num     ^NUM
     '0123456789' -> num;
@@ -104,36 +69,20 @@ comment ^COMMENT
     _ -> comment;
 
 eq      ^BECOMES
-    '=' -> eeq
-    '>' -> arrow;
+    '=' -> ^EQ
+    '>' -> ^ARROW;
 
 ne
-    '=' -> neq;
+    '=' -> ^NE;
 
 lt      ^LT
-    '=' -> le;
+    '=' -> ^LE;
 
 gt      ^GT
-    '=' -> ge;
+    '=' -> ^GE;
 
-lparen  ^LPAREN;
-rparen  ^RPAREN;
-lbrace  ^LBRACE;
-rbrace  ^RBRACE;
-plus    ^PLUS;
-minus   ^MINUS;
-star    ^STAR;
-pct     ^PCT;
-comma   ^COMMA;
-semi    ^SEMI;
-colon   ^COLON;
-ws      ^WHITESPACE;
-eeq     ^EQ;
-arrow   ^ARROW;
-neq     ^NE;
-le      ^LE;
-ge      ^GE;
-0       ^NUM;
+ws      ^WHITESPACE
+    ' \t\n' -> ws;
 
 # lacs grammar
 

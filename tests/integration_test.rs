@@ -87,6 +87,37 @@ acc -> ACC;
     assert_eq!(res, "aaaa a aa aa");
 }
 
+#[test]
+fn test_advanced_operators() {
+    //setup
+    let spec = "
+        'inj '
+        start
+            'i' -> ki
+            ' ' -> ws
+            _ -> ^ID;
+        ki ^ID
+            'n' -> ^IN;
+        ID | IN | ki
+            ' ' -> fail
+            _ -> ID;
+        ws ^_;
+        s
+            -> x s
+            -> x;
+        x
+            -> ID
+            -> IN ``;".to_string();
+
+    let fjr = FormatJobRunner::build(&spec);
+
+    //exercise
+    let res = fjr.format(&"i ij ijjjijijiji inj in iii".to_string()).unwrap();
+
+    //verify
+    assert_eq!(res, "iijijjjijijijiinjiii");
+}
+
 fn test_fjr(case_name: &str, spec_name: &str){
     //setup
     let fjr = FormatJobRunner::build(&load_spec(spec_name));
