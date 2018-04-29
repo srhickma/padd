@@ -45,7 +45,7 @@ impl FormatJobRunner {
                     None => Err(format!("Failed to parse input")),
                 }
             },
-            Err(se) => Err(format!("Failed to scan input: failed at ({},{}): ...{}...", se.line, se.character, se.sequence)),
+            Err(se) => Err(format!("Failed to scan input: No accepting scans after ({},{}): {}...", se.line, se.character, se.sequence)),
         }
     }
 }

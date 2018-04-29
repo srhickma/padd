@@ -118,6 +118,27 @@ fn test_advanced_operators() {
     assert_eq!(res, "iijijjjijijijiinjiii");
 }
 
+#[test]
+fn test_failed_scan_input() {
+    //setup
+    let spec = "
+'ab'
+
+start 'a' -> ACC;
+
+s -> ACC;
+    ".to_string();
+
+    let fjr = FormatJobRunner::build(&spec);
+
+    //exercise
+    let res = fjr.format(&"b".to_string());
+
+    //verify
+    assert!(res.is_err());
+    assert_eq!(res.err().unwrap(), "Failed to scan input: No accepting scans after (1,1): b...");
+}
+
 fn test_fjr(case_name: &str, spec_name: &str){
     //setup
     let fjr = FormatJobRunner::build(&load_spec(spec_name));
