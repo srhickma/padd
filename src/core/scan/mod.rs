@@ -3,7 +3,7 @@ use std::collections::HashMap;
 pub mod maximal_munch;
 
 pub trait Scanner {
-    fn scan<'a, 'b>(&self, input: &'a str, dfa: &'b DFA) -> Option<Vec<Token>>;
+    fn scan<'a, 'b>(&self, input: &'a str, dfa: &'b DFA) -> Result<Vec<Token>, ScanningError>;
 }
 
 pub fn def_scanner() -> Box<Scanner> {
@@ -108,6 +108,13 @@ impl TransitionDelta for RuntimeTransitionDelta {
             None => String::new(),
         }
     }
+}
+
+#[derive(Debug)]
+pub struct ScanningError {
+    pub sequence: String,
+    pub character: usize,
+    pub line: usize,
 }
 
 #[cfg(test)]
@@ -267,6 +274,96 @@ kind=LBRACKET lexeme={
 kind=RBRACKET lexeme=}
 kind=RBRACKET lexeme=}"
         );
+    }
+
+    #[test]
+    fn scan_fail_simple() {
+        //setup
+        let alphabet = "{} \t\n".to_string();
+        let states: [&str; 5] = ["start", "lbr", "rbr", "ws", ""];
+        let start: State = "start".to_string();
+        let delta: fn(&str, char) -> &str = |state, c| match (state, c) {
+            ("start", ' ') => "ws",
+            ("start", '\t') => "ws",
+            ("start", '\n') => "ws",
+            ("start", '{') => "lbr",
+            ("start", '}') => "rbr",
+            ("ws", ' ') => "ws",
+            ("ws", '\t') => "ws",
+            ("ws", '\n') => "ws",
+            (&_, _) => "",
+        };
+        let tokenizer: fn(&str) -> &'static str = |state| match state {
+            "lbr" => "LBRACKET",
+            "rbr" => "RBRACKET",
+            "ws" => "_",
+            _ => "",
+        };
+
+        let dfa = DFA{
+            alphabet,
+            start,
+            td: Box::new(CompileTransitionDelta::build(&states, delta, tokenizer)),
+        };
+
+        let input = "  {{\n}{}{} \tx{} \t{}}";
+
+        let scanner = def_scanner();
+
+        //execute
+        let tokens = scanner.scan(&input, &dfa);
+
+        //verify
+        assert!(tokens.is_err());
+        let err = tokens.err().unwrap();
+        assert_eq!(err.sequence, "x{} \t{}}");
+        assert_eq!(err.line, 2);
+        assert_eq!(err.character, 8);
+    }
+
+    #[test]
+    fn scan_fail_complex() {
+        //setup
+        let alphabet = "{} \t\n".to_string();
+        let states: [&str; 5] = ["start", "lbr", "rbr", "ws", ""];
+        let start: State = "start".to_string();
+        let delta: fn(&str, char) -> &str = |state, c| match (state, c) {
+            ("start", ' ') => "ws",
+            ("start", '\t') => "ws",
+            ("start", '\n') => "ws",
+            ("start", '{') => "lbr",
+            ("start", '}') => "rbr",
+            ("ws", ' ') => "ws",
+            ("ws", '\t') => "ws",
+            ("ws", '\n') => "ws",
+            (&_, _) => "",
+        };
+        let tokenizer: fn(&str) -> &'static str = |state| match state {
+            "lbr" => "LBRACKET",
+            "rbr" => "RBRACKET",
+            "ws" => "_",
+            _ => "",
+        };
+
+        let dfa = DFA{
+            alphabet,
+            start,
+            td: Box::new(CompileTransitionDelta::build(&states, delta, tokenizer)),
+        };
+
+        let input = "   {  {  {{{\t}}}\n {} }  }   { {}\n }   {  {  {{{\t}}}\n {} }  } xyz  { {}\n }   {  {  {{{\t}}}\n {} }  }   { {}\n } ";
+
+        let scanner = def_scanner();
+
+        //execute
+        let tokens = scanner.scan(&input, &dfa);
+
+        //verify
+        assert!(tokens.is_err());
+        let err = tokens.err().unwrap();
+        assert_eq!(err.sequence, "xyz  { {}\n");
+        assert_eq!(err.line, 4);
+        assert_eq!(err.character, 10);
     }
 
     fn tokens_string(tokens: &Vec<Token>) -> String {

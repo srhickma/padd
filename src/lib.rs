@@ -35,15 +35,17 @@ impl FormatJobRunner {
         }
     }
 
-    pub fn format(&self, input: &String) -> Result<String, &str> {
-        let tokens = self.scanner.scan(input, &self.dfa);
-        if tokens.is_none() {
-            return Err("Failed to scan input");
-        }
-        let tree = self.parser.parse(tokens.unwrap(), &self.grammar);
-        match tree {
-            Some(parse) => Ok(self.formatter.format(&parse)),
-            None => Err("Failed to parse input"),
+    pub fn format(&self, input: &String) -> Result<String, String> {
+        let res = self.scanner.scan(input, &self.dfa);
+        match res {
+            Ok(tokens) => {
+                let tree = self.parser.parse(tokens, &self.grammar);
+                match tree {
+                    Some(parse) => Ok(self.formatter.format(&parse)),
+                    None => Err(format!("Failed to parse input")),
+                }
+            },
+            Err(se) => Err(format!("Failed to scan input: failed at ({},{}): ...{}...", se.line, se.character, se.sequence)),
         }
     }
 }
