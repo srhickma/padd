@@ -3,6 +3,7 @@ use core::scan::Token;
 use core::scan::State;
 use core::scan::Scanner;
 use core::scan::ScanningError;
+use core::scan::FAIL_SEQUENCE_LENGTH;
 use std::cmp;
 
 pub struct MaximalMunchScanner;
@@ -44,7 +45,7 @@ impl Scanner for MaximalMunchScanner {
             let (r_input, end_state, end_line, end_character) = scan_one(input, &dfa.start, line, character, (input, &dfa.start, line, character), dfa);
             let scanned_chars: &[char] = &input[0..(input.len() - r_input.len())];
             if scanned_chars.is_empty() {
-                let seq_len = cmp::min(r_input.len(), 10);
+                let seq_len = cmp::min(r_input.len(), FAIL_SEQUENCE_LENGTH);
                 let mut sequence: String = String::with_capacity(seq_len);
                 for c in &r_input[..seq_len] {
                     sequence.push(*c);

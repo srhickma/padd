@@ -10,6 +10,8 @@ pub fn def_scanner() -> Box<Scanner> {
     Box::new(maximal_munch::MaximalMunchScanner)
 }
 
+static FAIL_SEQUENCE_LENGTH: usize = 10;
+
 #[derive(PartialEq, Clone)]
 pub struct Token {
     pub kind: Kind,
