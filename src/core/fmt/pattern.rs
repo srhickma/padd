@@ -7,6 +7,7 @@ use core::parse::Tree;
 use core::scan::State;
 use core::scan::DFA;
 use core::scan::CompileTransitionDelta;
+use core::Error;
 
 static PATTERN_ALPHABET: &'static str = "{}[];=1234567890abcdefghijklmnopqrstuvwxyz \n\t";
 static PATTERN_STATES: [&'static str; 12] = ["start", "semi", "eq", "lbrace", "rbrace", "lbracket", "rbracket", "zero", "num", "alpha", "ws", ""];
@@ -132,10 +133,11 @@ pub struct Declaration {
     pub value: Option<Pattern>,
 }
 
-pub fn generate_pattern(input: &str) -> Pattern {
+pub fn generate_pattern(input: &str) -> Result<Pattern, Error> {
+
     return match parse_pattern(input) {
-        Some(root) => generate_pattern_internal(&root),
-        None => panic!("Failed to parse pattern"),
+        Ok(root) => Ok(generate_pattern_internal(&root)),
+        Err(e) => Err(e),
     };
 }
 
@@ -201,16 +203,21 @@ fn parse_declaration(decl: &Tree) -> Declaration {
     }
 }
 
-fn parse_pattern(input: &str) -> Option<Tree> {
+fn parse_pattern(input: &str) -> Result<Tree, Error> {
     let scanner = def_scanner();
     let parser = def_parser();
 
-    let mut parse: Option<Tree> = None;
+    let mut res: Result<Tree, Error> = Err(Error::Err("Failed to get thread local DFA".to_string()));
     PATTERN_DFA.with(|f| {
-        let tokens = scanner.scan(input, f);
-        parse = parser.parse(tokens.unwrap(), &PATTERN_GRAMMAR);
+        res = match scanner.scan(input, f) {
+            Ok(tokens) => match parser.parse(tokens, &PATTERN_GRAMMAR) {
+                Some(parse) => Ok(parse),
+                None => Err(Error::ParseErr())
+            },
+            Err(se) => Err(Error::ScanErr(se)),
+        }
     });
-    parse
+    res
 }
 
 #[cfg(test)]
@@ -320,7 +327,7 @@ mod tests {
         let input = "\t \n\n\n\n{1}  {2}  {45;something=\n\n \t} {46;somethinelse=\n\n \t;some=}";
 
         //execute
-        let pattern = generate_pattern(input);
+        let pattern = generate_pattern(input).unwrap();
 
         //verify
         assert_eq!(pattern.segments.len(), 8);

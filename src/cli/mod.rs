@@ -40,7 +40,13 @@ fn load_spec(spec_path: &String) {
         Err(e) => error(format!("Could't find specification file \"{}\": {}", spec_path, e)),
     }
 
-    let fjr = FormatJobRunner::build(&spec);
+    let fjr_res = FormatJobRunner::build(&spec);
+    if fjr_res.is_err() {
+        error(format!("Error loading specification {}: {}", spec_path, fjr_res.err().unwrap()));
+        return;
+    }
+
+    let fjr = fjr_res.unwrap();
 
     println!("Successfully loaded specification");
 
@@ -78,7 +84,7 @@ fn load_spec(spec_path: &String) {
 
         match fjr.format(&input){
             Ok(res) => println!("{}", res),
-            Err(e) => println!("{}", e),
+            Err(e) => println!("Error formatting {}: {}", target_path, e),
         }
     }
 }
