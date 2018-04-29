@@ -1,5 +1,6 @@
 use core::parse::Tree;
 use core::fmt::pattern::*;
+use core::Error;
 use std::collections::HashMap;
 
 mod pattern;
@@ -9,14 +10,19 @@ pub struct Formatter {
 }
 
 impl Formatter {
-    pub fn create(patterns: Vec<PatternPair>) -> Formatter {
+    pub fn create(patterns: Vec<PatternPair>) -> Result<Formatter, Error> {
         let mut pattern_map = HashMap::new();
         for pattern_pair in patterns {
-            pattern_map.insert(pattern_pair.production, generate_pattern(&pattern_pair.pattern[..]));
+            match generate_pattern(&pattern_pair.pattern[..]) {
+                Ok(pattern) => {
+                    pattern_map.insert(pattern_pair.production, pattern);
+                },
+                Err(e) => return Err(e),
+            }
         }
-        return Formatter{
+        Ok(Formatter{
             pattern_map,
-        }
+        })
     }
 
     pub fn format<'a>(&self, parse: &'a Tree) -> String {

@@ -29,7 +29,7 @@ s -> acc s `{0}\\n{1}`
 acc -> ACC;
     ".to_string();
 
-    let fjr = FormatJobRunner::build(&spec);
+    let fjr = FormatJobRunner::build(&spec).unwrap();
 
     //exercise
     let res = fjr.format(&"abasdfergrthergerghera".to_string()).unwrap();
@@ -78,7 +78,7 @@ s -> acc s `{0} {1}`
 acc -> ACC;
     ".to_string();
 
-    let fjr = FormatJobRunner::build(&spec);
+    let fjr = FormatJobRunner::build(&spec).unwrap();
 
     //exercise
     let res = fjr.format(&"aaaa \t \n  a aa  aa ".to_string()).unwrap();
@@ -109,7 +109,7 @@ fn test_advanced_operators() {
             -> ID
             -> IN ``;".to_string();
 
-    let fjr = FormatJobRunner::build(&spec);
+    let fjr = FormatJobRunner::build(&spec).unwrap();
 
     //exercise
     let res = fjr.format(&"i ij ijjjijijiji inj in iii".to_string()).unwrap();
@@ -118,30 +118,9 @@ fn test_advanced_operators() {
     assert_eq!(res, "iijijjjijijijiinjiii");
 }
 
-#[test]
-fn test_failed_scan_input() {
-    //setup
-    let spec = "
-'ab'
-
-start 'a' -> ACC;
-
-s -> ACC;
-    ".to_string();
-
-    let fjr = FormatJobRunner::build(&spec);
-
-    //exercise
-    let res = fjr.format(&"b".to_string());
-
-    //verify
-    assert!(res.is_err());
-    assert_eq!(res.err().unwrap(), "Failed to scan input: No accepting scans after (1,1): b...");
-}
-
 fn test_fjr(case_name: &str, spec_name: &str){
     //setup
-    let fjr = FormatJobRunner::build(&load_spec(spec_name));
+    let fjr = FormatJobRunner::build(&load_spec(spec_name)).unwrap();
 
     //exercise
     let res = fjr.format(&load_input(case_name)).unwrap();
@@ -182,7 +161,7 @@ fn assert_matches_file(result: String, file_name: &str){
         Ok(_) => {
             output_file.unwrap().read_to_string(&mut output);
         },
-        Err(e) => {
+        Err(_) => {
             let mut output_file = File::create(&file_path);
             match output_file {
                 Ok(_) => {

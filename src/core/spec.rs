@@ -11,6 +11,7 @@ use core::scan::Kind;
 use core::scan::DFA;
 use core::scan::CompileTransitionDelta;
 use core::scan::RuntimeTransitionDelta;
+use core::Error;
 use std::collections::HashMap;
 
 static SPEC_ALPHABET: &'static str = "`-=~!@#$%^&*()_+{}|[]\\;':\"<>?,./QWERTYUIOPASDFGHJKLZXCVBNM1234567890abcdefghijklmnopqrstuvwxyz \n\t";
@@ -151,11 +152,13 @@ lazy_static! {
     static ref SPEC_GRAMMAR: Grammar = Grammar::from(SPEC_PRODUCTIONS.clone());
 }
 
-pub fn generate_spec(parse: &Tree) -> (DFA, Grammar, Formatter) {
+pub fn generate_spec(parse: &Tree) -> Result<(DFA, Grammar, Formatter), Error> {
     let dfa = generate_dfa(parse.get_child(0));
     let (grammar, pattern_pairs) = generate_grammar(parse.get_child(1));
-    let formatter = Formatter::create(pattern_pairs);
-    (dfa, grammar, formatter)
+    match Formatter::create(pattern_pairs) {
+        Ok(formatter) => Ok((dfa, grammar, formatter)),
+        Err(e) => Err(e),
+    }
 }
 
 fn generate_dfa(tree: &Tree) -> DFA {
@@ -319,16 +322,21 @@ fn generate_grammar_ids<'a, 'b>(ids_node: &'a Tree, accumulator: &'b mut Vec<Str
     }
 }
 
-pub fn parse_spec(input: &str) -> Option<Tree> {
+pub fn parse_spec(input: &str) -> Result<Tree, Error> {
     let scanner = def_scanner();
     let parser = def_parser();
 
-    let mut parse: Option<Tree> = None;
+    let mut res: Result<Tree, Error> = Err(Error::Err("Failed to get thread local DFA".to_string()));
     SPEC_DFA.with(|f| {
-        let tokens = scanner.scan(input, f);
-        parse = parser.parse(tokens.unwrap(), &SPEC_GRAMMAR)
+        res = match scanner.scan(input, f) {
+            Ok(tokens) => match parser.parse(tokens, &SPEC_GRAMMAR) {
+                Some(parse) => Ok(parse),
+                None => Err(Error::ParseErr())
+            },
+            Err(se) => Err(Error::ScanErr(se)),
+        }
     });
-    parse
+    res
 }
 
 fn replace_escapes(input: &str) -> String {
@@ -632,7 +640,7 @@ w -> WHITESPACE ``;
         //specification
         let tree = parse_spec(spec);
         let parse = tree.unwrap();
-        let (dfa, grammar, formatter) = generate_spec(&parse);
+        let (dfa, grammar, formatter) = generate_spec(&parse).unwrap();
 
         //input
         let tokens = scanner.scan(input, &dfa);
