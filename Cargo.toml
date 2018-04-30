@@ -9,3 +9,4 @@ name = "padd"
 [dependencies]
 lazy_static = "1.0"
 stopwatch = "0.0.7"
+regex = "0.2"
