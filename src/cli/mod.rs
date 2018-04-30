@@ -146,7 +146,7 @@ fn term_loop(fjr: &FormatJobRunner){
 }
 
 fn format_file(target_path: &Path, fjr: &FormatJobRunner){
-    println!(">> Formatting {}", target_path.to_string_lossy());
+    print!(">> Formatting {}: ", target_path.to_string_lossy());
     let target_file = OpenOptions::new().read(true).write(true).open(&target_path);
     match target_file {
         Ok(_) => {
@@ -171,7 +171,7 @@ fn format_file(target_path: &Path, fjr: &FormatJobRunner){
                         },
                     }
                     match target.write_all(res.as_bytes()) {
-                        Ok(_) => {},
+                        Ok(_) => {println!("OK")},
                         Err(e) => {
                             println!("Couldn't write to target file \"{}\": {}", &target_path.to_string_lossy(), e);
                             return;
