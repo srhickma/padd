@@ -68,12 +68,19 @@ pub fn run(){
     }
 
     match target {
-        Some(target_path) => format_file(target_path, &fjr),
+        Some(target_path) => {
+            if directory.is_some() {
+                error("Invalid arguments: Target file and directory both specified".to_string());
+            } else if file_regex.is_some() {
+                error("Invalid arguments: Target file and file regex both specified".to_string());
+            }
+            format_file(target_path, &fjr)
+        },
         None => match directory {
             Some(dir_path) => {
                 let fn_regex = match file_regex {
                     Some(regex) => regex,
-                    None => Regex::new(r#".*\.rs"#).unwrap(),
+                    None => Regex::new(r#".*"#).unwrap(),
                 };
 
                 dir_recur(dir_path, &fn_regex, &fjr)
@@ -182,7 +189,7 @@ fn format_file(target_path: &Path, fjr: &FormatJobRunner){
 }
 
 fn error(err_text: String){
-    println!("{}", err_text);
+    println!("ERROR: {}", err_text);
     println!("Usage info goes here");
     process::exit(0);
 }

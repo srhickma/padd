@@ -151,7 +151,10 @@ impl Parser for EarleyParser {
 
         let (valid, complete_parses) = partial_parse(chart.len() - 1, grammar, &mut chart);
 
-        println!("FOUND {} COMPLETE PARSE(S)", complete_parses.len());
+        if complete_parses.len() != 1 {
+            println!("WARN: Found {} complete parse(s)", complete_parses.len());
+        }
+
 
         if !valid {
             return None;
