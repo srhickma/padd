@@ -1,6 +1,8 @@
 extern crate regex;
+extern crate stopwatch;
 
 use self::regex::Regex;
+use self::stopwatch::Stopwatch;
 use padd::FormatJobRunner;
 use std::env;
 use std::io;
@@ -13,6 +15,10 @@ use std::fs::File;
 use std::fs::OpenOptions;
 use std::fs;
 use std::path::Path;
+use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
+
+static FORMATTED: AtomicUsize = ATOMIC_USIZE_INIT;
+static TOTAL: AtomicUsize = ATOMIC_USIZE_INIT;
 
 pub fn run(){
     let args: Vec<_> = env::args().collect();
@@ -67,6 +73,9 @@ pub fn run(){
         }
     }
 
+    let mut sw = Stopwatch::new();
+    sw.start();
+
     match target {
         Some(target_path) => {
             if directory.is_some() {
@@ -88,6 +97,11 @@ pub fn run(){
             None => term_loop(&fjr),
         }
     }
+
+    sw.stop();
+    let total = TOTAL.load(Ordering::Relaxed);
+    let formatted = FORMATTED.load(Ordering::Relaxed);
+    println!("COMPLETE: {}ms : {} processed, {} formatted, {} failed", sw.elapsed_ms(), total, formatted, total - formatted);
 }
 
 fn dir_recur(dir_path: &Path, fn_regex: &Regex, fjr: &FormatJobRunner){
@@ -146,6 +160,13 @@ fn term_loop(fjr: &FormatJobRunner){
 }
 
 fn format_file(target_path: &Path, fjr: &FormatJobRunner){
+    TOTAL.fetch_add(1, Ordering::SeqCst);
+    if format_file_internal(target_path, fjr) {
+        FORMATTED.fetch_add(1, Ordering::SeqCst);
+    }
+}
+
+fn format_file_internal(target_path: &Path, fjr: &FormatJobRunner) -> bool {
     print!(">> Formatting {}: ", target_path.to_string_lossy());
     let target_file = OpenOptions::new().read(true).write(true).open(&target_path);
     match target_file {
@@ -157,7 +178,7 @@ fn format_file(target_path: &Path, fjr: &FormatJobRunner){
                 Ok(_) => {},
                 Err(e) => {
                     println!("Could't read target file \"{}\": {}", &target_path.to_string_lossy(), e);
-                    return;
+                    return false;
                 },
             }
 
@@ -167,29 +188,33 @@ fn format_file(target_path: &Path, fjr: &FormatJobRunner){
                         Ok(_) => {},
                         Err(e) => {
                             println!("Couldn't seek to start of target file \"{}\": {}", &target_path.to_string_lossy(), e);
-                            return;
+                            return false;
                         },
                     }
                     match target.write_all(res.as_bytes()) {
                         Ok(_) => {println!("OK")},
                         Err(e) => {
                             println!("Couldn't write to target file \"{}\": {}", &target_path.to_string_lossy(), e);
-                            return;
+                            return false;
                         },
                     }
                 },
-                Err(e) => println!("Error formatting {}: {}", &target_path.to_string_lossy(), e),
+                Err(e) => {
+                    println!("Error formatting {}: {}", &target_path.to_string_lossy(), e);
+                    return false;
+                },
             }
         },
         Err(e) => {
             println!("Could't find target file \"{}\": {}", &target_path.to_string_lossy(), e);
-            return;
+            return false;
         },
     }
+    true
 }
 
 fn error(err_text: String){
     println!("ERROR: {}", err_text);
-    println!("Usage info goes here");
+    println!("Usage: padd specification [-t target | -d directory [-m regex]]");
     process::exit(0);
 }
