@@ -60,7 +60,7 @@ thread_local! {
             ("id", 'W') | ("id", 'C') | ("id", 'I') | ("id", 'N') | ("id", 'S') |
             ("id", 'X') | ("id", 'D') | ("id", 'J') | ("id", 'O') | ("id", 'T') |
             ("id", 'Y') | ("id", 'E') | ("id", 'K') | ("id", 'P') | ("id", 'U') |
-            ("id", 'Z') | ("id", 'F') => "id",
+            ("id", 'Z') | ("id", 'F') | ("id", '_') => "id",
 
             ("ws", ' ') | ("ws", '\t') | ("ws", '\n') => "ws",
 
@@ -124,8 +124,11 @@ lazy_static! {
             "trans trans tran",
             "trans tran",
 
-            "tran CILC ARROW hatopt ID",
+            "tran mtcs ARROW hatopt ID",
             "tran DEF ARROW hatopt ID",
+
+            "mtcs CILC OR mtcs",
+            "mtcs CILC",
 
             "hatopt HAT",
             "hatopt ",
@@ -203,7 +206,7 @@ fn generate_dfa_states<'a>(states_node: &Tree, delta: &mut HashMap<State, HashMa
     let transopt_node = state_node.get_child(1);
     if !transopt_node.is_empty() {
         let mut state_delta: HashMap<char, State> = HashMap::new();
-        generate_dfa_trans(transopt_node.get_child(0), &mut state_delta, tokenizer);
+        generate_dfa_trans(transopt_node.get_child(0), &mut state_delta, delta, tokenizer, head_state);
         for state in &tail_states {
             extend_delta((*state), state_delta.clone(), delta);
         }
@@ -231,18 +234,14 @@ fn generate_dfa_targets<'a>(targets_node: &'a Tree, accumulator: &mut Vec<&'a St
     }
 }
 
-fn generate_dfa_trans<'a>(trans_node: &'a Tree, state_delta: &mut HashMap<char, State>, tokenizer: &mut HashMap<State, Kind>) {
+fn generate_dfa_trans<'a>(trans_node: &'a Tree, state_delta: &mut HashMap<char, State>, delta: &mut HashMap<State, HashMap<char, State>>, tokenizer: &mut HashMap<State, Kind>, src: &State){
     let tran_node = trans_node.get_child(trans_node.children.len() - 1);
 
     let dest: &State = &tran_node.get_child(3).lhs.lexeme;
     let matcher = tran_node.get_child(0);
     match &matcher.lhs.kind[..] {
-        "CILC" => {
-            let mut matcher_string = matcher.lhs.lexeme.trim_matches('\'');
-            let matcher_cleaned = replace_escapes(&matcher_string);
-            for c in matcher_cleaned.chars() {
-                state_delta.insert(c, dest.clone());
-            }
+        "mtcs" => {
+            generate_dfa_mtcs(matcher, state_delta, delta, tokenizer, src, dest);
         },
         "DEF" => {
             if state_delta.contains_key(&DEF_MATCHER) {
@@ -258,7 +257,39 @@ fn generate_dfa_trans<'a>(trans_node: &'a Tree, state_delta: &mut HashMap<char, 
     }
 
     if trans_node.children.len() == 2 {
-        generate_dfa_trans(trans_node.get_child(0), state_delta, tokenizer)
+        generate_dfa_trans(trans_node.get_child(0), state_delta, delta, tokenizer, src);
+    }
+}
+
+fn generate_dfa_mtcs<'a>(mtcs_node: &'a Tree, state_delta: &mut HashMap<char, State>, delta: &mut HashMap<State, HashMap<char, State>>, tokenizer: &mut HashMap<State, Kind>, src: &State, dest: &State){
+    let matcher = mtcs_node.children.first().unwrap();
+    let mut matcher_string = matcher.lhs.lexeme.trim_matches('\'');
+    let matcher_cleaned = replace_escapes(&matcher_string);
+    let mut chars = matcher_cleaned.chars();
+    if matcher_cleaned.len() == 1 {
+        state_delta.insert(chars.next().unwrap(), dest.clone());
+    } else {
+        let mut from : State = src.clone();
+        let mut to: String = format!("#{}#", from);
+        state_delta.insert(chars.next().unwrap(), dest.clone());
+        let mut i = 0;
+        for c in chars {
+            to = if i == matcher_cleaned.len() - 1 {
+                dest.clone()
+            } else {
+                format!("{}{}", from, c)
+            };
+
+            delta.entry(from)
+                .or_insert(HashMap::new())
+                .insert(c, to.clone());
+            from = to;
+            i += 1;
+        }
+    }
+
+    if mtcs_node.children.len() == 3 {
+        generate_dfa_mtcs(mtcs_node.get_child(2), state_delta, delta, tokenizer, src, dest);
     }
 }
 
@@ -467,31 +498,36 @@ w -> WHITESPACE `[prefix]{0}\n\n{1;prefix=[prefix]\t}[prefix]{2}\n\n`
     │       │   │   │       │       │   │   ├── trans
     │       │   │   │       │       │   │   │   ├── trans
     │       │   │   │       │       │   │   │   │   └── tran
-    │       │   │   │       │       │   │   │   │       ├── CILC <- '' ''
+    │       │   │   │       │       │   │   │   │       ├── mtcs
+    │       │   │   │       │       │   │   │   │       │   └── CILC <- '' ''
     │       │   │   │       │       │   │   │   │       ├── ARROW <- '->'
     │       │   │   │       │       │   │   │   │       ├── hatopt
     │       │   │   │       │       │   │   │   │       │   └──  <- 'NULL'
     │       │   │   │       │       │   │   │   │       └── ID <- 'ws'
     │       │   │   │       │       │   │   │   └── tran
-    │       │   │   │       │       │   │   │       ├── CILC <- ''\\t''
+    │       │   │   │       │       │   │   │       ├── mtcs
+    │       │   │   │       │       │   │   │       │   └── CILC <- ''\\t''
     │       │   │   │       │       │   │   │       ├── ARROW <- '->'
     │       │   │   │       │       │   │   │       ├── hatopt
     │       │   │   │       │       │   │   │       │   └──  <- 'NULL'
     │       │   │   │       │       │   │   │       └── ID <- 'ws'
     │       │   │   │       │       │   │   └── tran
-    │       │   │   │       │       │   │       ├── CILC <- ''\\n''
+    │       │   │   │       │       │   │       ├── mtcs
+    │       │   │   │       │       │   │       │   └── CILC <- ''\\n''
     │       │   │   │       │       │   │       ├── ARROW <- '->'
     │       │   │   │       │       │   │       ├── hatopt
     │       │   │   │       │       │   │       │   └──  <- 'NULL'
     │       │   │   │       │       │   │       └── ID <- 'ws'
     │       │   │   │       │       │   └── tran
-    │       │   │   │       │       │       ├── CILC <- ''{''
+    │       │   │   │       │       │       ├── mtcs
+    │       │   │   │       │       │       │   └── CILC <- ''{''
     │       │   │   │       │       │       ├── ARROW <- '->'
     │       │   │   │       │       │       ├── hatopt
     │       │   │   │       │       │       │   └──  <- 'NULL'
     │       │   │   │       │       │       └── ID <- 'lbr'
     │       │   │   │       │       └── tran
-    │       │   │   │       │           ├── CILC <- ''}''
+    │       │   │   │       │           ├── mtcs
+    │       │   │   │       │           │   └── CILC <- ''}''
     │       │   │   │       │           ├── ARROW <- '->'
     │       │   │   │       │           ├── hatopt
     │       │   │   │       │           │   └──  <- 'NULL'
@@ -508,19 +544,22 @@ w -> WHITESPACE `[prefix]{0}\n\n{1;prefix=[prefix]\t}[prefix]{2}\n\n`
     │       │   │       │       ├── trans
     │       │   │       │       │   ├── trans
     │       │   │       │       │   │   └── tran
-    │       │   │       │       │   │       ├── CILC <- '' ''
+    │       │   │       │       │   │       ├── mtcs
+    │       │   │       │       │   │       │   └── CILC <- '' ''
     │       │   │       │       │   │       ├── ARROW <- '->'
     │       │   │       │       │   │       ├── hatopt
     │       │   │       │       │   │       │   └──  <- 'NULL'
     │       │   │       │       │   │       └── ID <- 'ws'
     │       │   │       │       │   └── tran
-    │       │   │       │       │       ├── CILC <- ''\\t''
+    │       │   │       │       │       ├── mtcs
+    │       │   │       │       │       │   └── CILC <- ''\\t''
     │       │   │       │       │       ├── ARROW <- '->'
     │       │   │       │       │       ├── hatopt
     │       │   │       │       │       │   └──  <- 'NULL'
     │       │   │       │       │       └── ID <- 'ws'
     │       │   │       │       └── tran
-    │       │   │       │           ├── CILC <- ''\\n''
+    │       │   │       │           ├── mtcs
+    │       │   │       │           │   └── CILC <- ''\\n''
     │       │   │       │           ├── ARROW <- '->'
     │       │   │       │           ├── hatopt
     │       │   │       │           │   └──  <- 'NULL'
@@ -616,11 +655,11 @@ w -> WHITESPACE `[prefix]{0}\n\n{1;prefix=[prefix]\t}[prefix]{2}\n\n`
 ' \\t\\n{}'
 
 # dfa
-start ' \\t\\n' -> ws
+start ' ' | '\\t' | '\\n' -> ws
  '{' -> lbr
  '}' -> rbr;
 ws^WHITESPACE
- ' \\t\\n' -> ws;
+ ' ' | '\\t' | '\\n' -> ws;
 lbr^LBRACKET;
 rbr^RBRACKET;
 
@@ -722,7 +761,8 @@ w -> WHITESPACE ``;
     │       │   │       │   └── trans
     │       │   │       │       ├── trans
     │       │   │       │       │   └── tran
-    │       │   │       │       │       ├── CILC <- ''i''
+    │       │   │       │       │       ├── mtcs
+    │       │   │       │       │       │   └── CILC <- ''i''
     │       │   │       │       │       ├── ARROW <- '->'
     │       │   │       │       │       ├── hatopt
     │       │   │       │       │       │   └──  <- 'NULL'
@@ -741,7 +781,8 @@ w -> WHITESPACE ``;
     │       │       ├── transopt
     │       │       │   └── trans
     │       │       │       └── tran
-    │       │       │           ├── CILC <- ''n''
+    │       │       │           ├── mtcs
+    │       │       │           │   └── CILC <- ''n''
     │       │       │           ├── ARROW <- '->'
     │       │       │           ├── hatopt
     │       │       │           │   └── HAT <- '^'
@@ -758,7 +799,8 @@ w -> WHITESPACE ``;
     │           │   └── trans
     │           │       ├── trans
     │           │       │   └── tran
-    │           │       │       ├── CILC <- '' ''
+    │           │       │       ├── mtcs
+    │           │       │       │   └── CILC <- '' ''
     │           │       │       ├── ARROW <- '->'
     │           │       │       ├── hatopt
     │           │       │       │   └──  <- 'NULL'

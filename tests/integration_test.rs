@@ -64,7 +64,7 @@ fn test_ignore_tokens() {
 'a \n\t'
 
 start 'a' -> a
-' \n\t' -> ws;
+' ' | '\n' | '\t' -> ws;
 
 a^ACC
 'a' -> a

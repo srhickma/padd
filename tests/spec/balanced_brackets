@@ -2,11 +2,11 @@
 
 # dfa
 start
- ' \t\n' -> ws
+ ' ' | '\t' | '\n' -> ws
  '{' -> lbr
  '}' -> rbr;
 ws ^ WHITESPACE
- ' \t\n' -> ws;
+ ' ' | '\t' | '\n' -> ws;
 lbr ^ LBRACKET;
 rbr ^ RBRACKET;
 
