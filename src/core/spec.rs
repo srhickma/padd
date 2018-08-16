@@ -270,20 +270,26 @@ fn generate_dfa_mtcs<'a>(mtcs_node: &'a Tree, state_delta: &mut HashMap<char, St
         state_delta.insert(chars.next().unwrap(), dest.clone());
     } else {
         let mut from : State = src.clone();
-        let mut to: String = format!("#{}#", from);
-        state_delta.insert(chars.next().unwrap(), dest.clone());
-        let mut i = 0;
+        let first_char = chars.next().unwrap();
+        let mut to: String = format!("#{}#{}", from, first_char);
+        state_delta.insert(first_char, to.clone());
+        println!("{} '{}' -> {}", &from, first_char, &to);
+
+        let mut i = 1;
         for c in chars {
+            from = to.clone(); //TODO try to reduce cloning
+            //println!("{} {}", i, matcher_cleaned.len());
             to = if i == matcher_cleaned.len() - 1 {
                 dest.clone()
             } else {
-                format!("{}{}", from, c)
+                format!("{}{}", &to, c)
             };
+
+            println!("{} '{}' -> {}", &from, c, &to);
 
             delta.entry(from)
                 .or_insert(HashMap::new())
-                .insert(c, to.clone());
-            from = to;
+                .insert(c, to.clone())
             i += 1;
         }
     }
@@ -723,6 +729,48 @@ w -> WHITESPACE ``;
 
 }\n\n"
         );
+    }
+
+    #[test]
+    fn multi_character_lexing() {
+        //setup
+        let spec = "
+'abcdefghijklmnopqrstuvwxyz '
+
+start
+  #'if' -> ^IF
+  #'else' -> ^ELSE
+  'for' -> ^FOR
+  #'fob' -> ^FOB
+  #'final' -> ^FINAL
+  ' ' -> ws
+  _ -> id;
+
+ws^_;
+
+id ^ID
+ ' ' -> fail
+ _ -> id;
+
+s -> ;
+    ";
+
+        let input = "fdkgdfjgdjglkdjglkdjgljbnhbduhoifjeoigjeoghknhkjdfjgoirjt for if endif \
+        elseif somethign eldsfnj hi bob joe here final for fob else if id idhere fobre";
+
+        let scanner = def_scanner();
+
+        //specification
+        let tree = parse_spec(spec);
+        let parse = tree.unwrap();
+        let (dfa, grammar, formatter) = generate_spec(&parse).unwrap();
+
+        //input
+        let tokens = scanner.scan(input, &dfa).unwrap();
+
+        for token in tokens {
+            println!("{}", token.kind);
+        }
     }
 
     #[test]
