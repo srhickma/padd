@@ -206,6 +206,10 @@ fn generate_dfa_states<'a>(states_node: &Tree, delta: &mut HashMap<State, HashMa
     let transopt_node = state_node.get_child(1);
     if !transopt_node.is_empty() {
         let mut state_delta: HashMap<char, State> = HashMap::new();
+
+        //TODO remove this after CDFA
+        generate_dfa_trans_def_prefill(transopt_node.get_child(0), &mut state_delta);
+
         generate_dfa_trans(transopt_node.get_child(0), &mut state_delta, delta, tokenizer, head_state);
         for state in &tail_states {
             extend_delta((*state), state_delta.clone(), delta);
@@ -234,6 +238,24 @@ fn generate_dfa_targets<'a>(targets_node: &'a Tree, accumulator: &mut Vec<&'a St
     }
 }
 
+fn generate_dfa_trans_def_prefill<'a>(trans_node: &'a Tree, state_delta: &mut HashMap<char, State>){
+    let tran_node = trans_node.get_child(trans_node.children.len() - 1);
+
+    let dest: &State = &tran_node.get_child(3).lhs.lexeme;
+    let matcher = tran_node.get_child(0);
+    match &matcher.lhs.kind[..] {
+        "DEF" => {
+            state_delta.insert(DEF_MATCHER, dest.clone());
+            return;
+        },
+        &_ => {},
+    }
+
+    if trans_node.children.len() == 2 {
+        generate_dfa_trans_def_prefill(trans_node.get_child(0), state_delta);
+    }
+}
+
 fn generate_dfa_trans<'a>(trans_node: &'a Tree, state_delta: &mut HashMap<char, State>, delta: &mut HashMap<State, HashMap<char, State>>, tokenizer: &mut HashMap<State, Kind>, src: &State){
     let tran_node = trans_node.get_child(trans_node.children.len() - 1);
 
@@ -244,10 +266,7 @@ fn generate_dfa_trans<'a>(trans_node: &'a Tree, state_delta: &mut HashMap<char, 
             generate_dfa_mtcs(matcher, state_delta, delta, tokenizer, src, dest);
         },
         "DEF" => {
-            if state_delta.contains_key(&DEF_MATCHER) {
-                panic!("DFA generation failed, more than one default matcher");
-            }
-            state_delta.insert(DEF_MATCHER, dest.clone());
+            //TODO fill with CDFA
         },
         &_ => panic!("Transition map input is neither CILC or DEF"),
     }
@@ -263,7 +282,7 @@ fn generate_dfa_trans<'a>(trans_node: &'a Tree, state_delta: &mut HashMap<char, 
 
 fn generate_dfa_mtcs<'a>(mtcs_node: &'a Tree, state_delta: &mut HashMap<char, State>, delta: &mut HashMap<State, HashMap<char, State>>, tokenizer: &mut HashMap<State, Kind>, src: &State, dest: &State){
     let matcher = mtcs_node.children.first().unwrap();
-    let mut matcher_string = matcher.lhs.lexeme.trim_matches('\'');
+    let matcher_string = matcher.lhs.lexeme.trim_matches('\'');
     let matcher_cleaned = replace_escapes(&matcher_string);
     let mut chars = matcher_cleaned.chars();
     if matcher_cleaned.len() == 1 {
@@ -273,23 +292,30 @@ fn generate_dfa_mtcs<'a>(mtcs_node: &'a Tree, state_delta: &mut HashMap<char, St
         let first_char = chars.next().unwrap();
         let mut to: String = format!("#{}#{}", from, first_char);
         state_delta.insert(first_char, to.clone());
-        println!("{} '{}' -> {}", &from, first_char, &to);
+
+        //TODO remove with CDFA
+        let def_trans = state_delta.get(&DEF_MATCHER);
 
         let mut i = 1;
         for c in chars {
             from = to.clone(); //TODO try to reduce cloning
-            //println!("{} {}", i, matcher_cleaned.len());
             to = if i == matcher_cleaned.len() - 1 {
                 dest.clone()
             } else {
                 format!("{}{}", &to, c)
             };
 
-            println!("{} '{}' -> {}", &from, c, &to);
-
-            delta.entry(from)
+            delta.entry(from.clone())
                 .or_insert(HashMap::new())
-                .insert(c, to.clone())
+                .insert(c, to.clone());
+
+            match def_trans {
+                Some(state) => {
+                    delta.get_mut(&from).unwrap().insert(DEF_MATCHER, state.clone());
+                },
+                None => {}
+            };
+
             i += 1;
         }
     }
@@ -377,7 +403,7 @@ pub fn parse_spec(input: &str) -> Result<Tree, Error> {
 }
 
 fn replace_escapes(input: &str) -> String {
-    let mut res = String::with_capacity(input.as_bytes().len() / 2);
+    let mut res = String::with_capacity(input.as_bytes().len());
     let mut i = 0;
     let mut last_char: char = ' ';
     for c in input.chars() {
@@ -738,11 +764,11 @@ w -> WHITESPACE ``;
 'abcdefghijklmnopqrstuvwxyz '
 
 start
-  #'if' -> ^IF
-  #'else' -> ^ELSE
+  'if' -> ^IF
+  'else' -> ^ELSE
   'for' -> ^FOR
-  #'fob' -> ^FOB
-  #'final' -> ^FINAL
+  'fob' -> ^FOB
+  'final' -> ^FINAL
   ' ' -> ws
   _ -> id;
 
@@ -759,18 +785,41 @@ s -> ;
         elseif somethign eldsfnj hi bob joe here final for fob else if id idhere fobre";
 
         let scanner = def_scanner();
-
-        //specification
         let tree = parse_spec(spec);
         let parse = tree.unwrap();
-        let (dfa, grammar, formatter) = generate_spec(&parse).unwrap();
+        let (dfa, _, _) = generate_spec(&parse).unwrap();
 
-        //input
+        //execute
         let tokens = scanner.scan(input, &dfa).unwrap();
 
+        //verify
+        let mut res_string = String::new();
         for token in tokens {
-            println!("{}", token.kind);
+            res_string = format!("{}\nkind={} lexeme={}", res_string, token.kind, token.lexeme);
         }
+
+        assert_eq!(res_string, "
+kind=ID lexeme=fdkgdfjgdjglkdjglkdjgljbnhbduhoifjeoigjeoghknhkjdfjgoirjt
+kind=FOR lexeme=for
+kind=IF lexeme=if
+kind=ID lexeme=endif
+kind=ELSE lexeme=else
+kind=IF lexeme=if
+kind=ID lexeme=somethign
+kind=ID lexeme=eldsfnj
+kind=ID lexeme=hi
+kind=ID lexeme=bob
+kind=ID lexeme=joe
+kind=ID lexeme=here
+kind=FINAL lexeme=final
+kind=FOR lexeme=for
+kind=FOB lexeme=fob
+kind=ELSE lexeme=else
+kind=IF lexeme=if
+kind=ID lexeme=id
+kind=ID lexeme=idhere
+kind=FOB lexeme=fob
+kind=ID lexeme=re")
     }
 
     #[test]
