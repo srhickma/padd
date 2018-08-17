@@ -81,20 +81,15 @@ The specification file:
 
 # dfa
 start
- ' \t\n' -> ws
- '{' -> lbr
- '}' -> rbr;
-ws ^ WHITESPACE
- ' \t\n' -> ws;
-lbr ^ LBRACKET;
-rbr ^ RBRACKET;
+ ' ' | '\t' | '\n' -> ws
+ '{' -> ^LBRACKET
+ '}' -> ^RBRACKET;
+ws ^_;
 
 # grammar
 s -> s b
   ->;
-b -> LBRACKET s RBRACKET `[prefix]{0}\n\n{1;prefix=[prefix]\t}[prefix]{2}\n\n`
-  -> w;
-w -> WHITESPACE ``;
+b -> LBRACKET s RBRACKET `[prefix]{0}\n\n{1;prefix=[prefix]\t}[prefix]{2}\n\n`;
 ```
 The input:
 ```
