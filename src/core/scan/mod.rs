@@ -55,6 +55,9 @@ impl DFA {
 pub trait TransitionDelta {
     fn transition<'a>(&'a self, state: &'a State, c: char) -> &'a State;
     fn tokenize(&self, state: &State) -> Kind;
+
+    //TODO remove with CDFA
+    fn has_non_def_transition(&self, c: char, state: &State) -> bool;
 }
 
 pub struct CompileTransitionDelta {
@@ -69,6 +72,11 @@ impl TransitionDelta for CompileTransitionDelta {
     }
     fn tokenize(&self, state: &State) -> Kind {
         (self.tokenizer)(&state[..]).to_string()
+    }
+
+    //TODO remove with CDFA
+    fn has_non_def_transition(&self, c: char, state: &State) -> bool {
+        self.transition(state, c) != ""
     }
 }
 
@@ -96,7 +104,7 @@ impl TransitionDelta for RuntimeTransitionDelta {
         match self.delta.get(state) {
             Some(hm) => match hm.get(&c) {
                 Some(s) => s,
-                None => match hm.get(&'_') {
+                None => match hm.get(&'_') { //TODO make default matcher
                     Some(s) => s,
                     None => &NULL_STATE,
                 },
@@ -108,6 +116,17 @@ impl TransitionDelta for RuntimeTransitionDelta {
         match self.tokenizer.get(state) {
             Some(s) => s.clone(),
             None => String::new(),
+        }
+    }
+
+    //TODO remove with CDFA
+    fn has_non_def_transition(&self, c: char, state: &State) -> bool {
+        match self.delta.get(state) {
+            Some(hm) => match hm.get(&c) {
+                Some(_) => true,
+                None => false
+            },
+            None => false,
         }
     }
 }

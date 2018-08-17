@@ -27,7 +27,14 @@ impl Scanner for MaximalMunchScanner {
             };
 
             let next_state = dfa.transition(state, input[0]);
-            let tail: &[char] = &input[1..];
+
+            //TODO remove with CDFA
+            let tail: &[char] = if state.chars().next().unwrap() == '#' && !dfa.td.has_non_def_transition(input[0], state) {
+                input
+            } else {
+                &input[1..]
+            };
+
             let (r_input, end_state, end_line, end_character) = scan_one(tail, next_state, new_line, new_character, (input, state, line, character), dfa);
 
             return if dfa.accepts(end_state) {

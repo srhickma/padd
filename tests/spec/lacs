@@ -16,45 +16,20 @@ start
     ':' -> ^COLON
     ' ' | '\t' | '\n' -> ws
     '=' -> eq
-    '!' -> ne
+    '!=' -> ^NE
     '<' -> lt
     '>' -> gt
     '/' -> slash
-    '0' -> ^NUM
+    '0' -> num
     '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' -> num
-    'd' -> kd
-    'v' -> kv
-    'I' -> kI
-    'i' -> ki
-    'e' -> ke
+    'def' -> ^DEF
+    'var' -> ^VAR
+    'Int' -> ^INT
+    'if' -> ^IF
+    'else' -> ^ELSE
     _ -> ^ID;
 
-kd      ^ID
-    'e' -> kde;
-kde     ^ID
-    'f' -> ^DEF;
-
-kv      ^ID
-    'a' -> kva;
-kva     ^ID
-    'r' -> ^VAR;
-
-kI      ^ID
-    'n' -> kIn;
-kIn     ^ID
-    't' -> ^INT;
-
-ki      ^ID
-    'f' -> ^IF;
-
-ke      ^ID
-    'l' -> kel;
-kel     ^ID
-    's' -> kels;
-kels    ^ID
-    'e' -> ^ELSE;
-
-ELSE | IF | INT | VAR | DEF | ID | kels | kel | ke | ki | kIn | kI | kva | kv | kde | kd
+ID
     '<' | '>' | '=' | '+' | '-' | '*' | '/' | '%' | '(' | ')' | '{' | '}' | ',' | ';' | ':' | '!' | ' ' | '\n' | '\t' -> fail
     _ -> ID;
 
@@ -71,9 +46,6 @@ comment ^COMMENT
 eq      ^BECOMES
     '=' -> ^EQ
     '>' -> ^ARROW;
-
-ne
-    '=' -> ^NE;
 
 lt      ^LT
     '=' -> ^LE;
