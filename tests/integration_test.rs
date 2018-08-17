@@ -63,6 +63,11 @@ fn test_lacs_complex() {
 }
 
 #[test]
+fn test_java8_simple(){
+    test_fjr("java8_simple", "java8_extensive");
+}
+
+#[test]
 fn test_ignore_tokens() {
     //setup
     let spec = "

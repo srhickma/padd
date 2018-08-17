@@ -1,0 +1,222 @@
+# SIGMA
+'<>=+-*/\\%(){},.;:!?^|"\'~ \t\nABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+
+#----------------------------------------------------------------------------------------------------------------------#
+# CDFA                                                                                                                 #
+#----------------------------------------------------------------------------------------------------------------------#
+
+start
+    '{' -> ^LBRACE
+    '}' -> ^RBRACE
+    '(' -> ^LPAREN
+    ')' -> ^RPAREN
+    '[' -> ^LARRI
+    ']' -> ^RARRI
+
+    ',' -> ^COMMA
+    ';' -> ^SEMI
+    ':' -> ^COLON
+
+    # OPERATORS
+    '=' -> eq
+    '<' -> lt
+    '>' -> gt
+    '!' -> not
+    '+' -> plus
+    '-' -> minus
+    '*' -> star
+    '%' -> pct
+    '/' -> slash
+    '~' -> ^COMP
+    '&' -> and
+    '^' -> ^OR_BE
+    '|' -> or
+    '?' -> ^QST
+    '.' -> dot
+
+    # LITERALS
+    '"' -> string
+    '\'' -> char
+    '0' -> zero
+    '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' -> num
+
+    # KEYWORDS
+    'abstract' -> ^ABSTRACT
+    'assert' -> ^ASSERT
+    'boolean' -> ^BOOLEAN
+    'break' -> ^BREAK
+    'byte' -> ^BYTE
+    'case' -> ^CASE
+    'catch' -> ^CATCH
+    'char' -> ^CHAR
+    'class' -> ^CLASS
+    'const' -> ^CONST
+    'continue' -> ^CONTINUE
+    'default' -> ^DEFAULT
+    'do' -> ^DO
+    'double' -> ^DOUBLE
+    'else' -> ^ELSE
+    'enum' -> ^ENUM
+    'extends' -> ^EXTENDS
+    'final' -> ^FINAL
+    'finally' -> ^FINALLY
+    'float' -> ^FLOAT
+    'for' -> ^FOR
+    'goto' -> ^GOTO
+    'if' -> ^IF
+    'implements' -> ^IMPLEMENTS
+    'import' -> ^IMPORT
+    'instanceof' -> ^INSTANCEOF
+    'int' -> ^INT
+    'interface' -> ^INTERFACE
+    'long' -> ^LONG
+    'native' -> ^NATIVE
+    'new' -> ^NEW
+    'package' -> ^PACKAGE
+    'private' -> ^PRIVATE
+    'protected' -> ^PROTECTED
+    'public' -> ^PUBLIC
+    'return' -> ^RETURN
+    'short' -> ^SHORT
+    'static' -> ^STATIC
+    'strictfp' -> ^STRICTFP
+    'super' -> ^SUPER
+    'switch' -> ^SWITCH
+    'synchronized' -> ^SYNCHRONIZED
+    'this' -> ^THIS
+    'throw' -> ^THROW
+    'throws' -> ^THROWS
+    'transient' -> ^TRANSIENT
+    'try' -> ^TRY
+    'void' -> ^VOID
+    'volatile' -> ^VOLATILE
+    'while' -> ^WHILE
+
+    # MISC
+    ' ' | '\t' | '\n' -> ws
+    'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' | 'h' | 'i' | 'j' | 'k' | 'l' | 'm' | 'n' | 'o' | 'p' | 'q' | 'r' | 's'
+        | 't' | 'u' | 'v' | 'w' | 'x' | 'y' | 'z' | 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H' | 'I' | 'J' | 'K'
+        | 'L' | 'M' | 'N' | 'O' | 'P' | 'Q' | 'R' | 'S' | 'T' | 'U' | 'V' | 'W' | 'X' | 'Y' | 'Z' | '$' | '_' -> id;
+
+#
+# OPERATORS
+#
+
+eq      ^ASSN
+    '=' -> ^EQ
+
+not     ^NOT
+    '=' -> ^NE;
+
+lt      ^LT
+    '<' -> ^BL_SHIFT
+    '=' -> ^LE;
+
+gt      ^GT
+    '>' -> ^brs
+    '=' -> ^GE;
+
+brs     ^BR_SHIFT
+    '>' -> ^BR_SHIFT;
+
+plus    ^PLUS
+    '+' -> ^INC
+    '=' -> ^PLUS_E;
+
+minus   ^MINUS
+    '>' -> ^ARROW
+    '-' -> ^DEC
+    '=' -> ^MINUS_E;
+
+star    ^STAR
+    '=' -> ^STAR_E;
+
+pct     ^PCT
+    '=' -> ^PCT_E;
+
+slash   ^DIV
+    '/' -> lcom
+    '*' -> bcom
+    '=' -> ^DIV_E;
+
+and     ^AND_B
+    '&' -> ^AND_L;
+
+or      ^OR_BI
+    '|' -> ^OR_L;
+
+dot     ^DOT
+    '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' -> float
+    '..' -> ^TRIDOT
+
+#
+# LITERALS
+#
+
+string
+    '"' -> ^STRING
+    '\\"' -> string
+    _ -> string;
+
+char    # ignoring length
+    '\'' -> ^CHAR
+    _ -> char;
+
+zero    ^NUM
+    'x' | 'X' -> hex
+    'b' | 'B' -> bin
+    '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' -> oct
+    'e' | 'E' -> floatexp
+    'f' | 'd' | 'F' | 'D' -> ^FLOAT;
+
+num     ^NUM
+    '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '_' -> num
+    '.' -> float
+    'e' | 'E' -> floatexp
+    'f' | 'd' | 'F' | 'D' -> ^FLOAT;
+
+bin  ^BIN
+    '0' | '1' | '_' -> bin;
+
+hex     ^HEX
+    '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | 'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'A' | 'B' | 'C'
+        | 'D' | 'E' | 'F' | '_' -> hex;
+
+oct   ^OCT
+    '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '_' -> oct;
+
+float   ^FLOAT
+    '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '_' -> float
+    'e' | 'E' -> floatexp
+    'f' | 'd' | 'F' | 'D' -> ^FLOAT;
+
+floatexp
+    '-' | '+' -> floatexp
+    '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' -> float;
+
+#
+# MISC
+#
+
+ws      ^WHITESPACE
+    ' \t\n' -> ws;
+
+lcom ^COMMENT
+    '\n' -> fail
+    _ -> lcom;
+
+bcom
+    '*/' -> ^COMMENT
+    '_' -> bcom;
+
+id      ^ID
+    'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' | 'h' | 'i' | 'j' | 'k' | 'l' | 'm' | 'n' | 'o' | 'p' | 'q' | 'r' | 's'
+        | 't' | 'u' | 'v' | 'w' | 'x' | 'y' | 'z' | 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H' | 'I' | 'J' | 'K'
+        | 'L' | 'M' | 'N' | 'O' | 'P' | 'Q' | 'R' | 'S' | 'T' | 'U' | 'V' | 'W' | 'X' | 'Y' | 'Z' | '$' | '_' | '0'
+        | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' -> id;
+
+#----------------------------------------------------------------------------------------------------------------------#
+# GRAMMAR                                                                                                              #
+#----------------------------------------------------------------------------------------------------------------------#
+
+s -> ;
