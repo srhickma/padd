@@ -782,7 +782,7 @@ s -> ;
     ";
 
         let input = "fdkgdfjgdjglkdjglkdjgljbnhbduhoifjeoigjeoghknhkjdfjgoirjt for if endif \
-        elseif somethign eldsfnj hi bob joe here final for fob else if id idhere fobre";
+        elseif somethign eldsfnj hi bob joe here final for fob else if id idhere fobre f ";
 
         let scanner = def_scanner();
         let tree = parse_spec(spec);
@@ -819,7 +819,8 @@ kind=IF lexeme=if
 kind=ID lexeme=id
 kind=ID lexeme=idhere
 kind=FOB lexeme=fob
-kind=ID lexeme=re")
+kind=ID lexeme=re
+kind=ID lexeme=f")
     }
 
     #[test]
