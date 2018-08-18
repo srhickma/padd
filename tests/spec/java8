@@ -1,5 +1,5 @@
 # SIGMA
-'<>=+-*/\\%(){},.;:!?^|"\'~ \t\nABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+'<>=+-*/\\%(){}[],.;:!?^@|"\'~ \t\nABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
 
 #----------------------------------------------------------------------------------------------------------------------#
 # CDFA                                                                                                                 #
@@ -16,6 +16,8 @@ start
     ',' -> ^COMMA
     ';' -> ^SEMI
     ':' -> ^COLON
+
+    '@' -> ^AT
 
     # OPERATORS
     '=' -> eq
@@ -38,6 +40,7 @@ start
     '"' -> string
     '\'' -> char
     '0' -> zero
+    'true' | 'false' | 'null' -> ^LIT
     '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' -> num
 
     # KEYWORDS
@@ -73,9 +76,9 @@ start
     'native' -> ^NATIVE
     'new' -> ^NEW
     'package' -> ^PACKAGE
-    'private' -> ^PRIVATE
-    'protected' -> ^PROTECTED
-    'public' -> ^PUBLIC
+    'private' -> ^VISIBILITY
+    'protected' -> ^VISIBILITY
+    'public' -> ^VISIBILITY
     'return' -> ^RETURN
     'short' -> ^SHORT
     'static' -> ^STATIC
@@ -139,7 +142,7 @@ slash   ^BOP
     '*' -> bcom
     '=' -> ^ASSN;
 
-and     ^BOP
+and     ^AND
     '&' -> ^COMP;
 
 or      ^OR_BI
@@ -198,8 +201,8 @@ floatexp
 # MISC
 #
 
-ws      ^WHITESPACE
-    ' \t\n' -> ws;
+ws      ^_
+    ' ' | '\t' | '\n' -> ws;
 
 lcom ^COMMENT
     '\n' -> fail
@@ -219,4 +222,151 @@ id      ^ID
 # GRAMMAR                                                                                                              #
 #----------------------------------------------------------------------------------------------------------------------#
 
-s -> ;
+CompilationUnit
+    -> PackageDeclarationOpt ImportDeclarationsOpt TypeDeclarationsOpt;
+
+PackageDeclarationOpt
+    -> AnnotationsOpt PACKAGE id_chain SEMI;
+
+ImportDeclarationsOpt
+    -> ImportDeclarations
+    ->;
+ImportDeclarations
+    -> ImportDeclaration ImportDeclarations
+    -> ImportDeclaration;
+ImportDeclaration
+    -> IMPORT typename SEMI
+    -> IMPORT typename DOT STAR SEMI
+    -> IMPORT STATIC typename DOT ID SEMI
+    -> IMPORT STATIC typename DOT STAR SEMI;
+
+TypeDeclarationsOpt
+    -> TypeDeclarations
+    ->;
+TypeDeclarations
+    -> TypeDeclaration TypeDeclarations
+    -> TypeDeclaration;
+TypeDeclaration
+    -> ClassDeclaration
+    -> InterfaceDeclaration
+    -> SEMI;
+
+#
+# CLASS
+#
+
+class_declaration
+    -> class_modifiers_opt CLASS ID type_parameters_opt superclass_opt superinterfaces_opt class_body;
+
+class_modifiers_opt
+    -> class_modifiers
+    ->;
+class_modifiers
+    -> class_modifier class_modifiers
+    -> class_modifier;
+class_modifier
+    -> annotation
+    -> VISIBILITY
+    -> ABSTRACT
+    -> STATIC
+    -> FINAL
+    -> STRICTFP;
+
+class_type
+    -> class_type DOT class_type_internal
+    -> class_type_internal;
+class_type_internal
+    -> annotations_opt ID type_arguments;
+
+#
+# ENUM
+#
+
+enum_declaration
+    ->;
+
+#
+# ANNOTATION
+#
+
+annotation_declaration
+    ->;
+
+#
+# INTERFACE
+#
+
+interface_declaration
+    ->;
+
+#
+# TYPE
+#
+
+type_parameters_opt
+    -> LT type_parameters GT
+    ->;
+type_parameters
+    -> type_parameter COMMA type_parameters
+    -> type_parameter;
+type_parameter
+    -> annotations_opt ID type_bound_opt;
+type_bound_opt
+    -> type_bound
+    ->;
+type_bound
+    -> EXTENDS type_variable
+    -> EXTENDS class_type additional_bounds_opt;
+additional_bounds_opt
+    -> AND class_type;
+
+#
+# MISC
+#
+
+ElementValuePairsOpt
+    -> ElementValuePairs
+    ->;
+ElementValuePairs
+    -> ElementValuePair COMMA ElementValuePairs
+    -> ElementValuePair;
+ElementValuePair
+    -> ID ASSN ElementValue;
+ElementValue
+    -> ConditionalExpression
+    -> ElementValueArrayInitializer
+    -> annotation;
+ElementValueArrayInitializer
+    -> LBRACE ElementValuesOpt comma_opt RBRACE;
+ElementValuesOpt
+    -> ElementValues
+    ->;
+ElementValues
+    -> ElementValue COMMA ElementValues
+    -> ElementValue;
+
+ConditionalExpression
+    -> ;
+
+annotations_opt
+    -> annotations
+    ->;
+annotations
+    -> annotation annotations
+    -> annotation;
+annotation
+    -> AT typename LPAREN ElementValuePairsOpt RPAREN
+    -> AT typename LPAREN ElementValue RPAREN
+    -> AT typename;
+
+typename
+    -> ID DOT typename
+    -> ID;
+
+id_chain
+    -> ID DOT id_chain
+    -> ID;
+
+comma_opt
+    -> COMMA
+    ->;
