@@ -15,7 +15,7 @@ start
 
     ',' -> ^COMMA
     ';' -> ^SEMI
-    ':' -> ^COLON
+    ':' -> colon
 
     '@' -> ^AT
 
@@ -31,7 +31,7 @@ start
     '/' -> slash
     '~' -> ^COMP
     '&' -> and
-    '^' -> ^BOP
+    '^' -> ^OR_BE
     '|' -> or
     '?' -> ^QST
     '.' -> dot
@@ -46,7 +46,7 @@ start
     # KEYWORDS
     'abstract' -> ^ABSTRACT
     'assert' -> ^ASSERT
-    'boolean' -> ^BOOLEAN
+    'boolean' -> ^PRIM
     'break' -> ^BREAK
     'byte' -> ^PRIM
     'case' -> ^CASE
@@ -69,7 +69,7 @@ start
     'if' -> ^IF
     'implements' -> ^IMPLEMENTS
     'import' -> ^IMPORT
-    'instanceof' -> ^INSTANCEOF
+    'instanceof' -> ^CMP_REL
     'int' -> ^PRIM
     'interface' -> ^INTERFACE
     'long' -> ^PRIM
@@ -106,21 +106,21 @@ start
 #
 
 eq      ^ASSN
-    '=' -> ^EQ;
+    '=' -> ^CMP_EQ;
 
 not     ^NOT
-    '=' -> ^COMP;
+    '=' -> ^CMP_EQ;
 
-lt      ^COMP
-    '<' -> ^BL_SHIFT
-    '=' -> ^COMP;
+lt      ^CMP_REL
+    '<' -> ^SHIFT
+    '=' -> ^CMP_REL;
 
-gt      ^COMP
+gt      ^CMP_REL
     '>' -> brs
-    '=' -> ^COMP;
+    '=' -> ^CMP_REL;
 
-brs     ^BOP
-    '>' -> ^BOP;
+brs     ^SHIFT
+    '>' -> ^SHIFT;
 
 plus    ^PLUS
     '+' -> ^INC
@@ -131,22 +131,22 @@ minus   ^MINUS
     '-' -> ^DEC
     '=' -> ^ASSN;
 
-star    ^BOP
+star    ^OP_MULT
     '=' -> ^ASSN;
 
-pct     ^BOP
+pct     ^OP_MULT
     '=' -> ^ASSN;
 
-slash   ^BOP
+slash   ^OP_MULT
     '/' -> lcom
     '*' -> bcom
     '=' -> ^ASSN;
 
 and     ^AND
-    '&' -> ^COMP;
+    '&' -> ^AND_L;
 
 or      ^OR_BI
-    '|' -> ^COMP;
+    '|' -> ^OR_L;
 
 dot     ^DOT
     '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' -> float
@@ -200,6 +200,9 @@ floatexp
 #
 # MISC
 #
+
+colon   ^COLON
+    ':' -> ^M_REF;
 
 ws      ^_
     ' ' | '\t' | '\n' -> ws;
@@ -290,13 +293,13 @@ class_body_declaration
     -> class_member_dec
     -> instance_initializer
     -> static_initializer
-    -> constructor_declaration;
+    -> constructor_dec;
 
 class_member_declaration
-    -> field_declaration
-    -> method_declaration
-    -> class_declaration
-    -> interface_declaration
+    -> field_dec
+    -> method_dec
+    -> class_dec
+    -> interface_dec
     -> SEMI;
 
 instance_initializer
@@ -305,19 +308,19 @@ instance_initializer
 static_initializer
     ->;
 
-constructor_declaration
+constructor_dec
     ->;
 
 field_declaration
     -> field_modifiers_opt type variable_declarator_list;
 
-method_declaration
+method_dec
     ->;
 
-class_declaration
+class_dec
     ->;
 
-interface_declaration
+interface_dec
     ->;
 
 #
@@ -359,12 +362,12 @@ type_bound_opt
     ->;
 type_bound
     -> EXTENDS type_variable
-    -> EXTENDS class_type AND type_extra_bounds_opt;
-type_extra_bounds_opt
-    -> type_extra_bounds
+    -> EXTENDS class_type AND additional_bounds_opt;
+additional_bounds_opt
+    -> additional_bounds
     ->;
-type_extra_bounds
-    -> class_type AND type_extra_bounds
+additional_bounds
+    -> class_type AND additional_bounds
     -> class_type;
 
 type_arguments_opt
@@ -380,6 +383,10 @@ type_argument
 type
     -> non_array_type array_dims_opt;
 
+typename
+    -> typename DOT ID
+    -> ID;
+
 non_array_type
     -> class_type
     -> type_variable
@@ -393,6 +400,15 @@ class_type
     -> class_type_internal;
 class_type_internal
     -> type_variable type_arguments_opt;
+
+class_type_to_instantiate
+    -> annotated_ids type_arguments
+    -> annotated_ids LT GT;
+
+class_literal
+    -> typename unann_array_dims_opt DOT CLASS
+    -> PRIM unann_array_dims_opt DOT CLASS
+    -> VOID DOT CLASS
 
 type_variable
     -> annotations_opt ID;
@@ -408,6 +424,29 @@ array_dims
     -> array_dim;
 array_dim
     -> annotations_opt LARRI RARRI;
+
+unann_type
+    -> unann_non_array_type array_dims_opt;
+
+unann_non_array_type
+    -> unann_class_type
+    -> ID
+    -> PRIM;
+
+unann_class_type
+    -> unann_class_type DOT annotations_opt unann_class_type_internal
+    -> unann_class_type_internal;
+unann_class_type_internal
+    -> ID type_arguments_opt;
+
+unann_array_dims_opt
+    -> unann_array_dims
+    ->;
+unann_array_dims
+    -> unann_array_dim unann_array_dims
+    -> unann_array_dim;
+unann_array_dim
+    -> LARRI RARRI;
 
 wildcard
     -> annotations_opt QST wildcard_bounds_opt
@@ -443,9 +482,6 @@ ElementValues
     -> ElementValue COMMA ElementValues
     -> ElementValue;
 
-ConditionalExpression
-    -> ;
-
 annotations_opt
     -> annotations
     ->;
@@ -457,9 +493,9 @@ annotation
     -> AT typename LPAREN ElementValue RPAREN
     -> AT typename;
 
-typename
-    -> ID DOT typename
-    -> ID;
+annotated_ids
+    -> annotations_opt ID DOT annotated_ids
+    -> annotations_opt ID;
 
 id_chain
     -> ID DOT id_chain
@@ -483,21 +519,243 @@ field_modifier
     -> TRANSIENT
     -> VOLATILE;
 
+variable_modifiers_opt
+    -> variable_modifiers
+    ->;
+variable_modifiers
+    -> variable_modifier variable_modifiers
+    -> variable_modifier;
+variable_modifier
+    -> annotation
+    -> FINAL;
+
 variable_declarator_list
     -> variable_declarator COMMA varaible_declarator
     -> variable_declarator;
 variable_declarator
     -> ID array_dims_opt variable_initializer_opt;
 
+variable_initializers_opt
+    -> variable_initializers
+    ->;
+variable_initializers
+    -> variable_initializer COMMA variable_initializer
+    -> variable_initializer;
 variable_initializer_opt
-    -> EQ variable_initializer
+    -> ASSN variable_initializer # should really just be equals
     ->;
 variable_initializer
-    -> expression
+    -> expr
     -> array_initializer;
 
-expression
-    ->;
-
 array_initializer
+    -> LBRACE variable_initializers_opt comma_opt RBRACE;
+
+block
+    -> LBRACE block_statements_opt RBRACE;
+
+#
+# STATEMENTS
+#
+
+block_statements_opt
+    -> block_statements
     ->;
+block_statements
+    -> block_statement block_statements
+    -> block_statement;
+block_statement
+    -> lvar_dec_statement
+    -> class_dec
+    -> statement;
+
+lvar_dec_statement
+    -> lvar_dec SEMI;
+lvar_dec
+    -> variable_modifiers_opt unann_type variable_declarator_list;
+
+statement
+    -> statement_without_trailing_substatement
+    -> labeled_statement
+    -> if_then_statement
+    -> if_then_else_statement
+    -> while_statement
+    -> for_statement;
+
+statement_without_trailing_substatement
+    -> block
+    -> empty_statement
+    -> expression_statement
+    -> assert_statement
+    -> switch_statement
+    -> do_statement
+    -> break_statement
+    -> continue_statement
+    -> return_statement
+    -> synchronized_statement
+    -> throw_statement
+    -> try_statement;
+
+#
+# EXPRESSIONS
+#
+
+expr
+    -> lambda_expr
+    -> conditional_expr
+    -> lhs ASSN expr;
+
+lhs
+    -> expr_name
+    -> field_access
+    -> array_access;
+
+lambda_expr
+    -> lambda_params ARROW lambda_body;
+
+lambda_body
+    -> expr
+    -> block;
+
+conditional_expr
+    -> conditional_or_expr
+    -> conditional_or_expr QST expr COLON conditional_expr
+    -> conditional_or_expr QST expr COLON lambda_expr;
+
+conditional_or_expr
+    -> conditional_and_expr
+    -> conditional_or_expr OR_L conditional_and_expr;
+
+conditional_and_expr
+    -> inclusive_or_expr
+    -> conditional_and_expr AND_L inclusive_or_expr;
+
+inclusive_or_expr
+    -> exclusive_or_expr
+    -> inclusive_or_expr OR_BI exclusive_or_expr;
+
+exclusive_or_expr
+    -> and_expr
+    -> exclusive_or_expr OR_BE and_expr;
+
+and_expr
+    -> equality_expr
+    -> and_expr AND equality_expr;
+
+equality_expr
+    -> relational_expr
+    -> equality_expr CMP_EQ relational_expr;
+
+relational_expr
+    -> shift_expr
+    -> relational_expr CMP_REL shift_expr;
+
+shift_expr
+    -> additive_expr
+    -> shift_expr SHIFT additive_expr;
+
+additive_expr
+    -> multiplicative_expr
+    -> additive_expr PLUS multiplicative_expr
+    -> additive_expr MINUS multiplicative_expr;
+
+multiplicative_expr
+    -> unary_expr
+    -> multiplicative_expr OP_MULT unary_expr;
+
+unary_expr
+    -> INC unary_expr
+    -> DEC unary_expr
+    -> PLUS unary_expr
+    -> MINUS unary_expr
+    -> unary_expr_not_plus_minus;
+
+unary_expr_not_plus_minus
+    -> COMP unary_expr
+    -> NOT unary_expr
+    -> postfix_expr
+    -> cast_expr;
+
+postfix_expr
+    -> primary
+    -> expr_name
+    -> postfix_expr INC
+    -> postfix_expr DEC;
+
+cast_expr
+    -> LPAREN PRIM RPAREN unary_expr
+    -> LPAREN type additional_bounds_opt RPAREN unary_expr_not_plus_minus
+    -> LPAREN type additional_bounds_opt RPAREN lambda_expr;
+
+expr_name
+    -> ID
+    -> expr_name DOT ID;
+
+primary
+    -> primary_no_new_array
+    -> array_creation_expr;
+
+primary_no_new_array
+    -> LIT
+    -> class_literal
+    -> THIS
+    -> typename DOT THIS
+    -> LPAREN expr RPAREN
+    -> class_icreation_expr
+    -> field_access
+    -> array_access
+    -> method_invocation
+    -> method_reference;
+
+class_icreation_expr
+    -> unqualified_class_icreation_expr
+    -> expr_name DOT unqualified_class_icreation_expr
+    -> primary DOT unqualified_class_icreation_expr;
+
+unqualified_class_icreation_expr
+    -> NEW type_arguments_opt class_type_to_instantiate LPAREN aruments_opt RPAREN class_body_opt;
+
+field_access
+    -> primary DOT ID
+    -> SUPER DOT ID
+    -> typename DOT super DOT ID;
+
+array_access
+    -> expr_name LARRI expr RARRI
+    -> primary_no_new_array LARRI expr RARRI;
+
+method_invocation
+    -> method_name LPAREN arguments_opt RPAREN
+    -> typename DOT type_arguments_opt ID LPAREN arguments_opt RPAREN
+    -> expr_name DOT type_arguments_opt ID LPAREN arguments_opt RPAREN
+    -> primary DOT type_arguments_opt ID LPAREN arguments_opt RPAREN
+    -> SUPER DOT type_arguments_opt ID LPAREN arguments_opt RPAREN
+    -> typename DOT SUPER DOT type_arguments_opt ID LPAREN arguments_opt RPAREN;
+
+arguments_opt
+    -> arguments
+    ->;
+arguments
+    -> expr COMMA arguments
+    -> expr;
+
+method_reference
+    -> expr_name M_REF type_arguments_opt ID
+    -> type M_REF type_arguments_opt ID
+    -> primary M_REF type_arguments_opt ID
+    -> SUPER M_REF type_arguments_opt ID
+    -> typename M_REF type_arguments_opt ID
+    -> class_type M_REF type_arguments_opt NEW
+    -> array_type M_REF NEW;
+
+array_creation_expr
+    -> NEW PRIM dim_exprs array_dims_opt
+    -> NEW class_type dim_exprs array_dims_opt
+    -> NEW PRIM array_dims array_initializer
+    -> NEW class_type array_dims array_initializer;
+
+dim_exprs
+    -> dim_expr dim_exprs
+    -> dim_expr;
+dim_expr
+    -> annotations_opt LARRI expr RARRI;
