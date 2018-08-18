@@ -48,31 +48,31 @@ start
     'assert' -> ^ASSERT
     'boolean' -> ^BOOLEAN
     'break' -> ^BREAK
-    'byte' -> ^BYTE
+    'byte' -> ^PRIM
     'case' -> ^CASE
     'catch' -> ^CATCH
-    'char' -> ^CHAR
+    'char' -> ^PRIM
     'class' -> ^CLASS
     'const' -> ^CONST
     'continue' -> ^CONTINUE
     'default' -> ^DEFAULT
     'do' -> ^DO
-    'double' -> ^DOUBLE
+    'double' -> ^PRIM
     'else' -> ^ELSE
     'enum' -> ^ENUM
     'extends' -> ^EXTENDS
     'final' -> ^FINAL
     'finally' -> ^FINALLY
-    'float' -> ^FLOAT
+    'float' -> ^PRIM
     'for' -> ^FOR
     'goto' -> ^GOTO
     'if' -> ^IF
     'implements' -> ^IMPLEMENTS
     'import' -> ^IMPORT
     'instanceof' -> ^INSTANCEOF
-    'int' -> ^INT
+    'int' -> ^PRIM
     'interface' -> ^INTERFACE
-    'long' -> ^LONG
+    'long' -> ^PRIM
     'native' -> ^NATIVE
     'new' -> ^NEW
     'package' -> ^PACKAGE
@@ -80,7 +80,7 @@ start
     'protected' -> ^VISIBILITY
     'public' -> ^VISIBILITY
     'return' -> ^RETURN
-    'short' -> ^SHORT
+    'short' -> ^PRIM
     'static' -> ^STATIC
     'strictfp' -> ^STRICTFP
     'super' -> ^SUPER
@@ -106,7 +106,7 @@ start
 #
 
 eq      ^ASSN
-    '=' -> ^COMP;
+    '=' -> ^EQ;
 
 not     ^NOT
     '=' -> ^COMP;
@@ -272,11 +272,53 @@ class_modifier
     -> FINAL
     -> STRICTFP;
 
-class_type
-    -> class_type DOT class_type_internal
-    -> class_type_internal;
-class_type_internal
-    -> annotations_opt ID type_arguments;
+superclass_opt
+    -> superclass
+    ->;
+superclass
+    -> EXTENDS class_type
+
+superinterfaces_opt
+    -> superinterfaces
+    ->;
+superinterfaces
+    -> IMPLEMENTS class_types;
+
+class_body
+    -> LBRACE class_body_dec RBRACE;
+class_body_declaration
+    -> class_member_dec
+    -> instance_initializer
+    -> static_initializer
+    -> constructor_declaration;
+
+class_member_declaration
+    -> field_declaration
+    -> method_declaration
+    -> class_declaration
+    -> interface_declaration
+    -> SEMI;
+
+instance_initializer
+    ->;
+
+static_initializer
+    ->;
+
+constructor_declaration
+    ->;
+
+field_declaration
+    -> field_modifiers_opt type variable_declarator_list;
+
+method_declaration
+    ->;
+
+class_declaration
+    ->;
+
+interface_declaration
+    ->;
 
 #
 # ENUM
@@ -311,14 +353,70 @@ type_parameters
     -> type_parameter;
 type_parameter
     -> annotations_opt ID type_bound_opt;
+
 type_bound_opt
     -> type_bound
     ->;
 type_bound
     -> EXTENDS type_variable
-    -> EXTENDS class_type additional_bounds_opt;
-additional_bounds_opt
-    -> AND class_type;
+    -> EXTENDS class_type AND type_extra_bounds_opt;
+type_extra_bounds_opt
+    -> type_extra_bounds
+    ->;
+type_extra_bounds
+    -> class_type AND type_extra_bounds
+    -> class_type;
+
+type_arguments_opt
+    -> LT type_arguments GT
+    ->;
+type_arguments
+    -> type_argument COMMA type_arguments
+    -> type_argument;
+type_argument
+    -> type
+    -> wildcard;
+
+type
+    -> non_array_type array_dims_opt;
+
+non_array_type
+    -> class_type
+    -> type_variable
+    -> primitive_type;
+
+class_types
+    -> class_type COMMA class_types
+    -> class_type;
+class_type
+    -> class_type DOT class_type_internal
+    -> class_type_internal;
+class_type_internal
+    -> type_variable type_arguments_opt;
+
+type_variable
+    -> annotations_opt ID;
+
+primitive_type
+    -> annotations_opt PRIM;
+
+array_dims_opt
+    -> array_dims
+    ->;
+array_dims
+    -> array_dim array_dims
+    -> array_dim;
+array_dim
+    -> annotations_opt LARRI RARRI;
+
+wildcard
+    -> annotations_opt QST wildcard_bounds_opt
+wildcard_bounds_opt
+    -> wildcard_bounds
+    ->;
+wildcard_bounds
+    -> EXTENDS type
+    -> SUPER type;
 
 #
 # MISC
@@ -369,4 +467,37 @@ id_chain
 
 comma_opt
     -> COMMA
+    ->;
+
+field_modifiers_opt
+    -> field_modifiers
+    ->;
+field_modifiers
+    -> field_modifier field_modifiers
+    -> field_modifier;
+field_modifier
+    -> annotations_opt
+    -> VISIBILITY
+    -> STATIC
+    -> FINAL
+    -> TRANSIENT
+    -> VOLATILE;
+
+variable_declarator_list
+    -> variable_declarator COMMA varaible_declarator
+    -> variable_declarator;
+variable_declarator
+    -> ID array_dims_opt variable_initializer_opt;
+
+variable_initializer_opt
+    -> EQ variable_initializer
+    ->;
+variable_initializer
+    -> expression
+    -> array_initializer;
+
+expression
+    ->;
+
+array_initializer
     ->;
