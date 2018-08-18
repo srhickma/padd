@@ -295,7 +295,7 @@ class_body_declaration
     -> static_initializer
     -> constructor_dec;
 
-class_member_declaration
+class_member_dec
     -> field_dec
     -> method_dec
     -> class_dec
@@ -315,7 +315,8 @@ field_declaration
     -> field_modifiers_opt type variable_declarator_list;
 
 method_dec
-    ->;
+    -> method_modifiers_opt method_header method_body;
+method_modifiers_opt
 
 class_dec
     ->;
@@ -505,35 +506,17 @@ comma_opt
     -> COMMA
     ->;
 
-field_modifiers_opt
-    -> field_modifiers
+semi_opt
+    -> SEMI
     ->;
-field_modifiers
-    -> field_modifier field_modifiers
-    -> field_modifier;
-field_modifier
-    -> annotations_opt
-    -> VISIBILITY
-    -> STATIC
-    -> FINAL
-    -> TRANSIENT
-    -> VOLATILE;
-
-variable_modifiers_opt
-    -> variable_modifiers
-    ->;
-variable_modifiers
-    -> variable_modifier variable_modifiers
-    -> variable_modifier;
-variable_modifier
-    -> annotation
-    -> FINAL;
 
 variable_declarator_list
     -> variable_declarator COMMA varaible_declarator
     -> variable_declarator;
 variable_declarator
     -> ID array_dims_opt variable_initializer_opt;
+variable_declarator_id
+    -> ID array_dims_opt;
 
 variable_initializers_opt
     -> variable_initializers
@@ -582,10 +565,17 @@ statement
     -> while_statement
     -> for_statement;
 
+statement_nsi
+    -> statement_without_trailing_substatement
+    -> labeled_statement_nsi
+    -> if_then_else_statement_nsi
+    -> while_statement_nsi
+    -> for_statement_nsi;
+
 statement_without_trailing_substatement
     -> block
-    -> empty_statement
-    -> expression_statement
+    -> SEMI
+    -> statement_expression SEMI
     -> assert_statement
     -> switch_statement
     -> do_statement
@@ -596,10 +586,164 @@ statement_without_trailing_substatement
     -> throw_statement
     -> try_statement;
 
+statement_expression_list
+    -> statement_expression COMMA statement_expression_list
+    -> statement_expression;
+statement_expression
+    -> assignment
+    -> INC unary_expr
+    -> DEC unary_expr
+    -> postfix_expr INC
+    -> postfix_expr DEC
+    -> method_invocation
+    -> class_icreation_expr;
+
+assignment
+    -> lhs ASSN expr;
+
+assert_statement
+    -> ASSERT expr SEMI
+    -> ASSERT expr COLON expr SEMI;
+
+switch_statement
+    -> SWITCH LPAREN expr RPAREN switch_block;
+
+switch_block
+    -> LBRACE switch_bsgs_opt switch_labels_opt RBRACE;
+
+switch_bsgs_opt
+    -> switch_bsgs
+    ->;
+switch_bsgs
+    -> switch_bsg switch_bsgs
+    -> switch_bsg;
+switch_bsg
+    -> switch_labels block_statements;
+
+switch_labels_opt
+    -> switch_labels
+    ->;
+switch_labels
+    -> switch_label switch_labels
+    -> switch_label;
+switch_label
+    -> CASE expr COLON
+    -> CASE ID COLON
+    -> DEFAULT COLON;
+
+do_statement
+    -> DO statement WHILE LPAREN expr RPAREN SEMI;
+
+break_statement
+    -> BREAK SEMI
+    -> BREAK ID SEMI;
+
+continue_statement
+    -> CONTINUE SEMI
+    -> CONTINUE ID SEMI;
+
+return_statement
+    -> RETURN SEMI
+    -> RETURN expr SEMI;
+
+synchronized_statement
+    -> SYNCHRONIZED LPAREN expr RPAREN block;
+
+throw_statement
+    -> THROW expr SEMI;
+
+try_statement
+    -> TRY block catches
+    -> TRY block catches_opt finally
+    -> try_with_resources_statement;
+
+try_with_resources_statement
+    -> TRY resource_specification block catches_opt finally_opt;
+resources_specification
+    -> LPAREN resources semi_opt RPAREN;
+resources
+    -> resource SEMI resources
+    -> resource;
+resource
+    -> variable_modifiers_opt unnan_type variable_declarator_id ASSN expr;
+
+finally_opt
+    -> finally
+    ->;
+finally
+    -> FINALLY block;
+
+catches_opt
+    -> catches
+    ->;
+catches
+    -> catch_clause catches
+    -> catch_clause;
+catch_clause
+    -> CATCH LPAREN catch_formal_parameter RPAREN block;
+catch_formal_parameter
+    -> variable_modifiers_opt catch_type variable_declarator_id;
+catch_type
+    -> unann_class_type OR_BI catch_type_internal;
+catch_type_internal
+    -> OR_BI class_type catch_type_internal
+    ->;
+
+labeled_statement
+    -> ID COLON statement;
+
+labeled_statement_nsi
+    -> ID COLON statement_nsi;
+
+if_then_statement
+    -> IF LPAREN expr RPAREN statement;
+
+if_then_else_statement
+    -> IF LPAREN expr RPAREN statement_nsi ELSE statement;
+
+if_then_else_statement_nsi
+    -> IF LPAREN expr RPAREN statement_nsi ELSE statement_nsi;
+
+while_statement
+    -> WHILE LPAREN expr RPAREN statement;
+
+while_statement_nsi
+    -> WHILE LPAREN expr RPAREN statement_nsi;
+
+for_statement
+    -> basic_for_statement statement
+    -> enhanced_for_statement statement;
+
+for_statement_nsi
+    -> basic_for_statement statement_nsi
+    -> enhanced_for_statement statement_nsi;
+
+basic_for_statement
+    -> FOR LPAREN for_init_opt SEMI expr_opt SEMI for_update_opt RPAREN;
+
+for_init_opt
+    -> for_init
+    ->;
+for_init
+    -> lvar_dec
+    -> statement_expression_list
+
+for_update_opt
+    -> for_update
+    ->;
+for_update
+    -> statement_expression_list
+
+enhanced_for_statement
+    -> FOR LPAREN variable_modifiers_opt unann_type variable_declarator_id COLON expr RPAREN;
+
 #
 # EXPRESSIONS
 #
 
+expr_opt
+    -> expr
+    ->;
 expr
     -> lambda_expr
     -> conditional_expr
@@ -759,3 +903,45 @@ dim_exprs
     -> dim_expr;
 dim_expr
     -> annotations_opt LARRI expr RARRI;
+
+#
+# MODIFIERS
+#
+
+method_modifiers_opt
+    -> method_modifiers
+    ->;
+method_modifiers
+    -> method_modifier method_modifiers
+    -> method_modifier;
+method_modifier
+    -> annotation
+    -> VISIBILITY
+    -> STATIC
+    -> FINAL
+    -> TRANSIENT
+    -> VOLATILE;
+
+field_modifiers_opt
+    -> field_modifiers
+    ->;
+field_modifiers
+    -> field_modifier field_modifiers
+    -> field_modifier;
+field_modifier
+    -> annotation
+    -> VISIBILITY
+    -> STATIC
+    -> FINAL
+    -> TRANSIENT
+    -> VOLATILE;
+
+variable_modifiers_opt
+    -> variable_modifiers
+    ->;
+variable_modifiers
+    -> variable_modifier variable_modifiers
+    -> variable_modifier;
+variable_modifier
+    -> annotation
+    -> FINAL;
