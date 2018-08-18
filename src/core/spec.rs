@@ -310,7 +310,10 @@ fn generate_ecdfa_trans<'a>(trans_node: &'a Tree, sources: &Vec<&State>, builder
 
 fn generate_ecdfa_mtcs<'a>(mtcs_node: &'a Tree, sources: &Vec<&State>, dest: &State, builder: &mut EncodedCDFABuilder) -> Result<(), runtime::CDFAError> {
     let matcher = mtcs_node.children.first().unwrap();
-    let matcher_string = matcher.lhs.lexeme.trim_matches('\'');
+    let matcher_string: String = matcher.lhs.lexeme.chars()
+        .skip(1)
+        .take(matcher.lhs.lexeme.len() - 2)
+        .collect();
     let matcher_cleaned = replace_escapes(&matcher_string);
     if matcher_cleaned.len() == 1 {
         for source in sources {
