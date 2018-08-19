@@ -407,18 +407,66 @@ enum_body_declarations_opt
     ->;
 
 #
-# ANNOTATION
-#
-
-annotation_dec
-    ->;
-
-#
 # INTERFACE
 #
 
 interface_dec
+    -> interface_modifiers_opt INTERFACE ID type_parameters_opt extends_interfaces_opt interface_body;
+
+extends_interfaces_opt
+    -> EXTENDS class_types
     ->;
+
+interface_body
+    -> LBRACE interface_member_decs_opt RBRACE;
+
+interface_member_decs_opt
+    -> interface_member_decs
+    ->;
+interface_member_decs
+    -> interface_member_dec interface_member_decs
+    -> interface_member_dec;
+interface_member_dec
+    -> const_dec
+    -> method_dec # ignore interface specific modifiers
+    -> class_dec
+    -> interface_dec
+    -> SEMI;
+
+const_dec
+    -> const_modifers_opt unann_type variable_declarator_list;
+
+#
+# ANNOTATION
+#
+
+annotation_dec
+    -> interface_modifiers_opt AT INTERFACE ID annotation_body;
+
+annotation_body
+    -> LBRACE annotation_member_decs_opt RBRACE;
+
+annotation_member_decs_opt
+    -> annotation_member_decs
+    ->;
+annotation_member_decs
+    -> annotation_member_dec annotation_member_decs
+    -> annotation_member_dec;
+annotation_member_dec
+    -> annotation_element_dec
+    -> const_dec
+    -> class_dec
+    -> interface_dec
+    -> SEMI;
+
+annotation_element_dec
+    -> annotation_element_modifiers_opt unann_type ID LPAREN RPAREN array_dims_opt default_value_opt SEMI;
+
+default_value_opt
+    -> default_value
+    ->;
+default_value
+    -> DEFAULT ElementValue;
 
 #
 # TYPE
@@ -997,6 +1045,19 @@ class_modifier
     -> FINAL
     -> STRICTFP;
 
+interface_modifiers_opt
+    -> interface_modifiers
+    ->;
+interface_modifiers
+    -> interface_modifier interface_modifiers
+    -> interface_modifier;
+interface_modifier
+    -> annotation
+    -> VISIBILITY
+    -> ABSTRACT
+    -> STATIC
+    -> STRICTFP;
+
 method_modifiers_opt
     -> method_modifiers
     ->;
@@ -1036,6 +1097,29 @@ field_modifier
     -> FINAL
     -> TRANSIENT
     -> VOLATILE;
+
+const_modifiers_opt
+    -> const_modifiers
+    ->;
+const_modifiers
+    -> const_modifier const_modifiers
+    -> const_modifier;
+const_modifier
+    -> annotation
+    -> VISIBILITY
+    -> STATIC
+    -> FINAL;
+
+annotation_element_modifiers_opt
+    -> annotation_element_modifiers
+    ->;
+annotation_element_modifiers
+    -> annotation_element_modifier annotation_element_modifiers
+    -> annotation_element_modifier;
+annotation_element_modifier
+    -> annotation
+    -> VISIBILITY
+    -> ABSTRACT;
 
 variable_modifiers_opt
     -> variable_modifiers
