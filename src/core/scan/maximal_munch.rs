@@ -11,13 +11,16 @@ pub struct MaximalMunchScanner;
 impl Scanner for MaximalMunchScanner {
     fn scan<'a, 'b>(&self, input: &'a str, dfa: &'b DFA) -> Result<Vec<Token>, ScanningError> {
 
-        fn scan_one<'a, 'b>(input: &'a [char], line: usize, character: usize, dfa: &'b DFA) -> (&'a [char], &'b State, usize, usize)
+        fn scan_one<'a, 'b>(input: &'a [char], line: usize, character: usize, dfa: &'b DFA) -> (usize, &'b State, usize, usize)
         {
             let mut input: &[char] = input;
+
+            let mut scanned: usize = 0;
             let mut state: &State = &dfa.start;
             let mut line: usize = line;
             let mut character: usize = character;
-            let mut last_accepting: (&[char], &State, usize, usize) = (input, &dfa.start, line, character);
+
+            let mut last_accepting: (usize, &State, usize, usize) = (scanned, state, line, character);
 
             while !input.is_empty() && dfa.has_transition(input[0], state) {
                 let (new_line, new_character) = if input[0] == '\n' {
@@ -30,6 +33,7 @@ impl Scanner for MaximalMunchScanner {
                 let tail: &[char] = if state.chars().next().unwrap() == '#' && !dfa.td.has_non_def_transition(input[0], state) {
                     input
                 } else {
+                    scanned += 1;
                     &input[1..]
                 };
 
@@ -39,7 +43,7 @@ impl Scanner for MaximalMunchScanner {
                 character = new_character;
 
                 if dfa.accepts(state) {
-                    last_accepting = (input, state, line, character);
+                    last_accepting = (scanned, state, line, character);
                 }
             }
 
@@ -56,18 +60,21 @@ impl Scanner for MaximalMunchScanner {
         let mut character: usize = 1;
 
         while !input.is_empty() {
-            let (r_input, end_state, end_line, end_character) = scan_one(input, line, character, dfa);
-            let scanned_chars: &[char] = &input[0..(input.len() - r_input.len())];
-            if scanned_chars.is_empty() {
-                let seq_len = cmp::min(r_input.len(), FAIL_SEQUENCE_LENGTH);
-                let mut sequence: String = String::with_capacity(seq_len);
-                for c in &r_input[..seq_len] {
-                    sequence.push(*c);
-                }
+            let (scanned, end_state, end_line, end_character) = scan_one(input, line, character, dfa);
+
+            line = end_line;
+            character = end_character;
+
+            let scanned_chars: &[char] = &input[0..scanned];
+            input = &input[scanned..];
+
+            if scanned == 0 {
+                let seq_len = cmp::min(input.len(), FAIL_SEQUENCE_LENGTH);
+
                 return Err(ScanningError{
-                    sequence,
-                    line: end_line,
-                    character: end_character,
+                    sequence: input.iter().take(seq_len).collect(),
+                    line,
+                    character,
                 });
             }
 
@@ -75,14 +82,10 @@ impl Scanner for MaximalMunchScanner {
             if accept_as != "_" {
                 let token = Token {
                     kind: accept_as,
-                    lexeme: scanned_chars.iter().cloned().collect::<String>(),
+                    lexeme: scanned_chars.iter().collect(),
                 };
                 tokens.push(token);
             }
-
-            input = r_input;
-            line = end_line;
-            character = end_character;
         }
 
         Ok(tokens)
