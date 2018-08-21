@@ -11,69 +11,40 @@ pub struct MaximalMunchScanner;
 impl Scanner for MaximalMunchScanner {
     fn scan<'a, 'b>(&self, input: &'a str, dfa: &'b DFA) -> Result<Vec<Token>, ScanningError> {
 
-        fn scan_one<'a, 'b>(input: &'a [char], state: &'b State, line: usize, character: usize, backtrack: (&'a [char], &'b State, usize, usize), dfa: &'b DFA) -> (&'a [char], &'b State, usize, usize)
+        fn scan_one<'a, 'b>(input: &'a [char], line: usize, character: usize, dfa: &'b DFA) -> (usize, &'b State, usize, usize)
         {
-            if input.is_empty() || !dfa.has_transition(input[0], state) {
+            let mut input: &[char] = input;
+
+            let mut scanned: usize = 0;
+            let mut state: &State = &dfa.start;
+            let mut line: usize = line;
+            let mut character: usize = character;
+
+            let mut last_accepting: (usize, &State, usize, usize) = (scanned, state, line, character);
+
+            while !input.is_empty() && dfa.has_transition(input[0], state) {
+                let head: char = input[0];
+
+                character += 1;
+                if head == '\n' {
+                    line += 1;
+                    character = 1;
+                }
+
+                //TODO remove with CDFA
+                if state.chars().next().unwrap() != '#' || dfa.td.has_non_def_transition(head, state) {
+                    scanned += 1;
+                    input = &input[1..];
+                }
+
+                state = dfa.transition(state, head);
+
                 if dfa.accepts(state) {
-                    return (input, state, line, character);
+                    last_accepting = (scanned, state, line, character);
                 }
-                return backtrack;
             }
 
-            let (new_line, new_character) = if input[0] == '\n' {
-                (line + 1, 1)
-            } else {
-                (line, character + 1)
-            };
-
-            let next_state = dfa.transition(state, input[0]);
-
-            //TODO remove with CDFA
-            let tail: &[char] = if state.chars().next().unwrap() == '#' && !dfa.td.has_non_def_transition(input[0], state) {
-                input
-            } else {
-                &input[1..]
-            };
-
-            let (r_input, end_state, end_line, end_character) = scan_one(tail, next_state, new_line, new_character, (input, state, line, character), dfa);
-
-            return if dfa.accepts(end_state) {
-                (r_input, end_state, end_line, end_character)
-            } else {
-                backtrack
-            }
-        }
-
-        fn recur<'a, 'b>(input: &'a [char], accumulator: &'a mut Vec<Token>, dfa: &'b DFA, line: usize, character: usize) -> Option<ScanningError> {
-            if input.is_empty() {
-                return None;
-            }
-
-            let (r_input, end_state, end_line, end_character) = scan_one(input, &dfa.start, line, character, (input, &dfa.start, line, character), dfa);
-            let scanned_chars: &[char] = &input[0..(input.len() - r_input.len())];
-            if scanned_chars.is_empty() {
-                let seq_len = cmp::min(r_input.len(), FAIL_SEQUENCE_LENGTH);
-                let mut sequence: String = String::with_capacity(seq_len);
-                for c in &r_input[..seq_len] {
-                    sequence.push(*c);
-                }
-                return Some(ScanningError{
-                    sequence,
-                    line: end_line,
-                    character: end_character,
-                });
-            }
-
-            let accept_as = dfa.tokenize(end_state);
-            if accept_as != "_" {
-                let token = Token {
-                    kind: accept_as,
-                    lexeme: scanned_chars.iter().cloned().collect::<String>(),
-                };
-                accumulator.push(token);
-            }
-
-            recur(r_input, accumulator, dfa, end_line, end_character)
+            last_accepting
         }
 
         let chars : Vec<char> = input.chars().map(|c| {
@@ -81,10 +52,39 @@ impl Scanner for MaximalMunchScanner {
         }).collect();
 
         let mut tokens: Vec<Token> = vec![];
-        let err = recur(&chars, &mut tokens, dfa, 1, 1);
-        match err {
-            Some(se) => Err(se),
-            None => Ok(tokens),
+        let mut input: &[char] = &chars;
+        let mut line: usize = 1;
+        let mut character: usize = 1;
+
+        while !input.is_empty() {
+            let (scanned, end_state, end_line, end_character) = scan_one(input, line, character, dfa);
+
+            line = end_line;
+            character = end_character;
+
+            let scanned_chars: &[char] = &input[0..scanned];
+            input = &input[scanned..];
+
+            if scanned == 0 {
+                let seq_len = cmp::min(input.len(), FAIL_SEQUENCE_LENGTH);
+
+                return Err(ScanningError{
+                    sequence: input.iter().take(seq_len).collect(),
+                    line,
+                    character,
+                });
+            }
+
+            let accept_as = dfa.tokenize(end_state);
+            if accept_as != "_" {
+                let token = Token {
+                    kind: accept_as,
+                    lexeme: scanned_chars.iter().collect(),
+                };
+                tokens.push(token);
+            }
         }
+
+        Ok(tokens)
     }
 }
