@@ -306,7 +306,7 @@ static_init
     -> STATIC block;
 
 constructor_dec
-    -> constructor_modifiers_opt constructor_declarator throws_opt constructor_body; ***modifiers
+    -> constructor_modifiers_opt constructor_declarator throws_opt constructor_body;
 constructor_body
     -> LBRACE explicit_constructor_invocation_opt block_statements_opt RBRACE;
 constructor_declarator
