@@ -13,35 +13,37 @@ impl Scanner for MaximalMunchScanner {
 
         fn scan_one<'a, 'b>(input: &'a [char], state: &'b State, line: usize, character: usize, backtrack: (&'a [char], &'b State, usize, usize), dfa: &'b DFA) -> (&'a [char], &'b State, usize, usize)
         {
-            if input.is_empty() || !dfa.has_transition(input[0], state) {
+            let mut input: &[char] = input;
+            let mut state: &State = state;
+            let mut line: usize = line;
+            let mut character: usize = character;
+            let mut last_accepting: (&[char], &State, usize, usize) = backtrack;
+
+            while !input.is_empty() && dfa.has_transition(input[0], state) {
+                let (new_line, new_character) = if input[0] == '\n' {
+                    (line + 1, 1)
+                } else {
+                    (line, character + 1)
+                };
+
+                //TODO remove with CDFA
+                let tail: &[char] = if state.chars().next().unwrap() == '#' && !dfa.td.has_non_def_transition(input[0], state) {
+                    input
+                } else {
+                    &input[1..]
+                };
+
+                state = dfa.transition(state, input[0]);
+                input = tail;
+                line = new_line;
+                character = new_character;
+
                 if dfa.accepts(state) {
-                    return (input, state, line, character);
+                    last_accepting = (input, state, line, character);
                 }
-                return backtrack;
             }
 
-            let (new_line, new_character) = if input[0] == '\n' {
-                (line + 1, 1)
-            } else {
-                (line, character + 1)
-            };
-
-            let next_state = dfa.transition(state, input[0]);
-
-            //TODO remove with CDFA
-            let tail: &[char] = if state.chars().next().unwrap() == '#' && !dfa.td.has_non_def_transition(input[0], state) {
-                input
-            } else {
-                &input[1..]
-            };
-
-            let (r_input, end_state, end_line, end_character) = scan_one(tail, next_state, new_line, new_character, (input, state, line, character), dfa);
-
-            return if dfa.accepts(end_state) {
-                (r_input, end_state, end_line, end_character)
-            } else {
-                backtrack
-            }
+            return last_accepting;
         }
 
         fn recur<'a, 'b>(input: &'a [char], accumulator: &'a mut Vec<Token>, dfa: &'b DFA, line: usize, character: usize) -> Option<ScanningError> {
