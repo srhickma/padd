@@ -23,31 +23,28 @@ impl Scanner for MaximalMunchScanner {
             let mut last_accepting: (usize, &State, usize, usize) = (scanned, state, line, character);
 
             while !input.is_empty() && dfa.has_transition(input[0], state) {
-                let (new_line, new_character) = if input[0] == '\n' {
-                    (line + 1, 1)
-                } else {
-                    (line, character + 1)
-                };
+                let head: char = input[0];
+
+                character += 1;
+                if head == '\n' {
+                    line += 1;
+                    character = 1;
+                }
 
                 //TODO remove with CDFA
-                let tail: &[char] = if state.chars().next().unwrap() == '#' && !dfa.td.has_non_def_transition(input[0], state) {
-                    input
-                } else {
+                if state.chars().next().unwrap() != '#' || dfa.td.has_non_def_transition(head, state) {
                     scanned += 1;
-                    &input[1..]
-                };
+                    input = &input[1..];
+                }
 
-                state = dfa.transition(state, input[0]);
-                input = tail;
-                line = new_line;
-                character = new_character;
+                state = dfa.transition(state, head);
 
                 if dfa.accepts(state) {
                     last_accepting = (scanned, state, line, character);
                 }
             }
 
-            return last_accepting;
+            last_accepting
         }
 
         let chars : Vec<char> = input.chars().map(|c| {
