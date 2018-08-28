@@ -139,7 +139,7 @@ lazy_static! {
             "sdec targets HAT DEF",
 
             "targets ID",
-            "targets ID OR targets",
+            "targets targets OR ID",
 
             "transopt trans",
             "transopt ",
@@ -245,11 +245,11 @@ fn generate_ecdfa_states<'a>(states_node: &Tree, builder: &mut EncodedCDFABuilde
     let sdec_node = state_node.get_child(0);
 
     let targets_node = sdec_node.get_child(0);
-    let head_state = &targets_node.get_child(0).lhs.lexeme;
+    let head_state = &targets_node.get_child(targets_node.children.len() - 1).lhs.lexeme;
 
     let mut states: Vec<&State> = vec![head_state];
     if targets_node.children.len() == 3 {
-        generate_ecdfa_targets(targets_node.get_child(2), &mut states);
+        generate_ecdfa_targets(targets_node.get_child(0), &mut states);
     }
 
     if sdec_node.children.len() == 3 {
@@ -274,9 +274,9 @@ fn generate_ecdfa_states<'a>(states_node: &Tree, builder: &mut EncodedCDFABuilde
 }
 
 fn generate_ecdfa_targets<'a>(targets_node: &'a Tree, accumulator: &mut Vec<&'a State>) {
-    accumulator.push(&targets_node.get_child(0).lhs.lexeme);
+    accumulator.push(&targets_node.get_child(targets_node.children.len() - 1).lhs.lexeme);
     if targets_node.children.len() == 3 {
-        generate_ecdfa_targets(targets_node.get_child(2), accumulator);
+        generate_ecdfa_targets(targets_node.get_child(0), accumulator);
     }
 }
 
@@ -980,10 +980,10 @@ kind=ID lexeme=f")
     │       └── state
     │           ├── sdec
     │           │   └── targets
-    │           │       ├── ID <- 'ID'
+    │           │       ├── targets
+    │           │       │   └── ID <- 'ID'
     │           │       ├── OR <- '|'
-    │           │       └── targets
-    │           │           └── ID <- 'ki'
+    │           │       └── ID <- 'ki'
     │           ├── transopt
     │           │   └── trans
     │           │       ├── trans
