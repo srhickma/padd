@@ -172,7 +172,7 @@ lazy_static! {
             "pattopt PATTC",
             "pattopt ",
 
-            "ids ID ids",
+            "ids ids ID",
             "ids ",
         ]);
 
@@ -391,11 +391,11 @@ fn generate_grammar_rhss<'a, 'b>(rhss_node: &'a Tree, lhs: &'a String, accumulat
 
 fn generate_grammar_ids<'a, 'b>(ids_node: &'a Tree, accumulator: &'b mut Vec<String>) {
     if !ids_node.is_empty() {
-        let id = ids_node.get_child(0).lhs.lexeme.clone();
+        let id = ids_node.get_child(1).lhs.lexeme.clone();
+
+        generate_grammar_ids(ids_node.get_child(0), accumulator);
 
         accumulator.push(id);
-
-        generate_grammar_ids(ids_node.get_child(1), accumulator)
     }
 }
 
@@ -507,11 +507,11 @@ mod tests {
                 │   └── rhs
                 │       ├── ARROW <- '->'
                 │       ├── ids
-                │       │   ├── ID <- 's'
-                │       │   └── ids
-                │       │       ├── ID <- 'b'
-                │       │       └── ids
-                │       │           └──  <- 'NULL'
+                │       │   ├── ids
+                │       │   │   ├── ids
+                │       │   │   │   └──  <- 'NULL'
+                │       │   │   └── ID <- 's'
+                │       │   └── ID <- 'b'
                 │       └── pattopt
                 │           └──  <- 'NULL'
                 └── SEMI <- ';'"
@@ -661,11 +661,11 @@ w -> WHITESPACE `[prefix]{0}\n\n{1;prefix=[prefix]\t}[prefix]{2}\n\n`
             │   │       │   │   └── rhs
             │   │       │   │       ├── ARROW <- '->'
             │   │       │   │       ├── ids
-            │   │       │   │       │   ├── ID <- 's'
-            │   │       │   │       │   └── ids
-            │   │       │   │       │       ├── ID <- 'b'
-            │   │       │   │       │       └── ids
-            │   │       │   │       │           └──  <- 'NULL'
+            │   │       │   │       │   ├── ids
+            │   │       │   │       │   │   ├── ids
+            │   │       │   │       │   │   │   └──  <- 'NULL'
+            │   │       │   │       │   │   └── ID <- 's'
+            │   │       │   │       │   └── ID <- 'b'
             │   │       │   │       └── pattopt
             │   │       │   │           └──  <- 'NULL'
             │   │       │   └── rhs
@@ -682,21 +682,21 @@ w -> WHITESPACE `[prefix]{0}\n\n{1;prefix=[prefix]\t}[prefix]{2}\n\n`
             │       │   │   └── rhs
             │       │   │       ├── ARROW <- '->'
             │       │   │       ├── ids
-            │       │   │       │   ├── ID <- 'LBRACKET'
-            │       │   │       │   └── ids
-            │       │   │       │       ├── ID <- 's'
-            │       │   │       │       └── ids
-            │       │   │       │           ├── ID <- 'RBRACKET'
-            │       │   │       │           └── ids
-            │       │   │       │               └──  <- 'NULL'
+            │       │   │       │   ├── ids
+            │       │   │       │   │   ├── ids
+            │       │   │       │   │   │   ├── ids
+            │       │   │       │   │   │   │   └──  <- 'NULL'
+            │       │   │       │   │   │   └── ID <- 'LBRACKET'
+            │       │   │       │   │   └── ID <- 's'
+            │       │   │       │   └── ID <- 'RBRACKET'
             │       │   │       └── pattopt
             │       │   │           └── PATTC <- '``'
             │       │   └── rhs
             │       │       ├── ARROW <- '->'
             │       │       ├── ids
-            │       │       │   ├── ID <- 'w'
-            │       │       │   └── ids
-            │       │       │       └──  <- 'NULL'
+            │       │       │   ├── ids
+            │       │       │   │   └──  <- 'NULL'
+            │       │       │   └── ID <- 'w'
             │       │       └── pattopt
             │       │           └──  <- 'NULL'
             │       └── SEMI <- ';'
@@ -706,9 +706,9 @@ w -> WHITESPACE `[prefix]{0}\n\n{1;prefix=[prefix]\t}[prefix]{2}\n\n`
                 │   └── rhs
                 │       ├── ARROW <- '->'
                 │       ├── ids
-                │       │   ├── ID <- 'WHITESPACE'
-                │       │   └── ids
-                │       │       └──  <- 'NULL'
+                │       │   ├── ids
+                │       │   │   └──  <- 'NULL'
+                │       │   └── ID <- 'WHITESPACE'
                 │       └── pattopt
                 │           └── PATTC <- '`[prefix]{0}\\n\\n{1;prefix=[prefix]\\t}[prefix]{2}\\n\\n`'
                 └── SEMI <- ';'"
@@ -1008,19 +1008,19 @@ kind=ID lexeme=f")
                 │   │   └── rhs
                 │   │       ├── ARROW <- '->'
                 │   │       ├── ids
-                │   │       │   ├── ID <- 'ID'
-                │   │       │   └── ids
-                │   │       │       ├── ID <- 's'
-                │   │       │       └── ids
-                │   │       │           └──  <- 'NULL'
+                │   │       │   ├── ids
+                │   │       │   │   ├── ids
+                │   │       │   │   │   └──  <- 'NULL'
+                │   │       │   │   └── ID <- 'ID'
+                │   │       │   └── ID <- 's'
                 │   │       └── pattopt
                 │   │           └──  <- 'NULL'
                 │   └── rhs
                 │       ├── ARROW <- '->'
                 │       ├── ids
-                │       │   ├── ID <- 'ID'
-                │       │   └── ids
-                │       │       └──  <- 'NULL'
+                │       │   ├── ids
+                │       │   │   └──  <- 'NULL'
+                │       │   └── ID <- 'ID'
                 │       └── pattopt
                 │           └──  <- 'NULL'
                 └── SEMI <- ';'"
