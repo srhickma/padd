@@ -848,6 +848,48 @@ ID <- 'iii'
     }
 
     #[test]
+    fn default_matcher_conflict() {
+        //setup
+        let spec = "
+' c'
+
+start
+    ' ' -> ^WS
+    'c' -> id;
+
+id      ^ID
+    'c' | '_' -> id;
+
+# grammar
+s ->;
+        ";
+
+        let input = "c c".to_string();
+        let mut iter = input.chars();
+        let mut getter = || {
+            iter.next()
+        };
+        let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
+
+        let scanner = runtime::def_scanner();
+
+        let tree = parse_spec(spec);
+        let parse = tree.unwrap();
+        let (cdfa, _, _) = generate_spec(&parse).unwrap();
+
+        //execute
+        let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
+
+        //verify
+        let mut res_string = String::new();
+        for token in tokens {
+            res_string = format!("{}\nkind={} lexeme={}", res_string, token.kind, token.lexeme);
+        }
+
+        assert_eq!(res_string, "\nkind=ID lexeme=c\nkind=WS lexeme= \nkind=ID lexeme=c")
+    }
+
+    #[test]
     fn multi_character_lexing() {
         //setup
         let spec = "
