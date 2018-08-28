@@ -159,7 +159,7 @@ lazy_static! {
 
             "gram prods",
 
-            "prods prod prods",
+            "prods prods prod",
             "prods prod",
 
             "prod ID rhss SEMI",
@@ -347,16 +347,16 @@ fn generate_grammar(tree: &Tree) -> (Grammar, Vec<PatternPair>) {
     (Grammar::from(productions), pattern_pairs)
 }
 
-fn generate_grammar_prods<'a, 'b>(prods_node: &'a Tree, accumulator: &'b mut Vec<Production>, pp_accumulator: &'b mut Vec<PatternPair>) {
-    let prod_node = prods_node.get_child(0);
+fn generate_grammar_prods<'a, 'b>(prods_node: &'a Tree, accumulator: &'b mut Vec<Production>, pp_accumulator: &'b mut Vec<PatternPair>){
+    if prods_node.children.len() == 2 {
+        generate_grammar_prods(prods_node.get_child(0), accumulator, pp_accumulator);
+    }
+
+    let prod_node = prods_node.get_child(prods_node.children.len() - 1);
 
     let id = &prod_node.get_child(0).lhs.lexeme;
 
     generate_grammar_rhss(prod_node.get_child(1), id, accumulator, pp_accumulator);
-
-    if prods_node.children.len() == 2 {
-        generate_grammar_prods(prods_node.get_child(1), accumulator, pp_accumulator);
-    }
 }
 
 fn generate_grammar_rhss<'a, 'b>(rhss_node: &'a Tree, lhs: &'a String, accumulator: &'b mut Vec<Production>, pp_accumulator: &'b mut Vec<PatternPair>) {
@@ -652,66 +652,66 @@ w -> WHITESPACE `[prefix]{0}\n\n{1;prefix=[prefix]\t}[prefix]{2}\n\n`
     │           └── SEMI <- ';'
     └── gram
         └── prods
-            ├── prod
-            │   ├── ID <- 's'
-            │   ├── rhss
-            │   │   ├── rhss
-            │   │   │   └── rhs
-            │   │   │       ├── ARROW <- '->'
-            │   │   │       ├── ids
-            │   │   │       │   ├── ID <- 's'
-            │   │   │       │   └── ids
-            │   │   │       │       ├── ID <- 'b'
-            │   │   │       │       └── ids
-            │   │   │       │           └──  <- 'NULL'
-            │   │   │       └── pattopt
-            │   │   │           └──  <- 'NULL'
-            │   │   └── rhs
-            │   │       ├── ARROW <- '->'
-            │   │       ├── ids
-            │   │       │   └──  <- 'NULL'
-            │   │       └── pattopt
-            │   │           └──  <- 'NULL'
-            │   └── SEMI <- ';'
-            └── prods
-                ├── prod
-                │   ├── ID <- 'b'
-                │   ├── rhss
-                │   │   ├── rhss
-                │   │   │   └── rhs
-                │   │   │       ├── ARROW <- '->'
-                │   │   │       ├── ids
-                │   │   │       │   ├── ID <- 'LBRACKET'
-                │   │   │       │   └── ids
-                │   │   │       │       ├── ID <- 's'
-                │   │   │       │       └── ids
-                │   │   │       │           ├── ID <- 'RBRACKET'
-                │   │   │       │           └── ids
-                │   │   │       │               └──  <- 'NULL'
-                │   │   │       └── pattopt
-                │   │   │           └── PATTC <- '``'
-                │   │   └── rhs
-                │   │       ├── ARROW <- '->'
-                │   │       ├── ids
-                │   │       │   ├── ID <- 'w'
-                │   │       │   └── ids
-                │   │       │       └──  <- 'NULL'
-                │   │       └── pattopt
-                │   │           └──  <- 'NULL'
-                │   └── SEMI <- ';'
-                └── prods
-                    └── prod
-                        ├── ID <- 'w'
-                        ├── rhss
-                        │   └── rhs
-                        │       ├── ARROW <- '->'
-                        │       ├── ids
-                        │       │   ├── ID <- 'WHITESPACE'
-                        │       │   └── ids
-                        │       │       └──  <- 'NULL'
-                        │       └── pattopt
-                        │           └── PATTC <- '`[prefix]{0}\\n\\n{1;prefix=[prefix]\\t}[prefix]{2}\\n\\n`'
-                        └── SEMI <- ';'"
+            ├── prods
+            │   ├── prods
+            │   │   └── prod
+            │   │       ├── ID <- 's'
+            │   │       ├── rhss
+            │   │       │   ├── rhss
+            │   │       │   │   └── rhs
+            │   │       │   │       ├── ARROW <- '->'
+            │   │       │   │       ├── ids
+            │   │       │   │       │   ├── ID <- 's'
+            │   │       │   │       │   └── ids
+            │   │       │   │       │       ├── ID <- 'b'
+            │   │       │   │       │       └── ids
+            │   │       │   │       │           └──  <- 'NULL'
+            │   │       │   │       └── pattopt
+            │   │       │   │           └──  <- 'NULL'
+            │   │       │   └── rhs
+            │   │       │       ├── ARROW <- '->'
+            │   │       │       ├── ids
+            │   │       │       │   └──  <- 'NULL'
+            │   │       │       └── pattopt
+            │   │       │           └──  <- 'NULL'
+            │   │       └── SEMI <- ';'
+            │   └── prod
+            │       ├── ID <- 'b'
+            │       ├── rhss
+            │       │   ├── rhss
+            │       │   │   └── rhs
+            │       │   │       ├── ARROW <- '->'
+            │       │   │       ├── ids
+            │       │   │       │   ├── ID <- 'LBRACKET'
+            │       │   │       │   └── ids
+            │       │   │       │       ├── ID <- 's'
+            │       │   │       │       └── ids
+            │       │   │       │           ├── ID <- 'RBRACKET'
+            │       │   │       │           └── ids
+            │       │   │       │               └──  <- 'NULL'
+            │       │   │       └── pattopt
+            │       │   │           └── PATTC <- '``'
+            │       │   └── rhs
+            │       │       ├── ARROW <- '->'
+            │       │       ├── ids
+            │       │       │   ├── ID <- 'w'
+            │       │       │   └── ids
+            │       │       │       └──  <- 'NULL'
+            │       │       └── pattopt
+            │       │           └──  <- 'NULL'
+            │       └── SEMI <- ';'
+            └── prod
+                ├── ID <- 'w'
+                ├── rhss
+                │   └── rhs
+                │       ├── ARROW <- '->'
+                │       ├── ids
+                │       │   ├── ID <- 'WHITESPACE'
+                │       │   └── ids
+                │       │       └──  <- 'NULL'
+                │       └── pattopt
+                │           └── PATTC <- '`[prefix]{0}\\n\\n{1;prefix=[prefix]\\t}[prefix]{2}\\n\\n`'
+                └── SEMI <- ';'"
         );
     }
 
