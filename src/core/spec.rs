@@ -132,7 +132,7 @@ lazy_static! {
             "states states state",
             "states state",
 
-            "state sdec transopt SEMI ",
+            "state sdec transopt SEMI",
 
             "sdec targets",
             "sdec targets HAT ID",
@@ -154,7 +154,7 @@ lazy_static! {
             "trand HAT ID",
             "trand HAT DEF",
 
-            "mtcs CILC OR mtcs",
+            "mtcs mtcs OR CILC",
             "mtcs CILC",
 
             "gram prods",
@@ -309,7 +309,7 @@ fn generate_ecdfa_trans<'a>(trans_node: &'a Tree, sources: &Vec<&State>, builder
 }
 
 fn generate_ecdfa_mtcs<'a>(mtcs_node: &'a Tree, sources: &Vec<&State>, dest: &State, builder: &mut EncodedCDFABuilder) -> Result<(), runtime::CDFAError> {
-    let matcher = mtcs_node.children.first().unwrap();
+    let matcher = mtcs_node.children.last().unwrap();
     let matcher_string: String = matcher.lhs.lexeme.chars()
         .skip(1)
         .take(matcher.lhs.lexeme.len() - 2)
@@ -326,7 +326,7 @@ fn generate_ecdfa_mtcs<'a>(mtcs_node: &'a Tree, sources: &Vec<&State>, dest: &St
     }
 
     if mtcs_node.children.len() == 3 {
-        generate_ecdfa_mtcs(mtcs_node.get_child(2), sources, dest, builder)
+        generate_ecdfa_mtcs(mtcs_node.get_child(0), sources, dest, builder)
     } else {
         Ok(())
     }
