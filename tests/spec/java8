@@ -97,9 +97,7 @@ start
 
     # MISC
     ' ' | '\t' | '\n' -> ws
-    'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' | 'h' | 'i' | 'j' | 'k' | 'l' | 'm' | 'n' | 'o' | 'p' | 'q' | 'r' | 's'
-        | 't' | 'u' | 'v' | 'w' | 'x' | 'y' | 'z' | 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H' | 'I' | 'J' | 'K'
-        | 'L' | 'M' | 'N' | 'O' | 'P' | 'Q' | 'R' | 'S' | 'T' | 'U' | 'V' | 'W' | 'X' | 'Y' | 'Z' | '$' | '_' -> id;
+    _ -> id;
 
 #
 # OPERATORS
@@ -225,11 +223,12 @@ id      ^ID
 # GRAMMAR                                                                                                              #
 #----------------------------------------------------------------------------------------------------------------------#
 
-CompilationUnit
-    -> PackageDeclarationOpt ImportDeclarationsOpt TypeDeclarationsOpt;
+cmp_unit
+    -> package_decl_opt ImportDeclarationsOpt TypeDeclarationsOpt;
 
-PackageDeclarationOpt
-    -> AnnotationsOpt PACKAGE id_chain SEMI;
+package_decl_opt
+    -> annotations_opt PACKAGE id_chain SEMI
+    ->;
 
 ImportDeclarationsOpt
     -> ImportDeclarations
@@ -279,7 +278,7 @@ class_body_opt
     -> class_body
     ->;
 class_body
-    -> LBRACE class_body_dec RBRACE;
+    -> LBRACE class_body_decs_opt RBRACE;
 class_body_decs_opt
     -> class_body_decs
     ->;
