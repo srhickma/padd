@@ -24,7 +24,6 @@ impl Parser for EarleyParser {
             for rule in &grammar.productions {
                 if rule.rhs.iter().all(|symbol| nss.contains(symbol)) && !nss.contains(&rule.lhs) {
                     nss.insert(rule.lhs.clone());
-                    println!("ADDING NULLABLE: {}", rule.lhs.clone());
                 }
             }
         }
@@ -227,16 +226,6 @@ impl Parser for EarleyParser {
                 }
             }
 
-//            println!("-----------------------------------------------------");
-//            for i in 0..parse_chart.len() {
-//                println!("SET {}", i);
-//                for j in 0..parse_chart[i].len() {
-//                    println!("{}", parse_chart[i][j].to_string());
-//                }
-//                println!();
-//            }
-//            println!("-----------------------------------------------------");
-
             let first_edge = parse_chart[start].iter()
                 .find(|edge| edge.finish == finish && edge.rule.unwrap().lhs == grammar.start);
             match first_edge {
@@ -256,8 +245,6 @@ impl Parser for EarleyParser {
                 } else {
                     let symbol = &symbols[depth];
                     if grammar.terminals.contains(symbol) {
-//                        println!("HIT TERMINAL scan={} symbol={}", scan[node].kind, symbol);
-
                         if scan[node].kind == *symbol {
                             vec![Edge{
                                 rule: None,
@@ -286,10 +273,6 @@ impl Parser for EarleyParser {
                      root: Node)
             -> Option<Vec<(Node, Edge<'a>)>> {
 
-//            println!("-----------------------------------------------------");
-//            println!("STARTING DF_SEARCH AT {}", root);
-//            println!("-----------------------------------------------------");
-
             fn aux<'a>(edges: &Fn(usize, Node) -> Vec<Edge<'a>>,
                        child: &Fn(&Edge) -> Node,
                        leaf: &Fn(usize, Node) -> bool,
@@ -297,15 +280,9 @@ impl Parser for EarleyParser {
                        root: Node)
                 -> Option<Vec<(Node, Edge<'a>)>> {
 
-//                println!("aux at depth={} root={}", depth, root);
-
                 if leaf(depth, root) {
-//                    println!("LEAF");
-
                     Some(vec![])
                 } else {
-//                    println!("NON-LEAF");
-
                     for edge in edges(depth, root) {
                         let mut res = aux(edges, child, leaf, depth + 1, child(&edge));
 
