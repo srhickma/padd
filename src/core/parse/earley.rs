@@ -156,28 +156,12 @@ impl Parser for EarleyParser {
 //        }
 //        println!("-----------------------------------------------------");
 
-        fn partial_parse<'a, 'b>(i: usize, grammar: &'a Grammar, chart: &'b mut Vec<Vec<Item<'a>>>) -> (bool, Vec<Item<'a>>) {
-            //TODO switch to a usize and remove valid
-            let mut complete_parses = vec![];
-            let mut res = false;
-            for j in 0..chart[i].len() {
-                let item = &chart[i][j];
-                if item.rule.lhs == grammar.start && item.next >= item.rule.rhs.len() && item.start == 0 {
-                    complete_parses.push(item.clone());
-                    res = true;
-                }
-            }
-            return (res, complete_parses);
+        fn recognized<'a, 'b>(grammar: &'a Grammar, chart: &'b Vec<Vec<Item<'a>>>) -> bool {
+            chart.last().unwrap().iter()
+                .any(|item| item.rule.lhs == grammar.start && item.next >= item.rule.rhs.len() && item.start == 0)
         }
 
-        let (valid, complete_parses) = partial_parse(chart.len() - 1, grammar, &mut chart);
-
-        //TODO this message is not always correct, depricate or fix
-        if complete_parses.len() != 1 {
-            println!("WARN: Found {} complete parse(s)", complete_parses.len());
-        }
-
-        return if valid {
+        return if recognized(grammar, &chart) {
             Some(parse_tree(grammar, &scan, chart))
         } else {
             None
