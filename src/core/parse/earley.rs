@@ -171,7 +171,7 @@ impl Parser for EarleyParser {
         fn parse_tree<'a>(grammar: &'a Grammar, scan: &'a Vec<Token>, chart: Vec<Vec<Item<'a>>>) -> Tree {
 
             fn aux<'a>(start: Node, edge: &Edge, grammar: &'a Grammar, scan: &'a Vec<Token>, chart: &Vec<Vec<Edge>>) -> Tree {
-                match edge.rule{ //TODO need to figure out what happens for NULL
+                match edge.rule{
                     None => Tree{ //Non-empty rhs
                         lhs: scan[start].clone(),
                         children: vec![],
@@ -182,14 +182,13 @@ impl Parser for EarleyParser {
                             lexeme: String::new(),
                         },
                         children: {
-                            let children: Vec<Tree> = top_list(start, edge, grammar, scan, chart).iter().rev()
+                            let mut children: Vec<Tree> = top_list(start, edge, grammar, scan, chart).iter().rev()
                                 .map(|&(node, ref edge)| aux(node, &edge, grammar, scan, chart))
                                 .collect();
-                            if children.is_empty() {
-                                vec![Tree::null()]
-                            } else {
-                                children
+                            if children.is_empty() { //empty rhs
+                                children.push(Tree::null());
                             }
+                            children
                         },
                     }
                 }
