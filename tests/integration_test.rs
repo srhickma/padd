@@ -1,7 +1,6 @@
 extern crate padd;
 
 use padd::FormatJobRunner;
-use std::io;
 use std::io::Read;
 use std::io::Write;
 use std::fs::File;
@@ -134,7 +133,7 @@ fn load_spec(name: &str) -> String {
     let spec_file = File::open(format!("tests/spec/{}", name));
     match spec_file {
         Ok(_) => {
-            spec_file.unwrap().read_to_string(&mut spec);
+            spec_file.unwrap().read_to_string(&mut spec).unwrap();
         },
         Err(e) => panic!("Could't find specification file: {}", e),
     }
@@ -146,7 +145,7 @@ fn load_input(name: &str) -> String {
     let input_file = File::open(format!("tests/input/{}", name));
     match input_file {
         Ok(_) => {
-            input_file.unwrap().read_to_string(&mut input);
+            input_file.unwrap().read_to_string(&mut input).unwrap();
         },
         Err(e) => panic!("Could't find input file: {}", e),
     }
@@ -159,13 +158,13 @@ fn assert_matches_file(result: String, file_name: &str){
     let output_file = File::open(&file_path);
     match output_file {
         Ok(_) => {
-            output_file.unwrap().read_to_string(&mut output);
+            output_file.unwrap().read_to_string(&mut output).unwrap();
         },
         Err(_) => {
             let mut output_file = File::create(&file_path);
             match output_file {
                 Ok(_) => {
-                    output_file.unwrap().write(result.as_bytes());
+                    output_file.unwrap().write(result.as_bytes()).unwrap();
                 },
                 Err(e) => panic!("Couldn't create output file: {}", e),
             }
