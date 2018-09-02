@@ -10,23 +10,28 @@ pub struct EarleyParser;
 impl Parser for EarleyParser {
     fn parse(&self, scan: Vec<Token>, grammar: &Grammar) -> Option<Tree> {
 
-        let mut nss: HashSet<String> = HashSet::new();
-
-        loop {
-            let old_size = nss.len();
-            update_nss(&mut nss, grammar);
-            if old_size == nss.len() {
-                break;
-            }
-        }
-
-        fn update_nss(nss: &mut HashSet<String>, grammar: &Grammar){
-            for rule in &grammar.productions {
-                if rule.rhs.iter().all(|symbol| nss.contains(symbol)) && !nss.contains(&rule.lhs) {
-                    nss.insert(rule.lhs.clone());
+        //TODO improve using quadratic time algorithm https://github.com/jeffreykegler/kollos/blob/master/notes/misc/loup2.md
+        fn build_nss(grammar: &Grammar) ->  HashSet<String> {
+            fn update_nss(nss: &mut HashSet<String>, grammar: &Grammar){
+                for rule in &grammar.productions {
+                    if rule.rhs.iter().all(|symbol| nss.contains(symbol)) && !nss.contains(&rule.lhs) {
+                        nss.insert(rule.lhs.clone());
+                    }
                 }
             }
+
+            let mut nss: HashSet<String> = HashSet::new();
+            loop {
+                let old_size = nss.len();
+                update_nss(&mut nss, grammar);
+                if old_size == nss.len() {
+                    break;
+                }
+            }
+            nss
         }
+
+        let nss: HashSet<String> = build_nss(grammar);
 
         let mut chart: Vec<Vec<Item>> = vec![vec![]];
         grammar.productions.iter()
