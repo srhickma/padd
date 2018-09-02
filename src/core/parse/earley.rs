@@ -170,7 +170,7 @@ impl Parser for EarleyParser {
         //TODO refactor to reduce long and duplicated parameter lists
         fn parse_tree<'a>(grammar: &'a Grammar, scan: &'a Vec<Token>, chart: Vec<Vec<Item<'a>>>) -> Tree {
 
-            fn aux<'a>(start: Node, edge: &Edge, grammar: &'a Grammar, scan: &'a Vec<Token>, chart: &Vec<Vec<Edge>>) -> Tree {
+            fn recur<'a>(start: Node, edge: &Edge, grammar: &'a Grammar, scan: &'a Vec<Token>, chart: &Vec<Vec<Edge>>) -> Tree {
                 match edge.rule{
                     None => Tree{ //Non-empty rhs
                         lhs: scan[start].clone(),
@@ -182,8 +182,9 @@ impl Parser for EarleyParser {
                             lexeme: String::new(),
                         },
                         children: {
-                            let mut children: Vec<Tree> = top_list(start, edge, grammar, scan, chart).iter().rev()
-                                .map(|&(node, ref edge)| aux(node, &edge, grammar, scan, chart))
+                            let mut children: Vec<Tree> =
+                                top_list(start, edge, grammar, scan, chart).iter().rev()
+                                .map(|&(node, ref edge)| recur(node, &edge, grammar, scan, chart))
                                 .collect();
                             if children.is_empty() { //empty rhs
                                 children.push(Tree::null());
@@ -217,38 +218,42 @@ impl Parser for EarleyParser {
                 .find(|edge| edge.finish == finish && edge.rule.unwrap().lhs == grammar.start);
             match first_edge {
                 None => panic!("Failed to find start item to begin parse"),
-                Some(edge) => aux(start, edge, grammar, scan, &parse_chart)
+                Some(edge) => recur(start, edge, grammar, scan, &parse_chart)
             }
         }
 
-        fn top_list<'a>(start: Node, edge: &Edge, grammar: &'a Grammar, scan: &'a Vec<Token>, chart: &Vec<Vec<Edge<'a>>>) -> Vec<(Node, Edge<'a>)> {
+        fn top_list<'a>(start: Node,
+                        edge: &Edge,
+                        grammar: &'a Grammar,
+                        scan: &'a Vec<Token>,
+                        chart: &Vec<Vec<Edge<'a>>>) -> Vec<(Node, Edge<'a>)> {
             let symbols: &Vec<String> = &edge.rule.unwrap().rhs;
             let bottom: usize = symbols.len();
             let leaf = |depth: usize, node: Node| depth == bottom && node == edge.finish;
             let edges = |depth: usize, node: Node| -> Vec<Edge> {
-                if depth >= bottom {
-                    vec![]
-                } else {
+                if depth < bottom {
                     let symbol = &symbols[depth];
                     if grammar.terminals.contains(symbol) {
                         if scan[node].kind == *symbol {
-                            vec![Edge{
+                            return vec![Edge{
                                 rule: None,
                                 finish: node + 1
                             }]
-                        } else {
-                            vec![]
                         }
                     } else { //TODO return iterators instead to avoid collection and cloning
-                        chart[node].iter()
+                        return chart[node].iter()
                             .filter(|edge| edge.rule.unwrap().lhs == *symbol)
                             .cloned()
                             .collect()
                     }
                 }
+                vec![]
             };
 
-            fn df_search<'a>(edges: &Fn(usize, Node) -> Vec<Edge<'a>>, leaf: &Fn(usize, Node) -> bool, depth: usize, root: Node) -> Option<Vec<(Node, Edge<'a>)>> {
+            fn df_search<'a>(edges: &Fn(usize, Node) -> Vec<Edge<'a>>,
+                             leaf: &Fn(usize, Node) -> bool,
+                             depth: usize,
+                             root: Node) -> Option<Vec<(Node, Edge<'a>)>> {
                 if leaf(depth, root) {
                     Some(vec![])
                 } else {
