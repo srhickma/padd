@@ -53,11 +53,7 @@ impl Parser for EarleyParser {
                 let item = chart[i][j].clone();
                 let next = (&item).next_symbol();
                 match next {
-                    None => {
-                        let index = item.start;
-                        //TODO eliminate this cloning!
-                        complete_op(item, &chart[index].clone(), &mut chart[i]);
-                    },
+                    None => complete_op(item, i, &mut chart),
                     Some(symbol) => {
                         if grammar.terminals.contains(symbol) {
                             scan_op(item, i, symbol, &scan, &mut chart);
@@ -117,21 +113,24 @@ impl Parser for EarleyParser {
             }
         }
 
-        fn complete_op<'a, 'b>(item: Item<'a>, src: &'b Vec<Item<'a>>, dest: &'b mut Vec<Item<'a>>) {
-            src.iter()
-                .filter(|old_item| match old_item.clone().next_symbol() {
+        fn complete_op<'a, 'b>(item: Item<'a>, i: usize, chart: &'b mut Vec<Vec<Item<'a>>>) {
+            let mut advanced: Vec<Item> = vec![];
+
+            chart[item.start].iter()
+                .filter(|old_item| match old_item.next_symbol() {
                         None => false,
                         Some(sym) => sym == item.rule.lhs,
                 })
-                .for_each(|old_item| append(
-                        Item{
-                            rule: old_item.rule,
-                            start: old_item.start,
-                            next: old_item.next + 1,
-                            token: None,
-                        },
-                        dest
-                ));
+                .for_each(|old_item| advanced.push(Item{
+                    rule: old_item.rule,
+                    start: old_item.start,
+                    next: old_item.next + 1,
+                    token: None,
+                }));
+
+            for item in advanced {
+                append(item, &mut chart[i]);
+            }
         }
 
         fn append<'a, 'b>(item: Item<'a>, item_set: &'b mut Vec<Item<'a>>) {
