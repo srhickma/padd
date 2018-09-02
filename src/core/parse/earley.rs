@@ -225,7 +225,6 @@ impl Parser for EarleyParser {
             let symbols: &Vec<String> = &edge.rule.unwrap().rhs;
             let bottom: usize = symbols.len();
             let leaf = |depth: usize, node: Node| depth == bottom && node == edge.finish;
-            let child = |edge: &Edge| edge.finish;
             let edges = |depth: usize, node: Node| -> Vec<Edge> {
                 if depth >= bottom {
                     vec![]
@@ -248,30 +247,18 @@ impl Parser for EarleyParser {
                     }
                 }
             };
-            match df_search(&edges, &child, &leaf, start) {
-                None => panic!("Failed to decompose parse edge of recognized scan"),
-                Some(path) => path
-            }
-        }
-
-        fn df_search<'a>(edges: &Fn(usize, Node) -> Vec<Edge<'a>>,
-                     child: &Fn(&Edge) -> Node,
-                     leaf: &Fn(usize, Node) -> bool,
-                     root: Node)
-            -> Option<Vec<(Node, Edge<'a>)>> {
 
             fn aux<'a>(edges: &Fn(usize, Node) -> Vec<Edge<'a>>,
-                       child: &Fn(&Edge) -> Node,
                        leaf: &Fn(usize, Node) -> bool,
                        depth: usize,
                        root: Node)
-                -> Option<Vec<(Node, Edge<'a>)>> {
+                       -> Option<Vec<(Node, Edge<'a>)>> {
 
                 if leaf(depth, root) {
                     Some(vec![])
                 } else {
                     for edge in edges(depth, root) {
-                        let mut res = aux(edges, child, leaf, depth + 1, child(&edge));
+                        let mut res = aux(edges, leaf, depth + 1, edge.finish);
 
                         match res {
                             None => {},
@@ -285,7 +272,10 @@ impl Parser for EarleyParser {
                 }
             }
 
-            aux(edges, child, leaf, 0, root)
+            match aux(&edges, &leaf, 0, start) {
+                None => panic!("Failed to decompose parse edge of recognized scan"),
+                Some(path) => path
+            }
         }
     }
 }
