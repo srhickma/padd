@@ -248,19 +248,12 @@ impl Parser for EarleyParser {
                 }
             };
 
-            fn aux<'a>(edges: &Fn(usize, Node) -> Vec<Edge<'a>>,
-                       leaf: &Fn(usize, Node) -> bool,
-                       depth: usize,
-                       root: Node)
-                       -> Option<Vec<(Node, Edge<'a>)>> {
-
+            fn df_search<'a>(edges: &Fn(usize, Node) -> Vec<Edge<'a>>, leaf: &Fn(usize, Node) -> bool, depth: usize, root: Node) -> Option<Vec<(Node, Edge<'a>)>> {
                 if leaf(depth, root) {
                     Some(vec![])
                 } else {
                     for edge in edges(depth, root) {
-                        let mut res = aux(edges, leaf, depth + 1, edge.finish);
-
-                        match res {
+                        match df_search(edges, leaf, depth + 1, edge.finish) {
                             None => {},
                             Some(mut path) => {
                                 path.push((root, edge));
@@ -272,7 +265,7 @@ impl Parser for EarleyParser {
                 }
             }
 
-            match aux(&edges, &leaf, 0, start) {
+            match df_search(&edges, &leaf, 0, start) {
                 None => panic!("Failed to decompose parse edge of recognized scan"),
                 Some(path) => path
             }
