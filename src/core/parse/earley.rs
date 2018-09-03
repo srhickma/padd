@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use core::parse::Parser;
 use core::parse::Grammar;
 use core::parse::Production;
@@ -9,29 +8,6 @@ pub struct EarleyParser;
 
 impl Parser for EarleyParser {
     fn parse(&self, scan: Vec<Token>, grammar: &Grammar) -> Option<Tree> {
-
-        //TODO improve using quadratic time algorithm https://github.com/jeffreykegler/kollos/blob/master/notes/misc/loup2.md
-        fn build_nss(grammar: &Grammar) ->  HashSet<String> {
-            fn update_nss(nss: &mut HashSet<String>, grammar: &Grammar){
-                for rule in &grammar.productions {
-                    if rule.rhs.iter().all(|symbol| nss.contains(symbol)) && !nss.contains(&rule.lhs) {
-                        nss.insert(rule.lhs.clone());
-                    }
-                }
-            }
-
-            let mut nss: HashSet<String> = HashSet::new();
-            loop {
-                let old_size = nss.len();
-                update_nss(&mut nss, grammar);
-                if old_size == nss.len() {
-                    break;
-                }
-            }
-            nss
-        }
-
-        let nss: HashSet<String> = build_nss(grammar);
         let mut parse_chart: Vec<Vec<Edge>> = vec![];
         let mut chart: Vec<Vec<Item>> = vec![vec![]];
 
@@ -68,7 +44,7 @@ impl Parser for EarleyParser {
                         if grammar.terminals.contains(symbol) {
                             scan_op(&item, i, symbol, &scan, &mut chart);
                         } else {
-                            predict_op(&item, i, symbol, &nss, grammar, &mut chart);
+                            predict_op(&item, i, symbol, grammar, &mut chart);
                         }
                     },
                 }
@@ -77,7 +53,7 @@ impl Parser for EarleyParser {
             i += 1;
         }
 
-        fn predict_op<'a, 'b>(item: &Item<'a>, i: usize, symbol: &'a str, nss: &HashSet<String>, grammar: &'a Grammar, chart: &'b mut Vec<Vec<Item<'a>>>) {
+        fn predict_op<'a, 'b>(item: &Item<'a>, i: usize, symbol: &'a str, grammar: &'a Grammar, chart: &'b mut Vec<Vec<Item<'a>>>) {
             grammar.productions.iter()
                 .filter(|prod| prod.lhs == symbol)
                 .for_each(|prod| {
@@ -91,7 +67,7 @@ impl Parser for EarleyParser {
                         &mut chart[i]
                     );
 
-                    if nss.contains(&prod.lhs) {
+                    if grammar.nullable(&prod) {
                         append(
                             Item{
                                 rule: item.rule,
@@ -128,8 +104,8 @@ impl Parser for EarleyParser {
 
             chart[item.start].iter()
                 .filter(|old_item| match old_item.next_symbol() {
-                        None => false,
-                        Some(sym) => sym == item.rule.lhs,
+                    None => false,
+                    Some(sym) => sym == item.rule.lhs,
                 })
                 .for_each(|old_item| advanced.push(Item{
                     rule: old_item.rule,
@@ -184,8 +160,8 @@ impl Parser for EarleyParser {
                         children: {
                             let mut children: Vec<Tree> =
                                 top_list(start, edge, grammar, scan, chart).iter().rev()
-                                .map(|&(node, ref edge)| recur(node, &edge, grammar, scan, chart))
-                                .collect();
+                                    .map(|&(node, ref edge)| recur(node, &edge, grammar, scan, chart))
+                                    .collect();
                             if children.is_empty() { //Empty rhs
                                 children.push(Tree::null());
                             }

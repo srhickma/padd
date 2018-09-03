@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::collections::HashMap;
 use core::scan::Token;
 
 mod earley;
@@ -75,6 +76,7 @@ impl Tree {
 
 pub struct Grammar {
     pub productions: Vec<Production>,
+    nss: HashSet<String>,
     #[allow(dead_code)]
     non_terminals: HashSet<String>,
     terminals: HashSet<String>,
@@ -84,7 +86,12 @@ pub struct Grammar {
 }
 
 impl Grammar {
+    pub fn nullable(&self, prod: &Production) -> bool {
+        self.nss.contains(&prod.lhs)
+    }
+
     pub fn from(productions: Vec<Production>) -> Grammar {
+        let nss = Grammar::build_nss(&productions);
         let non_terminals: HashSet<String> = productions.iter().cloned()
             .map(|prod| prod.lhs)
             .collect();
@@ -98,16 +105,57 @@ impl Grammar {
         let terminals = symbols.difference(&non_terminals)
             .map(|x| x.clone())
             .collect();
-
         let start = productions[0].lhs.clone();
 
         return Grammar {
             productions,
+            nss,
             non_terminals,
             terminals,
             symbols,
             start,
         };
+    }
+
+    fn build_nss(productions: &Vec<Production>) ->  HashSet<String> {
+        let mut nss: HashSet<String> = HashSet::new();
+        let mut prods_by_rhs: HashMap<&String, Vec<&Production>> = HashMap::new();
+        let mut work_stack: Vec<&String> = Vec::new();
+
+        for prod in productions {
+            for s in &prod.rhs {
+                prods_by_rhs.entry(s)
+                    .or_insert(Vec::new())
+                    .push(prod);
+            }
+
+            if prod.rhs.is_empty() {
+                nss.insert(prod.lhs.clone()); //TODO can we avoid cloning here
+                work_stack.push(&prod.lhs);
+            }
+        }
+
+        loop {
+            match work_stack.pop() {
+                None => break,
+                Some(work_symbol) => {
+                    match prods_by_rhs.get(work_symbol) {
+                        None => {},
+                        Some(prods) => {
+                            for prod in prods {
+                                if !nss.contains(&prod.lhs)
+                                    && prod.rhs.iter().all(|sym| nss.contains(sym)) {
+                                    nss.insert(prod.lhs.clone());
+                                    work_stack.push(&prod.lhs);
+                                }
+                            }
+                        }
+                    }
+                }
+            };
+        }
+
+        nss
     }
 }
 
