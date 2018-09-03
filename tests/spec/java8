@@ -1,5 +1,5 @@
 # SIGMA
-'<>=+-_*/\\%(){}[],.;:#!?^@|"\'~ \t\nABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+'<>=+-_*/\\%(){}[],.;:#!?^@&|"\'~ \t\nABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
 
 #----------------------------------------------------------------------------------------------------------------------#
 # CDFA                                                                                                                 #
@@ -111,15 +111,10 @@ not     ^NOT
     '=' -> ^CMP_EQ;
 
 lt      ^LT
-    '<' -> ^SHIFT
     '=' -> ^CMP_REL;
 
 gt      ^GT
-    '>' -> brs
     '=' -> ^CMP_REL;
-
-brs     ^SHIFT
-    '>' -> ^SHIFT;
 
 plus    ^PLUS
     '+' -> ^INC
@@ -216,7 +211,10 @@ bcom
 
 bcomm ^_; # TODO get rid of this after introducing comments
 
-id      ^ID
+id | ABSTRACT | ASSERT | PRIM | BREAK | PRIM | CASE | CATCH | ENUM | CLASS | CONST | CONTINUE | DEFAULT | DO | ELSE
+    | EXTENDS | FINAL | FINALLY | FOR | GOTO | IF | IMPLEMENTS | IMPORT | CMP_REL | INTERFACE | NATIVE | NEW | PACKAGE
+    | VISIBILITY | RETURN | STATIC | STRICTFP | SUPER | SWITCH | SYNCHRONIZED | THIS | THROW | THROWS | TRANSIENT | TRY
+    | VOID | VOLATILE | WHILE   ^ID
     'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' | 'h' | 'i' | 'j' | 'k' | 'l' | 'm' | 'n' | 'o' | 'p' | 'q' | 'r' | 's'
         | 't' | 'u' | 'v' | 'w' | 'x' | 'y' | 'z' | 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H' | 'I' | 'J' | 'K'
         | 'L' | 'M' | 'N' | 'O' | 'P' | 'Q' | 'R' | 'S' | 'T' | 'U' | 'V' | 'W' | 'X' | 'Y' | 'Z' | '$' | '_' | '0'
@@ -475,10 +473,12 @@ default_value
 #
 
 type_parameters_opt
-    -> LT type_parameters GT
+    -> type_parameters
     ->;
 type_parameters
-    -> type_parameter COMMA type_parameters
+    -> LT type_parameter_list GT;
+type_parameter_list
+    -> type_parameter COMMA type_parameter_list
     -> type_parameter;
 type_parameter
     -> annotations_opt ID type_bound_opt;
@@ -596,7 +596,7 @@ ElementValuePairs
 ElementValuePair
     -> ID ASSN ElementValue;
 ElementValue
-    -> ConditionalExpression
+    -> conditional_expr
     -> ElementValueArrayInitializer
     -> annotation;
 ElementValueArrayInitializer
@@ -809,7 +809,7 @@ catch_clause
 catch_formal_parameter
     -> modifiers_opt catch_type variable_declarator_id;
 catch_type
-    -> unann_class_type OR_BI catch_type_internal;
+    -> unann_class_type catch_type_internal;
 catch_type_internal
     -> OR_BI class_type catch_type_internal
     ->;
@@ -923,7 +923,9 @@ relational_expr
 
 shift_expr
     -> additive_expr
-    -> shift_expr SHIFT additive_expr;
+    -> shift_expr LT LT additive_expr
+    -> shift_expr GT GT additive_expr
+    -> shift_expr GT GT GT additive_expr;
 
 additive_expr
     -> multiplicative_expr
