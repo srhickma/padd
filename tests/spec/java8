@@ -110,11 +110,11 @@ eq      ^ASSN
 not     ^NOT
     '=' -> ^CMP_EQ;
 
-lt      ^CMP_REL
+lt      ^LT
     '<' -> ^SHIFT
     '=' -> ^CMP_REL;
 
-gt      ^CMP_REL
+gt      ^GT
     '>' -> brs
     '=' -> ^CMP_REL;
 
@@ -206,13 +206,15 @@ colon   ^COLON
 ws      ^_
     ' ' | '\t' | '\n' -> ws;
 
-lcom ^COMMENT
+lcom ^_
     '\n' -> fail
     _ -> lcom;
 
 bcom
-    '*/' -> ^COMMENT
+    '*/' -> bcomm # TODO get rid of this after introducing comments
     _ -> bcom;
+
+bcomm ^_; # TODO get rid of this after introducing comments
 
 id      ^ID
     'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' | 'h' | 'i' | 'j' | 'k' | 'l' | 'm' | 'n' | 'o' | 'p' | 'q' | 'r' | 's'
@@ -261,7 +263,7 @@ TypeDeclaration
 #
 
 class_dec
-    -> class_modifiers_opt CLASS ID type_parameters_opt superclass_opt superinterfaces_opt class_body;
+    -> modifiers_opt CLASS ID type_parameters_opt superclass_opt superinterfaces_opt class_body;
 
 superclass_opt
     -> superclass
@@ -306,7 +308,7 @@ static_init
     -> STATIC block;
 
 constructor_dec
-    -> constructor_modifiers_opt constructor_declarator throws_opt constructor_body;
+    -> modifiers_opt constructor_declarator throws_opt constructor_body;
 constructor_body
     -> LBRACE explicit_constructor_invocation_opt block_statements_opt RBRACE;
 constructor_declarator
@@ -328,11 +330,11 @@ argument_list
     -> expr COMMA expr
     -> expr;
 
-field_declaration
-    -> field_modifiers_opt type variable_declarator_list;
+field_dec
+    -> modifiers_opt type variable_declarator_list SEMI;
 
 method_dec
-    -> method_modifiers_opt method_header method_body;
+    -> modifiers_opt method_header method_body;
 method_header
     -> result method_declarator throws_opt
     -> type_parameters annotations_opt result method_declarator throws_opt;
@@ -355,12 +357,12 @@ formal_parameters
     -> formal_parameter
     -> receiver_parameter;
 formal_parameter
-    -> variable_modifiers_opt unann_type variable_declarator_id;
+    -> modifiers_opt unann_type variable_declarator_id;
 receiver_parameter
     -> annotations_opt unann_type ID DOT THIS
     -> annotations_opt unann_type THIS;
 last_formal_parameter
-    -> variable_modifiers_opt unann_type annotations_opt TRIDOT variable_declarator_id
+    -> modifiers_opt unann_type annotations_opt TRIDOT variable_declarator_id
     -> formal_parameter;
 
 throws_opt
@@ -385,7 +387,7 @@ result
 #
 
 enum_dec
-    -> class_modifiers_opt ENUM ID superinterfaces_opt enum_body;
+    -> modifiers_opt ENUM ID superinterfaces_opt enum_body;
 
 enum_body
     -> LBRACE enum_const_list_opt comma_opt enum_body_declarations_opt RBRACE;
@@ -411,7 +413,7 @@ enum_body_declarations_opt
 #
 
 interface_dec
-    -> interface_modifiers_opt INTERFACE ID type_parameters_opt extends_interfaces_opt interface_body;
+    -> modifiers_opt INTERFACE ID type_parameters_opt extends_interfaces_opt interface_body;
 
 extends_interfaces_opt
     -> EXTENDS class_types
@@ -428,7 +430,7 @@ interface_member_decs
     -> interface_member_dec;
 interface_member_dec
     -> const_dec
-    -> method_dec # ignore interface specific modifiers
+    -> method_dec
     -> class_dec
     -> interface_dec
     -> SEMI;
@@ -441,7 +443,7 @@ const_dec
 #
 
 annotation_dec
-    -> interface_modifiers_opt AT INTERFACE ID annotation_body;
+    -> modifiers_opt AT INTERFACE ID annotation_body;
 
 annotation_body
     -> LBRACE annotation_member_decs_opt RBRACE;
@@ -460,7 +462,7 @@ annotation_member_dec
     -> SEMI;
 
 annotation_element_dec
-    -> annotation_element_modifiers_opt unann_type ID LPAREN RPAREN array_dims_opt default_value_opt SEMI;
+    -> modifiers_opt unann_type ID LPAREN RPAREN array_dims_opt default_value_opt SEMI;
 
 default_value_opt
     -> default_value
@@ -513,7 +515,6 @@ typename
 
 non_array_type
     -> class_type
-    -> type_variable
     -> primitive_type;
 
 class_types
@@ -527,12 +528,13 @@ class_type_internal
 
 class_type_to_instantiate
     -> annotated_ids type_arguments
-    -> annotated_ids LT GT;
+    -> annotated_ids LT GT
+    -> annotated_ids;
 
 class_literal
     -> typename unann_array_dims_opt DOT CLASS
     -> PRIM unann_array_dims_opt DOT CLASS
-    -> VOID DOT CLASS
+    -> VOID DOT CLASS;
 
 type_variable
     -> annotations_opt ID;
@@ -573,7 +575,7 @@ unann_array_dim
     -> LARRI RARRI;
 
 wildcard
-    -> annotations_opt QST wildcard_bounds_opt
+    -> annotations_opt QST wildcard_bounds_opt;
 wildcard_bounds_opt
     -> wildcard_bounds
     ->;
@@ -634,10 +636,10 @@ semi_opt
     ->;
 
 variable_declarator_list
-    -> variable_declarator COMMA varaible_declarator
+    -> variable_declarator COMMA variable_declarator_list
     -> variable_declarator;
 variable_declarator
-    -> ID array_dims_opt variable_initializer_opt;
+    -> variable_declarator_id variable_initializer_opt;
 variable_declarator_id
     -> ID array_dims_opt;
 
@@ -678,7 +680,7 @@ block_statement
 lvar_dec_statement
     -> lvar_dec SEMI;
 lvar_dec
-    -> variable_modifiers_opt unann_type variable_declarator_list;
+    -> modifiers_opt unann_type variable_declarator_list;
 
 statement
     -> statement_without_trailing_substatement
@@ -788,7 +790,7 @@ resources
     -> resource SEMI resources
     -> resource;
 resource
-    -> variable_modifiers_opt unnan_type variable_declarator_id ASSN expr;
+    -> modifiers_opt unnan_type variable_declarator_id ASSN expr;
 
 finally_opt
     -> finally
@@ -805,7 +807,7 @@ catches
 catch_clause
     -> CATCH LPAREN catch_formal_parameter RPAREN block;
 catch_formal_parameter
-    -> variable_modifiers_opt catch_type variable_declarator_id;
+    -> modifiers_opt catch_type variable_declarator_id;
 catch_type
     -> unann_class_type OR_BI catch_type_internal;
 catch_type_internal
@@ -849,16 +851,16 @@ for_init_opt
     ->;
 for_init
     -> lvar_dec
-    -> statement_expression_list
+    -> statement_expression_list;
 
 for_update_opt
     -> for_update
     ->;
 for_update
-    -> statement_expression_list
+    -> statement_expression_list;
 
 enhanced_for_statement
-    -> FOR LPAREN variable_modifiers_opt unann_type variable_declarator_id COLON expr RPAREN;
+    -> FOR LPAREN modifiers_opt unann_type variable_declarator_id COLON expr RPAREN;
 
 #
 # EXPRESSIONS
@@ -915,7 +917,9 @@ equality_expr
 
 relational_expr
     -> shift_expr
-    -> relational_expr CMP_REL shift_expr;
+    -> relational_expr CMP_REL shift_expr
+    -> relational_expr LT shift_expr
+    -> relational_expr GT shift_expr;
 
 shift_expr
     -> additive_expr
@@ -980,7 +984,7 @@ class_icreation_expr
     -> primary DOT unqualified_class_icreation_expr;
 
 unqualified_class_icreation_expr
-    -> NEW type_arguments_opt class_type_to_instantiate LPAREN aruments_opt RPAREN class_body_opt;
+    -> NEW type_arguments_opt class_type_to_instantiate LPAREN arguments_opt RPAREN class_body_opt;
 
 field_access
     -> primary DOT ID
@@ -992,7 +996,7 @@ array_access
     -> primary_no_new_array LARRI expr RARRI;
 
 method_invocation
-    -> method_name LPAREN arguments_opt RPAREN
+    -> ID LPAREN arguments_opt RPAREN
     -> typename DOT type_arguments_opt ID LPAREN arguments_opt RPAREN
     -> expr_name DOT type_arguments_opt ID LPAREN arguments_opt RPAREN
     -> primary DOT type_arguments_opt ID LPAREN arguments_opt RPAREN
@@ -1031,40 +1035,13 @@ dim_expr
 # MODIFIERS
 #
 
-class_modifiers_opt
-    -> class_modifiers
+modifiers_opt
+    -> modifiers
     ->;
-class_modifiers
-    -> class_modifier class_modifiers
-    -> class_modifier;
-class_modifier
-    -> annotation
-    -> VISIBILITY
-    -> ABSTRACT
-    -> STATIC
-    -> FINAL
-    -> STRICTFP;
-
-interface_modifiers_opt
-    -> interface_modifiers
-    ->;
-interface_modifiers
-    -> interface_modifier interface_modifiers
-    -> interface_modifier;
-interface_modifier
-    -> annotation
-    -> VISIBILITY
-    -> ABSTRACT
-    -> STATIC
-    -> STRICTFP;
-
-method_modifiers_opt
-    -> method_modifiers
-    ->;
-method_modifiers
-    -> method_modifier method_modifiers
-    -> method_modifier;
-method_modifier
+modifiers
+    -> modifier modifiers
+    -> modifier;
+modifier
     -> annotation
     -> VISIBILITY
     -> ABSTRACT
@@ -1072,61 +1049,6 @@ method_modifier
     -> FINAL
     -> SYNCHRONIZED
     -> NATIVE
-    -> STRICTFP;
-
-constructor_modifiers_opt
-    -> constructor_modifiers
-    ->;
-constructor_modifiers
-    -> constructor_modifier constructor_modifiers
-    -> constructor_modifier;
-constructor_modifier
-    -> annotation
-    -> VISIBILITY;
-
-field_modifiers_opt
-    -> field_modifiers
-    ->;
-field_modifiers
-    -> field_modifier field_modifiers
-    -> field_modifier;
-field_modifier
-    -> annotation
-    -> VISIBILITY
-    -> STATIC
-    -> FINAL
+    -> STRICTFP
     -> TRANSIENT
     -> VOLATILE;
-
-const_modifiers_opt
-    -> const_modifiers
-    ->;
-const_modifiers
-    -> const_modifier const_modifiers
-    -> const_modifier;
-const_modifier
-    -> annotation
-    -> VISIBILITY
-    -> STATIC
-    -> FINAL;
-
-annotation_element_modifiers_opt
-    -> annotation_element_modifiers
-    ->;
-annotation_element_modifiers
-    -> annotation_element_modifier annotation_element_modifiers
-    -> annotation_element_modifier;
-annotation_element_modifier
-    -> annotation
-    -> VISIBILITY
-    -> ABSTRACT;
-
-variable_modifiers_opt
-    -> variable_modifiers
-    ->;
-variable_modifiers
-    -> variable_modifier variable_modifiers
-    -> variable_modifier;
-variable_modifier
-    -> annotation
-    -> FINAL;
