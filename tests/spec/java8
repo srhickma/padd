@@ -1,5 +1,5 @@
 # SIGMA
-'<>=+-*/\\%(){}[],.;:!?^@|"\'~ \t\nABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+'<>=+-*/\\%(){}[],.;:#!?^@|"\'~ \t\nABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
 
 #----------------------------------------------------------------------------------------------------------------------#
 # CDFA                                                                                                                 #
@@ -266,7 +266,7 @@ superclass_opt
     -> superclass
     ->;
 superclass
-    -> EXTENDS class_type
+    -> EXTENDS class_type;
 
 superinterfaces_opt
     -> superinterfaces
