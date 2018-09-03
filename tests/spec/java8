@@ -44,7 +44,7 @@ start
     '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' -> num
 
     # KEYWORDS
-    'abstract' -> ^ABSTRACT
+    'abstract' -> ^MOD
     'assert' -> ^ASSERT
     'boolean' -> ^PRIM
     'break' -> ^BREAK
@@ -53,7 +53,6 @@ start
     'catch' -> ^CATCH
     'char' -> ^PRIM
     'class' -> ^CLASS
-    'const' -> ^CONST
     'continue' -> ^CONTINUE
     'default' -> ^DEFAULT
     'do' -> ^DO
@@ -65,7 +64,6 @@ start
     'finally' -> ^FINALLY
     'float' -> ^PRIM
     'for' -> ^FOR
-    'goto' -> ^GOTO
     'if' -> ^IF
     'implements' -> ^IMPLEMENTS
     'import' -> ^IMPORT
@@ -73,26 +71,26 @@ start
     'int' -> ^PRIM
     'interface' -> ^INTERFACE
     'long' -> ^PRIM
-    'native' -> ^NATIVE
+    'native' -> ^MOD
     'new' -> ^NEW
     'package' -> ^PACKAGE
-    'private' -> ^VISIBILITY
-    'protected' -> ^VISIBILITY
-    'public' -> ^VISIBILITY
+    'private' -> ^MOD
+    'protected' -> ^MOD
+    'public' -> ^MOD
     'return' -> ^RETURN
     'short' -> ^PRIM
     'static' -> ^STATIC
-    'strictfp' -> ^STRICTFP
+    'strictfp' -> ^MOD
     'super' -> ^SUPER
     'switch' -> ^SWITCH
-    'synchronized' -> ^SYNCHRONIZED
+    'synchronized' -> ^MOD
     'this' -> ^THIS
     'throw' -> ^THROW
     'throws' -> ^THROWS
-    'transient' -> ^TRANSIENT
+    'transient' -> ^MOD
     'try' -> ^TRY
     'void' -> ^VOID
-    'volatile' -> ^VOLATILE
+    'volatile' -> ^MOD
     'while' -> ^WHILE
 
     # MISC
@@ -211,10 +209,9 @@ bcom
 
 bcomm ^_; # TODO get rid of this after introducing comments
 
-id | ABSTRACT | ASSERT | PRIM | BREAK | PRIM | CASE | CATCH | ENUM | CLASS | CONST | CONTINUE | DEFAULT | DO | ELSE
-    | EXTENDS | FINAL | FINALLY | FOR | GOTO | IF | IMPLEMENTS | IMPORT | CMP_REL | INTERFACE | NATIVE | NEW | PACKAGE
-    | VISIBILITY | RETURN | STATIC | STRICTFP | SUPER | SWITCH | SYNCHRONIZED | THIS | THROW | THROWS | TRANSIENT | TRY
-    | VOID | VOLATILE | WHILE   ^ID
+id | MOD | ASSERT | PRIM | BREAK | CASE | CATCH | ENUM | CLASS | CONTINUE | DEFAULT | DO | ELSE | EXTENDS | FINAL
+    | FINALLY | FOR | IF | IMPLEMENTS | IMPORT | CMP_REL | INTERFACE | NEW | PACKAGE | RETURN | SUPER | SWITCH | THIS
+    | THROW | THROWS | TRY | VOID | WHILE   ^ID
     'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' | 'h' | 'i' | 'j' | 'k' | 'l' | 'm' | 'n' | 'o' | 'p' | 'q' | 'r' | 's'
         | 't' | 'u' | 'v' | 'w' | 'x' | 'y' | 'z' | 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H' | 'I' | 'J' | 'K'
         | 'L' | 'M' | 'N' | 'O' | 'P' | 'Q' | 'R' | 'S' | 'T' | 'U' | 'V' | 'W' | 'X' | 'Y' | 'Z' | '$' | '_' | '0'
@@ -1045,12 +1042,6 @@ modifiers
     -> modifier;
 modifier
     -> annotation
-    -> VISIBILITY
-    -> ABSTRACT
+    -> MOD
     -> STATIC
-    -> FINAL
-    -> SYNCHRONIZED
-    -> NATIVE
-    -> STRICTFP
-    -> TRANSIENT
-    -> VOLATILE;
+    -> FINAL;
