@@ -860,7 +860,6 @@ start
 id      ^ID
     'c' | '_' -> id;
 
-# grammar
 s ->;
         ";
 
@@ -887,6 +886,48 @@ s ->;
         }
 
         assert_eq!(res_string, "\nkind=ID lexeme=c\nkind=WS lexeme= \nkind=ID lexeme=c")
+    }
+
+    #[test]
+    fn complex_id() {
+        //setup
+        let spec = "
+' ab_'
+
+start
+    ' ' -> ws
+    _ -> id;
+
+ws      ^_;
+
+id      ^ID
+    'a' | 'b' | '_' -> id;
+
+s
+    -> ids
+    ->;
+ids
+    -> ids ID
+    -> ID;
+        ";
+
+        let input = "a ababab _abab ab_abba_";
+
+        let scanner = def_scanner();
+        let tree = parse_spec(spec);
+        let parse = tree.unwrap();
+        let (dfa, _, _) = generate_spec(&parse).unwrap();
+
+        //execute
+        let tokens = scanner.scan(input, &dfa).unwrap();
+
+        //verify
+        let mut res_string = String::new();
+        for token in tokens {
+            res_string = format!("{}\nkind={} lexeme={}", res_string, token.kind, token.lexeme);
+        }
+
+        assert_eq!(res_string, "\nkind=ID lexeme=a\nkind=ID lexeme=ababab\nkind=ID lexeme=_abab\nkind=ID lexeme=ab_abba_")
     }
 
     #[test]

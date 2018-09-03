@@ -1,5 +1,5 @@
 # SIGMA
-'<>=+-*/\\%(){}[],.;:#!?^@|"\'~ \t\nABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+'<>=+-_*/\\%(){}[],.;:#!?^@|"\'~ \t\nABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
 
 #----------------------------------------------------------------------------------------------------------------------#
 # CDFA                                                                                                                 #
@@ -97,6 +97,7 @@ start
 
     # MISC
     ' ' | '\t' | '\n' -> ws
+    '#' -> fail
     _ -> id;
 
 #
@@ -211,7 +212,7 @@ lcom ^COMMENT
 
 bcom
     '*/' -> ^COMMENT
-    '_' -> bcom;
+    _ -> bcom;
 
 id      ^ID
     'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' | 'h' | 'i' | 'j' | 'k' | 'l' | 'm' | 'n' | 'o' | 'p' | 'q' | 'r' | 's'
