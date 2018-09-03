@@ -18,7 +18,6 @@ impl Parser for EarleyParser {
                     rule: prod,
                     start: 0,
                     next: 0,
-                    token: None,
                 };
                 chart[0].push(item);
             });
@@ -62,7 +61,6 @@ impl Parser for EarleyParser {
                             rule: prod,
                             start: i,
                             next: 0,
-                            token: None,
                         },
                         &mut chart[i]
                     );
@@ -73,7 +71,6 @@ impl Parser for EarleyParser {
                                 rule: item.rule,
                                 start: item.start,
                                 next: item.next + 1,
-                                token: None,
                             },
                             &mut chart[i]
                         );
@@ -92,7 +89,6 @@ impl Parser for EarleyParser {
                         rule: item.rule,
                         start: item.start,
                         next: item.next + 1,
-                        token: Some(&scan[i]),
                     },
                     &mut chart[i+1]
                 );
@@ -111,7 +107,6 @@ impl Parser for EarleyParser {
                     rule: old_item.rule,
                     start: old_item.start,
                     next: old_item.next + 1,
-                    token: None,
                 }));
 
             for item in advanced {
@@ -243,7 +238,6 @@ struct Item<'a> {
     rule: &'a Production,
     start: usize,
     next: usize,
-    token: Option<&'a Token>,
 }
 
 impl<'a> Item<'a> {
