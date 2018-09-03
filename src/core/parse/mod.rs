@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::collections::HashMap;
 use core::scan::Token;
 
 mod earley;
@@ -75,6 +76,7 @@ impl Tree {
 
 pub struct Grammar {
     pub productions: Vec<Production>,
+    nss: HashSet<String>,
     #[allow(dead_code)]
     non_terminals: HashSet<String>,
     terminals: HashSet<String>,
@@ -84,7 +86,12 @@ pub struct Grammar {
 }
 
 impl Grammar {
+    pub fn nullable(&self, prod: &Production) -> bool {
+        self.nss.contains(&prod.lhs)
+    }
+
     pub fn from(productions: Vec<Production>) -> Grammar {
+        let nss = Grammar::build_nss(&productions);
         let non_terminals: HashSet<String> = productions.iter().cloned()
             .map(|prod| prod.lhs)
             .collect();
@@ -98,16 +105,57 @@ impl Grammar {
         let terminals = symbols.difference(&non_terminals)
             .map(|x| x.clone())
             .collect();
-
         let start = productions[0].lhs.clone();
 
         return Grammar {
             productions,
+            nss,
             non_terminals,
             terminals,
             symbols,
             start,
         };
+    }
+
+    fn build_nss(productions: &Vec<Production>) ->  HashSet<String> {
+        let mut nss: HashSet<String> = HashSet::new();
+        let mut prods_by_rhs: HashMap<&String, Vec<&Production>> = HashMap::new();
+        let mut work_stack: Vec<&String> = Vec::new();
+
+        for prod in productions {
+            for s in &prod.rhs {
+                prods_by_rhs.entry(s)
+                    .or_insert(Vec::new())
+                    .push(prod);
+            }
+
+            if prod.rhs.is_empty() {
+                nss.insert(prod.lhs.clone()); //TODO can we avoid cloning here
+                work_stack.push(&prod.lhs);
+            }
+        }
+
+        loop {
+            match work_stack.pop() {
+                None => break,
+                Some(work_symbol) => {
+                    match prods_by_rhs.get(work_symbol) {
+                        None => {},
+                        Some(prods) => {
+                            for prod in prods {
+                                if !nss.contains(&prod.lhs)
+                                    && prod.rhs.iter().all(|sym| nss.contains(sym)) {
+                                    nss.insert(prod.lhs.clone());
+                                    work_stack.push(&prod.lhs);
+                                }
+                            }
+                        }
+                    }
+                }
+            };
+        }
+
+        nss
     }
 }
 
@@ -237,8 +285,8 @@ mod tests {
         //setup
         let productions = build_prods(&[
             "S expr",
-            "expr ( expr )",
-            "expr expr OP expr",
+            "S S OP expr",
+            "expr ( S )",
             "expr ID",
         ]);
         let grammar = Grammar::from(productions);
@@ -257,26 +305,28 @@ mod tests {
         //verify
         assert_eq!(tree.unwrap().to_string(),
 "└── S
+    ├── S
+    │   ├── S
+    │   │   └── expr
+    │   │       ├── ( <- 'xy'
+    │   │       ├── S
+    │   │       │   ├── S
+    │   │       │   │   └── expr
+    │   │       │   │       └── ID <- 'xy'
+    │   │       │   ├── OP <- 'xy'
+    │   │       │   └── expr
+    │   │       │       └── ID <- 'xy'
+    │   │       └── ) <- 'xy'
+    │   ├── OP <- 'xy'
+    │   └── expr
+    │       └── ID <- 'xy'
+    ├── OP <- 'xy'
     └── expr
-        ├── expr
-        │   ├── expr
-        │   │   ├── ( <- 'xy'
-        │   │   ├── expr
-        │   │   │   ├── expr
-        │   │   │   │   └── ID <- 'xy'
-        │   │   │   ├── OP <- 'xy'
-        │   │   │   └── expr
-        │   │   │       └── ID <- 'xy'
-        │   │   └── ) <- 'xy'
-        │   ├── OP <- 'xy'
+        ├── ( <- 'xy'
+        ├── S
         │   └── expr
         │       └── ID <- 'xy'
-        ├── OP <- 'xy'
-        └── expr
-            ├── ( <- 'xy'
-            ├── expr
-            │   └── ID <- 'xy'
-            └── ) <- 'xy'"
+        └── ) <- 'xy'"
         );
     }
 
@@ -437,6 +487,70 @@ mod tests {
     │   └──  <- 'NULL'
     └── w
         └── WHITESPACE <- 'xy'"
+        );
+    }
+
+    #[test]
+    fn advanced_parse_build(){
+        //setup
+        let productions = build_prods(&[
+            "sum sum PM prod",
+            "sum prod",
+            "prod prod MD fac",
+            "prod fac",
+            "fac LPAREN sum RPAREN",
+            "fac num",
+            "num DIGIT num",
+            "num DIGIT"
+        ]);
+        let grammar = Grammar::from(productions);
+
+        let scan = vec![
+            Token{ kind: "DIGIT".to_string(), lexeme: "1".to_string() },
+            Token{ kind: "PM".to_string(), lexeme: "+".to_string() },
+            Token{ kind: "LPAREN".to_string(), lexeme: "(".to_string() },
+            Token{ kind: "DIGIT".to_string(), lexeme: "2".to_string() },
+            Token{ kind: "MD".to_string(), lexeme: "*".to_string() },
+            Token{ kind: "DIGIT".to_string(), lexeme: "3".to_string() },
+            Token{ kind: "PM".to_string(), lexeme: "-".to_string() },
+            Token{ kind: "DIGIT".to_string(), lexeme: "4".to_string() },
+            Token{ kind: "RPAREN".to_string(), lexeme: ")".to_string() },
+        ];
+
+        let parser = def_parser();
+
+        //execute
+        let tree = parser.parse(scan, &grammar);
+
+        //verify
+        assert_eq!(tree.unwrap().to_string(),
+"└── sum
+    ├── sum
+    │   └── prod
+    │       └── fac
+    │           └── num
+    │               └── DIGIT <- '1'
+    ├── PM <- '+'
+    └── prod
+        └── fac
+            ├── LPAREN <- '('
+            ├── sum
+            │   ├── sum
+            │   │   └── prod
+            │   │       ├── prod
+            │   │       │   └── fac
+            │   │       │       └── num
+            │   │       │           └── DIGIT <- '2'
+            │   │       ├── MD <- '*'
+            │   │       └── fac
+            │   │           └── num
+            │   │               └── DIGIT <- '3'
+            │   ├── PM <- '-'
+            │   └── prod
+            │       └── fac
+            │           └── num
+            │               └── DIGIT <- '4'
+            └── RPAREN <- ')'"
         );
     }
 }
