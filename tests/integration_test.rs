@@ -73,8 +73,13 @@ fn test_java8_medium(){
 }
 
 #[test]
-fn test_java8_complex(){
-    test_fjr("java8_complex", "java8");
+fn test_java8_complex_spring(){
+    test_fjr("java8_complex_spring", "java8");
+}
+
+#[test]
+fn test_java8_complex_guice(){
+    test_fjr("java8_complex_guice", "java8");
 }
 
 #[test]

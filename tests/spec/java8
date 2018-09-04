@@ -285,8 +285,8 @@ class_body_decs
     -> class_body_dec;
 class_body_dec
     -> class_member_dec
-    -> instance_init
-    -> static_init
+    -> block
+    -> STATIC block
     -> constructor_dec;
 
 class_member_dec
@@ -295,12 +295,6 @@ class_member_dec
     -> class_dec
     -> interface_dec
     -> SEMI;
-
-instance_init
-    -> block;
-
-static_init
-    -> STATIC block;
 
 constructor_dec
     -> modifiers_opt constructor_declarator throws_opt constructor_body;
@@ -421,17 +415,8 @@ interface_member_decs_opt
     -> interface_member_decs
     ->;
 interface_member_decs
-    -> interface_member_dec interface_member_decs
-    -> interface_member_dec;
-interface_member_dec
-    -> const_dec
-    -> method_dec
-    -> class_dec
-    -> interface_dec
-    -> SEMI;
-
-const_dec
-    -> const_modifers_opt type variable_declarator_list;
+    -> class_member_dec interface_member_decs
+    -> class_member_dec;
 
 #
 # ANNOTATION
@@ -451,10 +436,7 @@ annotation_member_decs
     -> annotation_member_dec;
 annotation_member_dec
     -> annotation_element_dec
-    -> const_dec
-    -> class_dec
-    -> interface_dec
-    -> SEMI;
+    -> class_member_dec;
 
 annotation_element_dec
     -> modifiers_opt type ID LPAREN RPAREN array_dims_opt default_value_opt SEMI;
