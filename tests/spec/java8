@@ -352,12 +352,12 @@ formal_parameters
     -> formal_parameter
     -> receiver_parameter;
 formal_parameter
-    -> modifiers_opt unann_type variable_declarator_id;
+    -> modifiers_opt type variable_declarator_id;
 receiver_parameter
-    -> annotations_opt unann_type ID DOT THIS
-    -> annotations_opt unann_type THIS;
+    -> annotations_opt type ID DOT THIS
+    -> annotations_opt type THIS;
 last_formal_parameter
-    -> modifiers_opt unann_type annotations_opt TRIDOT variable_declarator_id
+    -> modifiers_opt type annotations_opt TRIDOT variable_declarator_id
     -> formal_parameter;
 
 throws_opt
@@ -374,7 +374,7 @@ exception_type
     -> type_variable;
 
 result
-    -> unann_type
+    -> type
     -> VOID;
 
 #
@@ -431,7 +431,7 @@ interface_member_dec
     -> SEMI;
 
 const_dec
-    -> const_modifers_opt unann_type variable_declarator_list;
+    -> const_modifers_opt type variable_declarator_list;
 
 #
 # ANNOTATION
@@ -457,7 +457,7 @@ annotation_member_dec
     -> SEMI;
 
 annotation_element_dec
-    -> modifiers_opt unann_type ID LPAREN RPAREN array_dims_opt default_value_opt SEMI;
+    -> modifiers_opt type ID LPAREN RPAREN array_dims_opt default_value_opt SEMI;
 
 default_value_opt
     -> default_value
@@ -529,8 +529,8 @@ class_type_to_instantiate
     -> annotated_ids;
 
 class_literal
-    -> typename unann_array_dims_opt DOT CLASS
-    -> PRIM unann_array_dims_opt DOT CLASS
+    -> typename array_dims_opt DOT CLASS
+    -> PRIM array_dims_opt DOT CLASS
     -> VOID DOT CLASS;
 
 type_variable
@@ -547,29 +547,6 @@ array_dims
     -> array_dim;
 array_dim
     -> annotations_opt LARRI RARRI;
-
-unann_type
-    -> unann_non_array_type array_dims_opt;
-
-unann_non_array_type
-    -> unann_class_type
-    -> ID
-    -> PRIM;
-
-unann_class_type
-    -> unann_class_type DOT annotations_opt unann_class_type_internal
-    -> unann_class_type_internal;
-unann_class_type_internal
-    -> ID type_arguments_opt;
-
-unann_array_dims_opt
-    -> unann_array_dims
-    ->;
-unann_array_dims
-    -> unann_array_dim unann_array_dims
-    -> unann_array_dim;
-unann_array_dim
-    -> LARRI RARRI;
 
 wildcard
     -> annotations_opt QST wildcard_bounds_opt;
@@ -677,7 +654,7 @@ block_statement
 lvar_dec_statement
     -> lvar_dec SEMI;
 lvar_dec
-    -> modifiers_opt unann_type variable_declarator_list;
+    -> modifiers_opt type variable_declarator_list;
 
 statement
     -> statement_without_trailing_substatement
@@ -686,13 +663,6 @@ statement
     -> if_then_else_statement
     -> while_statement
     -> for_statement;
-
-statement_nsi
-    -> statement_without_trailing_substatement
-    -> labeled_statement_nsi
-    -> if_then_else_statement_nsi
-    -> while_statement_nsi
-    -> for_statement_nsi;
 
 statement_without_trailing_substatement
     -> block
@@ -806,7 +776,7 @@ catch_clause
 catch_formal_parameter
     -> modifiers_opt catch_type variable_declarator_id;
 catch_type
-    -> unann_class_type catch_type_internal;
+    -> class_type catch_type_internal;
 catch_type_internal
     -> OR_BI class_type catch_type_internal
     ->;
@@ -814,31 +784,18 @@ catch_type_internal
 labeled_statement
     -> ID COLON statement;
 
-labeled_statement_nsi
-    -> ID COLON statement_nsi;
-
 if_then_statement
     -> IF LPAREN expr RPAREN statement;
 
 if_then_else_statement
-    -> IF LPAREN expr RPAREN statement_nsi ELSE statement;
-
-if_then_else_statement_nsi
-    -> IF LPAREN expr RPAREN statement_nsi ELSE statement_nsi;
+    -> IF LPAREN expr RPAREN statement ELSE statement;
 
 while_statement
     -> WHILE LPAREN expr RPAREN statement;
 
-while_statement_nsi
-    -> WHILE LPAREN expr RPAREN statement_nsi;
-
 for_statement
     -> basic_for_statement statement
     -> enhanced_for_statement statement;
-
-for_statement_nsi
-    -> basic_for_statement statement_nsi
-    -> enhanced_for_statement statement_nsi;
 
 basic_for_statement
     -> FOR LPAREN for_init_opt SEMI expr_opt SEMI for_update_opt RPAREN;
@@ -857,7 +814,7 @@ for_update
     -> statement_expression_list;
 
 enhanced_for_statement
-    -> FOR LPAREN modifiers_opt unann_type variable_declarator_id COLON expr RPAREN;
+    -> FOR LPAREN modifiers_opt type variable_declarator_id COLON expr RPAREN;
 
 #
 # EXPRESSIONS
