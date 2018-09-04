@@ -222,31 +222,31 @@ id | MOD | ASSERT | PRIM | BREAK | CASE | CATCH | ENUM | CLASS | CONTINUE | DEFA
 #----------------------------------------------------------------------------------------------------------------------#
 
 cmp_unit
-    -> package_decl_opt ImportDeclarationsOpt TypeDeclarationsOpt;
+    -> package_decl_opt import_decls_opt type_decls_opt;
 
 package_decl_opt
     -> annotations_opt PACKAGE id_chain SEMI
     ->;
 
-ImportDeclarationsOpt
-    -> ImportDeclarations
+import_decls_opt
+    -> import_decls
     ->;
-ImportDeclarations
-    -> ImportDeclaration ImportDeclarations
-    -> ImportDeclaration;
-ImportDeclaration
+import_decls
+    -> import_decl import_decls
+    -> import_decl;
+import_decl
     -> IMPORT typename SEMI
     -> IMPORT typename DOT STAR SEMI
     -> IMPORT STATIC typename DOT ID SEMI
     -> IMPORT STATIC typename DOT STAR SEMI;
 
-TypeDeclarationsOpt
-    -> TypeDeclarations
+type_decls_opt
+    -> type_decls
     ->;
-TypeDeclarations
-    -> TypeDeclaration TypeDeclarations
-    -> TypeDeclaration;
-TypeDeclaration
+type_decls
+    -> type_decl type_decls
+    -> type_decl;
+type_decl
     -> class_dec
     -> enum_dec
     -> interface_dec
@@ -463,7 +463,7 @@ default_value_opt
     -> default_value
     ->;
 default_value
-    -> DEFAULT ElementValue;
+    -> DEFAULT element_value;
 
 #
 # TYPE
@@ -584,26 +584,26 @@ wildcard_bounds
 # MISC
 #
 
-ElementValuePairsOpt
-    -> ElementValuePairs
+element_value_pairs_opt
+    -> element_value_pairs
     ->;
-ElementValuePairs
-    -> ElementValuePair COMMA ElementValuePairs
-    -> ElementValuePair;
-ElementValuePair
-    -> ID ASSN ElementValue;
-ElementValue
+element_value_pairs
+    -> element_value_pair COMMA element_value_pairs
+    -> element_value_pair;
+element_value_pair
+    -> ID ASSN element_value;
+element_value
     -> conditional_expr
-    -> ElementValueArrayInitializer
+    -> element_value_array_initializer
     -> annotation;
-ElementValueArrayInitializer
-    -> LBRACE ElementValuesOpt comma_opt RBRACE;
-ElementValuesOpt
-    -> ElementValues
+element_value_array_initializer
+    -> LBRACE element_values_opt comma_opt RBRACE;
+element_values_opt
+    -> element_values
     ->;
-ElementValues
-    -> ElementValue COMMA ElementValues
-    -> ElementValue;
+element_values
+    -> element_value COMMA element_value
+    -> element_value;
 
 annotations_opt
     -> annotations
@@ -612,8 +612,8 @@ annotations
     -> annotation annotations
     -> annotation;
 annotation
-    -> AT typename LPAREN ElementValuePairsOpt RPAREN
-    -> AT typename LPAREN ElementValue RPAREN
+    -> AT typename LPAREN element_value_pairs_opt RPAREN
+    -> AT typename LPAREN element_value RPAREN
     -> AT typename;
 
 annotated_ids
