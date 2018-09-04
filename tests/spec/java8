@@ -602,7 +602,7 @@ element_values_opt
     -> element_values
     ->;
 element_values
-    -> element_value COMMA element_value
+    -> element_value COMMA element_values
     -> element_value;
 
 annotations_opt
