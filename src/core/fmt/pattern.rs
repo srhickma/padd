@@ -1,13 +1,16 @@
+use std::error;
+use std::fmt;
 use core::parse::build_prods;
 use core::scan::def_scanner;
 use core::parse::def_parser;
+use core::parse;
 use core::parse::Grammar;
 use core::parse::Production;
 use core::parse::Tree;
+use core::scan;
 use core::scan::State;
 use core::scan::DFA;
 use core::scan::CompileTransitionDelta;
-use core::Error;
 
 static PATTERN_ALPHABET: &'static str = "{}[];=1234567890abcdefghijklmnopqrstuvwxyz \n\t";
 static PATTERN_STATES: [&'static str; 12] = ["start", "semi", "eq", "lbrace", "rbrace", "lbracket", "rbracket", "zero", "num", "alpha", "ws", ""];
@@ -133,7 +136,7 @@ pub struct Declaration {
     pub value: Option<Pattern>,
 }
 
-pub fn generate_pattern(input: &str) -> Result<Pattern, Error> {
+pub fn generate_pattern(input: &str) -> Result<Pattern, BuildError> {
 
     return match parse_pattern(input) {
         Ok(root) => Ok(generate_pattern_internal(&root)),
@@ -203,21 +206,48 @@ fn parse_declaration(decl: &Tree) -> Declaration {
     }
 }
 
-fn parse_pattern(input: &str) -> Result<Tree, Error> {
-    let scanner = def_scanner();
-    let parser = def_parser();
+fn parse_pattern(input: &str) -> Result<Tree, BuildError> {
+    PATTERN_DFA.with(|f| -> Result<Tree, BuildError> {
+        let tokens = def_scanner().scan(input, f)?;
+        let parse = def_parser().parse(tokens, &PATTERN_GRAMMAR)?;
+        Ok(parse)
+    })
+}
 
-    let mut res: Result<Tree, Error> = Err(Error::Err("Failed to get thread local DFA".to_string()));
-    PATTERN_DFA.with(|f| {
-        res = match scanner.scan(input, f) {
-            Ok(tokens) => match parser.parse(tokens, &PATTERN_GRAMMAR) {
-                Some(parse) => Ok(parse),
-                None => Err(Error::ParseErr())
-            },
-            Err(se) => Err(Error::ScanErr(se)),
+#[derive(Debug)]
+pub enum BuildError {
+    ScanErr(scan::Error),
+    ParseErr(parse::Error)
+}
+
+impl fmt::Display for BuildError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            BuildError::ScanErr(ref err) => write!(f, "Pattern scan error: {}", err),
+            BuildError::ParseErr(ref err) => write!(f, "Pattern parse error: {}", err),
         }
-    });
-    res
+    }
+}
+
+impl error::Error for BuildError {
+    fn cause(&self) -> Option<&error::Error> {
+        match *self {
+            BuildError::ScanErr(ref err) => Some(err),
+            BuildError::ParseErr(ref err) => Some(err),
+        }
+    }
+}
+
+impl From<scan::Error> for BuildError {
+    fn from(err: scan::Error) -> BuildError {
+        BuildError::ScanErr(err)
+    }
+}
+
+impl From<parse::Error> for BuildError {
+    fn from(err: parse::Error) -> BuildError {
+        BuildError::ParseErr(err)
+    }
 }
 
 #[cfg(test)]

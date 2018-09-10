@@ -1,6 +1,5 @@
 use core::parse::Tree;
 use core::fmt::pattern::*;
-use core::Error;
 use std::collections::HashMap;
 
 mod pattern;
@@ -10,15 +9,13 @@ pub struct Formatter {
 }
 
 impl Formatter {
-    pub fn create(patterns: Vec<PatternPair>) -> Result<Formatter, Error> {
+    pub fn create(patterns: Vec<PatternPair>) -> Result<Formatter, BuildError> {
         let mut pattern_map = HashMap::new();
         for pattern_pair in patterns {
-            match generate_pattern(&pattern_pair.pattern[..]) {
-                Ok(pattern) => {
-                    pattern_map.insert(pattern_pair.production, pattern);
-                },
-                Err(e) => return Err(e),
-            }
+            pattern_map.insert(
+                pattern_pair.production,
+                generate_pattern(&pattern_pair.pattern[..])?
+            );
         }
         Ok(Formatter{
             pattern_map,
@@ -33,6 +30,8 @@ impl Formatter {
         format_job.run()
     }
 }
+
+pub type BuildError = pattern::BuildError;
 
 struct FormatJob<'a> {
     parse: &'a Tree,
@@ -95,11 +94,13 @@ impl<'a> FormatJob<'a> {
             }
             match children.get(capture.child_index) {
                 Some(child) => return self.recur(child, &inner_scope),
+                //TODO use actual error here rather than panic!
                 None => panic!("Pattern index out of bounds: index={} children={}", capture.child_index, children.len()),
             }
         } else {
             match children.get(capture.child_index) {
                 Some(child) => return self.recur(child, outer_scope),
+                //TODO use actual error here rather than panic!
                 None => panic!("Pattern index out of bounds: index={} children={}", capture.child_index, children.len()),
             }
         }

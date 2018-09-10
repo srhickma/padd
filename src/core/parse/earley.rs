@@ -2,12 +2,13 @@ use core::parse::Parser;
 use core::parse::Grammar;
 use core::parse::Production;
 use core::parse::Tree;
+use core::parse;
 use core::scan::Token;
 
 pub struct EarleyParser;
 
 impl Parser for EarleyParser {
-    fn parse(&self, scan: Vec<Token>, grammar: &Grammar) -> Option<Tree> {
+    fn parse(&self, scan: Vec<Token>, grammar: &Grammar) -> Result<Tree, parse::Error> {
         let mut parse_chart: Vec<Vec<Edge>> = vec![];
         let mut chart: Vec<Vec<Item>> = vec![vec![]];
 
@@ -133,9 +134,11 @@ impl Parser for EarleyParser {
         }
 
         return if recognized(grammar, &chart) {
-            Some(parse_tree(grammar, &scan, parse_chart))
+            Ok(parse_tree(grammar, &scan, parse_chart))
         } else {
-            None
+            Err(parse::Error{
+                message: format!("Recognition failed after token {}: kind='{}' lexeme='{}'", i, scan[i - 1].kind, scan[i - 1].lexeme),
+            })
         };
 
         //TODO refactor to reduce long and duplicated parameter lists

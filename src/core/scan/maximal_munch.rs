@@ -1,15 +1,15 @@
+use core::scan;
 use core::scan::DFA;
 use core::scan::Token;
 use core::scan::State;
 use core::scan::Scanner;
-use core::scan::ScanningError;
 use core::scan::FAIL_SEQUENCE_LENGTH;
 use std::cmp;
 
 pub struct MaximalMunchScanner;
 
 impl Scanner for MaximalMunchScanner {
-    fn scan<'a, 'b>(&self, input: &'a str, dfa: &'b DFA) -> Result<Vec<Token>, ScanningError> {
+    fn scan<'a, 'b>(&self, input: &'a str, dfa: &'b DFA) -> Result<Vec<Token>, scan::Error> {
 
         fn scan_one<'a, 'b>(input: &'a [char], line: usize, character: usize, dfa: &'b DFA) -> (usize, &'b State, usize, usize)
         {
@@ -68,7 +68,7 @@ impl Scanner for MaximalMunchScanner {
             if scanned == 0 {
                 let seq_len = cmp::min(input.len(), FAIL_SEQUENCE_LENGTH);
 
-                return Err(ScanningError{
+                return Err(scan::Error{
                     sequence: input.iter().take(seq_len).collect(),
                     line,
                     character,
