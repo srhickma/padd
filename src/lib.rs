@@ -137,8 +137,10 @@ s -> ACC;
 
         //verify
         assert!(res.is_err());
-        assert_eq!(format!("{}", res.err().unwrap()), "Failed to scan input: No accepting scans aft\
-        er (1,1): b...");
+        assert_eq!(
+            format!("{}", res.err().unwrap()),
+            "Failed to scan input: No accepting scans after (1,1): b..."
+        );
     }
 
     #[test]
@@ -159,8 +161,10 @@ s -> B;
 
         //verify
         assert!(res.is_err());
-        assert_eq!(format!("{}", res.err().unwrap()), "Failed to parse input: Recognition failed af\
-        ter token 1: kind='ACC' lexeme='a'");
+        assert_eq!(
+            format!("{}", res.err().unwrap()),
+            "Failed to parse input: Recognition failed at token 1: ACC <- 'a'"
+        );
     }
 
     #[test]
@@ -179,8 +183,10 @@ s -> ACC;
 
         //verify
         assert!(res.is_err());
-        assert_eq!(format!("{}", res.err().unwrap()), "Failed to parse specification: Scan error: N\
-        o accepting scans after (2,5): ~\n\nstart \'...");
+        assert_eq!(
+            format!("{}", res.err().unwrap()),
+            "Failed to parse specification: Scan error: No accepting scans after (2,5): ~\n\nstart \'..."
+        );
     }
 
     #[test]
@@ -197,7 +203,9 @@ s -> B;
 
         //verify
         assert!(res.is_err());
-        assert_eq!(format!("{}", res.err().unwrap()), "Failed to parse specification: Parse error: \
-        Recognition failed after token 1: kind='ID' lexeme='start'");
+        assert_eq!(
+            format!("{}", res.err().unwrap()),
+            "Failed to parse specification: Parse error: Recognition failed at token 1: ID <- 'start'"
+        );
     }
 }

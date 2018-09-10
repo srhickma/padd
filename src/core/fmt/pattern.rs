@@ -136,23 +136,18 @@ pub struct Declaration {
     pub value: Option<Pattern>,
 }
 
-pub fn generate_pattern(input: &str) -> Result<Pattern, BuildError> {
-
-    return match parse_pattern(input) {
-        Ok(root) => Ok(generate_pattern_internal(&root)),
-        Err(e) => Err(e),
-    };
+pub fn generate_pattern(input: &str, prod: &Production) -> Result<Pattern, BuildError> {
+    let parse = parse_pattern(input)?;
+    generate_pattern_internal(&parse, prod)
 }
 
-pub fn generate_pattern_internal<'a>(root: &'a Tree) -> Pattern {
+pub fn generate_pattern_internal<'a>(root: &'a Tree, prod: &Production) -> Result<Pattern, BuildError>  {
     let mut segments: Vec<Segment> = vec![];
-    generate_pattern_recursive(&root, &mut segments);
-    return Pattern {
-        segments,
-    }
+    generate_pattern_recursive(&root, &mut segments, prod)?;
+    Ok(Pattern{segments})
 }
 
-fn generate_pattern_recursive<'a>(node: &'a Tree, accumulator: &'a mut Vec<Segment>) {
+fn generate_pattern_recursive<'a>(node: &'a Tree, accumulator: &'a mut Vec<Segment>, prod: &Production) -> Result<(), BuildError> {
     match &node.lhs.kind[..] {
         "WHITESPACE" => {
             accumulator.push(Segment::Filler(node.lhs.lexeme.clone()));
@@ -162,48 +157,59 @@ fn generate_pattern_recursive<'a>(node: &'a Tree, accumulator: &'a mut Vec<Segme
         },
         "capdesc" => {
             let declarations: Vec<Declaration> = if node.children.len() == 3 {
-                parse_declarations(&node.get_child(2))
+                parse_decls(&node.get_child(2), prod)?
             } else { //No declarations
                 vec![]
             };
-            accumulator.push(Segment::Capture(Capture{
-                child_index: node.get_child(0).lhs.lexeme.parse::<usize>().unwrap(),
-                declarations,
-            }));
+
+            let child_index = node.get_child(0).lhs.lexeme.parse::<usize>().unwrap();
+
+            if child_index >= prod.rhs.len() {
+                return Err(BuildError::CaptureErr(format!(
+                    "Capture index {} out of bounds for production '{}' with {} children",
+                    child_index,
+                    prod.to_string(),
+                    prod.rhs.len()
+                )));
+            }
+
+            accumulator.push(Segment::Capture(Capture{child_index, declarations}));
         },
         _ => {
             for child in &node.children {
-                generate_pattern_recursive(child, accumulator);
+                generate_pattern_recursive(child, accumulator, prod)?;
             }
         },
     }
+    Ok(())
 }
 
-fn parse_declarations<'a>(decls_node: &'a Tree) -> Vec<Declaration> {
+fn parse_decls<'a>(decls_node: &'a Tree, prod: &Production) -> Result<Vec<Declaration>, BuildError> {
     let mut declarations: Vec<Declaration> = vec![
-        parse_declaration(decls_node.get_child(0)),
+        parse_decl(decls_node.get_child(0), prod)?,
     ];
-    parse_optional_declarations(decls_node.get_child(1), &mut declarations);
-    return declarations;
+    parse_decls_opt(decls_node.get_child(1), &mut declarations, prod)?;
+    Ok(declarations)
 }
 
-fn parse_optional_declarations<'a>(declsopt_node: &'a Tree, accumulator: &'a mut Vec<Declaration>) {
+fn parse_decls_opt<'a>(declsopt_node: &'a Tree, accumulator: &'a mut Vec<Declaration>, prod: &Production) -> Result<(), BuildError> {
     if declsopt_node.children.len() == 3 {
-        accumulator.push(parse_declaration(declsopt_node.get_child(1)));
-        parse_optional_declarations(declsopt_node.get_child(2), accumulator);
+        accumulator.push(parse_decl(declsopt_node.get_child(1), prod)?);
+        parse_decls_opt(declsopt_node.get_child(2), accumulator, prod)?;
     }
+    Ok(())
 }
 
-fn parse_declaration(decl: &Tree) -> Declaration {
+fn parse_decl(decl: &Tree, prod: &Production) -> Result<Declaration, BuildError> {
     let val_node = decl.get_child(2).get_child(0);
-    return Declaration{
+    Ok(Declaration{
         key: decl.get_child(0).lhs.lexeme.clone(),
         value: if val_node.is_null() {
             None
         } else {
-            Some(generate_pattern_internal(val_node.get_child(0)))
+            Some(generate_pattern_internal(val_node.get_child(0), prod)?)
         },
-    }
+    })
 }
 
 fn parse_pattern(input: &str) -> Result<Tree, BuildError> {
@@ -217,7 +223,8 @@ fn parse_pattern(input: &str) -> Result<Tree, BuildError> {
 #[derive(Debug)]
 pub enum BuildError {
     ScanErr(scan::Error),
-    ParseErr(parse::Error)
+    ParseErr(parse::Error),
+    CaptureErr(String)
 }
 
 impl fmt::Display for BuildError {
@@ -225,6 +232,7 @@ impl fmt::Display for BuildError {
         match *self {
             BuildError::ScanErr(ref err) => write!(f, "Pattern scan error: {}", err),
             BuildError::ParseErr(ref err) => write!(f, "Pattern parse error: {}", err),
+            BuildError::CaptureErr(ref err) => write!(f, "Pattern capture error: {}", err)
         }
     }
 }
@@ -234,6 +242,7 @@ impl error::Error for BuildError {
         match *self {
             BuildError::ScanErr(ref err) => Some(err),
             BuildError::ParseErr(ref err) => Some(err),
+            BuildError::CaptureErr(_) => None
         }
     }
 }
@@ -354,10 +363,14 @@ mod tests {
     #[test]
     fn generate_pattern_simple() {
         //setup
-        let input = "\t \n\n\n\n{1}  {2}  {45;something=\n\n \t} {46;somethinelse=\n\n \t;some=}";
+        let input = "\t \n\n\n\n{1}  {2}  {4;something=\n\n \t} {3;somethinelse=\n\n \t;some=}";
+        let prod = Production{
+            lhs: String::new(),
+            rhs: vec![String::new(),String::new(),String::new(),String::new(),String::new()]
+        };
 
         //execute
-        let pattern = generate_pattern(input).unwrap();
+        let pattern = generate_pattern(input, &prod).unwrap();
 
         //verify
         assert_eq!(pattern.segments.len(), 8);
@@ -389,7 +402,7 @@ mod tests {
         assert!(match pattern.segments.get(5).unwrap() {
             &Segment::Filler(_) => false,
             &Segment::Substitution(_) => false,
-            &Segment::Capture(ref c) => c.child_index == 45 && c.declarations.len() == 1,
+            &Segment::Capture(ref c) => c.child_index == 4 && c.declarations.len() == 1,
         });
         assert!(match pattern.segments.get(4).unwrap() {
             &Segment::Filler(ref s) => "  " == *s,
@@ -399,7 +412,67 @@ mod tests {
         assert!(match pattern.segments.get(7).unwrap() {
             &Segment::Filler(_) => false,
             &Segment::Substitution(_) => false,
-            &Segment::Capture(ref c) => c.child_index == 46 && c.declarations.len() == 2,
+            &Segment::Capture(ref c) => c.child_index == 3 && c.declarations.len() == 2,
         });
+    }
+
+    #[test]
+    fn pattern_scan_error() {
+        //setup
+        let input = "#";
+        let prod = Production{
+            lhs: String::new(),
+            rhs: vec![]
+        };
+
+        //execute
+        let res = generate_pattern(input, &prod);
+
+        //verify
+        assert!(res.is_err());
+        assert_eq!(
+            format!("{}", res.err().unwrap()),
+            "Pattern scan error: No accepting scans after (1,1): #..."
+        );
+    }
+
+    #[test]
+    fn pattern_parse_error() {
+        //setup
+        let input = "4";
+        let prod = Production{
+            lhs: String::new(),
+            rhs: vec![]
+        };
+
+        //execute
+        let res = generate_pattern(input, &prod);
+
+        //verify
+        assert!(res.is_err());
+        assert_eq!(
+            format!("{}", res.err().unwrap()),
+            "Pattern parse error: Largest parse did not consume all tokens: 0 of 1"
+        );
+    }
+
+    #[test]
+    fn pattern_capture_error() {
+        //setup
+        let input = "{1}";
+        let prod = Production{
+            lhs: String::from("lhs"),
+            rhs: vec![String::from("rhs_item")]
+        };
+
+        //execute
+        let res = generate_pattern(input, &prod);
+
+        //verify
+        assert!(res.is_err());
+        assert_eq!(
+            format!("{}", res.err().unwrap()),
+            "Pattern capture error: Capture index 1 out of bounds for production 'lhs rhs_item' with 1 children"
+        );
     }
 }

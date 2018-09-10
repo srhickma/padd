@@ -115,7 +115,7 @@ impl Parser for EarleyParser {
             }
         }
 
-        fn append<'a, 'b>(item: Item<'a>, item_set: &'b mut Vec<Item<'a>>) {
+        fn append<'a, 'b>(item: Item<'a>, item_set: &'b mut Vec<Item<'a>>){
             for j in 0..item_set.len() {
                 if item_set[j] == item {
                     return;
@@ -130,14 +130,30 @@ impl Parser for EarleyParser {
 
         fn recognized<'a, 'b>(grammar: &'a Grammar, chart: &'b Vec<Vec<Item<'a>>>) -> bool {
             chart.last().unwrap().iter()
-                .any(|item| item.rule.lhs == grammar.start && item.next >= item.rule.rhs.len() && item.start == 0)
+                .any(|item| item.rule.lhs == grammar.start
+                    && item.next >= item.rule.rhs.len()
+                    && item.start == 0)
         }
 
         return if recognized(grammar, &chart) {
-            Ok(parse_tree(grammar, &scan, parse_chart))
+            if i - 1 == scan.len() {
+                Ok(parse_tree(grammar, &scan, parse_chart))
+            } else {
+                Err(parse::Error{
+                    message: format!(
+                        "Largest parse did not consume all tokens: {} of {}",
+                        i - 1,
+                        scan.len()
+                    ),
+                })
+            }
         } else {
             Err(parse::Error{
-                message: format!("Recognition failed after token {}: kind='{}' lexeme='{}'", i, scan[i - 1].kind, scan[i - 1].lexeme),
+                message: format!(
+                    "Recognition failed at token {}: {}",
+                    i,
+                    scan[i - 1].to_string()
+                ),
             })
         };
 

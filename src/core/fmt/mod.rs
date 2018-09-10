@@ -1,4 +1,5 @@
 use core::parse::Tree;
+use core::parse::Production;
 use core::fmt::pattern::*;
 use std::collections::HashMap;
 
@@ -13,8 +14,8 @@ impl Formatter {
         let mut pattern_map = HashMap::new();
         for pattern_pair in patterns {
             pattern_map.insert(
-                pattern_pair.production,
-                generate_pattern(&pattern_pair.pattern[..])?
+                pattern_pair.production.to_string(),
+                generate_pattern(&pattern_pair.pattern[..], &pattern_pair.production)?
             );
         }
         Ok(Formatter{
@@ -94,13 +95,11 @@ impl<'a> FormatJob<'a> {
             }
             match children.get(capture.child_index) {
                 Some(child) => return self.recur(child, &inner_scope),
-                //TODO use actual error here rather than panic!
                 None => panic!("Pattern index out of bounds: index={} children={}", capture.child_index, children.len()),
             }
         } else {
             match children.get(capture.child_index) {
                 Some(child) => return self.recur(child, outer_scope),
-                //TODO use actual error here rather than panic!
                 None => panic!("Pattern index out of bounds: index={} children={}", capture.child_index, children.len()),
             }
         }
@@ -108,6 +107,6 @@ impl<'a> FormatJob<'a> {
 }
 
 pub struct PatternPair {
-    pub production: String,
+    pub production: Production,
     pub pattern: String,
 }

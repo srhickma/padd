@@ -572,4 +572,25 @@ mod tests {
             └── RPAREN <- ')'"
         );
     }
+
+    #[test]
+    fn parse_must_consume() {
+        //setup
+        let productions = build_prods(&["s "]);
+        let grammar = Grammar::from(productions);
+
+        let scan = vec![Token{
+            kind: "kind".to_string(),
+            lexeme: "lexeme".to_string(),
+        }];
+
+        let parser = def_parser();
+
+        //execute
+        let res = parser.parse(scan, &grammar);
+
+        //verify
+        assert!(res.is_err());
+        assert_eq!(format!("{}", res.err().unwrap()), "Largest parse did not consume all tokens: 0 of 1")
+    }
 }

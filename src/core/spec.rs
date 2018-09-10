@@ -369,7 +369,7 @@ fn generate_grammar_rhss<'a, 'b>(rhss_node: &'a Tree, lhs: &'a String, accumulat
         let pattern = replace_escapes(pattern_string);
 
         pp_accumulator.push(PatternPair{
-            production: accumulator.last().unwrap().to_string(),
+            production: accumulator.last().unwrap().clone(),
             pattern,
         });
     }
