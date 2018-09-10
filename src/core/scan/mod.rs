@@ -1,9 +1,11 @@
 use std::collections::HashMap;
+use std::error;
+use std::fmt;
 
 pub mod maximal_munch;
 
 pub trait Scanner {
-    fn scan<'a, 'b>(&self, input: &'a str, dfa: &'b DFA) -> Result<Vec<Token>, ScanningError>;
+    fn scan<'a, 'b>(&self, input: &'a str, dfa: &'b DFA) -> Result<Vec<Token>, Error>;
 }
 
 pub fn def_scanner() -> Box<Scanner> {
@@ -19,8 +21,28 @@ pub struct Token {
 }
 
 impl Token {
+    //TODO fix this method or remove it
     pub fn to_string(&self) -> String {
         format!("{} <- '{}'", self.kind, self.lexeme.replace('\n', "\\n").replace('\t', "\\t"))
+    }
+}
+
+#[derive(Debug)]
+pub struct Error {
+    sequence: String,
+    character: usize,
+    line: usize,
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "No accepting scans after ({},{}): {}...", self.line, self.character, self.sequence)
+    }
+}
+
+impl error::Error for Error {
+    fn cause(&self) -> Option<&error::Error> {
+        None
     }
 }
 
@@ -129,13 +151,6 @@ impl TransitionDelta for RuntimeTransitionDelta {
             None => false,
         }
     }
-}
-
-#[derive(Debug)]
-pub struct ScanningError {
-    pub sequence: String,
-    pub character: usize,
-    pub line: usize,
 }
 
 #[cfg(test)]

@@ -1,11 +1,13 @@
 use std::collections::HashSet;
 use std::collections::HashMap;
+use std::error;
+use std::fmt;
 use core::scan::Token;
 
 mod earley;
 
 pub trait Parser {
-    fn parse(&self, scan: Vec<Token>, grammar: &Grammar) -> Option<Tree>;
+    fn parse(&self, scan: Vec<Token>, grammar: &Grammar) -> Result<Tree, Error>;
 }
 
 pub fn def_parser() -> Box<Parser> {
@@ -71,6 +73,23 @@ impl Tree {
     pub fn production(&self) -> String {
         let vec: Vec<String> = self.children.iter().map(|s| s.lhs.kind.clone()).collect();
         return format!("{} {}", self.lhs.kind, (&vec[..]).join(" "));
+    }
+}
+
+#[derive(Debug)]
+pub struct Error {
+    pub message: String,
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
+impl error::Error for Error {
+    fn cause(&self) -> Option<&error::Error> {
+        None
     }
 }
 
@@ -552,5 +571,26 @@ mod tests {
             │               └── DIGIT <- '4'
             └── RPAREN <- ')'"
         );
+    }
+
+    #[test]
+    fn parse_must_consume() {
+        //setup
+        let productions = build_prods(&["s "]);
+        let grammar = Grammar::from(productions);
+
+        let scan = vec![Token{
+            kind: "kind".to_string(),
+            lexeme: "lexeme".to_string(),
+        }];
+
+        let parser = def_parser();
+
+        //execute
+        let res = parser.parse(scan, &grammar);
+
+        //verify
+        assert!(res.is_err());
+        assert_eq!(format!("{}", res.err().unwrap()), "Largest parse did not consume all tokens: 0 of 1")
     }
 }

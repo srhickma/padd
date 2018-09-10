@@ -2,6 +2,8 @@
 extern crate lazy_static;
 extern crate stopwatch;
 
+use std::error;
+use std::fmt;
 use core::scan;
 use core::scan::DFA;
 use core::scan::Scanner;
@@ -10,7 +12,6 @@ use core::parse::Grammar;
 use core::parse::Parser;
 use core::fmt::Formatter;
 use core::spec;
-use core::Error;
 
 mod core;
 
@@ -23,36 +24,94 @@ pub struct FormatJobRunner {
 }
 
 impl FormatJobRunner {
-    pub fn build(spec: &String) -> Result<FormatJobRunner, String> {
-        match spec::parse_spec(spec) {
-            Ok(parse) => {
-                match spec::generate_spec(&parse) {
-                    Ok((dfa, grammar, formatter)) => Ok(FormatJobRunner {
-                        dfa,
-                        grammar,
-                        formatter,
-                        scanner: scan::def_scanner(),
-                        parser: parse::def_parser(),
-                    }),
-                    Err(e) => Err(e.to_string())
-                }
-            },
-            Err(e) => Err(e.to_string())
-        }
+    pub fn build(spec: &String) -> Result<FormatJobRunner, BuildError> {
+        let parse = spec::parse_spec(spec)?;
+        let (dfa, grammar, formatter) = spec::generate_spec(&parse)?;
+        Ok(FormatJobRunner{
+            dfa,
+            grammar,
+            formatter,
+            scanner: scan::def_scanner(),
+            parser: parse::def_parser(),
+        })
     }
 
-    pub fn format(&self, input: &String) -> Result<String, String> {
-        let res = self.scanner.scan(input, &self.dfa);
-        match res {
-            Ok(tokens) => {
-                let tree = self.parser.parse(tokens, &self.grammar);
-                match tree {
-                    Some(parse) => Ok(self.formatter.format(&parse)),
-                    None => Err(Error::ParseErr().to_string()),
-                }
-            },
-            Err(se) => Err(Error::ScanErr(se).to_string()),
+    pub fn format(&self, input: &String) -> Result<String, FormatError> {
+        let tokens = self.scanner.scan(input, &self.dfa)?;
+        let parse = self.parser.parse(tokens, &self.grammar)?;
+        Ok(self.formatter.format(&parse))
+    }
+}
+
+#[derive(Debug)]
+pub enum BuildError {
+    SpecParseErr(spec::ParseError),
+    SpecGenErr(spec::GenError)
+}
+
+impl fmt::Display for BuildError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            BuildError::SpecParseErr(ref err) => write!(f, "Failed to parse specification: {}", err),
+            BuildError::SpecGenErr(ref err) => write!(f, "Failed to generate specification: {}", err),
         }
+    }
+}
+
+impl error::Error for BuildError {
+    fn cause(&self) -> Option<&error::Error> {
+        match *self {
+            BuildError::SpecParseErr(ref err) => Some(err),
+            BuildError::SpecGenErr(ref err) => Some(err),
+        }
+    }
+}
+
+impl From<spec::ParseError> for BuildError {
+    fn from(err: spec::ParseError) -> BuildError {
+        BuildError::SpecParseErr(err)
+    }
+}
+
+impl From<spec::GenError> for BuildError {
+    fn from(err: spec::GenError) -> BuildError {
+        BuildError::SpecGenErr(err)
+    }
+}
+
+#[derive(Debug)]
+pub enum FormatError {
+    ScanErr(scan::Error),
+    ParseErr(parse::Error)
+}
+
+impl fmt::Display for FormatError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            FormatError::ScanErr(ref err) => write!(f, "Failed to scan input: {}", err),
+            FormatError::ParseErr(ref err) => write!(f, "Failed to parse input: {}", err),
+        }
+    }
+}
+
+impl error::Error for FormatError {
+    fn cause(&self) -> Option<&error::Error> {
+        match *self {
+            FormatError::ScanErr(ref err) => Some(err),
+            FormatError::ParseErr(ref err) => Some(err),
+        }
+    }
+}
+
+impl From<scan::Error> for FormatError {
+    fn from(err: scan::Error) -> FormatError {
+        FormatError::ScanErr(err)
+    }
+}
+
+impl From<parse::Error> for FormatError {
+    fn from(err: parse::Error) -> FormatError {
+        FormatError::ParseErr(err)
     }
 }
 
@@ -78,7 +137,10 @@ s -> ACC;
 
         //verify
         assert!(res.is_err());
-        assert_eq!(res.err().unwrap(), "Failed to scan input: No accepting scans after (1,1): b...");
+        assert_eq!(
+            format!("{}", res.err().unwrap()),
+            "Failed to scan input: No accepting scans after (1,1): b..."
+        );
     }
 
     #[test]
@@ -99,7 +161,10 @@ s -> B;
 
         //verify
         assert!(res.is_err());
-        assert_eq!(res.err().unwrap(), "Failed to parse input");
+        assert_eq!(
+            format!("{}", res.err().unwrap()),
+            "Failed to parse input: Recognition failed at token 1: ACC <- 'a'"
+        );
     }
 
     #[test]
@@ -118,7 +183,10 @@ s -> ACC;
 
         //verify
         assert!(res.is_err());
-        assert_eq!(res.err().unwrap(), "Failed to scan input: No accepting scans after (2,5): ~\n\nstart \'...");
+        assert_eq!(
+            format!("{}", res.err().unwrap()),
+            "Failed to parse specification: Scan error: No accepting scans after (2,5): ~\n\nstart \'..."
+        );
     }
 
     #[test]
@@ -135,6 +203,9 @@ s -> B;
 
         //verify
         assert!(res.is_err());
-        assert_eq!(res.err().unwrap(), "Failed to parse input");
+        assert_eq!(
+            format!("{}", res.err().unwrap()),
+            "Failed to parse specification: Parse error: Recognition failed at token 1: ID <- 'start'"
+        );
     }
 }

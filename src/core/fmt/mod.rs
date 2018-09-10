@@ -1,6 +1,6 @@
 use core::parse::Tree;
+use core::parse::Production;
 use core::fmt::pattern::*;
-use core::Error;
 use std::collections::HashMap;
 
 mod pattern;
@@ -10,15 +10,13 @@ pub struct Formatter {
 }
 
 impl Formatter {
-    pub fn create(patterns: Vec<PatternPair>) -> Result<Formatter, Error> {
+    pub fn create(patterns: Vec<PatternPair>) -> Result<Formatter, BuildError> {
         let mut pattern_map = HashMap::new();
         for pattern_pair in patterns {
-            match generate_pattern(&pattern_pair.pattern[..]) {
-                Ok(pattern) => {
-                    pattern_map.insert(pattern_pair.production, pattern);
-                },
-                Err(e) => return Err(e),
-            }
+            pattern_map.insert(
+                pattern_pair.production.to_string(),
+                generate_pattern(&pattern_pair.pattern[..], &pattern_pair.production)?
+            );
         }
         Ok(Formatter{
             pattern_map,
@@ -33,6 +31,8 @@ impl Formatter {
         format_job.run()
     }
 }
+
+pub type BuildError = pattern::BuildError;
 
 struct FormatJob<'a> {
     parse: &'a Tree,
@@ -107,6 +107,6 @@ impl<'a> FormatJob<'a> {
 }
 
 pub struct PatternPair {
-    pub production: String,
+    pub production: Production,
     pub pattern: String,
 }

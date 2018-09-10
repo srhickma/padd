@@ -1,17 +1,21 @@
+use std;
+use std::error;
 use core::parse::build_prods;
 use core::scan::def_scanner;
 use core::parse::def_parser;
+use core::fmt;
 use core::fmt::PatternPair;
 use core::fmt::Formatter;
+use core::parse;
 use core::parse::Grammar;
 use core::parse::Production;
 use core::parse::Tree;
+use core::scan;
 use core::scan::State;
 use core::scan::Kind;
 use core::scan::DFA;
 use core::scan::CompileTransitionDelta;
 use core::scan::RuntimeTransitionDelta;
-use core::Error;
 use std::collections::HashMap;
 
 static SPEC_ALPHABET: &'static str = "`-=~!@#$%^&*()_+{}|[]\\;':\"<>?,./QWERTYUIOPASDFGHJKLZXCVBNM1234567890abcdefghijklmnopqrstuvwxyz \n\t";
@@ -155,14 +159,14 @@ lazy_static! {
     static ref SPEC_GRAMMAR: Grammar = Grammar::from(SPEC_PRODUCTIONS.clone());
 }
 
-pub fn generate_spec(parse: &Tree) -> Result<(DFA, Grammar, Formatter), Error> {
+pub fn generate_spec(parse: &Tree) -> Result<(DFA, Grammar, Formatter), GenError> {
     let dfa = generate_dfa(parse.get_child(0));
     let (grammar, pattern_pairs) = generate_grammar(parse.get_child(1));
-    match Formatter::create(pattern_pairs) {
-        Ok(formatter) => Ok((dfa, grammar, formatter)),
-        Err(e) => Err(e),
-    }
+    let formatter = Formatter::create(pattern_pairs)?;
+    Ok((dfa, grammar, formatter))
 }
+
+pub type GenError = fmt::BuildError;
 
 fn generate_dfa(tree: &Tree) -> DFA {
     let mut delta: HashMap<State, HashMap<char, State>> = HashMap::new();
@@ -212,7 +216,7 @@ fn generate_dfa_states<'a>(states_node: &Tree, delta: &mut HashMap<State, HashMa
 
         generate_dfa_trans(transopt_node.get_child(0), &mut state_delta, delta, tokenizer, head_state);
         for state in &tail_states {
-            extend_delta((*state), state_delta.clone(), delta);
+            extend_delta(*state, state_delta.clone(), delta);
         }
         extend_delta(head_state, state_delta, delta);
     }
@@ -365,7 +369,7 @@ fn generate_grammar_rhss<'a, 'b>(rhss_node: &'a Tree, lhs: &'a String, accumulat
         let pattern = replace_escapes(pattern_string);
 
         pp_accumulator.push(PatternPair{
-            production: accumulator.last().unwrap().to_string(),
+            production: accumulator.last().unwrap().clone(),
             pattern,
         });
     }
@@ -385,21 +389,48 @@ fn generate_grammar_ids<'a, 'b>(ids_node: &'a Tree, accumulator: &'b mut Vec<Str
     }
 }
 
-pub fn parse_spec(input: &str) -> Result<Tree, Error> {
-    let scanner = def_scanner();
-    let parser = def_parser();
+pub fn parse_spec(input: &str) -> Result<Tree, ParseError> {
+    SPEC_DFA.with(|f| -> Result<Tree, ParseError> {
+        let tokens = def_scanner().scan(input, f)?;
+        let parse = def_parser().parse(tokens, &SPEC_GRAMMAR)?;
+        Ok(parse)
+    })
+}
 
-    let mut res: Result<Tree, Error> = Err(Error::Err("Failed to get thread local DFA".to_string()));
-    SPEC_DFA.with(|f| {
-        res = match scanner.scan(input, f) {
-            Ok(tokens) => match parser.parse(tokens, &SPEC_GRAMMAR) {
-                Some(parse) => Ok(parse),
-                None => Err(Error::ParseErr())
-            },
-            Err(se) => Err(Error::ScanErr(se)),
+#[derive(Debug)]
+pub enum ParseError {
+    ScanErr(scan::Error),
+    ParseErr(parse::Error)
+}
+
+impl std::fmt::Display for ParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match *self {
+            ParseError::ScanErr(ref err) => write!(f, "Scan error: {}", err),
+            ParseError::ParseErr(ref err) => write!(f, "Parse error: {}", err),
         }
-    });
-    res
+    }
+}
+
+impl error::Error for ParseError {
+    fn cause(&self) -> Option<&error::Error> {
+        match *self {
+            ParseError::ScanErr(ref err) => Some(err),
+            ParseError::ParseErr(ref err) => Some(err),
+        }
+    }
+}
+
+impl From<scan::Error> for ParseError {
+    fn from(err: scan::Error) -> ParseError {
+        ParseError::ScanErr(err)
+    }
+}
+
+impl From<parse::Error> for ParseError {
+    fn from(err: parse::Error) -> ParseError {
+        ParseError::ParseErr(err)
+    }
 }
 
 fn replace_escapes(input: &str) -> String {

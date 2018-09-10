@@ -2,12 +2,13 @@ use core::parse::Parser;
 use core::parse::Grammar;
 use core::parse::Production;
 use core::parse::Tree;
+use core::parse;
 use core::scan::Token;
 
 pub struct EarleyParser;
 
 impl Parser for EarleyParser {
-    fn parse(&self, scan: Vec<Token>, grammar: &Grammar) -> Option<Tree> {
+    fn parse(&self, scan: Vec<Token>, grammar: &Grammar) -> Result<Tree, parse::Error> {
         let mut parse_chart: Vec<Vec<Edge>> = vec![];
         let mut chart: Vec<Vec<Item>> = vec![vec![]];
 
@@ -114,7 +115,7 @@ impl Parser for EarleyParser {
             }
         }
 
-        fn append<'a, 'b>(item: Item<'a>, item_set: &'b mut Vec<Item<'a>>) {
+        fn append<'a, 'b>(item: Item<'a>, item_set: &'b mut Vec<Item<'a>>){
             for j in 0..item_set.len() {
                 if item_set[j] == item {
                     return;
@@ -129,13 +130,31 @@ impl Parser for EarleyParser {
 
         fn recognized<'a, 'b>(grammar: &'a Grammar, chart: &'b Vec<Vec<Item<'a>>>) -> bool {
             chart.last().unwrap().iter()
-                .any(|item| item.rule.lhs == grammar.start && item.next >= item.rule.rhs.len() && item.start == 0)
+                .any(|item| item.rule.lhs == grammar.start
+                    && item.next >= item.rule.rhs.len()
+                    && item.start == 0)
         }
 
         return if recognized(grammar, &chart) {
-            Some(parse_tree(grammar, &scan, parse_chart))
+            if i - 1 == scan.len() {
+                Ok(parse_tree(grammar, &scan, parse_chart))
+            } else {
+                Err(parse::Error{
+                    message: format!(
+                        "Largest parse did not consume all tokens: {} of {}",
+                        i - 1,
+                        scan.len()
+                    ),
+                })
+            }
         } else {
-            None
+            Err(parse::Error{
+                message: format!(
+                    "Recognition failed at token {}: {}",
+                    i,
+                    scan[i - 1].to_string()
+                ),
+            })
         };
 
         //TODO refactor to reduce long and duplicated parameter lists

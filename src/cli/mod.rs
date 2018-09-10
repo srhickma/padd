@@ -3,6 +3,7 @@ extern crate stopwatch;
 
 use self::regex::Regex;
 use self::stopwatch::Stopwatch;
+use padd;
 use padd::FormatJobRunner;
 use std::env;
 use std::io;
@@ -122,7 +123,7 @@ fn dir_recur(dir_path: &Path, fn_regex: &Regex, fjr: &FormatJobRunner){
         });
 }
 
-fn load_spec(spec_path: &String) -> Result<FormatJobRunner, String> {
+fn load_spec(spec_path: &String) -> Result<FormatJobRunner, padd::BuildError> {
     let mut spec = String::new();
 
     let spec_file = File::open(spec_path);
