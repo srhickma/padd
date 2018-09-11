@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::error;
 use std::fmt;
+use core::spec::DEF_MATCHER;
 
 pub mod maximal_munch;
 
@@ -130,7 +131,7 @@ impl TransitionDelta for RuntimeTransitionDelta {
         match self.delta.get(state) {
             Some(hm) => match hm.get(&c) {
                 Some(s) => s,
-                None => match hm.get(&'_') { //TODO make default matcher
+                None => match hm.get(&DEF_MATCHER) {
                     Some(s) => s,
                     None => &NULL_STATE,
                 },

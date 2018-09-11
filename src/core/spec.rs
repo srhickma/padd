@@ -20,7 +20,7 @@ use std::collections::HashMap;
 
 static SPEC_ALPHABET: &'static str = "`-=~!@#$%^&*()_+{}|[]\\;':\"<>?,./QWERTYUIOPASDFGHJKLZXCVBNM1234567890abcdefghijklmnopqrstuvwxyz \n\t";
 static SPEC_STATES: [&'static str; 15] = ["hat", "minus", "patt", "cil", "comment", "semi", "def", "ws", "id", "arrow", "pattc", "cilc", "cilbs", "or", ""];
-static DEF_MATCHER: char = '_';
+pub static DEF_MATCHER: char = '_';
 
 thread_local! {
     static SPEC_DFA: DFA = {
