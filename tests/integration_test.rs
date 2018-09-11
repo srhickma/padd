@@ -63,13 +63,11 @@ fn test_ignore_tokens() {
 'a \n\t'
 
 start 'a' -> a
-' ' | '\n' | '\t' -> ws;
+' ' | '\n' | '\t' -> ^_;
 
 a^ACC
 'a' -> a
 _ -> fail;
-
-ws^_;
 
 s -> acc s `{0} {1}`
 -> acc;
@@ -92,15 +90,12 @@ fn test_advanced_operators() {
     let spec = "
         'inj '
         start
-            'i' -> ki
-            ' ' -> ws
+            'in' -> ^IN
+            ' ' -> ^_
             _ -> ^ID;
-        ki ^ID
-            'n' -> ^IN;
-        ID | IN | ki
+        ID | IN
             ' ' -> fail
             _ -> ID;
-        ws ^_;
         s
             -> x s
             -> x;

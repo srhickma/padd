@@ -64,19 +64,19 @@ impl DFA {
         self.alphabet.chars().any(|x| c == x) && self.transition(state, c) != ""
     }
     fn accepts(&self, state: &State) -> bool {
-        self.td.tokenize(state).len() > 0
+        self.td.tokenize(state).is_some()
     }
     fn transition<'a>(&'a self, state: &'a State, c: char) -> &'a State {
         self.td.transition(state, c)
     }
-    fn tokenize(&self, state: &State) -> Kind {
+    fn tokenize(&self, state: &State) -> Option<Kind> {
         self.td.tokenize(state)
     }
 }
 
 pub trait TransitionDelta {
     fn transition<'a>(&'a self, state: &'a State, c: char) -> &'a State;
-    fn tokenize(&self, state: &State) -> Kind;
+    fn tokenize(&self, state: &State) -> Option<Kind>;
 
     //TODO remove with CDFA
     fn has_non_def_transition(&self, c: char, state: &State) -> bool;
@@ -92,8 +92,12 @@ impl TransitionDelta for CompileTransitionDelta {
     fn transition<'a>(&'a self, state: &'a State, c: char) -> &'a State {
         self.state_map.get(&(self.delta)(&state[..], c).to_string()).unwrap()
     }
-    fn tokenize(&self, state: &State) -> Kind {
-        (self.tokenizer)(&state[..]).to_string()
+    fn tokenize(&self, state: &State) -> Option<Kind> {
+        //let kind = (self.tokenizer)(&state[..]).to_string();
+        match (self.tokenizer)(&state[..]) {
+            "" => None,
+            _kind => Some(_kind.to_string())
+        }
     }
 
     //TODO remove with CDFA
@@ -134,10 +138,11 @@ impl TransitionDelta for RuntimeTransitionDelta {
             None => &NULL_STATE,
         }
     }
-    fn tokenize(&self, state: &State) -> Kind {
+
+    fn tokenize(&self, state: &State) -> Option<Kind> {
         match self.tokenizer.get(state) {
-            Some(s) => s.clone(),
-            None => String::new(),
+            Some(s) => Some(s.clone()),
+            None => None,
         }
     }
 

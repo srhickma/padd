@@ -75,8 +75,8 @@ impl Scanner for MaximalMunchScanner {
                 });
             }
 
-            let accept_as = dfa.tokenize(end_state);
-            if accept_as != "_" {
+            let accept_as = dfa.tokenize(end_state).unwrap();
+            if accept_as != "_" { //TODO replace with def matcher
                 let token = Token {
                     kind: accept_as,
                     lexeme: scanned_chars.iter().collect(),

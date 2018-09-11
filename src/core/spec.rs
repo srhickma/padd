@@ -128,14 +128,15 @@ lazy_static! {
             "trans trans tran",
             "trans tran",
 
-            "tran mtcs ARROW hatopt ID",
-            "tran DEF ARROW hatopt ID",
+            "tran mtcs ARROW trand",
+            "tran DEF ARROW trand",
+
+            "trand ID",
+            "trand HAT ID",
+            "trand HAT DEF",
 
             "mtcs CILC OR mtcs",
             "mtcs CILC",
-
-            "hatopt HAT",
-            "hatopt ",
 
             "gram prods",
 
@@ -245,7 +246,9 @@ fn generate_dfa_targets<'a>(targets_node: &'a Tree, accumulator: &mut Vec<&'a St
 fn generate_dfa_trans_def_prefill<'a>(trans_node: &'a Tree, state_delta: &mut HashMap<char, State>){
     let tran_node = trans_node.get_child(trans_node.children.len() - 1);
 
-    let dest: &State = &tran_node.get_child(3).lhs.lexeme;
+    let trand_node = tran_node.get_child(2);
+    let dest: &State = &trand_node.get_child(trand_node.children.len() - 1).lhs.lexeme;
+
     let matcher = tran_node.get_child(0);
     match &matcher.lhs.kind[..] {
         "DEF" => {
@@ -263,7 +266,9 @@ fn generate_dfa_trans_def_prefill<'a>(trans_node: &'a Tree, state_delta: &mut Ha
 fn generate_dfa_trans<'a>(trans_node: &'a Tree, state_delta: &mut HashMap<char, State>, delta: &mut HashMap<State, HashMap<char, State>>, tokenizer: &mut HashMap<State, Kind>, src: &State){
     let tran_node = trans_node.get_child(trans_node.children.len() - 1);
 
-    let dest: &State = &tran_node.get_child(3).lhs.lexeme;
+    let trand_node = tran_node.get_child(2);
+    let dest: &State = &trand_node.get_child(trand_node.children.len() - 1).lhs.lexeme;
+
     let matcher = tran_node.get_child(0);
     match &matcher.lhs.kind[..] {
         "mtcs" => {
@@ -275,7 +280,7 @@ fn generate_dfa_trans<'a>(trans_node: &'a Tree, state_delta: &mut HashMap<char, 
         &_ => panic!("Transition map input is neither CILC or DEF"),
     }
 
-    if !tran_node.get_child(2).is_empty() { //Immediate state pass-through
+    if trand_node.children.len() == 2 { //Immediate state pass-through
         tokenizer.insert(dest.clone(), dest.clone());
     }
 
@@ -564,37 +569,32 @@ w -> WHITESPACE `[prefix]{0}\n\n{1;prefix=[prefix]\t}[prefix]{2}\n\n`
     │       │   │   │       │       │   │   │   │       ├── mtcs
     │       │   │   │       │       │   │   │   │       │   └── CILC <- '' ''
     │       │   │   │       │       │   │   │   │       ├── ARROW <- '->'
-    │       │   │   │       │       │   │   │   │       ├── hatopt
-    │       │   │   │       │       │   │   │   │       │   └──  <- 'NULL'
-    │       │   │   │       │       │   │   │   │       └── ID <- 'ws'
+    │       │   │   │       │       │   │   │   │       └── trand
+    │       │   │   │       │       │   │   │   │           └── ID <- 'ws'
     │       │   │   │       │       │   │   │   └── tran
     │       │   │   │       │       │   │   │       ├── mtcs
     │       │   │   │       │       │   │   │       │   └── CILC <- ''\\t''
     │       │   │   │       │       │   │   │       ├── ARROW <- '->'
-    │       │   │   │       │       │   │   │       ├── hatopt
-    │       │   │   │       │       │   │   │       │   └──  <- 'NULL'
-    │       │   │   │       │       │   │   │       └── ID <- 'ws'
+    │       │   │   │       │       │   │   │       └── trand
+    │       │   │   │       │       │   │   │           └── ID <- 'ws'
     │       │   │   │       │       │   │   └── tran
     │       │   │   │       │       │   │       ├── mtcs
     │       │   │   │       │       │   │       │   └── CILC <- ''\\n''
     │       │   │   │       │       │   │       ├── ARROW <- '->'
-    │       │   │   │       │       │   │       ├── hatopt
-    │       │   │   │       │       │   │       │   └──  <- 'NULL'
-    │       │   │   │       │       │   │       └── ID <- 'ws'
+    │       │   │   │       │       │   │       └── trand
+    │       │   │   │       │       │   │           └── ID <- 'ws'
     │       │   │   │       │       │   └── tran
     │       │   │   │       │       │       ├── mtcs
     │       │   │   │       │       │       │   └── CILC <- ''{''
     │       │   │   │       │       │       ├── ARROW <- '->'
-    │       │   │   │       │       │       ├── hatopt
-    │       │   │   │       │       │       │   └──  <- 'NULL'
-    │       │   │   │       │       │       └── ID <- 'lbr'
+    │       │   │   │       │       │       └── trand
+    │       │   │   │       │       │           └── ID <- 'lbr'
     │       │   │   │       │       └── tran
     │       │   │   │       │           ├── mtcs
     │       │   │   │       │           │   └── CILC <- ''}''
     │       │   │   │       │           ├── ARROW <- '->'
-    │       │   │   │       │           ├── hatopt
-    │       │   │   │       │           │   └──  <- 'NULL'
-    │       │   │   │       │           └── ID <- 'rbr'
+    │       │   │   │       │           └── trand
+    │       │   │   │       │               └── ID <- 'rbr'
     │       │   │   │       └── SEMI <- ';'
     │       │   │   └── state
     │       │   │       ├── sdec
@@ -610,23 +610,20 @@ w -> WHITESPACE `[prefix]{0}\n\n{1;prefix=[prefix]\t}[prefix]{2}\n\n`
     │       │   │       │       │   │       ├── mtcs
     │       │   │       │       │   │       │   └── CILC <- '' ''
     │       │   │       │       │   │       ├── ARROW <- '->'
-    │       │   │       │       │   │       ├── hatopt
-    │       │   │       │       │   │       │   └──  <- 'NULL'
-    │       │   │       │       │   │       └── ID <- 'ws'
+    │       │   │       │       │   │       └── trand
+    │       │   │       │       │   │           └── ID <- 'ws'
     │       │   │       │       │   └── tran
     │       │   │       │       │       ├── mtcs
     │       │   │       │       │       │   └── CILC <- ''\\t''
     │       │   │       │       │       ├── ARROW <- '->'
-    │       │   │       │       │       ├── hatopt
-    │       │   │       │       │       │   └──  <- 'NULL'
-    │       │   │       │       │       └── ID <- 'ws'
+    │       │   │       │       │       └── trand
+    │       │   │       │       │           └── ID <- 'ws'
     │       │   │       │       └── tran
     │       │   │       │           ├── mtcs
     │       │   │       │           │   └── CILC <- ''\\n''
     │       │   │       │           ├── ARROW <- '->'
-    │       │   │       │           ├── hatopt
-    │       │   │       │           │   └──  <- 'NULL'
-    │       │   │       │           └── ID <- 'ws'
+    │       │   │       │           └── trand
+    │       │   │       │               └── ID <- 'ws'
     │       │   │       └── SEMI <- ';'
     │       │   └── state
     │       │       ├── sdec
@@ -800,10 +797,8 @@ start
   'for' -> ^FOR
   'fob' -> ^FOB
   'final' -> ^FINAL
-  ' ' -> ws
+  ' ' -> ^_
   _ -> id;
-
-ws^_;
 
 id ^ID
  ' ' -> fail
@@ -893,15 +888,14 @@ kind=ID lexeme=f")
     │       │   │       │       │       ├── mtcs
     │       │   │       │       │       │   └── CILC <- ''i''
     │       │   │       │       │       ├── ARROW <- '->'
-    │       │   │       │       │       ├── hatopt
-    │       │   │       │       │       │   └──  <- 'NULL'
-    │       │   │       │       │       └── ID <- 'ki'
+    │       │   │       │       │       └── trand
+    │       │   │       │       │           └── ID <- 'ki'
     │       │   │       │       └── tran
     │       │   │       │           ├── DEF <- '_'
     │       │   │       │           ├── ARROW <- '->'
-    │       │   │       │           ├── hatopt
-    │       │   │       │           │   └── HAT <- '^'
-    │       │   │       │           └── ID <- 'ID'
+    │       │   │       │           └── trand
+    │       │   │       │               ├── HAT <- '^'
+    │       │   │       │               └── ID <- 'ID'
     │       │   │       └── SEMI <- ';'
     │       │   └── state
     │       │       ├── sdec
@@ -913,9 +907,9 @@ kind=ID lexeme=f")
     │       │       │           ├── mtcs
     │       │       │           │   └── CILC <- ''n''
     │       │       │           ├── ARROW <- '->'
-    │       │       │           ├── hatopt
-    │       │       │           │   └── HAT <- '^'
-    │       │       │           └── ID <- 'IN'
+    │       │       │           └── trand
+    │       │       │               ├── HAT <- '^'
+    │       │       │               └── ID <- 'IN'
     │       │       └── SEMI <- ';'
     │       └── state
     │           ├── sdec
@@ -931,15 +925,13 @@ kind=ID lexeme=f")
     │           │       │       ├── mtcs
     │           │       │       │   └── CILC <- '' ''
     │           │       │       ├── ARROW <- '->'
-    │           │       │       ├── hatopt
-    │           │       │       │   └──  <- 'NULL'
-    │           │       │       └── ID <- 'fail'
+    │           │       │       └── trand
+    │           │       │           └── ID <- 'fail'
     │           │       └── tran
     │           │           ├── DEF <- '_'
     │           │           ├── ARROW <- '->'
-    │           │           ├── hatopt
-    │           │           │   └──  <- 'NULL'
-    │           │           └── ID <- 'ID'
+    │           │           └── trand
+    │           │               └── ID <- 'ID'
     │           └── SEMI <- ';'
     └── gram
         └── prods

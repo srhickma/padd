@@ -47,15 +47,12 @@ fn main() {
     let spec = "
         'inj '
         start
-            'i' -> ki
-            ' ' -> ws
+            'in' -> ^IN
+            ' ' -> ^_
             _ -> ^ID;
-        ki ^ID
-            'n' -> ^IN;
-        ID | IN | ki
+        ID | IN
             ' ' -> fail
             _ -> ID;
-        ws ^_;
         s
             -> x s
             -> x;
@@ -77,14 +74,14 @@ fn main() {
 ## Simple Example: Balanced Brackets
 The specification file:
 ```
+# sigma
 ' \t\n{}'
 
 # dfa
 start
- ' ' | '\t' | '\n' -> ws
+ ' ' | '\t' | '\n' -> ^_
  '{' -> ^LBRACKET
  '}' -> ^RBRACKET;
-ws ^_;
 
 # grammar
 s -> s b
