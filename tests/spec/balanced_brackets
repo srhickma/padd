@@ -2,10 +2,9 @@
 
 # dfa
 start
- ' ' | '\t' | '\n' -> ws
+ ' ' | '\t' | '\n' -> ^_
  '{' -> ^LBRACKET
  '}' -> ^RBRACKET;
-ws ^_;
 
 # grammar
 s -> s b

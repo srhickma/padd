@@ -1,3 +1,4 @@
+use core::spec::DEF_MATCHER;
 use core::scan;
 use core::scan::DFA;
 use core::scan::Token;
@@ -75,8 +76,8 @@ impl Scanner for MaximalMunchScanner {
                 });
             }
 
-            let accept_as = dfa.tokenize(end_state);
-            if accept_as != "_" {
+            let accept_as = dfa.tokenize(end_state).unwrap();
+            if accept_as != DEF_MATCHER.to_string() {
                 let token = Token {
                     kind: accept_as,
                     lexeme: scanned_chars.iter().collect(),
