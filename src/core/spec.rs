@@ -19,87 +19,106 @@ use core::scan::RuntimeTransitionDelta;
 use std::collections::HashMap;
 
 static SPEC_ALPHABET: &'static str = "`-=~!@#$%^&*()_+{}|[]\\;':\"<>?,./QWERTYUIOPASDFGHJKLZXCVBNM1234567890abcdefghijklmnopqrstuvwxyz \n\t";
-static SPEC_STATES: [&'static str; 15] = ["hat", "minus", "patt", "cil", "comment", "semi", "def", "ws", "id", "arrow", "pattc", "cilc", "cilbs", "or", ""];
 pub static DEF_MATCHER: char = '_';
 
+#[derive(PartialEq, Clone)]
+enum S {
+    START,
+    HAT,
+    MINUS,
+    BSLASH,
+    PATT,
+    PATTC,
+    CIL,
+    CILC,
+    CILBS,
+    COMMENT,
+    SEMI,
+    DEF,
+    OR,
+    WS,
+    ID,
+    ARROW,
+    FAIL
+}
+
 thread_local! {
-    static SPEC_DFA: DFA = {
-        let start: State = "start".to_string();
-        let delta: fn(&str, char) -> &str = |state, c| match (state, c) {
-            ("start", '^') => "hat",
-            ("start", '-') => "minus",
-            ("start", '\\') => "bslash",
-            ("start", '`') => "patt",
-            ("start", '\'') => "cil",
-            ("start", '#') => "comment",
-            ("start", ';') => "semi",
-            ("start", '_') => "def",
-            ("start", '|') => "or",
-            ("start", ' ') | ("start", '\t') | ("start", '\n') => "ws",
-            ("start", '0') | ("start", '1') | ("start", '2') | ("start", '3') | ("start", '4') |
-            ("start", '5') | ("start", '6') | ("start", '7') | ("start", '8') | ("start", '9') |
-            ("start", 'a') | ("start", 'g') | ("start", 'l') | ("start", 'q') | ("start", 'v') |
-            ("start", 'b') | ("start", 'h') | ("start", 'm') | ("start", 'r') | ("start", 'w') |
-            ("start", 'c') | ("start", 'i') | ("start", 'n') | ("start", 's') | ("start", 'x') |
-            ("start", 'd') | ("start", 'j') | ("start", 'o') | ("start", 't') | ("start", 'y') |
-            ("start", 'e') | ("start", 'k') | ("start", 'p') | ("start", 'u') | ("start", 'z') |
-            ("start", 'f') | ("start", 'A') | ("start", 'G') | ("start", 'L') | ("start", 'Q') |
-            ("start", 'V') | ("start", 'B') | ("start", 'H') | ("start", 'M') | ("start", 'R') |
-            ("start", 'W') | ("start", 'C') | ("start", 'I') | ("start", 'N') | ("start", 'S') |
-            ("start", 'X') | ("start", 'D') | ("start", 'J') | ("start", 'O') | ("start", 'T') |
-            ("start", 'Y') | ("start", 'E') | ("start", 'K') | ("start", 'P') | ("start", 'U') |
-            ("start", 'Z') | ("start", 'F') => "id",
+    static SPEC_DFA: DFA<S> = {
+        let delta: fn(S, char) -> S = |state, c| match (state, c) {
+            (S::START, '^') => S::HAT,
+            (S::START, '-') => S::MINUS,
+            (S::START, '\\') => S::BSLASH,
+            (S::START, '`') => S::PATT,
+            (S::START, '\'') => S::CIL,
+            (S::START, '#') => S::COMMENT,
+            (S::START, ';') => S::SEMI,
+            (S::START, '_') => S::DEF,
+            (S::START, '|') => S::OR,
+            (S::START, ' ') | (S::START, '\t') | (S::START, '\n') => S::WS,
+            (S::START, '0') | (S::START, '1') | (S::START, '2') | (S::START, '3') | (S::START, '4') |
+            (S::START, '5') | (S::START, '6') | (S::START, '7') | (S::START, '8') | (S::START, '9') |
+            (S::START, 'a') | (S::START, 'g') | (S::START, 'l') | (S::START, 'q') | (S::START, 'v') |
+            (S::START, 'b') | (S::START, 'h') | (S::START, 'm') | (S::START, 'r') | (S::START, 'w') |
+            (S::START, 'c') | (S::START, 'i') | (S::START, 'n') | (S::START, 's') | (S::START, 'x') |
+            (S::START, 'd') | (S::START, 'j') | (S::START, 'o') | (S::START, 't') | (S::START, 'y') |
+            (S::START, 'e') | (S::START, 'k') | (S::START, 'p') | (S::START, 'u') | (S::START, 'z') |
+            (S::START, 'f') | (S::START, 'A') | (S::START, 'G') | (S::START, 'L') | (S::START, 'Q') |
+            (S::START, 'V') | (S::START, 'B') | (S::START, 'H') | (S::START, 'M') | (S::START, 'R') |
+            (S::START, 'W') | (S::START, 'C') | (S::START, 'I') | (S::START, 'N') | (S::START, 'S') |
+            (S::START, 'X') | (S::START, 'D') | (S::START, 'J') | (S::START, 'O') | (S::START, 'T') |
+            (S::START, 'Y') | (S::START, 'E') | (S::START, 'K') | (S::START, 'P') | (S::START, 'U') |
+            (S::START, 'Z') | (S::START, 'F') => S::ID,
 
-            ("minus", '>') => "arrow",
+            (S::MINUS, '>') => S::ARROW,
 
-            ("id", '0') | ("id", '1') | ("id", '2') | ("id", '3') | ("id", '4') |
-            ("id", '5') | ("id", '6') | ("id", '7') | ("id", '8') | ("id", '9') |
-            ("id", 'a') | ("id", 'g') | ("id", 'l') | ("id", 'q') | ("id", 'v') |
-            ("id", 'b') | ("id", 'h') | ("id", 'm') | ("id", 'r') | ("id", 'w') |
-            ("id", 'c') | ("id", 'i') | ("id", 'n') | ("id", 's') | ("id", 'x') |
-            ("id", 'd') | ("id", 'j') | ("id", 'o') | ("id", 't') | ("id", 'y') |
-            ("id", 'e') | ("id", 'k') | ("id", 'p') | ("id", 'u') | ("id", 'z') |
-            ("id", 'f') | ("id", 'A') | ("id", 'G') | ("id", 'L') | ("id", 'Q') |
-            ("id", 'V') | ("id", 'B') | ("id", 'H') | ("id", 'M') | ("id", 'R') |
-            ("id", 'W') | ("id", 'C') | ("id", 'I') | ("id", 'N') | ("id", 'S') |
-            ("id", 'X') | ("id", 'D') | ("id", 'J') | ("id", 'O') | ("id", 'T') |
-            ("id", 'Y') | ("id", 'E') | ("id", 'K') | ("id", 'P') | ("id", 'U') |
-            ("id", 'Z') | ("id", 'F') | ("id", '_') => "id",
+            (S::ID, '0') | (S::ID, '1') | (S::ID, '2') | (S::ID, '3') | (S::ID, '4') |
+            (S::ID, '5') | (S::ID, '6') | (S::ID, '7') | (S::ID, '8') | (S::ID, '9') |
+            (S::ID, 'a') | (S::ID, 'g') | (S::ID, 'l') | (S::ID, 'q') | (S::ID, 'v') |
+            (S::ID, 'b') | (S::ID, 'h') | (S::ID, 'm') | (S::ID, 'r') | (S::ID, 'w') |
+            (S::ID, 'c') | (S::ID, 'i') | (S::ID, 'n') | (S::ID, 's') | (S::ID, 'x') |
+            (S::ID, 'd') | (S::ID, 'j') | (S::ID, 'o') | (S::ID, 't') | (S::ID, 'y') |
+            (S::ID, 'e') | (S::ID, 'k') | (S::ID, 'p') | (S::ID, 'u') | (S::ID, 'z') |
+            (S::ID, 'f') | (S::ID, 'A') | (S::ID, 'G') | (S::ID, 'L') | (S::ID, 'Q') |
+            (S::ID, 'V') | (S::ID, 'B') | (S::ID, 'H') | (S::ID, 'M') | (S::ID, 'R') |
+            (S::ID, 'W') | (S::ID, 'C') | (S::ID, 'I') | (S::ID, 'N') | (S::ID, 'S') |
+            (S::ID, 'X') | (S::ID, 'D') | (S::ID, 'J') | (S::ID, 'O') | (S::ID, 'T') |
+            (S::ID, 'Y') | (S::ID, 'E') | (S::ID, 'K') | (S::ID, 'P') | (S::ID, 'U') |
+            (S::ID, 'Z') | (S::ID, 'F') | (S::ID, '_') => S::ID,
 
-            ("ws", ' ') | ("ws", '\t') | ("ws", '\n') => "ws",
+            (S::WS, ' ') | (S::WS, '\t') | (S::WS, '\n') => S::WS,
 
-            ("patt", '`') => "pattc",
-            ("patt", _) => "patt",
+            (S::PATT, '`') => S::PATTC,
+            (S::PATT, _) => S::PATT,
 
-            ("cil", '\'') => "cilc",
-            ("cil", '\\') => "cilbs",
-            ("cil", _) => "cil",
+            (S::CIL, '\'') => S::CILC,
+            (S::CIL, '\\') => S::CILBS,
+            (S::CIL, _) => S::CIL,
 
-            ("cilbs", _) => "cil",
+            (S::CILBS, _) => S::CIL,
 
-            ("comment", '\n') => "",
-            ("comment", _) => "comment",
+            (S::COMMENT, '\n') => S::FAIL,
+            (S::COMMENT, _) => S::COMMENT,
 
-            (&_, _) => "",
+            (_, _) => S::FAIL,
         };
-        let tokenizer: fn(&str) -> &'static str = |state| match state {
-            "hat" => "HAT",
-            "arrow" => "ARROW",
-            "pattc" => "PATTC",
-            "cilc" => "CILC",
-            "comment" => "_",
-            "ws" => "_",
-            "id" => "ID",
-            "def" => "DEF",
-            "semi" => "SEMI",
-            "or" => "OR",
+        let tokenizer: fn(S) -> String = |state| match state {
+            S::HAT => "HAT",
+            S::ARROW => "ARROW",
+            S::PATTC => "PATTC",
+            S::CILC => "CILC",
+            S::COMMENT => "_",
+            S::WS => "_",
+            S::ID => "ID",
+            S::DEF => "DEF",
+            S::SEMI => "SEMI",
+            S::OR => "OR",
             _ => "",
-        };
+        }.to_string();
 
         DFA{
             alphabet: SPEC_ALPHABET.to_string(),
-            start,
-            td: Box::new(CompileTransitionDelta::build(&SPEC_STATES, delta, tokenizer)),
+            start: S::START,
+            td: Box::new(CompileTransitionDelta::build(delta, tokenizer, S::FAIL)),
         }
     };
 }
@@ -160,7 +179,7 @@ lazy_static! {
     static ref SPEC_GRAMMAR: Grammar = Grammar::from(SPEC_PRODUCTIONS.clone());
 }
 
-pub fn generate_spec(parse: &Tree) -> Result<(DFA, Grammar, Formatter), GenError> {
+pub fn generate_spec(parse: &Tree) -> Result<(DFA<State>, Grammar, Formatter), GenError> {
     let dfa = generate_dfa(parse.get_child(0));
     let (grammar, pattern_pairs) = generate_grammar(parse.get_child(1));
     let formatter = Formatter::create(pattern_pairs)?;
@@ -169,7 +188,7 @@ pub fn generate_spec(parse: &Tree) -> Result<(DFA, Grammar, Formatter), GenError
 
 pub type GenError = fmt::BuildError;
 
-fn generate_dfa(tree: &Tree) -> DFA {
+fn generate_dfa(tree: &Tree) -> DFA<State> {
     let mut delta: HashMap<State, HashMap<char, State>> = HashMap::new();
     let mut tokenizer: HashMap<State, Kind> = HashMap::new();
 
@@ -178,7 +197,7 @@ fn generate_dfa(tree: &Tree) -> DFA {
 
     let start = generate_dfa_states(tree.get_child(1), &mut delta, &mut tokenizer);
 
-    DFA {
+    DFA{
         alphabet,
         start,
         td: Box::new(RuntimeTransitionDelta{

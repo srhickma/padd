@@ -2,28 +2,26 @@ use core::spec::DEF_MATCHER;
 use core::scan;
 use core::scan::DFA;
 use core::scan::Token;
-use core::scan::State;
 use core::scan::Scanner;
 use core::scan::FAIL_SEQUENCE_LENGTH;
 use std::cmp;
 
 pub struct MaximalMunchScanner;
 
-impl Scanner for MaximalMunchScanner {
-    fn scan<'a, 'b>(&self, input: &'a str, dfa: &'b DFA) -> Result<Vec<Token>, scan::Error> {
+impl<State : PartialEq + Clone> Scanner<State> for MaximalMunchScanner {
+    fn scan<'a, 'b>(&self, input: &'a str, dfa: &'b DFA<State>) -> Result<Vec<Token>, scan::Error> {
 
-        fn scan_one<'a, 'b>(input: &'a [char], line: usize, character: usize, dfa: &'b DFA) -> (usize, &'b State, usize, usize)
-        {
+        fn scan_one<'a, 'b, State : PartialEq + Clone>(input: &'a [char], line: usize, character: usize, dfa: &'b DFA<State>) -> (usize, State, usize, usize) {
             let mut input: &[char] = input;
 
             let mut scanned: usize = 0;
-            let mut state: &State = &dfa.start;
+            let mut state: State = dfa.start.clone();
             let mut line: usize = line;
             let mut character: usize = character;
 
-            let mut last_accepting: (usize, &State, usize, usize) = (scanned, state, line, character);
+            let mut last_accepting: (usize, State, usize, usize) = (scanned, state.clone(), line, character);
 
-            while !input.is_empty() && dfa.has_transition(input[0], state) {
+            while !input.is_empty() && dfa.has_transition(input[0], &state) {
                 let head: char = input[0];
 
                 character += 1;
@@ -33,15 +31,15 @@ impl Scanner for MaximalMunchScanner {
                 }
 
                 //TODO remove with CDFA
-                if state.chars().next().unwrap() != '#' || dfa.td.has_non_def_transition(head, state) {
+                if dfa.td.should_advance_scanner(head, &state) {
                     scanned += 1;
                     input = &input[1..];
                 }
 
-                state = dfa.transition(state, head);
+                state = dfa.transition(&state, head);
 
-                if dfa.accepts(state) {
-                    last_accepting = (scanned, state, line, character);
+                if dfa.accepts(&state) {
+                    last_accepting = (scanned, state.clone(), line, character);
                 }
             }
 
@@ -76,7 +74,7 @@ impl Scanner for MaximalMunchScanner {
                 });
             }
 
-            let accept_as = dfa.tokenize(end_state).unwrap();
+            let accept_as = dfa.tokenize(&end_state).unwrap();
             if accept_as != DEF_MATCHER.to_string() {
                 let token = Token {
                     kind: accept_as,

@@ -7,6 +7,7 @@ use std::fmt;
 use core::scan;
 use core::scan::DFA;
 use core::scan::Scanner;
+use core::scan::State;
 use core::parse;
 use core::parse::Grammar;
 use core::parse::Parser;
@@ -16,10 +17,10 @@ use core::spec;
 mod core;
 
 pub struct FormatJobRunner {
-    dfa: DFA,
+    dfa: DFA<State>,
     grammar: Grammar,
     formatter: Formatter,
-    scanner: Box<Scanner>,
+    scanner: Box<Scanner<State>>,
     parser: Box<Parser>,
 }
 
