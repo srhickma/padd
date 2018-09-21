@@ -1,7 +1,7 @@
-use std::collections::HashMap;
 use std::collections::HashSet;
+use std::collections::HashMap;
 use core::data::stream::ReadDrivenStream;
-use std::iter::Peekable;
+use core::data::map::CEHashMap;
 use std::error;
 use std::fmt;
 
@@ -16,7 +16,7 @@ pub trait CDFA<State, Token> {
 pub struct EncodedCDFA {
     alphabet: HashedAlphabet,
     accepting: HashSet<usize>,
-    t_delta: CEHashMap<StateDelta>,
+    t_delta: CEHashMap<TransitionTrie>,
     def_delta: CEHashMap<usize>,
     tokenizer: CEHashMap<usize>,
     start: usize,
@@ -24,14 +24,9 @@ pub struct EncodedCDFA {
 
 impl CDFA<usize, usize> for EncodedCDFA {
     fn transition(&self, state: &usize, stream: &mut ReadDrivenStream<char>) -> Option<usize> {
-        //TODO need to account for partial states here
         match self.t_delta.get(*state) {
             None => None,
-            Some(state_delta) => {
-                let res: Option<usize> = state_delta.transition(stream.pull().unwrap());
-                stream.consume();
-                res
-            }
+            Some(t_trie) => t_trie.transition(stream)
         }
     }
 
@@ -59,76 +54,206 @@ impl CDFA<usize, usize> for EncodedCDFA {
 }
 
 
-struct PartialStateChain {
-    chain_nfa: ChainNFA
-}
-
-impl PartialStateChain {
-    fn build() {}
-
-    fn begin(&mut self) -> &ChainNFA {
-        self.chain_nfa.cursor = 1;
-        &self.chain_nfa
-    }
-}
-
-struct ChainNFA {
-    chain: Vec<char>,
-    cursor: usize,
-    dest: usize,
-    default: usize,
-}
-
-impl ChainNFA {
-    fn transistion(&mut self, c: char) -> (usize, bool) { //TODO returning a bool is a bit hacky
-        //if self.chain
-        //if self.chain.get(cursor)
-        (0, false)
-    }
-}
-
-
-struct StateDelta {
-    c_delta: HashMap<char, usize>,
+struct TransitionTrie {
+    root: TransitionNode,
     default: Option<usize>,
 }
 
-impl Default for StateDelta {
-    fn default() -> StateDelta { StateDelta::new() }
-}
-
-
-impl StateDelta {
-    fn new() -> StateDelta {
-        return StateDelta {
-            c_delta: HashMap::new(),
+impl TransitionTrie {
+    fn new() -> TransitionTrie {
+        TransitionTrie {
+            root: TransitionNode {
+                children: HashMap::new(),
+                dest: 0,
+            },
             default: None,
-        };
-    }
-
-    fn transition(&self, c: char) -> Option<usize> {
-        match self.c_delta.get(&c) {
-            None => self.default,
-            Some(dest) => Some(*dest)
         }
     }
 
-    fn mark_trans(&mut self, c: char, dest: usize) {
-        self.c_delta.insert(c, dest);
+    fn transition(&self, stream: &mut ReadDrivenStream<char>) -> Option<usize> {
+        let mut curr: &TransitionNode = &self.root;
+        while !curr.leaf() {
+            curr = match stream.pull() {
+                None => return None,
+                Some(c) => match curr.get_child(c) {
+                    None => match self.default {
+                        None => return None,
+                        Some(state) => {
+                            stream.replay().advance().consume();
+                            return Some(state);
+                        }
+                    }
+                    Some(child) => child
+                }
+            }
+        }
+
+        stream.consume();
+        Some(curr.dest)
     }
 
-    fn mark_def(&mut self, dest: usize) {
-        self.default = Some(dest);
+    fn insert(&mut self, c: char, dest: usize) {
+        TransitionTrie::insert_internal(c, &mut self.root, true, dest);
     }
 
-    fn has_trans(&self, c: char) -> bool {
-        self.c_delta.contains_key(&c)
+    fn insert_chain(&mut self, chars: &Vec<char>, dest: usize) {
+        TransitionTrie::insert_chain_internal(0, &mut self.root, chars, dest);
     }
 
-    fn has_def(&self) -> bool {
-        self.default.is_some()
+    fn insert_chain_internal(i: usize, node: &mut TransitionNode, chars: &Vec<char>, dest: usize) {
+        if i == chars.len() {
+            return
+        }
+
+        let c = chars[i];
+        TransitionTrie::insert_internal(c, node, i == chars.len() - 1, dest);
+        TransitionTrie::insert_chain_internal(i + 1, node.get_child_mut(c).unwrap(), chars, dest);
+    }
+
+    fn insert_internal(c: char, node: &mut TransitionNode, last: bool, dest: usize) {
+        if !node.has_child(c) {
+            let child = TransitionNode {
+                children: HashMap::new(),
+                dest: if last { dest } else { 0 },
+            };
+            node.add_child(c, child);
+        } else if last {
+            //TODO throw error here (trie is not prefix free)
+        }
+    }
+
+    fn set_default(&mut self, default: usize) {
+        //TODO throw error if default is not None (already set)
+        self.default = Some(default);
     }
 }
+
+impl Default for TransitionTrie {
+    fn default() -> TransitionTrie { TransitionTrie::new() }
+}
+
+struct TransitionNode {
+    children: HashMap<char, TransitionNode>,
+    dest: usize,
+}
+
+impl TransitionNode {
+    fn leaf(&self) -> bool {
+        self.children.is_empty()
+    }
+
+    fn get_child(&self, c: char) -> Option<&TransitionNode> {
+        self.children.get(&c)
+    }
+
+    fn get_child_mut(&mut self, c: char) -> Option<&mut TransitionNode> {
+        self.children.get_mut(&c)
+    }
+
+    fn has_child(&self, c: char) -> bool {
+        self.children.contains_key(&c)
+    }
+
+    fn add_child(&mut self, c: char, child: TransitionNode) {
+        self.children.insert(c, child);
+    }
+}
+
+
+//trait Transition<State> {
+//    fn follow(&self, stream: &mut ReadDrivenStream<char>) -> State;
+//}
+//
+//struct SimplexTransition {
+//    dest: usize
+//}
+//
+//impl Transition<usize> for SimplexTransition {
+//    fn follow(&self, stream: &mut ReadDrivenStream<char>) -> usize {
+//        stream.consume();
+//        self.dest
+//    }
+//}
+//
+//struct ChainTreeTransition {
+//
+//}
+//
+//impl Transition<usize> for ChainTreeTransition {
+//    fn follow(&self, stream: &mut ReadDrivenStream<char>) -> usize {
+//
+//    }
+//}
+
+
+//struct PartialStateChain {
+//    chain_nfa: ChainNFA
+//}
+//
+//impl PartialStateChain {
+//    fn build() {}
+//
+//    fn begin(&mut self) -> &ChainNFA {
+//        self.chain_nfa.cursor = 1;
+//        &self.chain_nfa
+//    }
+//}
+//
+//struct ChainNFA {
+//    chain: Vec<char>,
+//    cursor: usize,
+//    dest: usize,
+//    default: usize,
+//}
+//
+//impl ChainNFA {
+//    fn transistion(&mut self, c: char) -> (usize, bool) { //TODO returning a bool is a bit hacky
+//        (0, false)
+//    }
+//}
+//
+//
+//struct StateDelta {
+//    c_delta: HashMap<char, usize>,
+//    default: Option<usize>,
+//}
+//
+//impl Default for StateDelta {
+//    fn default() -> StateDelta { StateDelta::new() }
+//}
+//
+//
+//impl StateDelta {
+//    fn new() -> StateDelta {
+//        return StateDelta {
+//            c_delta: HashMap::new(),
+//            default: None,
+//        };
+//    }
+//
+//    fn transition(&self, c: char) -> Option<usize> {
+//        match self.c_delta.get(&c) {
+//            None => self.default,
+//            Some(dest) => Some(*dest)
+//        }
+//    }
+//
+//    fn mark_trans(&mut self, c: char, dest: usize) {
+//        self.c_delta.insert(c, dest);
+//    }
+//
+//    fn mark_def(&mut self, dest: usize) {
+//        self.default = Some(dest);
+//    }
+//
+//    fn has_trans(&self, c: char) -> bool {
+//        self.c_delta.contains_key(&c)
+//    }
+//
+//    fn has_def(&self) -> bool {
+//        self.default.is_some()
+//    }
+//}
 
 
 pub trait CDFABuilder<State, Token, Impl: CDFA<State, Token>> {
@@ -154,28 +279,5 @@ struct HashedAlphabet {
 impl Alphabet for HashedAlphabet {
     fn contains(&self, c: char) -> bool {
         self.alphabet.contains(&c)
-    }
-}
-
-
-//Continuously encoded hash map
-struct CEHashMap<V: Default> {
-    vector: Vec<V>
-}
-
-impl<V: Default> CEHashMap<V> {
-    fn insert(&mut self, key: usize, value: V) {
-        while self.vector.len() <= key {
-            self.vector.push(V::default());
-        }
-        self.vector.insert(key, value)
-    }
-
-    fn get(&self, key: usize) -> Option<&V> {
-        self.vector.get(key)
-    }
-
-    fn contains(&self, key: usize) -> bool {
-        self.get(key).is_some()
     }
 }
