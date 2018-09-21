@@ -1,13 +1,14 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::collections::LinkedList;
+use std::collections::linked_list::Iter;
 use std::iter::Peekable;
 use std::error;
 use std::fmt;
 
 pub trait CDFA<State, Token> {
-    fn transition(&self, state: &State, stream: &mut Peekable<impl Iterator<Item=char>>) -> Option<State>;
-    fn has_transition(&self, state: &State, stream: &mut Peekable<impl Iterator<Item=char>>) -> bool;
+    fn transition(&self, state: &State, stream: &mut ReadDrivenStream<char>) -> Option<State>;
+    fn has_transition(&self, state: &State, stream: &mut ReadDrivenStream<char>) -> bool;
     fn accepts(&self, state: &State) -> bool;
     fn tokenize(&self, state: &State) -> Option<Token>;
     fn start(&self) -> State;
@@ -23,16 +24,23 @@ pub struct EncodedCDFA {
 }
 
 impl CDFA<usize, usize> for EncodedCDFA {
-    fn transition(&self, state: &usize, stream: &mut Peekable<impl Iterator<Item=char>>) -> Option<usize> {
+    fn transition(&self, state: &usize, stream: &mut ReadDrivenStream<char>) -> Option<usize> {
         //TODO need to account for partial states here
         match self.t_delta.get(*state) {
             None => None,
-            Some(state_delta) => state_delta.transition(stream.peek().unwrap())
+            Some(state_delta) => {
+                let res: Option<usize> = state_delta.transition(stream.pull().unwrap());
+                stream.consume();
+                res
+            }
         }
     }
 
-    fn has_transition(&self, state: &usize, stream: &mut Peekable<impl Iterator<Item=char>>) -> bool {
-        self.transition(state, stream).is_some()
+    fn has_transition(&self, state: &usize, stream: &mut ReadDrivenStream<char>) -> bool {
+        stream.block();
+        let res = self.transition(state, stream).is_some();
+        stream.unblock();
+        res
     }
 
     fn accepts(&self, state: &usize) -> bool {
@@ -99,8 +107,8 @@ impl StateDelta {
         };
     }
 
-    fn transition(&self, c: &char) -> Option<usize> {
-        match self.c_delta.get(c) {
+    fn transition(&self, c: char) -> Option<usize> {
+        match self.c_delta.get(&c) {
             None => self.default,
             Some(dest) => Some(*dest)
         }
@@ -174,15 +182,60 @@ impl<V: Default> CEHashMap<V> {
 }
 
 
-pub struct InputStream {
-    buffer_queue: LinkedList<char>,
-    consumer: fn(char),
+//TODO separate into its own data type file with tests
+pub struct ReadDrivenStream<T: Clone> {
+    incoming_buffer: LinkedList<T>,
+    outgoing_buffer: LinkedList<T>,
+    getter: fn() -> Option<T>,
+    block: bool,
 }
 
-impl InputStream {
-    fn write(&mut self, c: char) {
-        self.buffer_queue.push_front(c);
+impl<T: Clone> ReadDrivenStream<T> {
+    fn observe(getter: fn() -> Option<T>) -> ReadDrivenStream<T> {
+        ReadDrivenStream {
+            incoming_buffer: LinkedList::new(),
+            outgoing_buffer: LinkedList::new(),
+            getter,
+            block: false,
+        }
     }
 
-    fn
+    fn pull(&mut self) -> Option<T> {
+        let val: T = match self.incoming_buffer.pop_back() {
+            None => match (self.getter)() {
+                None => { return None; }
+                Some(val) => val
+            },
+            Some(val) => val
+        };
+
+        self.outgoing_buffer.push_back(val.clone());
+
+        Some(val)
+    }
+
+    fn replay(&mut self) {
+        let mut val: Option<T> = self.outgoing_buffer.pop_front();
+        while val.is_some() {
+            self.incoming_buffer.push_back(val.unwrap());
+            val = self.outgoing_buffer.pop_front();
+        }
+    }
+
+    fn consume(&mut self) {
+        if self.block {
+            self.replay();
+            self.block = false;
+        } else {
+            self.outgoing_buffer.clear();
+        }
+    }
+
+    fn block(&mut self) {
+        self.block = true;
+    }
+
+    fn unblock(&mut self) {
+        self.block = false;
+    }
 }
