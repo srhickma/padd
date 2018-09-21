@@ -5,6 +5,7 @@ use std::cmp::PartialEq;
 use std::clone::Clone;
 use core::spec::DEF_MATCHER;
 
+pub mod cdfa;
 pub mod maximal_munch;
 
 pub trait Scanner<State: PartialEq + Clone> {
