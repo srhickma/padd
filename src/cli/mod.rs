@@ -132,11 +132,11 @@ fn load_spec(spec_path: &String) -> Result<FormatJobRunner, padd::BuildError> {
             match spec_file.unwrap().read_to_string(&mut spec) {
                 Ok(_) => {},
                 Err(e) => {
-                    error(format!("Could't read specification file \"{}\": {}", &spec_path, e));
+                    error(format!("Could not read specification file \"{}\": {}", &spec_path, e));
                 },
             }
         },
-        Err(e) => error(format!("Could't find specification file \"{}\": {}", &spec_path, e)),
+        Err(e) => error(format!("Could not find specification file \"{}\": {}", &spec_path, e)),
     }
 
     FormatJobRunner::build(&spec)
@@ -178,7 +178,7 @@ fn format_file_internal(target_path: &Path, fjr: &FormatJobRunner) -> bool {
             match target.read_to_string(&mut input) {
                 Ok(_) => {},
                 Err(e) => {
-                    println!("Could't read target file \"{}\": {}", &target_path.to_string_lossy(), e);
+                    println!("Could not read target file \"{}\": {}", &target_path.to_string_lossy(), e);
                     return false;
                 },
             }
@@ -188,14 +188,21 @@ fn format_file_internal(target_path: &Path, fjr: &FormatJobRunner) -> bool {
                     match target.seek(SeekFrom::Start(0)) {
                         Ok(_) => {},
                         Err(e) => {
-                            println!("Couldn't seek to start of target file \"{}\": {}", &target_path.to_string_lossy(), e);
+                            println!("Could not seek to start of target file \"{}\": {}", &target_path.to_string_lossy(), e);
+                            return false;
+                        },
+                    }
+                    match target.set_len(0) {
+                        Ok(_) => {},
+                        Err(e) => {
+                            println!("Could not clear target file \"{}\": {}", &target_path.to_string_lossy(), e);
                             return false;
                         },
                     }
                     match target.write_all(res.as_bytes()) {
                         Ok(_) => {println!("OK")},
                         Err(e) => {
-                            println!("Couldn't write to target file \"{}\": {}", &target_path.to_string_lossy(), e);
+                            println!("Could not write to target file \"{}\": {}", &target_path.to_string_lossy(), e);
                             return false;
                         },
                     }
@@ -207,7 +214,7 @@ fn format_file_internal(target_path: &Path, fjr: &FormatJobRunner) -> bool {
             }
         },
         Err(e) => {
-            println!("Could't find target file \"{}\": {}", &target_path.to_string_lossy(), e);
+            println!("Could not find target file \"{}\": {}", &target_path.to_string_lossy(), e);
             return false;
         },
     }
