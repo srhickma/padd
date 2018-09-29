@@ -876,7 +876,7 @@ s ->;
         let parse = tree.unwrap();
         let (cdfa, _, _) = generate_spec(&parse).unwrap();
 
-        //execute
+        //exercise
         let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
 
         //verify
@@ -911,15 +911,21 @@ ids
     -> ID;
         ";
 
-        let input = "a ababab _abab ab_abba_";
+        let input = "a ababab _abab ab_abba_".to_string();
+        let mut iter = input.chars();
+        let mut getter = || {
+            iter.next()
+        };
+        let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
 
-        let scanner = def_scanner();
+        let scanner = runtime::def_scanner();
+
         let tree = parse_spec(spec);
         let parse = tree.unwrap();
-        let (dfa, _, _) = generate_spec(&parse).unwrap();
+        let (cdfa, _, _) = generate_spec(&parse).unwrap();
 
-        //execute
-        let tokens = scanner.scan(input, &dfa).unwrap();
+        //exercise
+        let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
 
         //verify
         let mut res_string = String::new();
