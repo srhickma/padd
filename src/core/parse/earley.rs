@@ -136,16 +136,6 @@ impl Parser for EarleyParser {
                     && item.start == 0)
         }
 
-//        println!("-----------------------------------------------------");
-//        for i in 0..chart.len() {
-//            println!("SET {}", i);
-//            for j in 0..chart[i].len() {
-//                println!("{}", chart[i][j].to_string());
-//            }
-//            println!();
-//        }
-//        println!("-----------------------------------------------------");
-
         return if recognized(grammar, &chart) {
             if i - 1 == scan.len() {
                 Ok(parse_tree(grammar, &scan, parse_chart))
