@@ -78,41 +78,40 @@ impl<'a, 'g: 'a, T: 'g + 'a + Clone> Stream<'a, 'g, T> {
         }
     }
 
-    pub fn consumer<'s>(&'s mut self) -> StreamConsumer<'s, 'a, 'g, T> {
+    pub fn detach_front(&mut self) {
+        unsafe {
+            (&mut *self.source).detach_front()
+        }
+    }
+
+    pub fn detach_back(&mut self) -> Option<Self> {
+        unsafe {
+            (&mut *self.source).detach_back()
+        }
+    }
+
+    pub fn consumer<'s>(&'s mut self, on_consume: Box<FnMut(&LinkedList<T>) + 's>) -> StreamConsumer<'s, 'a, 'g, T> {
         StreamConsumer {
             stream: self,
-            on_consume: Box::new(|_| {}),
+            on_consume,
             block: false
         }
     }
-}
-
-pub struct StreamConsumer<'s, 'a: 's, 'g: 'a + 's, T: 'g + 'a + 's + Clone> {
-    stream: &'s mut Stream<'a, 'g, T>,
-    on_consume: Box<FnMut(&LinkedList<T>)>,
-    block: bool,
-}
-
-impl<'s, 'a: 's, 'g: 'a + 's, T: 'g + 'a + 's + Clone> StreamConsumer<'s, 'a, 'g, T> {
-    pub fn on_consume(&mut self, on_consume: Box<FnMut(&LinkedList<T>)>) -> &mut Self {
-        self.on_consume = on_consume;
-        self
-    }
 
     pub fn has_next(&mut self) -> bool {
-        if self.stream.buffer.incoming_buffer.is_empty() {
+        if self.buffer.incoming_buffer.is_empty() {
             self.source_pull();
-            !self.stream.buffer.incoming_buffer.is_empty()
+            !self.buffer.incoming_buffer.is_empty()
         } else {
             true
         }
     }
 
     pub fn pull(&mut self) -> Option<T> {
-        let val: T = match self.stream.buffer.incoming_buffer.pop_back() {
+        let val: T = match self.buffer.incoming_buffer.pop_back() {
             None => {
                 self.source_pull();
-                match self.stream.buffer.incoming_buffer.pop_back() {
+                match self.buffer.incoming_buffer.pop_back() {
                     None => return None,
                     Some(val) => val
                 }
@@ -120,25 +119,46 @@ impl<'s, 'a: 's, 'g: 'a + 's, T: 'g + 'a + 's + Clone> StreamConsumer<'s, 'a, 'g
             Some(val) => val
         };
 
-        self.stream.buffer.outgoing_buffer.push_back(val.clone());
+        self.buffer.outgoing_buffer.push_back(val.clone());
 
         Some(val)
     }
 
     fn source_pull(&mut self) {
         unsafe {
-            (&mut *self.stream.source).pull()
+            (&mut *self.source).pull()
         }
     }
 
     pub fn advance(&mut self) -> &mut Self {
-        match self.stream.buffer.incoming_buffer.pop_back() {
+        match self.buffer.incoming_buffer.pop_back() {
             None => self,
             Some(val) => {
-                self.stream.buffer.outgoing_buffer.push_back(val.clone());
+                self.buffer.outgoing_buffer.push_back(val.clone());
                 self
             }
         }
+    }
+}
+
+pub struct StreamConsumer<'s, 'a: 's, 'g: 'a + 's, T: 'g + 'a + 's + Clone> {
+    stream: &'s mut Stream<'a, 'g, T>,
+    on_consume: Box<FnMut(&LinkedList<T>) + 's>,
+    block: bool,
+}
+
+impl<'s, 'a: 's, 'g: 'a + 's, T: 'g + 'a + 's + Clone> StreamConsumer<'s, 'a, 'g, T> {
+    pub fn has_next(&mut self) -> bool {
+        self.stream.has_next()
+    }
+
+    pub fn pull(&mut self) -> Option<T> {
+        self.stream.pull()
+    }
+
+    pub fn advance(&mut self) -> &mut Self {
+        self.stream.advance();
+        self
     }
 
     pub fn replay(&mut self) -> &mut Self {
