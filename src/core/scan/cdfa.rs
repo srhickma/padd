@@ -1,13 +1,13 @@
 use std::collections::HashSet;
 use std::collections::HashMap;
-use core::data::stream::ReadDrivenStream;
+use core::data::stream::StreamConsumer;
 use core::data::map::CEHashMap;
 use std::error;
 use std::fmt;
 
 pub trait CDFA<State, Token> {
-    fn transition(&self, state: &State, stream: &mut ReadDrivenStream<char>) -> Option<State>;
-    fn has_transition(&self, state: &State, stream: &mut ReadDrivenStream<char>) -> bool;
+    fn transition(&self, state: &State, stream: &mut StreamConsumer<char>) -> Option<State>;
+    fn has_transition(&self, state: &State, stream: &mut StreamConsumer<char>) -> bool;
     fn accepts(&self, state: &State) -> bool;
     fn tokenize(&self, state: &State) -> Option<Token>;
     fn start(&self) -> State;
@@ -23,14 +23,14 @@ pub struct EncodedCDFA {
 }
 
 impl CDFA<usize, usize> for EncodedCDFA {
-    fn transition(&self, state: &usize, stream: &mut ReadDrivenStream<char>) -> Option<usize> {
+    fn transition(&self, state: &usize, stream: &mut StreamConsumer<char>) -> Option<usize> {
         match self.t_delta.get(*state) {
             None => None,
             Some(t_trie) => t_trie.transition(stream)
         }
     }
 
-    fn has_transition(&self, state: &usize, stream: &mut ReadDrivenStream<char>) -> bool {
+    fn has_transition(&self, state: &usize, stream: &mut StreamConsumer<char>) -> bool {
         stream.block();
         let res = self.transition(state, stream).is_some();
         stream.unblock();
@@ -70,7 +70,7 @@ impl TransitionTrie {
         }
     }
 
-    fn transition(&self, stream: &mut ReadDrivenStream<char>) -> Option<usize> {
+    fn transition(&self, stream: &mut StreamConsumer<char>) -> Option<usize> {
         let mut curr: &TransitionNode = &self.root;
         while !curr.leaf() {
             curr = match stream.pull() {
