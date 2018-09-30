@@ -1,5 +1,5 @@
 # SIGMA
-'<>=+-_*/\\%(){}[],.;:#!?^@&|"\'~ \t\nABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+'<>=+-_*/\\%(){}[],.;:#!?^$@&|"\'`~ \t\nABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
 
 #----------------------------------------------------------------------------------------------------------------------#
 # CDFA                                                                                                                 #
@@ -31,7 +31,7 @@ start
     '/' -> slash
     '~' -> ^COMP
     '&' -> and
-    '^' -> ^OR_BE
+    '^' -> hat
     '|' -> or
     '?' -> ^QST
     '.' -> dot
@@ -40,7 +40,7 @@ start
     '"' -> string
     '\'' -> char
     '0' -> zero
-    'true' | 'false' | 'null' -> ^LIT
+    'true' | 'false' | 'null' -> char_lit
     '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' -> num
 
     # KEYWORDS
@@ -60,16 +60,14 @@ start
     'else' -> ^ELSE
     'enum' -> ^ENUM
     'extends' -> ^EXTENDS
-    'final' -> ^FINAL
-    'finally' -> ^FINALLY
+    'final' -> final
     'float' -> ^PRIM
     'for' -> ^FOR
     'if' -> ^IF
     'implements' -> ^IMPLEMENTS
     'import' -> ^IMPORT
-    'instanceof' -> ^CMP_REL
-    'int' -> ^PRIM
-    'interface' -> ^INTERFACE
+    'instanceof' -> ^INSTANCEOF
+    'int' -> int
     'long' -> ^PRIM
     'native' -> ^MOD
     'new' -> ^NEW
@@ -83,10 +81,9 @@ start
     'strictfp' -> ^MOD
     'super' -> ^SUPER
     'switch' -> ^SWITCH
-    'synchronized' -> ^MOD
+    'synchronized' -> ^SYNCHRONIZED
     'this' -> ^THIS
-    'throw' -> ^THROW
-    'throws' -> ^THROWS
+    'throw' -> throw
     'transient' -> ^MOD
     'try' -> ^TRY
     'void' -> ^VOID
@@ -95,7 +92,7 @@ start
 
     # MISC
     ' ' | '\t' | '\n' -> ws
-    '#' -> fail
+    '#' | '$' | '`' -> fail
     _ -> id;
 
 #
@@ -109,9 +106,11 @@ not     ^NOT
     '=' -> ^CMP_EQ;
 
 lt      ^LT
+    '<=' -> ^ASSN
     '=' -> ^CMP_REL;
 
 gt      ^GT
+    '>=' | '>>=' -> ^ASSN
     '=' -> ^CMP_REL;
 
 plus    ^PLUS
@@ -123,61 +122,82 @@ minus   ^MINUS
     '-' -> ^DEC
     '=' -> ^ASSN;
 
-star    ^OP_MULT
+star    ^STAR
     '=' -> ^ASSN;
 
-pct     ^OP_MULT
+pct     ^PCT
     '=' -> ^ASSN;
 
-slash   ^OP_MULT
+slash   ^SLASH
     '/' -> lcom
     '*' -> bcom
     '=' -> ^ASSN;
 
 and     ^AND
+    '=' -> ^ASSN
     '&' -> ^AND_L;
 
 or      ^OR_BI
+    '=' -> ^ASSN
     '|' -> ^OR_L;
 
 dot     ^DOT
     '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' -> float
     '..' -> ^TRIDOT;
 
+hat     ^OR_BE
+    '=' -> ^ASSN;
+
 #
 # LITERALS
 #
 
+char_lit    ^LIT
+    '\'' | '"' | '.' | '?' | '|' | '^' | '&' | '~' | '/' | '%' | '*' | '-' | '+' | '!' | '>' | '<' | '=' | '@' | ':'
+        | ';' | ',' | ']' | '[' | ')' | '(' | '}' | '{' | ' ' | '\t' | '\n' | '#' | '\\' | '$' | '`' -> fail
+    _ -> id;
+
 string
     '"' -> ^LIT
-    '\\"' -> string
+    '\\' -> string_esc
     _ -> string;
 
-char    # ignoring length
+string_esc
+    _ -> string;
+
+char
     '\'' -> ^LIT
+    '\\' -> char_esc
+    _ -> char;
+
+char_esc
     _ -> char;
 
 zero    ^LIT
+    '0' -> zero
     'x' | 'X' -> hex
     'b' | 'B' -> bin
     '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' -> oct
+    '.' -> float
     'e' | 'E' -> floatexp
-    'f' | 'd' | 'F' | 'D' -> ^LIT;
+    'f' | 'd' | 'F' | 'D' | 'L' -> ^LIT;
 
 num     ^LIT
     '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '_' -> num
     '.' -> float
     'e' | 'E' -> floatexp
-    'f' | 'd' | 'F' | 'D' -> ^LIT;
+    'f' | 'd' | 'F' | 'D' | 'L' -> ^LIT;
 
 bin  ^LIT
     '0' | '1' | '_' -> bin;
 
 hex     ^LIT
+    'L' -> ^LIT
     '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | 'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'A' | 'B' | 'C'
         | 'D' | 'E' | 'F' | '_' -> hex;
 
 oct   ^LIT
+    'L' -> ^LIT
     '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '_' -> oct;
 
 float   ^LIT
@@ -193,13 +213,31 @@ floatexp
 # MISC
 #
 
+throw   ^THROW
+    's' -> ^THROWS
+    '\'' | '"' | '.' | '?' | '|' | '^' | '&' | '~' | '/' | '%' | '*' | '-' | '+' | '!' | '>' | '<' | '=' | '@' | ':'
+        | ';' | ',' | ']' | '[' | ')' | '(' | '}' | '{' | ' ' | '\t' | '\n' | '#' | '\\' | '$' | '`' -> fail
+    _ -> id;
+
+int     ^PRIM
+    'erface' -> ^INTERFACE
+    '\'' | '"' | '.' | '?' | '|' | '^' | '&' | '~' | '/' | '%' | '*' | '-' | '+' | '!' | '>' | '<' | '=' | '@' | ':'
+        | ';' | ',' | ']' | '[' | ')' | '(' | '}' | '{' | ' ' | '\t' | '\n' | '#' | '\\' | '$' | '`' -> fail
+    _ -> id;
+
+final   ^FINAL
+    'ly' -> ^FINALLY
+    '\'' | '"' | '.' | '?' | '|' | '^' | '&' | '~' | '/' | '%' | '*' | '-' | '+' | '!' | '>' | '<' | '=' | '@' | ':'
+        | ';' | ',' | ']' | '[' | ')' | '(' | '}' | '{' | ' ' | '\t' | '\n' | '#' | '\\' | '$' | '`' -> fail
+    _ -> id;
+
 colon   ^COLON
     ':' -> ^M_REF;
 
 ws      ^_
     ' ' | '\t' | '\n' -> ws;
 
-lcom ^_
+lcom    ^_
     '\n' -> fail
     _ -> lcom;
 
@@ -207,11 +245,16 @@ bcom
     '*/' -> bcomm # TODO get rid of this after introducing comments
     _ -> bcom;
 
-bcomm ^_; # TODO get rid of this after introducing comments
+bcomm   ^_; # TODO get rid of this after introducing comments
 
-id | MOD | ASSERT | PRIM | BREAK | CASE | CATCH | ENUM | CLASS | CONTINUE | DEFAULT | DO | ELSE | EXTENDS | FINAL
-    | FINALLY | FOR | IF | IMPLEMENTS | IMPORT | CMP_REL | INTERFACE | NEW | PACKAGE | RETURN | SUPER | SWITCH | THIS
-    | THROW | THROWS | TRY | VOID | WHILE   ^ID
+MOD | ASSERT | PRIM | BREAK | CASE | CATCH | ENUM | CLASS | CONTINUE | DEFAULT | DO | ELSE | EXTENDS | FINALLY | FOR
+    | IF | IMPLEMENTS | IMPORT | INSTANCEOF | NEW | PACKAGE | RETURN | SUPER | SWITCH | THIS | THROWS | TRY | VOID | WHILE
+    | INTERFACE | SYNCHRONIZED | STATIC
+    '\'' | '"' | '.' | '?' | '|' | '^' | '&' | '~' | '/' | '%' | '*' | '-' | '+' | '!' | '>' | '<' | '=' | '@' | ':'
+         | ';' | ',' | ']' | '[' | ')' | '(' | '}' | '{' | ' ' | '\t' | '\n' | '#' | '\\' | '$' | '`' -> fail
+     _ -> id;
+
+id      ^ID
     'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' | 'h' | 'i' | 'j' | 'k' | 'l' | 'm' | 'n' | 'o' | 'p' | 'q' | 'r' | 's'
         | 't' | 'u' | 'v' | 'w' | 'x' | 'y' | 'z' | 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H' | 'I' | 'J' | 'K'
         | 'L' | 'M' | 'N' | 'O' | 'P' | 'Q' | 'R' | 'S' | 'T' | 'U' | 'V' | 'W' | 'X' | 'Y' | 'Z' | '$' | '_' | '0'
@@ -294,6 +337,8 @@ class_member_dec
     -> method_dec
     -> class_dec
     -> interface_dec
+    -> enum_dec
+    -> annotation_dec
     -> SEMI;
 
 constructor_dec
@@ -316,7 +361,7 @@ argument_list_opt
     -> argument_list
     ->;
 argument_list
-    -> expr COMMA expr
+    -> expr COMMA argument_list
     -> expr;
 
 field_dec
@@ -382,11 +427,11 @@ enum_body
     -> LBRACE enum_const_list_opt comma_opt enum_body_declarations_opt RBRACE;
 
 enum_const_list_opt
-    -> enum_constant_list
+    -> enum_const_list
     ->;
 enum_const_list
-    -> enum_constant COMMA enum_constant_list
-    -> enum_constant;
+    -> enum_const COMMA enum_const_list
+    -> enum_const;
 enum_const
     -> annotations_opt ID enum_const_arg_list_opt class_body_opt;
 enum_const_arg_list_opt
@@ -467,9 +512,9 @@ type_bound_opt
     ->;
 type_bound
     -> EXTENDS type_variable
-    -> EXTENDS class_type AND additional_bounds_opt;
+    -> EXTENDS class_type additional_bounds_opt;
 additional_bounds_opt
-    -> additional_bounds
+    -> AND additional_bounds
     ->;
 additional_bounds
     -> class_type AND additional_bounds
@@ -493,6 +538,9 @@ type
 typename
     -> typename DOT ID
     -> ID;
+
+array_type
+    -> non_array_type array_dims;
 
 non_array_type
     -> class_type
@@ -585,6 +633,10 @@ id_chain
     -> ID DOT id_chain
     -> ID;
 
+id_list
+    -> ID COMMA id_list
+    -> ID;
+
 comma_opt
     -> COMMA
     ->;
@@ -605,7 +657,7 @@ variable_initializers_opt
     -> variable_initializers
     ->;
 variable_initializers
-    -> variable_initializer COMMA variable_initializer
+    -> variable_initializer COMMA variable_initializers
     -> variable_initializer;
 variable_initializer_opt
     -> ASSN variable_initializer # should really just be equals
@@ -734,14 +786,14 @@ try_statement
     -> try_with_resources_statement;
 
 try_with_resources_statement
-    -> TRY resource_specification block catches_opt finally_opt;
+    -> TRY resources_specification block catches_opt finally_opt;
 resources_specification
     -> LPAREN resources semi_opt RPAREN;
 resources
     -> resource SEMI resources
     -> resource;
 resource
-    -> modifiers_opt unnan_type variable_declarator_id ASSN expr;
+    -> modifiers_opt type variable_declarator_id ASSN expr;
 
 finally_opt
     -> finally
@@ -818,7 +870,12 @@ lhs
     -> array_access;
 
 lambda_expr
-    -> lambda_params ARROW lambda_body;
+    -> lambda_parameters ARROW lambda_body;
+
+lambda_parameters
+    -> ID
+    -> LPAREN formal_parameter_list_opt RPAREN
+    -> LPAREN id_list RPAREN;
 
 lambda_body
     -> expr
@@ -857,7 +914,8 @@ relational_expr
     -> shift_expr
     -> relational_expr CMP_REL shift_expr
     -> relational_expr LT shift_expr
-    -> relational_expr GT shift_expr;
+    -> relational_expr GT shift_expr
+    -> relational_expr INSTANCEOF type;
 
 shift_expr
     -> additive_expr
@@ -872,7 +930,9 @@ additive_expr
 
 multiplicative_expr
     -> unary_expr
-    -> multiplicative_expr OP_MULT unary_expr;
+    -> multiplicative_expr STAR unary_expr
+    -> multiplicative_expr PCT unary_expr
+    -> multiplicative_expr SLASH unary_expr;
 
 unary_expr
     -> INC unary_expr
@@ -984,5 +1044,7 @@ modifiers
 modifier
     -> annotation
     -> MOD
+    -> SYNCHRONIZED
     -> STATIC
-    -> FINAL;
+    -> FINAL
+    -> DEFAULT;
