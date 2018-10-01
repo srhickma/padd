@@ -1,9 +1,112 @@
 use std::collections::HashSet;
 use std::collections::HashMap;
-use core::data::stream::StreamConsumer;
-use core::data::map::CEHashMap;
 use std::error;
 use std::fmt;
+use std::usize;
+use core::data::stream::StreamConsumer;
+use core::data::map::CEHashMap;
+
+pub trait CDFABuilder<State, Token> {
+    fn new() -> Self;
+
+    fn set_alphabet(&mut self, chars: impl Iterator<Item=char>);
+    fn mark_start(&mut self, state: &State);
+    fn mark_trans(&mut self, from: &State, to: &State, on: char);
+    fn mark_chain(&mut self, from: &State, to: &State, on: impl Iterator<Item=char>);
+    fn mark_def(&mut self, from: &State, to: &State);
+    fn mark_token(&mut self, state: &State, token: &Token);
+}
+
+pub struct EncodedCDFABuilder {
+    encoder: HashMap<String, usize>,
+    decoder: Vec<String>,
+
+    alphabet: HashedAlphabet,
+    accepting: HashSet<usize>,
+    t_delta: CEHashMap<TransitionTrie>,
+    def_delta: CEHashMap<usize>,
+    tokenizer: CEHashMap<usize>,
+    start: usize,
+}
+
+impl EncodedCDFABuilder {
+    fn encode(&mut self, val: &String) -> usize {
+        if self.encoder.contains_key(val) {
+            *self.encoder.get(val).unwrap()
+        } else {
+            let key = self.decoder.len();
+            self.decoder.push(val.clone());
+            self.encoder.insert(val.clone(), key);
+            key
+        }
+    }
+
+    fn decode(&self, key: usize) -> String {
+        self.decoder[key].clone()
+    }
+
+    fn get_transition_trie(&mut self, from: usize) -> &mut TransitionTrie {
+        if !self.t_delta.contains(from) {
+            self.t_delta.insert(from, TransitionTrie::new());
+        }
+        self.t_delta.get_mut(from).unwrap()
+    }
+}
+
+impl CDFABuilder<String, usize> for EncodedCDFABuilder {
+    fn new() -> Self {
+        EncodedCDFABuilder {
+            encoder: HashMap::new(),
+            decoder: Vec::new(),
+
+            alphabet: HashedAlphabet::new(),
+            accepting: HashSet::new(),
+            t_delta: CEHashMap::new(),
+            def_delta: CEHashMap::new(),
+            tokenizer: CEHashMap::new(),
+            start: usize::max_value()
+        }
+    }
+
+    fn set_alphabet(&mut self, chars: impl Iterator<Item=char>) {
+        chars.for_each(|c| self.alphabet.insert(c));
+    }
+
+    fn mark_start(&mut self, state: &String) {
+        self.start = self.encode(state);
+    }
+
+    fn mark_trans(&mut self, from: &String, to: &String, on: char) {
+        let from_encoded = self.encode(from);
+        let to_encoded = self.encode(to);
+
+        let t_trie = self.get_transition_trie(from_encoded);
+
+        t_trie.insert(on, to_encoded);
+    }
+
+    fn mark_chain(&mut self, from: &String, to: &String, on: impl Iterator<Item=char>) {
+        let from_encoded = self.encode(from);
+        let to_encoded = self.encode(to);
+
+        let t_trie = self.get_transition_trie(from_encoded);
+
+        let mut chars: Vec<char> = Vec::new();
+        on.for_each(|c| chars.push(c));
+        t_trie.insert_chain(&chars, to_encoded);
+    }
+
+    fn mark_def(&mut self, from: &String, to: &String) {
+        let from_encoded = self.encode(from);
+        let to_encoded = self.encode(to);
+        self.def_delta.insert(from_encoded, to_encoded)
+    }
+
+    fn mark_token(&mut self, state: &String, token: &usize) {
+        let state_encoded = self.encode(state);
+        self.tokenizer.insert(state_encoded, *token)
+    }
+}
 
 pub trait CDFA<State, Token> {
     fn transition(&self, state: &State, stream: &mut StreamConsumer<char>) -> Option<State>;
@@ -20,6 +123,25 @@ pub struct EncodedCDFA {
     def_delta: CEHashMap<usize>,
     tokenizer: CEHashMap<usize>,
     start: usize,
+}
+
+impl EncodedCDFA {
+    fn build_from(builder: EncodedCDFABuilder) -> Result<Self, String> {
+        if builder.start == usize::max_value() {
+            Err("No start state was set".to_string())
+        } else if builder.start > builder.t_delta.size() {
+            Err("Invalid start state".to_string())
+        } else {
+            Ok(EncodedCDFA {
+                alphabet: builder.alphabet,
+                accepting: builder.accepting,
+                t_delta: builder.t_delta,
+                def_delta: builder.def_delta,
+                tokenizer: builder.tokenizer,
+                start: builder.start
+            })
+        }
+    }
 }
 
 impl CDFA<usize, usize> for EncodedCDFA {
@@ -102,7 +224,7 @@ impl TransitionTrie {
 
     fn insert_chain_internal(i: usize, node: &mut TransitionNode, chars: &Vec<char>, dest: usize) {
         if i == chars.len() {
-            return
+            return;
         }
 
         let c = chars[i];
@@ -119,11 +241,15 @@ impl TransitionTrie {
             node.add_child(c, child);
         } else if last {
             //TODO throw error here (trie is not prefix free)
+            panic!("Trie is not prefix free");
         }
     }
 
     fn set_default(&mut self, default: usize) {
-        //TODO throw error if default is not None (already set)
+        if self.default.is_some() {
+            //TODO throw error if default is not None (already set)
+            panic!("default transition set twice");
+        }
         self.default = Some(default);
     }
 }
@@ -159,26 +285,24 @@ impl TransitionNode {
     }
 }
 
-
-
-pub trait CDFABuilder<State, Token, Impl: CDFA<State, Token>> {
-    fn new() -> Self;
-    fn build(&self) -> Result<Impl, String>; //TODO create custom error type
-
-    fn mark_start(&self, state: &State);
-    fn mark_trans(&self, from: &State, to: &State, on: char);
-    fn mark_chain(&self, from: &State, to: &State, on: impl Iterator<Item=char>);
-    fn mark_def(&self, from: &State, to: &State);
-    fn mark_token(&self, state: &State, token: &Token);
-}
-
-
 trait Alphabet {
     fn contains(&self, c: char) -> bool;
 }
 
 struct HashedAlphabet {
     alphabet: HashSet<char>
+}
+
+impl HashedAlphabet {
+    fn new() -> HashedAlphabet {
+        HashedAlphabet {
+            alphabet: HashSet::new()
+        }
+    }
+
+    fn insert(&mut self, c: char) {
+        self.alphabet.insert(c);
+    }
 }
 
 impl Alphabet for HashedAlphabet {

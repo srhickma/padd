@@ -49,8 +49,6 @@ impl<State: PartialEq + Clone> Scanner<State> for MaximalMunchScanner {
 
                 match res {
                     None => {
-                        //TODO what do we want to do here
-                        //TODO need to scan back through input
                         break;
                     }
                     Some(next) => {
@@ -118,4 +116,3 @@ impl<State: PartialEq + Clone> Scanner<State> for MaximalMunchScanner {
         Ok(tokens)
     }
 }
-
