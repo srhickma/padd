@@ -1,26 +1,22 @@
 use std::collections::LinkedList;
-use std::cmp;
-use core::spec::DEF_MATCHER;
 use core::scan;
 use core::scan::Token;
 use core::scan::FAIL_SEQUENCE_LENGTH;
 use core::scan::cdfa::CDFA;
 use core::data::stream::Stream;
 use core::data::stream::StreamSource;
-use core::data::stream::StreamConsumer;
 
 //TODO use generic token type?
 
 pub trait Scanner<State: PartialEq + Clone> {
-    fn scan<'a, 'b>(&self, stream: &'a mut StreamSource<char>, cdfa: &'b CDFA<State, String>) -> Result<Vec<Token>, scan::Error>;
+    fn scan<'a, 'b>(&self, stream: &'a mut StreamSource<char>, cdfa: &'b CDFA<State, usize>) -> Result<Vec<Token>, scan::Error>;
 }
 
 pub struct MaximalMunchScanner;
 
 impl<State: PartialEq + Clone> Scanner<State> for MaximalMunchScanner {
-    fn scan<'a, 'b>(&self, stream_source: &'a mut StreamSource<char>, cdfa: &'b CDFA<State, String>) -> Result<Vec<Token>, scan::Error> {
-        fn scan_one<State: PartialEq + Clone>(stream: &mut Stream<char>, line: usize, character: usize, cdfa: &CDFA<State, String>) -> (String, Option<State>, usize, usize) {
-
+    fn scan<'a, 'b>(&self, stream_source: &'a mut StreamSource<char>, cdfa: &'b CDFA<State, usize>) -> Result<Vec<Token>, scan::Error> {
+        fn scan_one<State: PartialEq + Clone>(stream: &mut Stream<char>, line: usize, character: usize, cdfa: &CDFA<State, usize>) -> (String, Option<State>, usize, usize) {
             let mut state: State = cdfa.start();
             let mut line: usize = line;
             let mut character: usize = character;
@@ -30,7 +26,6 @@ impl<State: PartialEq + Clone> Scanner<State> for MaximalMunchScanner {
             let mut consumed: LinkedList<char> = LinkedList::new();
 
             loop {
-
                 let res: Option<State> = {
                     let mut consumer = stream
                         .consumer(Box::new(| list: &LinkedList<char> | {
@@ -40,6 +35,9 @@ impl<State: PartialEq + Clone> Scanner<State> for MaximalMunchScanner {
                                     line += 1;
                                     character = 1;
                                 }
+
+                                println!("CONSUMED {}", c);
+
                                 consumed.push_back(*c)
                             }
                         }));
@@ -49,6 +47,7 @@ impl<State: PartialEq + Clone> Scanner<State> for MaximalMunchScanner {
 
                 match res {
                     None => {
+                        println!("FAIL");
                         break;
                     }
                     Some(next) => {
@@ -73,6 +72,8 @@ impl<State: PartialEq + Clone> Scanner<State> for MaximalMunchScanner {
 
         loop {
             let (scanned, end_state, end_line, end_character) = scan_one(&mut stream, line, character, cdfa);
+
+            println!("SCANONE {}", &scanned);
 
             stream = match stream.detach_back() {
                 None => stream.split(),
@@ -101,14 +102,15 @@ impl<State: PartialEq + Clone> Scanner<State> for MaximalMunchScanner {
                 },
                 Some(state) => {
                     let accept_as = cdfa.tokenize(&state).unwrap();
-                    if accept_as != DEF_MATCHER.to_string() { //TODO get rid of this hacky crap
-                        let token = Token {
-                            kind: accept_as,
-                            lexeme: scanned,
-                        };
-                        //TODO write tokens to another ReadDrivenStream
-                        tokens.push(token);
-                    }
+                    let token = Token {
+                        kind: accept_as.to_string(),
+                        lexeme: scanned,
+                    };
+
+                    println!("SCANNED {}", &token.to_string());
+
+                    //TODO write tokens to another ReadDrivenStream
+                    tokens.push(token);
                 }
             }
         }
