@@ -53,7 +53,7 @@ impl<State: PartialEq + Clone> Scanner<State> for MaximalMunchScanner {
                     Some(next) => {
                         if cdfa.accepts(&next) {
                             last_accepting = (consumed.iter().collect(), Some(next.clone()), line, character);
-                            stream.detach_front();
+                            stream.detach_tail();
                             stream.split();
                         }
                         state = next;
@@ -75,7 +75,7 @@ impl<State: PartialEq + Clone> Scanner<State> for MaximalMunchScanner {
 
             println!("SCANONE {}", &scanned);
 
-            stream = match stream.detach_back() {
+            stream = match stream.detach_head() {
                 None => stream.split(),
                 Some(wrapped_stream) => wrapped_stream
             };

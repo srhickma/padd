@@ -1,48 +1,54 @@
 use std::collections::LinkedList;
 
 pub struct StreamSource<'g, T: 'g + Clone> {
-    consumers: LinkedList<StreamBuffer<T>>,
+    buffers: LinkedList<StreamBuffer<T>>,
     getter: &'g mut FnMut() -> Option<T>,
 }
 
 impl<'g, T: 'g + Clone> StreamSource<'g, T> {
     pub fn observe(getter: &'g mut FnMut() -> Option<T>) -> StreamSource<'g, T> {
         StreamSource {
-            consumers: LinkedList::new(),
+            buffers: LinkedList::new(),
             getter,
         }
     }
 
     pub fn split<'a>(&'a mut self) -> Stream<'a, 'g, T> {
-        self.consumers.push_front(StreamBuffer::new());
+        self.buffers.push_back(StreamBuffer::new());
 
-        self.back().unwrap()
+        self.head().unwrap()
     }
 
-    fn detach_front<'a>(&'a mut self) {
-        self.consumers.pop_front();
+    pub fn detach_tail<'a>(&'a mut self) {
+        match self.buffers.pop_back() {
+            None => {}
+            Some(head) => {
+                self.buffers = LinkedList::new();
+                self.buffers.push_back(head);
+            }
+        };
     }
 
-    fn detach_back<'a>(&'a mut self) -> Option<Stream<'a, 'g, T>> {
-        self.consumers.pop_front();
-        self.back()
+    pub fn detach_head<'a>(&'a mut self) -> Option<Stream<'a, 'g, T>> {
+        self.buffers.pop_back();
+        self.head()
     }
 
-    fn back<'a>(&'a mut self) -> Option<Stream<'a, 'g, T>> {
+    pub fn head<'a>(&'a mut self) -> Option<Stream<'a, 'g, T>> {
         Some(Stream {
             source: self,
-            buffer: match self.consumers.back_mut() {
+            buffer: match self.buffers.back_mut() {
                 None => return None,
-                Some(consumer) => consumer
+                Some(buffer) => buffer
             },
         })
     }
 
     fn pull(&mut self) {
         match (self.getter)() {
-            None => {},
-            Some(val) => for consumer in &mut self.consumers {
-                consumer.push(&val)
+            None => {}
+            Some(val) => for buffer in &mut self.buffers {
+                buffer.push(&val)
             }
         }
     }
@@ -57,7 +63,7 @@ impl<T: Clone> StreamBuffer<T> {
     fn new() -> Self {
         StreamBuffer {
             incoming_buffer: LinkedList::new(),
-            outgoing_buffer: LinkedList::new()
+            outgoing_buffer: LinkedList::new(),
         }
     }
 
@@ -79,7 +85,7 @@ impl<T: Clone> StreamBuffer<T> {
 
     fn advance(&mut self) {
         match self.incoming_buffer.pop_back() {
-            None => {},
+            None => {}
             Some(val) => self.outgoing_buffer.push_back(val.clone())
         };
     }
@@ -105,15 +111,16 @@ impl<'a, 'g: 'a, T: 'g + 'a + Clone> Stream<'a, 'g, T> {
         }
     }
 
-    pub fn detach_front(&mut self) {
+    pub fn detach_tail(&mut self) -> &mut Self {
         unsafe {
-            (&mut *self.source).detach_front()
+            (&mut *self.source).detach_tail()
         }
+        self
     }
 
-    pub fn detach_back(&mut self) -> Option<Self> {
+    pub fn detach_head(&mut self) -> Option<Self> {
         unsafe {
-            (&mut *self.source).detach_back()
+            (&mut *self.source).detach_head()
         }
     }
 
@@ -138,7 +145,7 @@ impl<'a, 'g: 'a, T: 'g + 'a + Clone> Stream<'a, 'g, T> {
                     None => return None,
                     Some(val) => val
                 }
-            },
+            }
             Some(val) => val
         };
 
@@ -175,7 +182,7 @@ impl<'s, 'a: 's, 'g: 'a + 's, T: 'g + 'a + 's + Clone> StreamConsumer<'s, 'a, 'g
         StreamConsumer {
             stream,
             on_consume,
-            block: false
+            block: false,
         }
     }
 
@@ -492,5 +499,122 @@ mod tests {
 
         //verify
         assert_eq!(res, "abcdefdef");
+    }
+
+    #[test]
+    fn split_detach_head() {
+        //setup
+        let input = "abcdefghijklmnopqrstuvwxyz".to_string();
+        let mut iter = input.chars();
+
+        let mut getter = || {
+            iter.next()
+        };
+
+        let mut source = StreamSource::observe(&mut getter);
+
+        let mut base_res = String::new();
+        let mut split_res = String::new();
+
+        //exercise
+        let mut base_stream = source.split();
+        read_to(&mut base_stream, &mut base_res, 10);
+
+        let mut split_stream = base_stream.split();
+        read_to(&mut split_stream, &mut split_res, 5);
+
+        read_all(&mut base_stream, &mut base_res);
+        read_all(&mut split_stream, &mut split_res);
+
+        //verify
+        assert_eq!(base_res, "abcdefghijklmnopqrstuvwxyz");
+        assert_eq!(split_res, "klmnopqrstuvwxyz");
+    }
+
+    #[test]
+    fn split_detach_tail() {
+        //setup
+        let input = "abcdefghijklmnopqrstuvwxyz".to_string();
+        let mut iter = input.chars();
+
+        let mut getter = || {
+            iter.next()
+        };
+
+        let mut source = StreamSource::observe(&mut getter);
+
+        let mut stream1_res = String::new();
+        let mut stream2_res = String::new();
+        let mut stream3_res = String::new();
+
+        //exercise
+        let mut stream1 = source.split();
+        read_to(&mut stream1, &mut stream1_res, 6);
+
+        let mut stream2 = stream1.split();
+        read_to(&mut stream2, &mut stream2_res, 6);
+
+        stream2.detach_tail();
+
+        let mut stream3 = stream2.split();
+        read_to(&mut stream3, &mut stream3_res, 6);
+
+        stream2 = stream3.detach_head().unwrap();
+        read_all(&mut stream2, &mut stream2_res);
+
+        //verify
+        assert!(stream2.detach_head().is_none());
+
+        assert_eq!(stream1_res, "abcdef");
+        assert_eq!(stream2_res, "ghijklmnopqrstuvwxyz");
+        assert_eq!(stream3_res, "mnopqr");
+    }
+
+    #[test]
+    fn deep_split() {
+        //setup
+        let input = "abcdefghijklmnopqrstuvwxyz".to_string();
+        let mut iter = input.chars();
+
+        let mut getter = || {
+            iter.next()
+        };
+
+        let mut source = StreamSource::observe(&mut getter);
+        let mut stream = source.split();
+
+        let mut res = String::new();
+
+        //exercise
+        for _ in 0..12 {
+            read_to(&mut stream, &mut res, 1);
+            stream = stream.split();
+        }
+
+        read_to(&mut stream, &mut res, 1);
+
+        for _ in 0..12 {
+            read_to(&mut stream, &mut res, 1);
+            stream = stream.detach_head().unwrap();
+        }
+
+        read_to(&mut stream, &mut res, 1);
+
+        //verify
+        assert!(stream.detach_head().is_none());
+
+        assert_eq!(res, "abcdefghijklmnmlkjihgfedcb");
+    }
+
+    fn read_to(stream: &mut Stream<char>, to: &mut String, n: usize) {
+        for _ in 0..n {
+            to.push(stream.pull().unwrap())
+        }
+    }
+
+    fn read_all(stream: &mut Stream<char>, to: &mut String) {
+        while stream.has_next() {
+            to.push(stream.pull().unwrap())
+        }
     }
 }
