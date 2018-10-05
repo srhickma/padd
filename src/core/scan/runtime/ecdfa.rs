@@ -1,23 +1,14 @@
 use std::collections::HashSet;
 use std::collections::HashMap;
 use std::usize;
+use core::data::Data;
 use core::data::stream::StreamSource;
 use core::data::stream::StreamConsumer;
 use core::data::map::CEHashMap;
-use core::scan::maximal_munch_cdfa::Scanner;
-use core::scan::maximal_munch_cdfa::MaximalMunchScanner;
-
-pub trait CDFABuilder<State, Token> {
-    fn new() -> Self;
-
-    fn set_alphabet(&mut self, chars: impl Iterator<Item=char>) -> &mut Self;
-    fn mark_accepting(&mut self, state: &State) -> &mut Self;
-    fn mark_start(&mut self, state: &State) -> &mut Self;
-    fn mark_trans(&mut self, from: &State, to: &State, on: char) -> &mut Self;
-    fn mark_chain(&mut self, from: &State, to: &State, on: impl Iterator<Item=char>) -> &mut Self;
-    fn mark_def(&mut self, from: &State, to: &State) -> &mut Self;
-    fn mark_token(&mut self, state: &State, token: &Token) -> &mut Self;
-}
+use core::scan::runtime;
+use core::scan::runtime::CDFA;
+use core::scan::runtime::CDFABuilder;
+use core::scan::runtime::alphabet::HashedAlphabet;
 
 pub struct EncodedCDFABuilder {
     encoder: HashMap<String, usize>,
@@ -60,7 +51,7 @@ impl CDFABuilder<String, usize> for EncodedCDFABuilder {
             accepting: HashSet::new(),
             t_delta: CEHashMap::new(),
             tokenizer: CEHashMap::new(),
-            start: usize::max_value()
+            start: usize::max_value(),
         }
     }
 
@@ -127,14 +118,6 @@ impl CDFABuilder<String, usize> for EncodedCDFABuilder {
     }
 }
 
-pub trait CDFA<State, Token> {
-    fn transition(&self, state: &State, stream: &mut StreamConsumer<char>) -> Option<State>;
-    fn has_transition(&self, state: &State, stream: &mut StreamConsumer<char>) -> bool;
-    fn accepts(&self, state: &State) -> bool;
-    fn tokenize(&self, state: &State) -> Option<Token>;
-    fn start(&self) -> State;
-}
-
 pub struct EncodedCDFA {
     alphabet: HashedAlphabet,
     accepting: HashSet<usize>,
@@ -155,7 +138,7 @@ impl EncodedCDFA {
                 accepting: builder.accepting,
                 t_delta: builder.t_delta,
                 tokenizer: builder.tokenizer,
-                start: builder.start
+                start: builder.start,
             })
         }
     }
@@ -163,13 +146,10 @@ impl EncodedCDFA {
 
 impl CDFA<usize, usize> for EncodedCDFA {
     fn transition(&self, state: &usize, stream: &mut StreamConsumer<char>) -> Option<usize> {
-        let res = match self.t_delta.get(*state) {
+        match self.t_delta.get(*state) {
             None => None,
             Some(t_trie) => t_trie.transition(stream)
-        };
-
-        println!("transitioned from {} to {:?}", state, res);
-        res
+        }
     }
 
     fn has_transition(&self, state: &usize, stream: &mut StreamConsumer<char>) -> bool {
@@ -206,7 +186,7 @@ impl TransitionTrie {
         TransitionTrie {
             root: TransitionNode {
                 children: HashMap::new(),
-                dest: 0,
+                dest: usize::max_value(),
             },
             default: None,
         }
@@ -214,24 +194,40 @@ impl TransitionTrie {
 
     fn transition(&self, stream: &mut StreamConsumer<char>) -> Option<usize> {
         let mut curr: &TransitionNode = &self.root;
-        while !curr.leaf() {
-            curr = match stream.pull() {
-                None => return None,
-                Some(c) => match curr.get_child(c) {
-                    None => match self.default {
-                        None => return None,
-                        Some(state) => {
-                            stream.replay().advance().consume();
-                            return Some(state);
+
+        if curr.children.is_empty() {
+            match self.default {
+                None => None,
+                Some(state) => {
+                    match stream.pull() {
+                        None => None,
+                        Some(_) => {
+                            stream.consume();
+                            Some(state)
                         }
                     }
-                    Some(child) => child
                 }
             }
-        }
+        } else {
+            while !curr.leaf() {
+                curr = match stream.pull() {
+                    None => return None,
+                    Some(c) => match curr.get_child(c) {
+                        None => match self.default {
+                            None => return None,
+                            Some(state) => {
+                                stream.replay().advance().consume();
+                                return Some(state);
+                            }
+                        }
+                        Some(child) => child
+                    }
+                }
+            }
 
-        stream.consume();
-        Some(curr.dest)
+            stream.consume();
+            Some(curr.dest)
+        }
     }
 
     fn insert(&mut self, c: char, dest: usize) {
@@ -256,7 +252,7 @@ impl TransitionTrie {
         if !node.has_child(c) {
             let child = TransitionNode {
                 children: HashMap::new(),
-                dest: if last { dest } else { 0 },
+                dest: if last { dest } else { usize::max_value() },
             };
             node.add_child(c, child);
         } else if last {
@@ -305,35 +301,6 @@ impl TransitionNode {
     }
 }
 
-trait Alphabet {
-    fn contains(&self, c: char) -> bool;
-}
-
-struct HashedAlphabet {
-    alphabet: HashSet<char>
-}
-
-impl HashedAlphabet {
-    fn new() -> HashedAlphabet {
-        HashedAlphabet {
-            alphabet: HashSet::new()
-        }
-    }
-
-    fn insert(&mut self, c: char) {
-        self.alphabet.insert(c);
-    }
-}
-
-impl Alphabet for HashedAlphabet {
-    fn contains(&self, c: char) -> bool {
-        self.alphabet.contains(&c)
-    }
-}
-
-
-//TODO move this to a better place
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -363,8 +330,23 @@ mod tests {
 
         let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
 
-        let scanner = MaximalMunchScanner{};
+        let scanner = runtime::def_scanner();
 
+        //exercise
         let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
+
+        //verify
+        let mut result = String::new();
+        for token in tokens {
+            result.push_str(&token.to_string());
+            result.push('\n');
+        }
+
+//        assert_eq!(result, "\
+//0 <- '0'
+//0 <- '0'
+//0 <- '0'
+//0 <- '0'
+//1 <- '11010101'");
     }
 }

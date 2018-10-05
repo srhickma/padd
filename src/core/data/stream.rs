@@ -606,6 +606,64 @@ mod tests {
         assert_eq!(res, "abcdefghijklmnmlkjihgfedcb");
     }
 
+//    #[test]
+//    fn double_consumer() {
+//        //setup
+//        let input = "abcdef".to_string();
+//        let mut iter = input.chars();
+//
+//        let mut getter = || {
+//            iter.next()
+//        };
+//
+//        let mut source = StreamSource::observe(&mut getter);
+//        let mut base = source.split();
+//
+//        let mut consumed1 = String::new();
+//        let mut consumed2 = String::new();
+//
+//        //exercise
+//        {
+//            let mut stream1 = base.consumer(Box::new(|list: &LinkedList<char>| {
+//                for c in list {
+//                    consumed1.push(*c);
+//                }
+//            }));
+//
+//            let mut stream2 = base.consumer(Box::new(|list: &LinkedList<char>| {
+//                for c in list {
+//                    consumed1.push(*c);
+//                }
+//            }));
+//
+//            stream.block();
+//            loop {
+//                match stream.pull() {
+//                    None => break,
+//                    Some(c) => res_pulled.push(c)
+//                }
+//            }
+//            stream.consume().replay();
+//            loop {
+//                match stream.pull() {
+//                    None => break,
+//                    Some(c) => res_pulled.push(c)
+//                }
+//            }
+//            stream.unblock().consume().replay();
+//            loop {
+//                match stream.pull() {
+//                    None => break,
+//                    Some(c) => res_pulled.push(c)
+//                }
+//            }
+//        }
+//
+//        //verify
+//        assert_eq!(res_pulled, "abcdefabcdef");
+//        assert_eq!(res_consumed, "abcdef");
+//    }
+
     fn read_to(stream: &mut Stream<char>, to: &mut String, n: usize) {
         for _ in 0..n {
             to.push(stream.pull().unwrap())
