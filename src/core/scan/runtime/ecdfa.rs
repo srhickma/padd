@@ -17,7 +17,7 @@ pub struct EncodedCDFABuilder {
     alphabet: HashedAlphabet,
     accepting: HashSet<usize>,
     t_delta: CEHashMap<TransitionTrie>,
-    tokenizer: CEHashMap<usize>,
+    tokenizer: CEHashMap<String>,
     start: usize,
 }
 
@@ -41,7 +41,7 @@ impl EncodedCDFABuilder {
     }
 }
 
-impl CDFABuilder<String, usize> for EncodedCDFABuilder {
+impl CDFABuilder<String, String> for EncodedCDFABuilder {
     fn new() -> Self {
         EncodedCDFABuilder {
             encoder: HashMap::new(),
@@ -111,9 +111,9 @@ impl CDFABuilder<String, usize> for EncodedCDFABuilder {
         self
     }
 
-    fn mark_token(&mut self, state: &String, token: &usize) -> &mut Self {
+    fn mark_token(&mut self, state: &String, token: &String) -> &mut Self {
         let state_encoded = self.encode(state);
-        self.tokenizer.insert(state_encoded, *token);
+        self.tokenizer.insert(state_encoded, token.clone());
         self
     }
 }
@@ -122,7 +122,7 @@ pub struct EncodedCDFA {
     alphabet: HashedAlphabet,
     accepting: HashSet<usize>,
     t_delta: CEHashMap<TransitionTrie>,
-    tokenizer: CEHashMap<usize>,
+    tokenizer: CEHashMap<String>,
     start: usize,
 }
 
@@ -144,7 +144,7 @@ impl EncodedCDFA {
     }
 }
 
-impl CDFA<usize, usize> for EncodedCDFA {
+impl CDFA<usize, String> for EncodedCDFA {
     fn transition(&self, state: &usize, stream: &mut StreamConsumer<char>) -> Option<usize> {
         match self.t_delta.get(*state) {
             None => None,
@@ -163,10 +163,10 @@ impl CDFA<usize, usize> for EncodedCDFA {
         self.accepting.contains(state)
     }
 
-    fn tokenize(&self, state: &usize) -> Option<usize> {
+    fn tokenize(&self, state: &usize) -> Option<String> {
         match self.tokenizer.get(*state) {
             None => None,
-            Some(dest) => Some(*dest)
+            Some(dest) => Some(dest.clone())
         }
     }
 
@@ -318,8 +318,8 @@ mod tests {
         builder
             .mark_def(&"notzero".to_string(), &"notzero".to_string());
         builder
-            .mark_token(&"zero".to_string(), &0)
-            .mark_token(&"notzero".to_string(), &1);
+            .mark_token(&"zero".to_string(), &"ZERO".to_string())
+            .mark_token(&"notzero".to_string(), &"NZ".to_string());
         builder
             .mark_start(&"start".to_string());
         builder
@@ -344,11 +344,11 @@ mod tests {
 
         //verify
         assert_eq!(tokens_string(&tokens), "\
-0 <- '0'
-0 <- '0'
-0 <- '0'
-0 <- '0'
-1 <- '11010101'
+ZERO <- '0'
+ZERO <- '0'
+ZERO <- '0'
+ZERO <- '0'
+NZ <- '11010101'
 ");
     }
 
@@ -368,9 +368,9 @@ mod tests {
             .mark_trans(&"ws".to_string(), &"ws".to_string(), '\t')
             .mark_trans(&"ws".to_string(), &"ws".to_string(), '\n');
         builder
-            .mark_token(&"lbr".to_string(), &0)
-            .mark_token(&"rbr".to_string(), &1)
-            .mark_token(&"ws".to_string(), &2);
+            .mark_token(&"lbr".to_string(), &"LBR".to_string())
+            .mark_token(&"rbr".to_string(), &"RBR".to_string())
+            .mark_token(&"ws".to_string(), &"WS".to_string());
         builder
             .mark_start(&"start".to_string());
         builder
@@ -396,22 +396,22 @@ mod tests {
 
         //verify
         assert_eq!(tokens_string(&tokens), "\
-2 <- '  '
-0 <- '{'
-0 <- '{'
-2 <- '\\n'
-1 <- '}'
-0 <- '{'
-1 <- '}'
-0 <- '{'
-1 <- '}'
-2 <- ' \\t'
-0 <- '{'
-1 <- '}'
-2 <- ' \\t'
-0 <- '{'
-1 <- '}'
-1 <- '}'
+WS <- '  '
+LBR <- '{'
+LBR <- '{'
+WS <- '\\n'
+RBR <- '}'
+LBR <- '{'
+RBR <- '}'
+LBR <- '{'
+RBR <- '}'
+WS <- ' \\t'
+LBR <- '{'
+RBR <- '}'
+WS <- ' \\t'
+LBR <- '{'
+RBR <- '}'
+RBR <- '}'
 ");
     }
 
@@ -431,9 +431,8 @@ mod tests {
             .mark_trans(&"ws".to_string(), &"ws".to_string(), '\t')
             .mark_trans(&"ws".to_string(), &"ws".to_string(), '\n');
         builder
-            .mark_token(&"lbr".to_string(), &0)
-            .mark_token(&"rbr".to_string(), &1);
-        //.mark_token(&"ws".to_string(), &2);
+            .mark_token(&"lbr".to_string(), &"LBR".to_string())
+            .mark_token(&"rbr".to_string(), &"RBR".to_string());
         builder
             .mark_start(&"start".to_string());
         builder
@@ -459,18 +458,18 @@ mod tests {
 
         //verify
         assert_eq!(tokens_string(&tokens), "\
-0 <- '{'
-0 <- '{'
-1 <- '}'
-0 <- '{'
-1 <- '}'
-0 <- '{'
-1 <- '}'
-0 <- '{'
-1 <- '}'
-0 <- '{'
-1 <- '}'
-1 <- '}'
+LBR <- '{'
+LBR <- '{'
+RBR <- '}'
+LBR <- '{'
+RBR <- '}'
+LBR <- '{'
+RBR <- '}'
+LBR <- '{'
+RBR <- '}'
+LBR <- '{'
+RBR <- '}'
+RBR <- '}'
 ");
     }
 
@@ -490,9 +489,8 @@ mod tests {
             .mark_trans(&"ws".to_string(), &"ws".to_string(), '\t')
             .mark_trans(&"ws".to_string(), &"ws".to_string(), '\n');
         builder
-            .mark_token(&"lbr".to_string(), &0)
-            .mark_token(&"rbr".to_string(), &1);
-        //.mark_token(&"ws".to_string(), &2);
+            .mark_token(&"lbr".to_string(), &"LBR".to_string())
+            .mark_token(&"rbr".to_string(), &"RBR".to_string());
         builder
             .mark_start(&"start".to_string());
         builder
@@ -540,9 +538,8 @@ mod tests {
             .mark_trans(&"ws".to_string(), &"ws".to_string(), '\t')
             .mark_trans(&"ws".to_string(), &"ws".to_string(), '\n');
         builder
-            .mark_token(&"lbr".to_string(), &0)
-            .mark_token(&"rbr".to_string(), &1);
-        //.mark_token(&"ws".to_string(), &2);
+            .mark_token(&"lbr".to_string(), &"LBR".to_string())
+            .mark_token(&"rbr".to_string(), &"RBR".to_string());
         builder
             .mark_start(&"start".to_string());
         builder
@@ -574,7 +571,7 @@ mod tests {
         assert_eq!(err.character, 10);
     }
 
-    fn tokens_string(tokens: &Vec<Token<usize>>) -> String {
+    fn tokens_string<Kind: Data>(tokens: &Vec<Token<Kind>>) -> String {
         let mut result = String::new();
         for token in tokens {
             result.push_str(&token.to_string());
