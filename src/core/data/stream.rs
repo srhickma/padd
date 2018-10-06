@@ -16,7 +16,7 @@ impl<'g, T: 'g + Clone> StreamSource<'g, T> {
     pub fn split<'a>(&'a mut self) -> Stream<'a, 'g, T> {
         self.buffers.push_back(StreamBuffer::new());
 
-        self.head().unwrap()
+        self.head()
     }
 
     pub fn detach_tail<'a>(&'a mut self) {
@@ -29,19 +29,24 @@ impl<'g, T: 'g + Clone> StreamSource<'g, T> {
         };
     }
 
-    pub fn detach_head<'a>(&'a mut self) -> Option<Stream<'a, 'g, T>> {
+    pub fn detach_head<'a>(&'a mut self) -> Stream<'a, 'g, T> {
         self.buffers.pop_back();
         self.head()
     }
 
-    pub fn head<'a>(&'a mut self) -> Option<Stream<'a, 'g, T>> {
-        Some(Stream {
+    pub fn head<'a>(&'a mut self) -> Stream<'a, 'g, T> {
+        if self.buffers.is_empty() {
+            return self.split();
+        }
+
+        Stream {
             source: self,
-            buffer: match self.buffers.back_mut() {
-                None => return None,
-                Some(buffer) => buffer
-            },
-        })
+            buffer: self.buffers.back_mut().unwrap(),
+        }
+    }
+
+    pub fn has_tail(&self) -> bool {
+        self.buffers.len() > 1
     }
 
     fn pull(&mut self) {
@@ -118,9 +123,15 @@ impl<'a, 'g: 'a, T: 'g + 'a + Clone> Stream<'a, 'g, T> {
         self
     }
 
-    pub fn detach_head(&mut self) -> Option<Self> {
+    pub fn detach_head(&mut self) -> Self {
         unsafe {
             (&mut *self.source).detach_head()
+        }
+    }
+
+    pub fn has_tail(&self) -> bool {
+        unsafe {
+            (&mut *self.source).has_tail()
         }
     }
 
@@ -241,7 +252,7 @@ mod tests {
         };
 
         let mut source = StreamSource::observe(&mut getter);
-        let mut stream = source.split();
+        let mut stream = source.head();
 
         let mut res = String::new();
 
@@ -268,7 +279,7 @@ mod tests {
         };
 
         let mut source = StreamSource::observe(&mut getter);
-        let mut base = source.split();
+        let mut base = source.head();
 
         let mut res_pulled = String::new();
         let mut res_consumed = String::new();
@@ -305,7 +316,7 @@ mod tests {
         };
 
         let mut source = StreamSource::observe(&mut getter);
-        let mut stream = source.split();
+        let mut stream = source.head();
 
         let mut res = String::new();
 
@@ -339,7 +350,7 @@ mod tests {
         };
 
         let mut source = StreamSource::observe(&mut getter);
-        let mut base = source.split();
+        let mut base = source.head();
 
         let mut res_pulled = String::new();
         let mut res_consumed = String::new();
@@ -391,7 +402,7 @@ mod tests {
         };
 
         let mut source = StreamSource::observe(&mut getter);
-        let mut base = source.split();
+        let mut base = source.head();
 
         let mut res_pulled = String::new();
         let mut res_consumed = String::new();
@@ -443,7 +454,7 @@ mod tests {
         };
 
         let mut source = StreamSource::observe(&mut getter);
-        let mut stream = source.split();
+        let mut stream = source.head();
 
         let mut res = String::new();
 
@@ -477,7 +488,7 @@ mod tests {
         };
 
         let mut source = StreamSource::observe(&mut getter);
-        let mut base = source.split();
+        let mut base = source.head();
         let mut stream = base.consumer(Box::new(|_| {}));
 
         let mut res = String::new();
@@ -548,7 +559,7 @@ mod tests {
         let mut stream3_res = String::new();
 
         //exercise
-        let mut stream1 = source.split();
+        let mut stream1 = source.head();
         read_to(&mut stream1, &mut stream1_res, 6);
 
         let mut stream2 = stream1.split();
@@ -559,12 +570,10 @@ mod tests {
         let mut stream3 = stream2.split();
         read_to(&mut stream3, &mut stream3_res, 6);
 
-        stream2 = stream3.detach_head().unwrap();
+        stream2 = stream3.detach_head();
         read_all(&mut stream2, &mut stream2_res);
 
         //verify
-        assert!(stream2.detach_head().is_none());
-
         assert_eq!(stream1_res, "abcdef");
         assert_eq!(stream2_res, "ghijklmnopqrstuvwxyz");
         assert_eq!(stream3_res, "mnopqr");
@@ -581,7 +590,7 @@ mod tests {
         };
 
         let mut source = StreamSource::observe(&mut getter);
-        let mut stream = source.split();
+        let mut stream = source.head();
 
         let mut res = String::new();
 
@@ -595,17 +604,15 @@ mod tests {
 
         for _ in 0..12 {
             read_to(&mut stream, &mut res, 1);
-            stream = stream.detach_head().unwrap();
+            stream = stream.detach_head();
         }
 
         read_to(&mut stream, &mut res, 1);
 
         //verify
-        assert!(stream.detach_head().is_none());
-
         assert_eq!(res, "abcdefghijklmnmlkjihgfedcb");
     }
-
+//
 //    #[test]
 //    fn double_consumer() {
 //        //setup

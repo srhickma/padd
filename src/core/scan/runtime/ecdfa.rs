@@ -304,18 +304,25 @@ impl TransitionNode {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use core::scan::runtime::Token;
 
     #[test]
     fn scan_binary() {
         //setup
         let mut builder: EncodedCDFABuilder = EncodedCDFABuilder::new();
-        builder.set_alphabet("01".chars())
+        builder
+            .set_alphabet("01".chars());
+        builder
             .mark_trans(&"start".to_string(), &"zero".to_string(), '0')
-            .mark_trans(&"start".to_string(), &"notzero".to_string(), '1')
-            .mark_def(&"notzero".to_string(), &"notzero".to_string())
+            .mark_trans(&"start".to_string(), &"notzero".to_string(), '1');
+        builder
+            .mark_def(&"notzero".to_string(), &"notzero".to_string());
+        builder
             .mark_token(&"zero".to_string(), &0)
-            .mark_token(&"notzero".to_string(), &1)
-            .mark_start(&"start".to_string())
+            .mark_token(&"notzero".to_string(), &1);
+        builder
+            .mark_start(&"start".to_string());
+        builder
             .mark_accepting(&"zero".to_string())
             .mark_accepting(&"notzero".to_string());
 
@@ -336,17 +343,243 @@ mod tests {
         let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
 
         //verify
+        assert_eq!(tokens_string(&tokens), "\
+0 <- '0'
+0 <- '0'
+0 <- '0'
+0 <- '0'
+1 <- '11010101'
+");
+    }
+
+    #[test]
+    fn scan_brackets() {
+        //setup
+        let mut builder: EncodedCDFABuilder = EncodedCDFABuilder::new();
+        builder
+            .set_alphabet("{} \t\n".chars());
+        builder
+            .mark_trans(&"start".to_string(), &"ws".to_string(), ' ')
+            .mark_trans(&"start".to_string(), &"ws".to_string(), '\t')
+            .mark_trans(&"start".to_string(), &"ws".to_string(), '\n')
+            .mark_trans(&"start".to_string(), &"lbr".to_string(), '{')
+            .mark_trans(&"start".to_string(), &"rbr".to_string(), '}')
+            .mark_trans(&"ws".to_string(), &"ws".to_string(), ' ')
+            .mark_trans(&"ws".to_string(), &"ws".to_string(), '\t')
+            .mark_trans(&"ws".to_string(), &"ws".to_string(), '\n');
+        builder
+            .mark_token(&"lbr".to_string(), &0)
+            .mark_token(&"rbr".to_string(), &1)
+            .mark_token(&"ws".to_string(), &2);
+        builder
+            .mark_start(&"start".to_string());
+        builder
+            .mark_accepting(&"lbr".to_string())
+            .mark_accepting(&"rbr".to_string())
+            .mark_accepting(&"ws".to_string());
+
+        let cdfa: EncodedCDFA = EncodedCDFA::build_from(builder).unwrap();
+
+        let input = "  {{\n}{}{} \t{} \t{}}".to_string();
+        let mut iter = input.chars();
+
+        let mut getter = || {
+            iter.next()
+        };
+
+        let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
+
+        let scanner = runtime::def_scanner();
+
+        //exercise
+        let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
+
+        //verify
+        assert_eq!(tokens_string(&tokens), "\
+2 <- '  '
+0 <- '{'
+0 <- '{'
+2 <- '\\n'
+1 <- '}'
+0 <- '{'
+1 <- '}'
+0 <- '{'
+1 <- '}'
+2 <- ' \\t'
+0 <- '{'
+1 <- '}'
+2 <- ' \\t'
+0 <- '{'
+1 <- '}'
+1 <- '}'
+");
+    }
+
+    #[test]
+    fn scan_ignore() {
+        //setup
+        let mut builder: EncodedCDFABuilder = EncodedCDFABuilder::new();
+        builder
+            .set_alphabet("{} \t\n".chars());
+        builder
+            .mark_trans(&"start".to_string(), &"ws".to_string(), ' ')
+            .mark_trans(&"start".to_string(), &"ws".to_string(), '\t')
+            .mark_trans(&"start".to_string(), &"ws".to_string(), '\n')
+            .mark_trans(&"start".to_string(), &"lbr".to_string(), '{')
+            .mark_trans(&"start".to_string(), &"rbr".to_string(), '}')
+            .mark_trans(&"ws".to_string(), &"ws".to_string(), ' ')
+            .mark_trans(&"ws".to_string(), &"ws".to_string(), '\t')
+            .mark_trans(&"ws".to_string(), &"ws".to_string(), '\n');
+        builder
+            .mark_token(&"lbr".to_string(), &0)
+            .mark_token(&"rbr".to_string(), &1);
+        //.mark_token(&"ws".to_string(), &2);
+        builder
+            .mark_start(&"start".to_string());
+        builder
+            .mark_accepting(&"lbr".to_string())
+            .mark_accepting(&"rbr".to_string())
+            .mark_accepting(&"ws".to_string());
+
+        let cdfa: EncodedCDFA = EncodedCDFA::build_from(builder).unwrap();
+
+        let input = "  {{\n}{}{} \t{} \t{}}".to_string();
+        let mut iter = input.chars();
+
+        let mut getter = || {
+            iter.next()
+        };
+
+        let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
+
+        let scanner = runtime::def_scanner();
+
+        //exercise
+        let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
+
+        //verify
+        assert_eq!(tokens_string(&tokens), "\
+0 <- '{'
+0 <- '{'
+1 <- '}'
+0 <- '{'
+1 <- '}'
+0 <- '{'
+1 <- '}'
+0 <- '{'
+1 <- '}'
+0 <- '{'
+1 <- '}'
+1 <- '}'
+");
+    }
+
+    #[test]
+    fn scan_fail_simple() {
+        //setup
+        let mut builder: EncodedCDFABuilder = EncodedCDFABuilder::new();
+        builder
+            .set_alphabet("{} \t\n".chars());
+        builder
+            .mark_trans(&"start".to_string(), &"ws".to_string(), ' ')
+            .mark_trans(&"start".to_string(), &"ws".to_string(), '\t')
+            .mark_trans(&"start".to_string(), &"ws".to_string(), '\n')
+            .mark_trans(&"start".to_string(), &"lbr".to_string(), '{')
+            .mark_trans(&"start".to_string(), &"rbr".to_string(), '}')
+            .mark_trans(&"ws".to_string(), &"ws".to_string(), ' ')
+            .mark_trans(&"ws".to_string(), &"ws".to_string(), '\t')
+            .mark_trans(&"ws".to_string(), &"ws".to_string(), '\n');
+        builder
+            .mark_token(&"lbr".to_string(), &0)
+            .mark_token(&"rbr".to_string(), &1);
+        //.mark_token(&"ws".to_string(), &2);
+        builder
+            .mark_start(&"start".to_string());
+        builder
+            .mark_accepting(&"lbr".to_string())
+            .mark_accepting(&"rbr".to_string())
+            .mark_accepting(&"ws".to_string());
+
+        let cdfa: EncodedCDFA = EncodedCDFA::build_from(builder).unwrap();
+
+        let input = "  {{\n}{}{} \tx{} \t{}}".to_string();
+        let mut iter = input.chars();
+
+        let mut getter = || {
+            iter.next()
+        };
+
+        let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
+
+        let scanner = runtime::def_scanner();
+
+        //exercise
+        let result = scanner.scan(&mut stream, &cdfa);
+
+        //verify
+        assert!(result.is_err());
+        let err = result.err().unwrap();
+        assert_eq!(err.sequence, "x{} \t{}}");
+        assert_eq!(err.line, 2);
+        assert_eq!(err.character, 8);
+    }
+
+    #[test]
+    fn scan_fail_complex() {
+        //setup
+        let mut builder: EncodedCDFABuilder = EncodedCDFABuilder::new();
+        builder
+            .set_alphabet("{} \t\n".chars());
+        builder
+            .mark_trans(&"start".to_string(), &"ws".to_string(), ' ')
+            .mark_trans(&"start".to_string(), &"ws".to_string(), '\t')
+            .mark_trans(&"start".to_string(), &"ws".to_string(), '\n')
+            .mark_trans(&"start".to_string(), &"lbr".to_string(), '{')
+            .mark_trans(&"start".to_string(), &"rbr".to_string(), '}')
+            .mark_trans(&"ws".to_string(), &"ws".to_string(), ' ')
+            .mark_trans(&"ws".to_string(), &"ws".to_string(), '\t')
+            .mark_trans(&"ws".to_string(), &"ws".to_string(), '\n');
+        builder
+            .mark_token(&"lbr".to_string(), &0)
+            .mark_token(&"rbr".to_string(), &1);
+        //.mark_token(&"ws".to_string(), &2);
+        builder
+            .mark_start(&"start".to_string());
+        builder
+            .mark_accepting(&"lbr".to_string())
+            .mark_accepting(&"rbr".to_string())
+            .mark_accepting(&"ws".to_string());
+
+        let cdfa: EncodedCDFA = EncodedCDFA::build_from(builder).unwrap();
+
+        let input = "   {  {  {{{\t}}}\n {} }  }   { {}\n }   {  {  {{{\t}}}\n {} }  } xyz  { {}\n }   {  {  {{{\t}}}\n {} }  }   { {}\n } ".to_string();
+        let mut iter = input.chars();
+
+        let mut getter = || {
+            iter.next()
+        };
+
+        let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
+
+        let scanner = runtime::def_scanner();
+
+        //exercise
+        let result = scanner.scan(&mut stream, &cdfa);
+
+        //verify
+        assert!(result.is_err());
+        let err = result.err().unwrap();
+        assert_eq!(err.sequence, "xyz  { {}\n");
+        assert_eq!(err.line, 4);
+        assert_eq!(err.character, 10);
+    }
+
+    fn tokens_string(tokens: &Vec<Token<usize>>) -> String {
         let mut result = String::new();
         for token in tokens {
             result.push_str(&token.to_string());
             result.push('\n');
         }
-
-//        assert_eq!(result, "\
-//0 <- '0'
-//0 <- '0'
-//0 <- '0'
-//0 <- '0'
-//1 <- '11010101'");
+        result
     }
 }
