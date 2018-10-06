@@ -8,70 +8,79 @@ use core::parse::Grammar;
 use core::parse::Production;
 use core::parse::Tree;
 use core::scan;
-use core::scan::State;
 use core::scan::DFA;
 use core::scan::CompileTransitionDelta;
 
 static PATTERN_ALPHABET: &'static str = "{}[];=1234567890abcdefghijklmnopqrstuvwxyz \n\t";
-static PATTERN_STATES: [&'static str; 12] = ["start", "semi", "eq", "lbrace", "rbrace", "lbracket", "rbracket", "zero", "num", "alpha", "ws", ""];
+
+#[derive(PartialEq, Clone)]
+enum S {
+    START,
+    LBRACE,
+    RBRACE,
+    LBRACKET,
+    RBRACKET,
+    SEMI,
+    EQ,
+    ZERO,
+    NUM,
+    ALPHA,
+    WS,
+    FAIL
+}
 
 thread_local! {
-    static PATTERN_DFA: DFA = {
-        let start: State = "start".to_string();
-        let delta: fn(&str, char) -> &str = |state, c| match (state, c) {
-            ("start", '{') => "lbrace",
-            ("start", '}') => "rbrace",
-            ("start", '[') => "lbracket",
-            ("start", ']') => "rbracket",
-            ("start", ';') => "semi",
-            ("start", '=') => "eq",
-            ("start", '0') => "zero",
-            ("start", '1') | ("start", '2') | ("start", '3') | ("start", '4') | ("start", '5') |
-            ("start", '6') | ("start", '7') | ("start", '8') | ("start", '9') => "num",
-            ("start", 'a') | ("start", 'g') | ("start", 'l') | ("start", 'q') | ("start", 'v') |
-            ("start", 'b') | ("start", 'h') | ("start", 'm') | ("start", 'r') | ("start", 'w') |
-            ("start", 'c') | ("start", 'i') | ("start", 'n') | ("start", 's') | ("start", 'x') |
-            ("start", 'd') | ("start", 'j') | ("start", 'o') | ("start", 't') | ("start", 'y') |
-            ("start", 'e') | ("start", 'k') | ("start", 'p') | ("start", 'u') | ("start", 'z') |
-            ("start", 'f') => "alpha",
-            ("start", ' ') => "ws",
-            ("start", '\t') => "ws",
-            ("start", '\n') => "ws",
+    static PATTERN_DFA: DFA<S> = {
+        let delta: fn(S, char) -> S = |state, c| match (state, c) {
+            (S::START, '{') => S::LBRACE,
+            (S::START, '}') => S::RBRACE,
+            (S::START, '[') => S::LBRACKET,
+            (S::START, ']') => S::RBRACKET,
+            (S::START, ';') => S::SEMI,
+            (S::START, '=') => S::EQ,
+            (S::START, '0') => S::ZERO,
+            (S::START, '1') | (S::START, '2') | (S::START, '3') | (S::START, '4') | (S::START, '5') |
+            (S::START, '6') | (S::START, '7') | (S::START, '8') | (S::START, '9') => S::NUM,
+            (S::START, 'a') | (S::START, 'g') | (S::START, 'l') | (S::START, 'q') | (S::START, 'v') |
+            (S::START, 'b') | (S::START, 'h') | (S::START, 'm') | (S::START, 'r') | (S::START, 'w') |
+            (S::START, 'c') | (S::START, 'i') | (S::START, 'n') | (S::START, 's') | (S::START, 'x') |
+            (S::START, 'd') | (S::START, 'j') | (S::START, 'o') | (S::START, 't') | (S::START, 'y') |
+            (S::START, 'e') | (S::START, 'k') | (S::START, 'p') | (S::START, 'u') | (S::START, 'z') |
+            (S::START, 'f') => S::ALPHA,
+            (S::START, ' ') | (S::START, '\t') | (S::START, '\n') => S::WS,
 
-            ("num", '0') | ("num", '1') | ("num", '2') | ("num", '3') | ("num", '4') |
-            ("num", '5') | ("num", '6') | ("num", '7') | ("num", '8') | ("num", '9') => "num",
+            (S::NUM, '0') | (S::NUM, '1') | (S::NUM, '2') | (S::NUM, '3') | (S::NUM, '4') |
+            (S::NUM, '5') | (S::NUM, '6') | (S::NUM, '7') | (S::NUM, '8') | (S::NUM, '9') => S::NUM,
 
-            ("alpha", 'a') | ("alpha", 'g') | ("alpha", 'l') | ("alpha", 'q') | ("alpha", 'v') |
-            ("alpha", 'b') | ("alpha", 'h') | ("alpha", 'm') | ("alpha", 'r') | ("alpha", 'w') |
-            ("alpha", 'c') | ("alpha", 'i') | ("alpha", 'n') | ("alpha", 's') | ("alpha", 'x') |
-            ("alpha", 'd') | ("alpha", 'j') | ("alpha", 'o') | ("alpha", 't') | ("alpha", 'y') |
-            ("alpha", 'e') | ("alpha", 'k') | ("alpha", 'p') | ("alpha", 'u') | ("alpha", 'z') |
-            ("alpha", 'f') => "alpha",
+            (S::ALPHA, 'a') | (S::ALPHA, 'g') | (S::ALPHA, 'l') | (S::ALPHA, 'q') | (S::ALPHA, 'v') |
+            (S::ALPHA, 'b') | (S::ALPHA, 'h') | (S::ALPHA, 'm') | (S::ALPHA, 'r') | (S::ALPHA, 'w') |
+            (S::ALPHA, 'c') | (S::ALPHA, 'i') | (S::ALPHA, 'n') | (S::ALPHA, 's') | (S::ALPHA, 'x') |
+            (S::ALPHA, 'd') | (S::ALPHA, 'j') | (S::ALPHA, 'o') | (S::ALPHA, 't') | (S::ALPHA, 'y') |
+            (S::ALPHA, 'e') | (S::ALPHA, 'k') | (S::ALPHA, 'p') | (S::ALPHA, 'u') | (S::ALPHA, 'z') |
+            (S::ALPHA, 'f') => S::ALPHA,
 
-            ("ws", ' ') => "ws",
-            ("ws", '\t') => "ws",
-            ("ws", '\n') => "ws",
+            (S::WS, ' ') | (S::WS, '\t') | (S::WS, '\n') => S::WS,
 
-            (&_, _) => "",
+            (_, _) => S::FAIL,
         };
-        let tokenizer: fn(&str) -> &'static str = |state| match state {
-            "semi" => "SEMI",
-            "eq" => "EQ",
-            "lbrace" => "LBRACE",
-            "rbrace" => "RBRACE",
-            "lbracket" => "LBRACKET",
-            "rbracket" => "RBRACKET",
-            "zero" => "NUM",
-            "num" => "NUM",
-            "alpha" => "ALPHA",
-            "ws" => "WHITESPACE",
+        let tokenizer: fn(S) -> String = |state| match state {
+            S::SEMI => "SEMI",
+            S::EQ => "EQ",
+            S::LBRACE => "LBRACE",
+            S::RBRACE => "RBRACE",
+            S::LBRACKET => "LBRACKET",
+            S::RBRACKET => "RBRACKET",
+            S::ZERO => "NUM",
+            S::NUM => "NUM",
+            S::ALPHA => "ALPHA",
+            S::WS => "WHITESPACE",
             _ => "",
-        };
+        }.to_string();
 
         let dfa = DFA{
             alphabet: PATTERN_ALPHABET.to_string(),
-            start,
-            td: Box::new(CompileTransitionDelta::build(&PATTERN_STATES, delta, tokenizer)),
+            start: S::START,
+            td: Box::new(CompileTransitionDelta::build(delta, tokenizer, S::FAIL)),
         };
         dfa
     };
