@@ -5,6 +5,7 @@ use core::data::stream::StreamConsumer;
 use core::data::map::CEHashMap;
 use core::scan::runtime::CDFA;
 use core::scan::runtime::CDFABuilder;
+use core::scan::runtime::CDFAError;
 use core::scan::runtime::alphabet::HashedAlphabet;
 
 pub struct EncodedCDFABuilder {
@@ -68,19 +69,19 @@ impl CDFABuilder<String, String> for EncodedCDFABuilder {
         self
     }
 
-    fn mark_trans(&mut self, from: &String, to: &String, on: char) -> &mut Self {
+    fn mark_trans(&mut self, from: &String, to: &String, on: char) -> Result<&mut Self, CDFAError> {
         let from_encoded = self.encode(from);
         let to_encoded = self.encode(to);
 
         {
             let t_trie = self.get_transition_trie(from_encoded);
-            t_trie.insert(on, to_encoded);
+            t_trie.insert(on, to_encoded)?;
         }
 
-        self
+        Ok(self)
     }
 
-    fn mark_chain(&mut self, from: &String, to: &String, on: impl Iterator<Item=char>) -> &mut Self {
+    fn mark_chain(&mut self, from: &String, to: &String, on: impl Iterator<Item=char>) -> Result<&mut Self, CDFAError> {
         let from_encoded = self.encode(from);
         let to_encoded = self.encode(to);
 
@@ -89,23 +90,24 @@ impl CDFABuilder<String, String> for EncodedCDFABuilder {
 
             let mut chars: Vec<char> = Vec::new();
             on.for_each(|c| chars.push(c));
-            t_trie.insert_chain(&chars, to_encoded);
+            t_trie.insert_chain(&chars, to_encoded)?;
         }
 
-        self
+        Ok(self)
     }
 
-    fn mark_def(&mut self, from: &String, to: &String) -> &mut Self {
+    fn mark_def(&mut self, from: &String, to: &String) -> Result<&mut Self, CDFAError> {
         let from_encoded = self.encode(from);
         let to_encoded = self.encode(to);
 
-        {
+        match {
             let t_trie = self.get_transition_trie(from_encoded);
 
             t_trie.set_default(to_encoded)
+        } {
+            Err(err) => Err(err),
+            Ok(()) => Ok(self)
         }
-
-        self
     }
 
     fn mark_token(&mut self, state: &String, token: &String) -> &mut Self {
@@ -124,11 +126,11 @@ pub struct EncodedCDFA {
 }
 
 impl EncodedCDFA {
-    pub fn build_from(builder: EncodedCDFABuilder) -> Result<Self, String> {
+    pub fn build_from(builder: EncodedCDFABuilder) -> Result<Self, CDFAError> {
         if builder.start == usize::max_value() {
-            Err("No start state was set".to_string())
+            Err(CDFAError::BuildErr("No start state was set".to_string()))
         } else if builder.start > builder.t_delta.size() {
-            Err("Invalid start state".to_string())
+            Err(CDFAError::BuildErr("Invalid start state".to_string()))
         } else {
             Ok(EncodedCDFA {
                 alphabet: builder.alphabet,
@@ -227,25 +229,25 @@ impl TransitionTrie {
         }
     }
 
-    fn insert(&mut self, c: char, dest: usize) {
-        TransitionTrie::insert_internal(c, &mut self.root, true, dest);
+    fn insert(&mut self, c: char, dest: usize) -> Result<(), CDFAError> {
+        TransitionTrie::insert_internal(c, &mut self.root, true, dest)
     }
 
-    fn insert_chain(&mut self, chars: &Vec<char>, dest: usize) {
-        TransitionTrie::insert_chain_internal(0, &mut self.root, chars, dest);
+    fn insert_chain(&mut self, chars: &Vec<char>, dest: usize) -> Result<(), CDFAError> {
+        TransitionTrie::insert_chain_internal(0, &mut self.root, chars, dest)
     }
 
-    fn insert_chain_internal(i: usize, node: &mut TransitionNode, chars: &Vec<char>, dest: usize) {
+    fn insert_chain_internal(i: usize, node: &mut TransitionNode, chars: &Vec<char>, dest: usize) -> Result<(), CDFAError> {
         if i == chars.len() {
-            return;
+            return Ok(());
         }
 
         let c = chars[i];
-        TransitionTrie::insert_internal(c, node, i == chars.len() - 1, dest);
-        TransitionTrie::insert_chain_internal(i + 1, node.get_child_mut(c).unwrap(), chars, dest);
+        TransitionTrie::insert_internal(c, node, i == chars.len() - 1, dest)?;
+        TransitionTrie::insert_chain_internal(i + 1, node.get_child_mut(c).unwrap(), chars, dest)
     }
 
-    fn insert_internal(c: char, node: &mut TransitionNode, last: bool, dest: usize) {
+    fn insert_internal(c: char, node: &mut TransitionNode, last: bool, dest: usize) -> Result<(), CDFAError> {
         if !node.has_child(c) {
             let child = TransitionNode {
                 children: HashMap::new(),
@@ -253,17 +255,18 @@ impl TransitionTrie {
             };
             node.add_child(c, child);
         } else if last {
-            //TODO throw error here (trie is not prefix free)
-            panic!("Trie is not prefix free");
+            return Err(CDFAError::BuildErr("Transition trie is not prefix free".to_string()));
         }
+        Ok(())
     }
 
-    fn set_default(&mut self, default: usize) {
+    fn set_default(&mut self, default: usize) -> Result<(), CDFAError> {
         if self.default.is_some() {
-            //TODO throw error if default is not None (already set)
-            panic!("default transition set twice");
+            Err(CDFAError::BuildErr("Default matcher used twice".to_string()))
+        } else {
+            self.default = Some(default);
+            Ok(())
         }
-        self.default = Some(default);
     }
 }
 
@@ -313,10 +316,10 @@ mod tests {
         builder
             .set_alphabet("01".chars());
         builder
-            .mark_trans(&"start".to_string(), &"zero".to_string(), '0')
-            .mark_trans(&"start".to_string(), &"notzero".to_string(), '1');
+            .mark_trans(&"start".to_string(), &"zero".to_string(), '0').unwrap()
+            .mark_trans(&"start".to_string(), &"notzero".to_string(), '1').unwrap();
         builder
-            .mark_def(&"notzero".to_string(), &"notzero".to_string());
+            .mark_def(&"notzero".to_string(), &"notzero".to_string()).unwrap();
         builder
             .mark_token(&"zero".to_string(), &"ZERO".to_string())
             .mark_token(&"notzero".to_string(), &"NZ".to_string());
@@ -359,14 +362,14 @@ NZ <- '11010101'
         builder
             .set_alphabet("{} \t\n".chars());
         builder
-            .mark_trans(&"start".to_string(), &"ws".to_string(), ' ')
-            .mark_trans(&"start".to_string(), &"ws".to_string(), '\t')
-            .mark_trans(&"start".to_string(), &"ws".to_string(), '\n')
-            .mark_trans(&"start".to_string(), &"lbr".to_string(), '{')
-            .mark_trans(&"start".to_string(), &"rbr".to_string(), '}')
-            .mark_trans(&"ws".to_string(), &"ws".to_string(), ' ')
-            .mark_trans(&"ws".to_string(), &"ws".to_string(), '\t')
-            .mark_trans(&"ws".to_string(), &"ws".to_string(), '\n');
+            .mark_trans(&"start".to_string(), &"ws".to_string(), ' ').unwrap()
+            .mark_trans(&"start".to_string(), &"ws".to_string(), '\t').unwrap()
+            .mark_trans(&"start".to_string(), &"ws".to_string(), '\n').unwrap()
+            .mark_trans(&"start".to_string(), &"lbr".to_string(), '{').unwrap()
+            .mark_trans(&"start".to_string(), &"rbr".to_string(), '}').unwrap()
+            .mark_trans(&"ws".to_string(), &"ws".to_string(), ' ').unwrap()
+            .mark_trans(&"ws".to_string(), &"ws".to_string(), '\t').unwrap()
+            .mark_trans(&"ws".to_string(), &"ws".to_string(), '\n').unwrap();
         builder
             .mark_token(&"lbr".to_string(), &"LBR".to_string())
             .mark_token(&"rbr".to_string(), &"RBR".to_string())
@@ -422,14 +425,14 @@ RBR <- '}'
         builder
             .set_alphabet("{} \t\n".chars());
         builder
-            .mark_trans(&"start".to_string(), &"ws".to_string(), ' ')
-            .mark_trans(&"start".to_string(), &"ws".to_string(), '\t')
-            .mark_trans(&"start".to_string(), &"ws".to_string(), '\n')
-            .mark_trans(&"start".to_string(), &"lbr".to_string(), '{')
-            .mark_trans(&"start".to_string(), &"rbr".to_string(), '}')
-            .mark_trans(&"ws".to_string(), &"ws".to_string(), ' ')
-            .mark_trans(&"ws".to_string(), &"ws".to_string(), '\t')
-            .mark_trans(&"ws".to_string(), &"ws".to_string(), '\n');
+            .mark_trans(&"start".to_string(), &"ws".to_string(), ' ').unwrap()
+            .mark_trans(&"start".to_string(), &"ws".to_string(), '\t').unwrap()
+            .mark_trans(&"start".to_string(), &"ws".to_string(), '\n').unwrap()
+            .mark_trans(&"start".to_string(), &"lbr".to_string(), '{').unwrap()
+            .mark_trans(&"start".to_string(), &"rbr".to_string(), '}').unwrap()
+            .mark_trans(&"ws".to_string(), &"ws".to_string(), ' ').unwrap()
+            .mark_trans(&"ws".to_string(), &"ws".to_string(), '\t').unwrap()
+            .mark_trans(&"ws".to_string(), &"ws".to_string(), '\n').unwrap();
         builder
             .mark_token(&"lbr".to_string(), &"LBR".to_string())
             .mark_token(&"rbr".to_string(), &"RBR".to_string());
@@ -480,14 +483,14 @@ RBR <- '}'
         builder
             .set_alphabet("{} \t\n".chars());
         builder
-            .mark_trans(&"start".to_string(), &"ws".to_string(), ' ')
-            .mark_trans(&"start".to_string(), &"ws".to_string(), '\t')
-            .mark_trans(&"start".to_string(), &"ws".to_string(), '\n')
-            .mark_trans(&"start".to_string(), &"lbr".to_string(), '{')
-            .mark_trans(&"start".to_string(), &"rbr".to_string(), '}')
-            .mark_trans(&"ws".to_string(), &"ws".to_string(), ' ')
-            .mark_trans(&"ws".to_string(), &"ws".to_string(), '\t')
-            .mark_trans(&"ws".to_string(), &"ws".to_string(), '\n');
+            .mark_trans(&"start".to_string(), &"ws".to_string(), ' ').unwrap()
+            .mark_trans(&"start".to_string(), &"ws".to_string(), '\t').unwrap()
+            .mark_trans(&"start".to_string(), &"ws".to_string(), '\n').unwrap()
+            .mark_trans(&"start".to_string(), &"lbr".to_string(), '{').unwrap()
+            .mark_trans(&"start".to_string(), &"rbr".to_string(), '}').unwrap()
+            .mark_trans(&"ws".to_string(), &"ws".to_string(), ' ').unwrap()
+            .mark_trans(&"ws".to_string(), &"ws".to_string(), '\t').unwrap()
+            .mark_trans(&"ws".to_string(), &"ws".to_string(), '\n').unwrap();
         builder
             .mark_token(&"lbr".to_string(), &"LBR".to_string())
             .mark_token(&"rbr".to_string(), &"RBR".to_string());
@@ -529,14 +532,14 @@ RBR <- '}'
         builder
             .set_alphabet("{} \t\n".chars());
         builder
-            .mark_trans(&"start".to_string(), &"ws".to_string(), ' ')
-            .mark_trans(&"start".to_string(), &"ws".to_string(), '\t')
-            .mark_trans(&"start".to_string(), &"ws".to_string(), '\n')
-            .mark_trans(&"start".to_string(), &"lbr".to_string(), '{')
-            .mark_trans(&"start".to_string(), &"rbr".to_string(), '}')
-            .mark_trans(&"ws".to_string(), &"ws".to_string(), ' ')
-            .mark_trans(&"ws".to_string(), &"ws".to_string(), '\t')
-            .mark_trans(&"ws".to_string(), &"ws".to_string(), '\n');
+            .mark_trans(&"start".to_string(), &"ws".to_string(), ' ').unwrap()
+            .mark_trans(&"start".to_string(), &"ws".to_string(), '\t').unwrap()
+            .mark_trans(&"start".to_string(), &"ws".to_string(), '\n').unwrap()
+            .mark_trans(&"start".to_string(), &"lbr".to_string(), '{').unwrap()
+            .mark_trans(&"start".to_string(), &"rbr".to_string(), '}').unwrap()
+            .mark_trans(&"ws".to_string(), &"ws".to_string(), ' ').unwrap()
+            .mark_trans(&"ws".to_string(), &"ws".to_string(), '\t').unwrap()
+            .mark_trans(&"ws".to_string(), &"ws".to_string(), '\n').unwrap();
         builder
             .mark_token(&"lbr".to_string(), &"LBR".to_string())
             .mark_token(&"rbr".to_string(), &"RBR".to_string());
@@ -578,8 +581,8 @@ RBR <- '}'
         builder
             .set_alphabet("fourive".chars());
         builder
-            .mark_chain(&"start".to_string(), &"four".to_string(), "four".chars())
-            .mark_chain(&"start".to_string(), &"five".to_string(), "five".chars());
+            .mark_chain(&"start".to_string(), &"four".to_string(), "four".chars()).unwrap()
+            .mark_chain(&"start".to_string(), &"five".to_string(), "five".chars()).unwrap();
         builder
             .mark_token(&"four".to_string(), &"FOUR".to_string())
             .mark_token(&"five".to_string(), &"FIVE".to_string());
@@ -625,15 +628,15 @@ FIVE <- 'five'
         builder
             .set_alphabet("fordk".chars());
         builder
-            .mark_chain(&"start".to_string(), &"FOR".to_string(), "for".chars());
+            .mark_chain(&"start".to_string(), &"FOR".to_string(), "for".chars()).unwrap();
         builder
             .mark_token(&"FOR".to_string(), &"FOR".to_string())
             .mark_token(&"id".to_string(), &"ID".to_string());
         builder
             .mark_start(&"start".to_string());
         builder
-            .mark_def(&"start".to_string(), &"id".to_string())
-            .mark_def(&"id".to_string(), &"id".to_string());
+            .mark_def(&"start".to_string(), &"id".to_string()).unwrap()
+            .mark_def(&"id".to_string(), &"id".to_string()).unwrap();
         builder
             .mark_accepting(&"FOR".to_string())
             .mark_accepting(&"id".to_string());

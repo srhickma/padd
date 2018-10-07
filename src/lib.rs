@@ -29,7 +29,7 @@ impl FormatJobRunner {
     pub fn build(spec: &String) -> Result<FormatJobRunner, BuildError> {
         let parse = spec::parse_spec(spec)?;
         let (cdfa, grammar, formatter) = spec::generate_spec(&parse)?;
-        Ok(FormatJobRunner{
+        Ok(FormatJobRunner {
             cdfa,
             grammar,
             formatter,
@@ -56,7 +56,7 @@ impl FormatJobRunner {
 #[derive(Debug)]
 pub enum BuildError {
     SpecParseErr(spec::ParseError),
-    SpecGenErr(spec::GenError)
+    SpecGenErr(spec::GenError),
 }
 
 impl fmt::Display for BuildError {
@@ -92,7 +92,7 @@ impl From<spec::GenError> for BuildError {
 #[derive(Debug)]
 pub enum FormatError {
     ScanErr(scan::Error),
-    ParseErr(parse::Error)
+    ParseErr(parse::Error),
 }
 
 impl fmt::Display for FormatError {
@@ -216,6 +216,54 @@ s -> B;
         assert_eq!(
             format!("{}", res.err().unwrap()),
             "Failed to parse specification: Parse error: Recognition failed at token 1: ID <- 'start'"
+        );
+    }
+
+    #[test]
+    fn test_failed_cdfa_multiple_def_matchers() {
+        //setup
+        let spec = "
+''
+
+start
+    _ -> ^A
+    _ -> ^B;
+
+s ->;
+    ".to_string();
+
+        //exercise
+        let res = FormatJobRunner::build(&spec);
+
+        //verify
+        assert!(res.is_err());
+        assert_eq!(
+            format!("{}", res.err().unwrap()),
+            "Failed to generate specification: ECDFA generation error: Failed to build CDFA: Default matcher used twice"
+        );
+    }
+
+    #[test]
+    fn test_failed_cdfa_non_prefix_free() {
+        //setup
+        let spec = "
+''
+
+start
+    'a' -> ^A
+    'ab' -> ^B;
+
+s ->;
+    ".to_string();
+
+        //exercise
+        let res = FormatJobRunner::build(&spec);
+
+        //verify
+        assert!(res.is_err());
+        assert_eq!(
+            format!("{}", res.err().unwrap()),
+            "Failed to generate specification: ECDFA generation error: Failed to build CDFA: Transition trie is not prefix free"
         );
     }
 }

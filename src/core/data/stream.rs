@@ -18,7 +18,7 @@ impl<'g, T: 'g + Clone> StreamSource<'g, T> {
             None => StreamBuffer::new(),
             Some(sb) => StreamBuffer {
                 incoming_buffer: sb.incoming_buffer.clone(),
-                outgoing_buffer: LinkedList::new()
+                outgoing_buffer: LinkedList::new(),
             }
         };
 
@@ -196,6 +196,7 @@ pub struct StreamConsumer<'s, 'a: 's, 'g: 'a + 's, T: 'g + 'a + 's + Clone> {
     block: bool, //TODO see if we can remove this via splitting
 }
 
+#[allow(dead_code)]
 impl<'s, 'a: 's, 'g: 'a + 's, T: 'g + 'a + 's + Clone> StreamConsumer<'s, 'a, 'g, T> {
     fn new(stream: &'s mut Stream<'a, 'g, T>, on_consume: Box<FnMut(&LinkedList<T>) + 's>) -> Self {
         StreamConsumer {

@@ -1,3 +1,5 @@
+use std::fmt;
+use std::error;
 use core::data::Data;
 use core::data::stream::StreamSource;
 use core::data::stream::StreamConsumer;
@@ -30,8 +32,35 @@ pub trait CDFABuilder<State, Kind> {
     fn set_alphabet(&mut self, chars: impl Iterator<Item=char>) -> &mut Self;
     fn mark_accepting(&mut self, state: &State) -> &mut Self;
     fn mark_start(&mut self, state: &State) -> &mut Self;
-    fn mark_trans(&mut self, from: &State, to: &State, on: char) -> &mut Self;
-    fn mark_chain(&mut self, from: &State, to: &State, on: impl Iterator<Item=char>) -> &mut Self;
-    fn mark_def(&mut self, from: &State, to: &State) -> &mut Self;
+    fn mark_trans(&mut self, from: &State, to: &State, on: char) -> Result<&mut Self, CDFAError>;
+    fn mark_chain(&mut self, from: &State, to: &State, on: impl Iterator<Item=char>) -> Result<&mut Self, CDFAError>;
+    fn mark_def(&mut self, from: &State, to: &State) -> Result<&mut Self, CDFAError>;
     fn mark_token(&mut self, state: &State, token: &Kind) -> &mut Self;
+}
+
+#[derive(Debug)]
+pub enum CDFAError {
+    BuildErr(String),
+}
+
+impl fmt::Display for CDFAError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            CDFAError::BuildErr(ref err) => write!(f, "Failed to build CDFA: {}", err),
+        }
+    }
+}
+
+impl error::Error for CDFAError {
+    fn cause(&self) -> Option<&error::Error> {
+        match *self {
+            CDFAError::BuildErr(_) => None,
+        }
+    }
+}
+
+impl From<String> for CDFAError {
+    fn from(err: String) -> CDFAError {
+        CDFAError::BuildErr(err)
+    }
 }

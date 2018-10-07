@@ -12,6 +12,7 @@ use core::scan::State;
 use core::scan::compile;
 use core::scan::compile::DFA;
 use core::scan::compile::CompileTransitionDelta;
+use core::scan::runtime;
 use core::scan::runtime::CDFABuilder;
 use core::scan::runtime::ecdfa::EncodedCDFA;
 use core::scan::runtime::ecdfa::EncodedCDFABuilder;
@@ -178,7 +179,7 @@ lazy_static! {
 }
 
 pub fn generate_spec(parse: &Tree) -> Result<(EncodedCDFA, Grammar, Formatter), GenError> {
-    let ecdfa = generate_dfa(parse.get_child(0))?;
+    let ecdfa = generate_ecdfa(parse.get_child(0))?;
     let (grammar, pattern_pairs) = generate_grammar(parse.get_child(1));
     let formatter = Formatter::create(pattern_pairs)?;
     Ok((ecdfa, grammar, formatter))
@@ -186,16 +187,15 @@ pub fn generate_spec(parse: &Tree) -> Result<(EncodedCDFA, Grammar, Formatter), 
 
 #[derive(Debug)]
 pub enum GenError {
-    CDFAError(String),
-    //TODO
+    CDFAError(runtime::CDFAError),
     PatternErr(fmt::BuildError),
 }
 
 impl std::fmt::Display for GenError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
-            GenError::CDFAError(ref err) => write!(f, "Failed to build CDFA: {}", err),
-            GenError::PatternErr(ref err) => write!(f, "Failed to build pattern: {}", err),
+            GenError::CDFAError(ref err) => write!(f, "ECDFA generation error: {}", err),
+            GenError::PatternErr(ref err) => write!(f, "Pattern build error: {}", err),
         }
     }
 }
@@ -203,15 +203,15 @@ impl std::fmt::Display for GenError {
 impl error::Error for GenError {
     fn cause(&self) -> Option<&error::Error> {
         match *self {
-            GenError::CDFAError(ref err) => None, //TODO
+            GenError::CDFAError(ref err) => Some(err),
             GenError::PatternErr(ref err) => Some(err),
         }
     }
 }
 
-impl From<String> for GenError {
-    fn from(err: String) -> GenError {
-        GenError::CDFAError(err) //TODO
+impl From<runtime::CDFAError> for GenError {
+    fn from(err: runtime::CDFAError) -> GenError {
+        GenError::CDFAError(err)
     }
 }
 
@@ -221,12 +221,12 @@ impl From<fmt::BuildError> for GenError {
     }
 }
 
-fn generate_dfa(tree: &Tree) -> Result<EncodedCDFA, String> {
+fn generate_ecdfa(tree: &Tree) -> Result<EncodedCDFA, runtime::CDFAError> {
     let mut builder = EncodedCDFABuilder::new();
 
     generate_ecdfa_alphabet(tree, &mut builder);
 
-    generate_ecdfa_states(tree.get_child(1), &mut builder);
+    generate_ecdfa_states(tree.get_child(1), &mut builder)?;
 
     EncodedCDFA::build_from(builder)
 }
@@ -238,7 +238,7 @@ fn generate_ecdfa_alphabet(tree: &Tree, builder: &mut EncodedCDFABuilder) {
     builder.set_alphabet(alphabet.chars());
 }
 
-fn generate_ecdfa_states<'a>(states_node: &Tree, builder: &mut EncodedCDFABuilder) {
+fn generate_ecdfa_states<'a>(states_node: &Tree, builder: &mut EncodedCDFABuilder) -> Result<(), runtime::CDFAError> {
     let state_node = states_node.get_child(states_node.children.len() - 1);
 
     let sdec_node = state_node.get_child(0);
@@ -261,14 +261,15 @@ fn generate_ecdfa_states<'a>(states_node: &Tree, builder: &mut EncodedCDFABuilde
 
     let transopt_node = state_node.get_child(1);
     if !transopt_node.is_empty() {
-        generate_ecdfa_trans(transopt_node.get_child(0), &states, builder);
+        generate_ecdfa_trans(transopt_node.get_child(0), &states, builder)?;
     }
 
     if states_node.children.len() == 2 {
-        return generate_ecdfa_states(states_node.get_child(0), builder);
+        generate_ecdfa_states(states_node.get_child(0), builder)
+    } else {
+        builder.mark_start(head_state);
+        Ok(())
     }
-
-    builder.mark_start(head_state);
 }
 
 fn generate_ecdfa_targets<'a>(targets_node: &'a Tree, accumulator: &mut Vec<&'a State>) {
@@ -278,7 +279,7 @@ fn generate_ecdfa_targets<'a>(targets_node: &'a Tree, accumulator: &mut Vec<&'a 
     }
 }
 
-fn generate_ecdfa_trans<'a>(trans_node: &'a Tree, sources: &Vec<&State>, builder: &mut EncodedCDFABuilder) {
+fn generate_ecdfa_trans<'a>(trans_node: &'a Tree, sources: &Vec<&State>, builder: &mut EncodedCDFABuilder) -> Result<(), runtime::CDFAError> {
     let tran_node = trans_node.get_child(trans_node.children.len() - 1);
 
     let trand_node = tran_node.get_child(2);
@@ -287,10 +288,10 @@ fn generate_ecdfa_trans<'a>(trans_node: &'a Tree, sources: &Vec<&State>, builder
     let matcher = tran_node.get_child(0);
     match &matcher.lhs.kind[..] {
         "mtcs" => {
-            generate_ecdfa_mtcs(matcher, sources, dest, builder);
+            generate_ecdfa_mtcs(matcher, sources, dest, builder)?;
         }
         "DEF" => for source in sources {
-            builder.mark_def(source, dest);
+            builder.mark_def(source, dest)?;
         },
         &_ => panic!("Transition map input is neither CILC or DEF"),
     }
@@ -300,27 +301,30 @@ fn generate_ecdfa_trans<'a>(trans_node: &'a Tree, sources: &Vec<&State>, builder
     }
 
     if trans_node.children.len() == 2 {
-        generate_ecdfa_trans(trans_node.get_child(0), sources, builder);
+        generate_ecdfa_trans(trans_node.get_child(0), sources, builder)
+    } else {
+        Ok(())
     }
 }
 
-fn generate_ecdfa_mtcs<'a>(mtcs_node: &'a Tree, sources: &Vec<&State>, dest: &State, builder: &mut EncodedCDFABuilder) {
+fn generate_ecdfa_mtcs<'a>(mtcs_node: &'a Tree, sources: &Vec<&State>, dest: &State, builder: &mut EncodedCDFABuilder) -> Result<(), runtime::CDFAError> {
     let matcher = mtcs_node.children.first().unwrap();
     let matcher_string = matcher.lhs.lexeme.trim_matches('\'');
     let matcher_cleaned = replace_escapes(&matcher_string);
-    //let mut chars = matcher_cleaned.chars();
     if matcher_cleaned.len() == 1 {
         for source in sources {
-            builder.mark_trans(source, dest, matcher_cleaned.chars().next().unwrap());
+            builder.mark_trans(source, dest, matcher_cleaned.chars().next().unwrap())?;
         }
     } else {
         for source in sources {
-            builder.mark_chain(source, dest, matcher_cleaned.chars());
+            builder.mark_chain(source, dest, matcher_cleaned.chars())?;
         }
     }
 
     if mtcs_node.children.len() == 3 {
-        generate_ecdfa_mtcs(mtcs_node.get_child(2), sources, dest, builder);
+        generate_ecdfa_mtcs(mtcs_node.get_child(2), sources, dest, builder)
+    } else {
+        Ok(())
     }
 }
 
@@ -469,7 +473,6 @@ mod tests {
     use super::*;
     use core::data::Data;
     use core::data::stream::StreamSource;
-    use core::scan::runtime;
 
     #[test]
     fn parse_spec_spaces() {
