@@ -1,16 +1,15 @@
-use std::collections::HashMap;
 use std::error;
 use std::fmt;
 use std::cmp::PartialEq;
 use std::clone::Clone;
-use core::spec::DEF_MATCHER;
+use core::data::Data;
 
 pub mod compile;
 pub mod runtime;
 pub mod maximal_munch;
 
 pub trait Scanner<State: PartialEq + Clone> {
-    fn scan<'a, 'b>(&self, input: &'a str, dfa: &'b DFA<State>) -> Result<Vec<Token>, Error>;
+    fn scan<'a, 'b>(&self, input: &'a str, dfa: &'b DFA<State>) -> Result<Vec<Token<String>>, Error>;
 }
 
 pub fn def_scanner<State : PartialEq + Clone>() -> Box<Scanner<State>> {
@@ -19,16 +18,15 @@ pub fn def_scanner<State : PartialEq + Clone>() -> Box<Scanner<State>> {
 
 static FAIL_SEQUENCE_LENGTH: usize = 10;
 
-#[derive(PartialEq, Clone)]
-pub struct Token {
+#[derive(PartialEq, Clone, Debug)]
+pub struct Token<Kind: fmt::Debug> {
     pub kind: Kind,
-    pub lexeme: String,
+    pub lexeme: String
 }
 
-impl Token {
-    //TODO fix this method or remove it
-    pub fn to_string(&self) -> String {
-        format!("{} <- '{}'", self.kind, self.lexeme.replace('\n', "\\n").replace('\t', "\\t"))
+impl<Kind: Data> Data for Token<Kind> {
+    fn to_string(&self) -> String {
+        format!("{} <- '{}'", self.kind.to_string(), self.lexeme.replace('\n', "\\n").replace('\t', "\\t"))
     }
 }
 
@@ -53,10 +51,6 @@ impl error::Error for Error {
 
 pub type Kind = String;
 pub type State = String;
-
-lazy_static! {
-    static ref NULL_STATE: String = String::new();
-}
 
 pub struct DFA<State : PartialEq + Clone> {
     pub alphabet: String,
@@ -124,48 +118,6 @@ impl<State : PartialEq + Clone> CompileTransitionDelta<State> {
             delta,
             tokenizer,
             fail_state
-        }
-    }
-}
-
-pub struct RuntimeTransitionDelta {
-    pub delta: HashMap<State, HashMap<char, State>>,
-    pub tokenizer: HashMap<State, Kind>,
-}
-
-impl TransitionDelta<State> for RuntimeTransitionDelta {
-    fn transition(&self, state: &State, c: char) -> State { //TODO replace all the string cloning here!!!
-        match self.delta.get(state) {
-            Some(hm) => match hm.get(&c) {
-                Some(s) => s.to_string(),
-                None => match hm.get(&DEF_MATCHER) {
-                    Some(s) => s.to_string(),
-                    None => (&NULL_STATE).to_string(),
-                },
-            },
-            None => (&NULL_STATE).to_string(),
-        }
-    }
-
-    fn tokenize(&self, state: &State) -> Option<Kind> {
-        match self.tokenizer.get(state) {
-            Some(s) => Some(s.clone()),
-            None => None,
-        }
-    }
-
-    fn fail_state(&self) -> State {
-        "".to_string()
-    }
-
-    //TODO remove with CDFA
-    fn should_advance_scanner(&self, c: char, state: &State) -> bool {
-        state.chars().next().unwrap() != '#' || match self.delta.get(state) {
-            Some(hm) => match hm.get(&c) {
-                Some(_) => true,
-                None => false
-            },
-            None => false,
         }
     }
 }
@@ -453,7 +405,7 @@ kind=RBRACKET lexeme=}"
         assert_eq!(err.character, 10);
     }
 
-    fn tokens_string(tokens: &Vec<Token>) -> String {
+    fn tokens_string(tokens: &Vec<Token<String>>) -> String {
         let mut res = String::new();
 
         for token in tokens {

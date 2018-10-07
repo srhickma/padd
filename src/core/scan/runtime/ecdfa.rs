@@ -127,7 +127,7 @@ pub struct EncodedCDFA {
 }
 
 impl EncodedCDFA {
-    fn build_from(builder: EncodedCDFABuilder) -> Result<Self, String> {
+    pub fn build_from(builder: EncodedCDFABuilder) -> Result<Self, String> {
         if builder.start == usize::max_value() {
             Err("No start state was set".to_string())
         } else if builder.start > builder.t_delta.size() {
@@ -304,7 +304,7 @@ impl TransitionNode {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use core::scan::runtime::Token;
+    use core::scan::Token;
 
     #[test]
     fn scan_binary() {
@@ -569,6 +569,95 @@ RBR <- '}'
         assert_eq!(err.sequence, "xyz  { {}\n");
         assert_eq!(err.line, 4);
         assert_eq!(err.character, 10);
+    }
+
+    #[test]
+    fn scan_chain_simple() {
+        //setup
+        let mut builder: EncodedCDFABuilder = EncodedCDFABuilder::new();
+        builder
+            .set_alphabet("fourive".chars());
+        builder
+            .mark_chain(&"start".to_string(), &"four".to_string(), "four".chars())
+            .mark_chain(&"start".to_string(), &"five".to_string(), "five".chars());
+        builder
+            .mark_token(&"four".to_string(), &"FOUR".to_string())
+            .mark_token(&"five".to_string(), &"FIVE".to_string());
+        builder
+            .mark_start(&"start".to_string());
+        builder
+            .mark_accepting(&"four".to_string())
+            .mark_accepting(&"five".to_string());
+
+        let cdfa: EncodedCDFA = EncodedCDFA::build_from(builder).unwrap();
+
+        let input = "fivefourfourfourfivefivefourfive".to_string();
+        let mut iter = input.chars();
+
+        let mut getter = || {
+            iter.next()
+        };
+
+        let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
+
+        let scanner = runtime::def_scanner();
+
+        //exercise
+        let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
+
+        //verify
+        assert_eq!(tokens_string(&tokens), "\
+FIVE <- 'five'
+FOUR <- 'four'
+FOUR <- 'four'
+FOUR <- 'four'
+FIVE <- 'five'
+FIVE <- 'five'
+FOUR <- 'four'
+FIVE <- 'five'
+");
+    }
+
+    #[test]
+    fn scan_chain_def() {
+        //setup
+        let mut builder: EncodedCDFABuilder = EncodedCDFABuilder::new();
+        builder
+            .set_alphabet("fordk".chars());
+        builder
+            .mark_chain(&"start".to_string(), &"FOR".to_string(), "for".chars());
+        builder
+            .mark_token(&"FOR".to_string(), &"FOR".to_string())
+            .mark_token(&"id".to_string(), &"ID".to_string());
+        builder
+            .mark_start(&"start".to_string());
+        builder
+            .mark_def(&"start".to_string(), &"id".to_string())
+            .mark_def(&"id".to_string(), &"id".to_string());
+        builder
+            .mark_accepting(&"FOR".to_string())
+            .mark_accepting(&"id".to_string());
+
+        let cdfa: EncodedCDFA = EncodedCDFA::build_from(builder).unwrap();
+
+        let input = "fdk".to_string();
+        let mut iter = input.chars();
+
+        let mut getter = || {
+            iter.next()
+        };
+
+        let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
+
+        let scanner = runtime::def_scanner();
+
+        //exercise
+        let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
+
+        //verify
+        assert_eq!(tokens_string(&tokens), "\
+ID <- 'fdk'
+");
     }
 
     fn tokens_string<Kind: Data>(tokens: &Vec<Token<Kind>>) -> String {

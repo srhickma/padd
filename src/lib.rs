@@ -4,10 +4,11 @@ extern crate stopwatch;
 
 use std::error;
 use std::fmt;
+use core::data::stream::StreamSource;
 use core::scan;
-use core::scan::DFA;
-use core::scan::Scanner;
-use core::scan::State;
+use core::scan::runtime;
+use core::scan::runtime::Scanner;
+use core::scan::runtime::ecdfa::EncodedCDFA;
 use core::parse;
 use core::parse::Grammar;
 use core::parse::Parser;
@@ -17,28 +18,36 @@ use core::spec;
 mod core;
 
 pub struct FormatJobRunner {
-    dfa: DFA<State>,
+    cdfa: EncodedCDFA,
     grammar: Grammar,
     formatter: Formatter,
-    scanner: Box<Scanner<State>>,
+    scanner: Box<Scanner<usize, String>>,
     parser: Box<Parser>,
 }
 
 impl FormatJobRunner {
     pub fn build(spec: &String) -> Result<FormatJobRunner, BuildError> {
         let parse = spec::parse_spec(spec)?;
-        let (dfa, grammar, formatter) = spec::generate_spec(&parse)?;
+        let (cdfa, grammar, formatter) = spec::generate_spec(&parse)?;
         Ok(FormatJobRunner{
-            dfa,
+            cdfa,
             grammar,
             formatter,
-            scanner: scan::def_scanner(),
+            scanner: runtime::def_scanner(),
             parser: parse::def_parser(),
         })
     }
 
     pub fn format(&self, input: &String) -> Result<String, FormatError> {
-        let tokens = self.scanner.scan(input, &self.dfa)?;
+        //TODO take a stream as input here?
+
+        let mut iter = input.chars();
+        let mut getter = || {
+            iter.next()
+        };
+        let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
+
+        let tokens = self.scanner.scan(&mut stream, &self.cdfa)?;
         let parse = self.parser.parse(tokens, &self.grammar)?;
         Ok(self.formatter.format(&parse))
     }

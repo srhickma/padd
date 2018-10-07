@@ -14,7 +14,15 @@ impl<'g, T: 'g + Clone> StreamSource<'g, T> {
     }
 
     pub fn split<'a>(&'a mut self) -> Stream<'a, 'g, T> {
-        self.buffers.push_back(StreamBuffer::new());
+        let buffer = match self.buffers.back() {
+            None => StreamBuffer::new(),
+            Some(sb) => StreamBuffer {
+                incoming_buffer: sb.incoming_buffer.clone(),
+                outgoing_buffer: LinkedList::new()
+            }
+        };
+
+        self.buffers.push_back(buffer);
 
         self.head()
     }
@@ -611,6 +619,30 @@ mod tests {
 
         //verify
         assert_eq!(res, "abcdefghijklmnmlkjihgfedcb");
+    }
+
+    #[test]
+    fn incoming_buffer_split() {
+        //setup
+        let input = "abc".to_string();
+        let mut iter = input.chars();
+
+        let mut getter = || {
+            iter.next()
+        };
+
+        let mut source = StreamSource::observe(&mut getter);
+        let mut stream = source.head();
+
+        let mut res = String::new();
+
+        //exercise
+        read_all(&mut stream, &mut res);
+        stream = stream.replay().split();
+        read_all(&mut stream, &mut res);
+
+        //verify
+        assert_eq!(res, "abcabc");
     }
 
     fn read_to(stream: &mut Stream<char>, to: &mut String, n: usize) {

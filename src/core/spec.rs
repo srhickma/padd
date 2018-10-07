@@ -1,8 +1,5 @@
 use std;
 use std::error;
-use core::parse::build_prods;
-use core::scan::def_scanner;
-use core::parse::def_parser;
 use core::fmt;
 use core::fmt::PatternPair;
 use core::fmt::Formatter;
@@ -12,11 +9,12 @@ use core::parse::Production;
 use core::parse::Tree;
 use core::scan;
 use core::scan::State;
-use core::scan::Kind;
 use core::scan::DFA;
 use core::scan::CompileTransitionDelta;
-use core::scan::RuntimeTransitionDelta;
-use std::collections::HashMap;
+use core::scan::runtime;
+use core::scan::runtime::CDFABuilder;
+use core::scan::runtime::ecdfa::EncodedCDFA;
+use core::scan::runtime::ecdfa::EncodedCDFABuilder;
 
 static SPEC_ALPHABET: &'static str = "`-=~!@#$%^&*()_+{}|[]\\;':\"<>?,./QWERTYUIOPASDFGHJKLZXCVBNM1234567890abcdefghijklmnopqrstuvwxyz \n\t";
 pub static DEF_MATCHER: char = '_';
@@ -39,7 +37,7 @@ enum S {
     WS,
     ID,
     ARROW,
-    FAIL
+    FAIL,
 }
 
 thread_local! {
@@ -124,7 +122,7 @@ thread_local! {
 }
 
 lazy_static! {
-    static ref SPEC_PRODUCTIONS: Vec<Production> = build_prods(&[
+    static ref SPEC_PRODUCTIONS: Vec<Production> = parse::build_prods(&[
             "spec dfa gram",
 
             "dfa CILC states",
@@ -179,110 +177,108 @@ lazy_static! {
     static ref SPEC_GRAMMAR: Grammar = Grammar::from(SPEC_PRODUCTIONS.clone());
 }
 
-pub fn generate_spec(parse: &Tree) -> Result<(DFA<State>, Grammar, Formatter), GenError> {
-    let dfa = generate_dfa(parse.get_child(0));
+pub fn generate_spec(parse: &Tree) -> Result<(EncodedCDFA, Grammar, Formatter), GenError> {
+    let ecdfa = generate_dfa(parse.get_child(0))?;
     let (grammar, pattern_pairs) = generate_grammar(parse.get_child(1));
     let formatter = Formatter::create(pattern_pairs)?;
-    Ok((dfa, grammar, formatter))
+    Ok((ecdfa, grammar, formatter))
 }
 
-pub type GenError = fmt::BuildError;
+#[derive(Debug)]
+pub enum GenError {
+    CDFAError(String),
+    //TODO
+    PatternErr(fmt::BuildError),
+}
 
-fn generate_dfa(tree: &Tree) -> DFA<State> {
-    let mut delta: HashMap<State, HashMap<char, State>> = HashMap::new();
-    let mut tokenizer: HashMap<State, Kind> = HashMap::new();
-
-    let alphabet_string = tree.get_child(0).lhs.lexeme.trim_matches('\'');
-    let alphabet = replace_escapes(&alphabet_string);
-
-    let start = generate_dfa_states(tree.get_child(1), &mut delta, &mut tokenizer);
-
-    DFA{
-        alphabet,
-        start,
-        td: Box::new(RuntimeTransitionDelta{
-            delta,
-            tokenizer,
-        }),
+impl std::fmt::Display for GenError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match *self {
+            GenError::CDFAError(ref err) => write!(f, "Failed to build CDFA: {}", err),
+            GenError::PatternErr(ref err) => write!(f, "Failed to build pattern: {}", err),
+        }
     }
 }
 
-fn generate_dfa_states<'a>(states_node: &Tree, delta: &mut HashMap<State, HashMap<char, State>>, tokenizer: &mut HashMap<State, Kind>) -> String {
+impl error::Error for GenError {
+    fn cause(&self) -> Option<&error::Error> {
+        match *self {
+            GenError::CDFAError(ref err) => None, //TODO
+            GenError::PatternErr(ref err) => Some(err),
+        }
+    }
+}
+
+impl From<String> for GenError {
+    fn from(err: String) -> GenError {
+        GenError::CDFAError(err) //TODO
+    }
+}
+
+impl From<fmt::BuildError> for GenError {
+    fn from(err: fmt::BuildError) -> GenError {
+        GenError::PatternErr(err)
+    }
+}
+
+fn generate_dfa(tree: &Tree) -> Result<EncodedCDFA, String> {
+    let mut builder = EncodedCDFABuilder::new();
+
+    generate_ecdfa_alphabet(tree, &mut builder);
+
+    generate_ecdfa_states(tree.get_child(1), &mut builder);
+
+    EncodedCDFA::build_from(builder)
+}
+
+fn generate_ecdfa_alphabet(tree: &Tree, builder: &mut EncodedCDFABuilder) {
+    let alphabet_string = tree.get_child(0).lhs.lexeme.trim_matches('\'');
+    let alphabet = replace_escapes(&alphabet_string);
+
+    builder.set_alphabet(alphabet.chars());
+}
+
+fn generate_ecdfa_states<'a>(states_node: &Tree, builder: &mut EncodedCDFABuilder) {
     let state_node = states_node.get_child(states_node.children.len() - 1);
 
     let sdec_node = state_node.get_child(0);
 
     let targets_node = sdec_node.get_child(0);
     let head_state = &targets_node.get_child(0).lhs.lexeme;
-    let mut tail_states: Vec<&State> = vec![];
+
+    let mut states: Vec<&State> = vec![head_state];
     if targets_node.children.len() == 3 {
-        generate_dfa_targets(targets_node.get_child(2), &mut tail_states);
+        generate_ecdfa_targets(targets_node.get_child(2), &mut states);
     }
 
     if sdec_node.children.len() == 3 {
         let end = &sdec_node.get_child(2).lhs.lexeme;
-        tokenizer.insert(head_state.clone(), end.clone());
-        for state in &tail_states {
-            tokenizer.insert((*state).clone(), end.clone());
+
+        for state in &states {
+            add_ecdfa_tokenizer(*state, end, builder);
         }
     }
 
     let transopt_node = state_node.get_child(1);
     if !transopt_node.is_empty() {
-        let mut state_delta: HashMap<char, State> = HashMap::new();
-
-        //TODO remove this after CDFA
-        generate_dfa_trans_def_prefill(transopt_node.get_child(0), &mut state_delta);
-
-        generate_dfa_trans(transopt_node.get_child(0), &mut state_delta, delta, tokenizer, head_state);
-        for state in &tail_states {
-            extend_delta(*state, state_delta.clone(), delta);
-        }
-        extend_delta(head_state, state_delta, delta);
+        generate_ecdfa_trans(transopt_node.get_child(0), &states, builder);
     }
 
     if states_node.children.len() == 2 {
-        return generate_dfa_states(states_node.get_child(0), delta, tokenizer);
+        return generate_ecdfa_states(states_node.get_child(0), builder);
     }
-    head_state.clone()
+
+    builder.mark_start(head_state);
 }
 
-fn extend_delta(state: &State, state_delta: HashMap<char, State>, delta: &mut HashMap<State, HashMap<char, State>>){
-    if delta.contains_key(state) {
-        delta.get_mut(state).unwrap().extend(state_delta);
-    } else {
-        delta.insert(state.clone(), state_delta);
-    }
-}
-
-fn generate_dfa_targets<'a>(targets_node: &'a Tree, accumulator: &mut Vec<&'a State>){
+fn generate_ecdfa_targets<'a>(targets_node: &'a Tree, accumulator: &mut Vec<&'a State>) {
     accumulator.push(&targets_node.get_child(0).lhs.lexeme);
     if targets_node.children.len() == 3 {
-        generate_dfa_targets(targets_node.get_child(2), accumulator);
+        generate_ecdfa_targets(targets_node.get_child(2), accumulator);
     }
 }
 
-fn generate_dfa_trans_def_prefill<'a>(trans_node: &'a Tree, state_delta: &mut HashMap<char, State>){
-    let tran_node = trans_node.get_child(trans_node.children.len() - 1);
-
-    let trand_node = tran_node.get_child(2);
-    let dest: &State = &trand_node.get_child(trand_node.children.len() - 1).lhs.lexeme;
-
-    let matcher = tran_node.get_child(0);
-    match &matcher.lhs.kind[..] {
-        "DEF" => {
-            state_delta.insert(DEF_MATCHER, dest.clone());
-            return;
-        },
-        &_ => {},
-    }
-
-    if trans_node.children.len() == 2 {
-        generate_dfa_trans_def_prefill(trans_node.get_child(0), state_delta);
-    }
-}
-
-fn generate_dfa_trans<'a>(trans_node: &'a Tree, state_delta: &mut HashMap<char, State>, delta: &mut HashMap<State, HashMap<char, State>>, tokenizer: &mut HashMap<State, Kind>, src: &State){
+fn generate_ecdfa_trans<'a>(trans_node: &'a Tree, sources: &Vec<&State>, builder: &mut EncodedCDFABuilder) {
     let tran_node = trans_node.get_child(trans_node.children.len() - 1);
 
     let trand_node = tran_node.get_child(2);
@@ -291,65 +287,47 @@ fn generate_dfa_trans<'a>(trans_node: &'a Tree, state_delta: &mut HashMap<char, 
     let matcher = tran_node.get_child(0);
     match &matcher.lhs.kind[..] {
         "mtcs" => {
-            generate_dfa_mtcs(matcher, state_delta, delta, tokenizer, src, dest);
-        },
-        "DEF" => {
-            //TODO fill with CDFA
+            generate_ecdfa_mtcs(matcher, sources, dest, builder);
+        }
+        "DEF" => for source in sources {
+            builder.mark_def(source, dest);
         },
         &_ => panic!("Transition map input is neither CILC or DEF"),
     }
 
     if trand_node.children.len() == 2 { //Immediate state pass-through
-        tokenizer.insert(dest.clone(), dest.clone());
+        add_ecdfa_tokenizer(dest, dest, builder);
     }
 
     if trans_node.children.len() == 2 {
-        generate_dfa_trans(trans_node.get_child(0), state_delta, delta, tokenizer, src);
+        generate_ecdfa_trans(trans_node.get_child(0), sources, builder);
     }
 }
 
-fn generate_dfa_mtcs<'a>(mtcs_node: &'a Tree, state_delta: &mut HashMap<char, State>, delta: &mut HashMap<State, HashMap<char, State>>, tokenizer: &mut HashMap<State, Kind>, src: &State, dest: &State){
+fn generate_ecdfa_mtcs<'a>(mtcs_node: &'a Tree, sources: &Vec<&State>, dest: &State, builder: &mut EncodedCDFABuilder) {
     let matcher = mtcs_node.children.first().unwrap();
     let matcher_string = matcher.lhs.lexeme.trim_matches('\'');
     let matcher_cleaned = replace_escapes(&matcher_string);
-    let mut chars = matcher_cleaned.chars();
+    //let mut chars = matcher_cleaned.chars();
     if matcher_cleaned.len() == 1 {
-        state_delta.insert(chars.next().unwrap(), dest.clone());
+        for source in sources {
+            builder.mark_trans(source, dest, matcher_cleaned.chars().next().unwrap());
+        }
     } else {
-        let mut from : State = src.clone();
-        let first_char = chars.next().unwrap();
-        let mut to: String = format!("#{}#{}", from, first_char);
-        state_delta.insert(first_char, to.clone());
-
-        //TODO remove with CDFA
-        let def_trans = state_delta.get(&DEF_MATCHER);
-
-        let mut i = 1;
-        for c in chars {
-            from = to.clone(); //TODO try to reduce cloning
-            to = if i == matcher_cleaned.len() - 1 {
-                dest.clone()
-            } else {
-                format!("{}{}", &to, c)
-            };
-
-            delta.entry(from.clone())
-                .or_insert(HashMap::new())
-                .insert(c, to.clone());
-
-            match def_trans {
-                Some(state) => {
-                    delta.get_mut(&from).unwrap().insert(DEF_MATCHER, state.clone());
-                },
-                None => {}
-            };
-
-            i += 1;
+        for source in sources {
+            builder.mark_chain(source, dest, matcher_cleaned.chars());
         }
     }
 
     if mtcs_node.children.len() == 3 {
-        generate_dfa_mtcs(mtcs_node.get_child(2), state_delta, delta, tokenizer, src, dest);
+        generate_ecdfa_mtcs(mtcs_node.get_child(2), sources, dest, builder);
+    }
+}
+
+fn add_ecdfa_tokenizer(state: &State, kind: &String, builder: &mut EncodedCDFABuilder) {
+    builder.mark_accepting(state);
+    if kind != "_" { //TODO
+        builder.mark_token(state, kind);
     }
 }
 
@@ -361,7 +339,7 @@ fn generate_grammar(tree: &Tree) -> (Grammar, Vec<PatternPair>) {
     (Grammar::from(productions), pattern_pairs)
 }
 
-fn generate_grammar_prods<'a, 'b>(prods_node: &'a Tree, accumulator: &'b mut Vec<Production>, pp_accumulator: &'b mut Vec<PatternPair>){
+fn generate_grammar_prods<'a, 'b>(prods_node: &'a Tree, accumulator: &'b mut Vec<Production>, pp_accumulator: &'b mut Vec<PatternPair>) {
     let prod_node = prods_node.get_child(0);
 
     let id = &prod_node.get_child(0).lhs.lexeme;
@@ -373,13 +351,13 @@ fn generate_grammar_prods<'a, 'b>(prods_node: &'a Tree, accumulator: &'b mut Vec
     }
 }
 
-fn generate_grammar_rhss<'a, 'b>(rhss_node: &'a Tree, lhs: &'a String, accumulator: &'b mut Vec<Production>, pp_accumulator: &'b mut Vec<PatternPair>){
+fn generate_grammar_rhss<'a, 'b>(rhss_node: &'a Tree, lhs: &'a String, accumulator: &'b mut Vec<Production>, pp_accumulator: &'b mut Vec<PatternPair>) {
     let rhs_node = rhss_node.get_child(rhss_node.children.len() - 1);
 
     let mut ids: Vec<String> = vec![];
     generate_grammar_ids(rhs_node.get_child(1), &mut ids);
 
-    let production = Production{
+    let production = Production {
         lhs: lhs.clone(),
         rhs: ids,
     };
@@ -392,7 +370,7 @@ fn generate_grammar_rhss<'a, 'b>(rhss_node: &'a Tree, lhs: &'a String, accumulat
         let pattern_string = &pattc[..].trim_matches('`');
         let pattern = replace_escapes(pattern_string);
 
-        pp_accumulator.push(PatternPair{
+        pp_accumulator.push(PatternPair {
             production: accumulator.last().unwrap().clone(),
             pattern,
         });
@@ -403,7 +381,7 @@ fn generate_grammar_rhss<'a, 'b>(rhss_node: &'a Tree, lhs: &'a String, accumulat
     }
 }
 
-fn generate_grammar_ids<'a, 'b>(ids_node: &'a Tree, accumulator: &'b mut Vec<String>){
+fn generate_grammar_ids<'a, 'b>(ids_node: &'a Tree, accumulator: &'b mut Vec<String>) {
     if !ids_node.is_empty() {
         let id = ids_node.get_child(0).lhs.lexeme.clone();
 
@@ -415,8 +393,8 @@ fn generate_grammar_ids<'a, 'b>(ids_node: &'a Tree, accumulator: &'b mut Vec<Str
 
 pub fn parse_spec(input: &str) -> Result<Tree, ParseError> {
     SPEC_DFA.with(|f| -> Result<Tree, ParseError> {
-        let tokens = def_scanner().scan(input, f)?;
-        let parse = def_parser().parse(tokens, &SPEC_GRAMMAR)?;
+        let tokens = scan::def_scanner().scan(input, f)?;
+        let parse = parse::def_parser().parse(tokens, &SPEC_GRAMMAR)?;
         Ok(parse)
     })
 }
@@ -424,7 +402,7 @@ pub fn parse_spec(input: &str) -> Result<Tree, ParseError> {
 #[derive(Debug)]
 pub enum ParseError {
     ScanErr(scan::Error),
-    ParseErr(parse::Error)
+    ParseErr(parse::Error),
 }
 
 impl std::fmt::Display for ParseError {
@@ -472,7 +450,7 @@ fn replace_escapes(input: &str) -> String {
                     last_char = ' '; //Stop \\\\ -> \\\ rather than \\
                     hit_double_slash = true;
                     '\\'
-                },
+                }
                 _ => c,
             });
         } else if c != '\\' {
@@ -489,6 +467,8 @@ fn replace_escapes(input: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use core::data::Data;
+    use core::data::stream::StreamSource;
 
     #[test]
     fn parse_spec_spaces() {
@@ -500,7 +480,7 @@ mod tests {
 
         //verify
         assert_eq!(tree.unwrap().to_string(),
-"└── spec
+                   "└── spec
     ├── dfa
     │   ├── CILC <- '' ''
     │   └── states
@@ -567,7 +547,7 @@ w -> WHITESPACE `[prefix]{0}\n\n{1;prefix=[prefix]\t}[prefix]{2}\n\n`
 
         //verify
         assert_eq!(tree.unwrap().to_string(),
-"└── spec
+                   "└── spec
     ├── dfa
     │   ├── CILC <- '' \\t\\n{}''
     │   └── states
@@ -750,18 +730,23 @@ b -> LBRACKET s RBRACKET `[prefix]{0}\\n\\n{1;prefix=[prefix]\\t}[prefix]{2}\\n\
 w -> WHITESPACE ``;
         ";
 
-        let input = "  {  {  {{{\t}}}\n {} }  }   { {}\n } ";
+        let input = "  {  {  {{{\t}}}\n {} }  }   { {}\n } ".to_string();
+        let mut iter = input.chars();
+        let mut getter = || {
+            iter.next()
+        };
+        let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
 
-        let scanner = def_scanner();
-        let parser = def_parser();
+        let scanner = runtime::def_scanner();
+        let parser = parse::def_parser();
 
         //specification
         let tree = parse_spec(spec);
         let parse = tree.unwrap();
-        let (dfa, grammar, formatter) = generate_spec(&parse).unwrap();
+        let (cdfa, grammar, formatter) = generate_spec(&parse).unwrap();
 
         //input
-        let tokens = scanner.scan(input, &dfa);
+        let tokens = scanner.scan(&mut stream, &cdfa);
         let tree = parser.parse(tokens.unwrap(), &grammar);
         let parse = tree.unwrap();
 
@@ -770,7 +755,7 @@ w -> WHITESPACE ``;
 
         //verify
         assert_eq!(res,
-"{
+                   "{
 
 	{
 
@@ -805,6 +790,57 @@ w -> WHITESPACE ``;
     }
 
     #[test]
+    fn generate_spec_advanced_operators() {
+        //setup
+        let spec = "
+        'inj '
+
+        start
+            'in' -> ^IN
+            ' ' -> ^_
+            _ -> ^ID;
+
+        ID | IN
+            ' ' -> fail
+            _ -> ID;
+
+        s ->;";
+
+        let input = "i ij ijjjijijiji inj in iii".to_string();
+        let mut iter = input.chars();
+        let mut getter = || {
+            iter.next()
+        };
+        let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
+
+        let scanner = runtime::def_scanner();
+        let parser = parse::def_parser();
+
+        let tree = parse_spec(spec);
+        let parse = tree.unwrap();
+        let (cdfa, grammar, formatter) = generate_spec(&parse).unwrap();
+
+        //exercise
+        let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
+
+        let mut result = String::new();
+        for token in tokens {
+            result.push_str(&token.to_string());
+            result.push('\n');
+        }
+
+        //verify
+        assert_eq!(result, "\
+ID <- 'i'
+ID <- 'ij'
+ID <- 'ijjjijijiji'
+ID <- 'inj'
+IN <- 'in'
+ID <- 'iii'
+");
+    }
+
+    #[test]
     fn multi_character_lexing() {
         //setup
         let spec = "
@@ -823,19 +859,23 @@ id ^ID
  ' ' -> fail
  _ -> id;
 
-s -> ;
-    ";
+s -> ;";
 
         let input = "fdkgdfjgdjglkdjglkdjgljbnhbduhoifjeoigjeoghknhkjdfjgoirjt for if endif \
-        elseif somethign eldsfnj hi bob joe here final for fob else if id idhere fobre f ";
+        elseif somethign eldsfnj hi bob joe here final for fob else if id idhere fobre f ".to_string();
+        let mut iter = input.chars();
+        let mut getter = || {
+            iter.next()
+        };
+        let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
 
-        let scanner = def_scanner();
+        let scanner = runtime::def_scanner();
         let tree = parse_spec(spec);
         let parse = tree.unwrap();
-        let (dfa, _, _) = generate_spec(&parse).unwrap();
+        let (cdfa, _, _) = generate_spec(&parse).unwrap();
 
         //execute
-        let tokens = scanner.scan(input, &dfa).unwrap();
+        let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
 
         //verify
         let mut res_string = String::new();
@@ -890,7 +930,7 @@ kind=ID lexeme=f")
 
         //verify
         assert_eq!(tree.unwrap().to_string(),
-"└── spec
+                   "└── spec
     ├── dfa
     │   ├── CILC <- ''inj ''
     │   └── states

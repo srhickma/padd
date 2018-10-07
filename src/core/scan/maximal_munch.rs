@@ -9,7 +9,7 @@ use std::cmp;
 pub struct MaximalMunchScanner;
 
 impl<State : PartialEq + Clone> Scanner<State> for MaximalMunchScanner {
-    fn scan<'a, 'b>(&self, input: &'a str, dfa: &'b DFA<State>) -> Result<Vec<Token>, scan::Error> {
+    fn scan<'a, 'b>(&self, input: &'a str, dfa: &'b DFA<State>) -> Result<Vec<Token<String>>, scan::Error> {
 
         fn scan_one<'a, 'b, State : PartialEq + Clone>(input: &'a [char], line: usize, character: usize, dfa: &'b DFA<State>) -> (usize, State, usize, usize) {
             let mut input: &[char] = input;
@@ -50,7 +50,7 @@ impl<State : PartialEq + Clone> Scanner<State> for MaximalMunchScanner {
             c
         }).collect();
 
-        let mut tokens: Vec<Token> = vec![];
+        let mut tokens: Vec<Token<String>> = vec![];
         let mut input: &[char] = &chars;
         let mut line: usize = 1;
         let mut character: usize = 1;
