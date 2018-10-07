@@ -1,11 +1,8 @@
 use std::collections::HashSet;
 use std::collections::HashMap;
 use std::usize;
-use core::data::Data;
-use core::data::stream::StreamSource;
 use core::data::stream::StreamConsumer;
 use core::data::map::CEHashMap;
-use core::scan::runtime;
 use core::scan::runtime::CDFA;
 use core::scan::runtime::CDFABuilder;
 use core::scan::runtime::alphabet::HashedAlphabet;
@@ -304,7 +301,10 @@ impl TransitionNode {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use core::data::Data;
+    use core::data::stream::StreamSource;
     use core::scan::Token;
+    use core::scan::runtime;
 
     #[test]
     fn scan_binary() {

@@ -12,7 +12,6 @@ use core::scan::State;
 use core::scan::compile;
 use core::scan::compile::DFA;
 use core::scan::compile::CompileTransitionDelta;
-use core::scan::runtime;
 use core::scan::runtime::CDFABuilder;
 use core::scan::runtime::ecdfa::EncodedCDFA;
 use core::scan::runtime::ecdfa::EncodedCDFABuilder;
@@ -470,6 +469,7 @@ mod tests {
     use super::*;
     use core::data::Data;
     use core::data::stream::StreamSource;
+    use core::scan::runtime;
 
     #[test]
     fn parse_spec_spaces() {
