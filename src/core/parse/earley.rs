@@ -4,11 +4,12 @@ use core::parse::Production;
 use core::parse::Tree;
 use core::parse;
 use core::scan::Token;
+use core::data::Data;
 
 pub struct EarleyParser;
 
 impl Parser for EarleyParser {
-    fn parse(&self, scan: Vec<Token>, grammar: &Grammar) -> Result<Tree, parse::Error> {
+    fn parse(&self, scan: Vec<Token<String>>, grammar: &Grammar) -> Result<Tree, parse::Error> {
         let mut parse_chart: Vec<Vec<Edge>> = vec![];
         let mut chart: Vec<Vec<Item>> = vec![vec![]];
 
@@ -79,7 +80,7 @@ impl Parser for EarleyParser {
                 });
         }
 
-        fn scan_op<'a, 'b>(item: &Item<'a>, i: usize, symbol: &'a str, scan: &'a Vec<Token>, chart: &'b mut Vec<Vec<Item<'a>>>) {
+        fn scan_op<'a, 'b>(item: &Item<'a>, i: usize, symbol: &'a str, scan: &'a Vec<Token<String>>, chart: &'b mut Vec<Vec<Item<'a>>>) {
             if i < scan.len() && scan[i].kind == symbol.to_string() {
                 if chart.len() <= i + 1 {
                     chart.push(vec![])
@@ -148,19 +149,25 @@ impl Parser for EarleyParser {
                 })
             }
         } else {
-            Err(parse::Error{
-                message: format!(
-                    "Recognition failed at token {}: {}",
-                    i,
-                    scan[i - 1].to_string()
-                ),
-            })
+            if scan.len() == 0 {
+                Err(parse::Error{
+                    message: "No tokens scanned".to_string(),
+                })
+            } else {
+                Err(parse::Error{
+                    message: format!(
+                        "Recognition failed at token {}: {}",
+                        i,
+                        scan[i - 1].to_string()
+                    ),
+                })
+            }
         };
 
         //TODO refactor to reduce long and duplicated parameter lists
-        fn parse_tree<'a>(grammar: &'a Grammar, scan: &'a Vec<Token>, chart: Vec<Vec<Edge<'a>>>) -> Tree {
+        fn parse_tree<'a>(grammar: &'a Grammar, scan: &'a Vec<Token<String>>, chart: Vec<Vec<Edge<'a>>>) -> Tree {
 
-            fn recur<'a>(start: Node, edge: &Edge, grammar: &'a Grammar, scan: &'a Vec<Token>, chart: &Vec<Vec<Edge>>) -> Tree {
+            fn recur<'a>(start: Node, edge: &Edge, grammar: &'a Grammar, scan: &'a Vec<Token<String>>, chart: &Vec<Vec<Edge>>) -> Tree {
                 match edge.rule{
                     None => Tree{ //Non-empty rhs
                         lhs: scan[start].clone(),
@@ -199,7 +206,7 @@ impl Parser for EarleyParser {
         fn top_list<'a>(start: Node,
                         edge: &Edge,
                         grammar: &'a Grammar,
-                        scan: &'a Vec<Token>,
+                        scan: &'a Vec<Token<String>>,
                         chart: &Vec<Vec<Edge<'a>>>) -> Vec<(Node, Edge<'a>)> {
             let symbols: &Vec<String> = &edge.rule.unwrap().rhs;
             let bottom: usize = symbols.len();

@@ -14,7 +14,15 @@ impl<'g, T: 'g + Clone> StreamSource<'g, T> {
     }
 
     pub fn split<'a>(&'a mut self) -> Stream<'a, 'g, T> {
-        self.buffers.push_back(StreamBuffer::new());
+        let buffer = match self.buffers.back() {
+            None => StreamBuffer::new(),
+            Some(sb) => StreamBuffer {
+                incoming_buffer: sb.incoming_buffer.clone(),
+                outgoing_buffer: LinkedList::new(),
+            }
+        };
+
+        self.buffers.push_back(buffer);
 
         self.head()
     }
@@ -185,9 +193,10 @@ impl<'a, 'g: 'a, T: 'g + 'a + Clone> Stream<'a, 'g, T> {
 pub struct StreamConsumer<'s, 'a: 's, 'g: 'a + 's, T: 'g + 'a + 's + Clone> {
     stream: &'s mut Stream<'a, 'g, T>,
     on_consume: Box<FnMut(&LinkedList<T>) + 's>,
-    block: bool, //TODO see if we can remove this via splitting
+    block: bool,
 }
 
+#[allow(dead_code)]
 impl<'s, 'a: 's, 'g: 'a + 's, T: 'g + 'a + 's + Clone> StreamConsumer<'s, 'a, 'g, T> {
     fn new(stream: &'s mut Stream<'a, 'g, T>, on_consume: Box<FnMut(&LinkedList<T>) + 's>) -> Self {
         StreamConsumer {
@@ -247,9 +256,7 @@ mod tests {
         let input = "erlerlkjrf4093452ri2309u0ur045thejhefkj".to_string();
         let mut iter = input.chars();
 
-        let mut getter = || {
-            iter.next()
-        };
+        let mut getter = || iter.next();
 
         let mut source = StreamSource::observe(&mut getter);
         let mut stream = source.head();
@@ -274,9 +281,7 @@ mod tests {
         let input = "erlerlkjrf4093452ri2309u0ur045thejhefkj".to_string();
         let mut iter = input.chars();
 
-        let mut getter = || {
-            iter.next()
-        };
+        let mut getter = || iter.next();
 
         let mut source = StreamSource::observe(&mut getter);
         let mut base = source.head();
@@ -311,9 +316,7 @@ mod tests {
         let input = "abcdef".to_string();
         let mut iter = input.chars();
 
-        let mut getter = || {
-            iter.next()
-        };
+        let mut getter = || iter.next();
 
         let mut source = StreamSource::observe(&mut getter);
         let mut stream = source.head();
@@ -345,9 +348,7 @@ mod tests {
         let input = "abcdef".to_string();
         let mut iter = input.chars();
 
-        let mut getter = || {
-            iter.next()
-        };
+        let mut getter = || iter.next();
 
         let mut source = StreamSource::observe(&mut getter);
         let mut base = source.head();
@@ -397,9 +398,7 @@ mod tests {
         let input = "abcdef".to_string();
         let mut iter = input.chars();
 
-        let mut getter = || {
-            iter.next()
-        };
+        let mut getter = || iter.next();
 
         let mut source = StreamSource::observe(&mut getter);
         let mut base = source.head();
@@ -449,9 +448,7 @@ mod tests {
         let input = "abcdef".to_string();
         let mut iter = input.chars();
 
-        let mut getter = || {
-            iter.next()
-        };
+        let mut getter = || iter.next();
 
         let mut source = StreamSource::observe(&mut getter);
         let mut stream = source.head();
@@ -483,9 +480,7 @@ mod tests {
         let input = "abcdef".to_string();
         let mut iter = input.chars();
 
-        let mut getter = || {
-            iter.next()
-        };
+        let mut getter = || iter.next();
 
         let mut source = StreamSource::observe(&mut getter);
         let mut base = source.head();
@@ -518,9 +513,7 @@ mod tests {
         let input = "abcdefghijklmnopqrstuvwxyz".to_string();
         let mut iter = input.chars();
 
-        let mut getter = || {
-            iter.next()
-        };
+        let mut getter = || iter.next();
 
         let mut source = StreamSource::observe(&mut getter);
 
@@ -548,9 +541,7 @@ mod tests {
         let input = "abcdefghijklmnopqrstuvwxyz".to_string();
         let mut iter = input.chars();
 
-        let mut getter = || {
-            iter.next()
-        };
+        let mut getter = || iter.next();
 
         let mut source = StreamSource::observe(&mut getter);
 
@@ -585,9 +576,7 @@ mod tests {
         let input = "abcdefghijklmnopqrstuvwxyz".to_string();
         let mut iter = input.chars();
 
-        let mut getter = || {
-            iter.next()
-        };
+        let mut getter = || iter.next();
 
         let mut source = StreamSource::observe(&mut getter);
         let mut stream = source.head();
@@ -611,6 +600,28 @@ mod tests {
 
         //verify
         assert_eq!(res, "abcdefghijklmnmlkjihgfedcb");
+    }
+
+    #[test]
+    fn incoming_buffer_split() {
+        //setup
+        let input = "abc".to_string();
+        let mut iter = input.chars();
+
+        let mut getter = || iter.next();
+
+        let mut source = StreamSource::observe(&mut getter);
+        let mut stream = source.head();
+
+        let mut res = String::new();
+
+        //exercise
+        read_all(&mut stream, &mut res);
+        stream = stream.replay().split();
+        read_all(&mut stream, &mut res);
+
+        //verify
+        assert_eq!(res, "abcabc");
     }
 
     fn read_to(stream: &mut Stream<char>, to: &mut String, n: usize) {

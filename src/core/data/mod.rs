@@ -12,3 +12,9 @@ impl Data for usize {
         format!("{}", self)
     }
 }
+
+impl Data for String {
+    fn to_string(&self) -> String {
+        self.clone()
+    }
+}

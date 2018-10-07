@@ -6,7 +6,7 @@ use core::data::Data;
 use core::data::stream::Stream;
 use core::data::stream::StreamSource;
 use core::scan::runtime::Scanner;
-use core::scan::runtime::Token;
+use core::scan::Token;
 
 pub struct MaximalMunchScanner;
 

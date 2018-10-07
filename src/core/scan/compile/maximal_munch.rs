@@ -1,15 +1,15 @@
+use std::cmp;
 use core::spec::DEF_MATCHER;
 use core::scan;
-use core::scan::DFA;
 use core::scan::Token;
-use core::scan::Scanner;
 use core::scan::FAIL_SEQUENCE_LENGTH;
-use std::cmp;
+use core::scan::compile::DFA;
+use core::scan::compile::Scanner;
 
 pub struct MaximalMunchScanner;
 
 impl<State : PartialEq + Clone> Scanner<State> for MaximalMunchScanner {
-    fn scan<'a, 'b>(&self, input: &'a str, dfa: &'b DFA<State>) -> Result<Vec<Token>, scan::Error> {
+    fn scan<'a, 'b>(&self, input: &'a str, dfa: &'b DFA<State>) -> Result<Vec<Token<String>>, scan::Error> {
 
         fn scan_one<'a, 'b, State : PartialEq + Clone>(input: &'a [char], line: usize, character: usize, dfa: &'b DFA<State>) -> (usize, State, usize, usize) {
             let mut input: &[char] = input;
@@ -30,11 +30,8 @@ impl<State : PartialEq + Clone> Scanner<State> for MaximalMunchScanner {
                     character = 1;
                 }
 
-                //TODO remove with CDFA
-                if dfa.td.should_advance_scanner(head, &state) {
-                    scanned += 1;
-                    input = &input[1..];
-                }
+                scanned += 1;
+                input = &input[1..];
 
                 state = dfa.transition(&state, head);
 
@@ -50,7 +47,7 @@ impl<State : PartialEq + Clone> Scanner<State> for MaximalMunchScanner {
             c
         }).collect();
 
-        let mut tokens: Vec<Token> = vec![];
+        let mut tokens: Vec<Token<String>> = vec![];
         let mut input: &[char] = &chars;
         let mut line: usize = 1;
         let mut character: usize = 1;

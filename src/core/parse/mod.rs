@@ -3,11 +3,12 @@ use std::collections::HashMap;
 use std::error;
 use std::fmt;
 use core::scan::Token;
+use core::data::Data;
 
 mod earley;
 
 pub trait Parser {
-    fn parse(&self, scan: Vec<Token>, grammar: &Grammar) -> Result<Tree, Error>;
+    fn parse(&self, scan: Vec<Token<String>>, grammar: &Grammar) -> Result<Tree, Error>;
 }
 
 pub fn def_parser() -> Box<Parser> {
@@ -16,7 +17,7 @@ pub fn def_parser() -> Box<Parser> {
 
 #[derive(Clone)]
 pub struct Tree {
-    pub lhs: Token,
+    pub lhs: Token<String>,
     pub children: Vec<Tree>,
 }
 

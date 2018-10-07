@@ -4,10 +4,11 @@ extern crate stopwatch;
 
 use std::error;
 use std::fmt;
+use core::data::stream::StreamSource;
 use core::scan;
-use core::scan::DFA;
-use core::scan::Scanner;
-use core::scan::State;
+use core::scan::runtime;
+use core::scan::runtime::Scanner;
+use core::scan::runtime::ecdfa::EncodedCDFA;
 use core::parse;
 use core::parse::Grammar;
 use core::parse::Parser;
@@ -17,28 +18,29 @@ use core::spec;
 mod core;
 
 pub struct FormatJobRunner {
-    dfa: DFA<State>,
+    cdfa: EncodedCDFA,
     grammar: Grammar,
     formatter: Formatter,
-    scanner: Box<Scanner<State>>,
+    scanner: Box<Scanner<usize, String>>,
     parser: Box<Parser>,
 }
 
 impl FormatJobRunner {
     pub fn build(spec: &String) -> Result<FormatJobRunner, BuildError> {
         let parse = spec::parse_spec(spec)?;
-        let (dfa, grammar, formatter) = spec::generate_spec(&parse)?;
-        Ok(FormatJobRunner{
-            dfa,
+        let (cdfa, grammar, formatter) = spec::generate_spec(&parse)?;
+        Ok(FormatJobRunner {
+            cdfa,
             grammar,
             formatter,
-            scanner: scan::def_scanner(),
+            scanner: runtime::def_scanner(),
             parser: parse::def_parser(),
         })
     }
 
-    pub fn format(&self, input: &String) -> Result<String, FormatError> {
-        let tokens = self.scanner.scan(input, &self.dfa)?;
+    pub fn format(&self, stream: &mut Stream<char>) -> Result<String, FormatError> {
+        let mut source = StreamSource::observe(stream.getter);
+        let tokens = self.scanner.scan(&mut source, &self.cdfa)?;
         let parse = self.parser.parse(tokens, &self.grammar)?;
         Ok(self.formatter.format(&parse))
     }
@@ -47,7 +49,7 @@ impl FormatJobRunner {
 #[derive(Debug)]
 pub enum BuildError {
     SpecParseErr(spec::ParseError),
-    SpecGenErr(spec::GenError)
+    SpecGenErr(spec::GenError),
 }
 
 impl fmt::Display for BuildError {
@@ -83,7 +85,7 @@ impl From<spec::GenError> for BuildError {
 #[derive(Debug)]
 pub enum FormatError {
     ScanErr(scan::Error),
-    ParseErr(parse::Error)
+    ParseErr(parse::Error),
 }
 
 impl fmt::Display for FormatError {
@@ -116,6 +118,16 @@ impl From<parse::Error> for FormatError {
     }
 }
 
+pub struct Stream<'g, T: 'g + Clone> {
+    getter: &'g mut FnMut() -> Option<T>,
+}
+
+impl<'g, T: 'g + Clone> Stream<'g, T> {
+    pub fn from(getter: &'g mut FnMut() -> Option<T>) -> Stream<'g, T> {
+        Stream { getter }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -131,10 +143,15 @@ start 'a' -> ^ACC;
 s -> ACC;
     ".to_string();
 
+        let input = "b".to_string();
+        let mut iter = input.chars();
+        let mut getter = || iter.next();
+        let mut stream = Stream::from(&mut getter);
+
         let fjr = FormatJobRunner::build(&spec).unwrap();
 
         //exercise
-        let res = fjr.format(&"b".to_string());
+        let res = fjr.format(&mut stream);
 
         //verify
         assert!(res.is_err());
@@ -155,10 +172,15 @@ start 'a' -> ^ACC;
 s -> B;
     ".to_string();
 
+        let input = "a".to_string();
+        let mut iter = input.chars();
+        let mut getter = || iter.next();
+        let mut stream = Stream::from(&mut getter);
+
         let fjr = FormatJobRunner::build(&spec).unwrap();
 
         //exercise
-        let res = fjr.format(&"a".to_string());
+        let res = fjr.format(&mut stream);
 
         //verify
         assert!(res.is_err());
@@ -207,6 +229,54 @@ s -> B;
         assert_eq!(
             format!("{}", res.err().unwrap()),
             "Failed to parse specification: Parse error: Recognition failed at token 1: ID <- 'start'"
+        );
+    }
+
+    #[test]
+    fn test_failed_cdfa_multiple_def_matchers() {
+        //setup
+        let spec = "
+''
+
+start
+    _ -> ^A
+    _ -> ^B;
+
+s ->;
+    ".to_string();
+
+        //exercise
+        let res = FormatJobRunner::build(&spec);
+
+        //verify
+        assert!(res.is_err());
+        assert_eq!(
+            format!("{}", res.err().unwrap()),
+            "Failed to generate specification: ECDFA generation error: Failed to build CDFA: Default matcher used twice"
+        );
+    }
+
+    #[test]
+    fn test_failed_cdfa_non_prefix_free() {
+        //setup
+        let spec = "
+''
+
+start
+    'a' -> ^A
+    'ab' -> ^B;
+
+s ->;
+    ".to_string();
+
+        //exercise
+        let res = FormatJobRunner::build(&spec);
+
+        //verify
+        assert!(res.is_err());
+        assert_eq!(
+            format!("{}", res.err().unwrap()),
+            "Failed to generate specification: ECDFA generation error: Failed to build CDFA: Transition trie is not prefix free"
         );
     }
 }

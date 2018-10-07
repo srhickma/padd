@@ -1,6 +1,7 @@
 extern crate padd;
 
 use padd::FormatJobRunner;
+use padd::Stream;
 use std::io::Read;
 use std::io::Write;
 use std::fs::File;
@@ -28,10 +29,15 @@ s -> acc s `{0}\\n{1}`
 acc -> ACC;
     ".to_string();
 
+    let input = "abasdfergrthergerghera".to_string();
+    let mut iter = input.chars();
+    let mut getter = || iter.next();
+    let mut stream = Stream::from(&mut getter);
+
     let fjr = FormatJobRunner::build(&spec).unwrap();
 
     //exercise
-    let res = fjr.format(&"abasdfergrthergerghera".to_string()).unwrap();
+    let res = fjr.format(&mut stream).unwrap();
 
     //verify
     assert_eq!(res,
@@ -75,10 +81,15 @@ s -> acc s `{0} {1}`
 acc -> ACC;
     ".to_string();
 
+    let input = "aaaa \t \n  a aa  aa ".to_string();
+    let mut iter = input.chars();
+    let mut getter = || iter.next();
+    let mut stream = Stream::from(&mut getter);
+
     let fjr = FormatJobRunner::build(&spec).unwrap();
 
     //exercise
-    let res = fjr.format(&"aaaa \t \n  a aa  aa ".to_string()).unwrap();
+    let res = fjr.format(&mut stream).unwrap();
 
     //verify
     assert_eq!(res, "aaaa a aa aa");
@@ -103,10 +114,15 @@ fn test_advanced_operators() {
             -> ID
             -> IN ``;".to_string();
 
+    let input = "i ij ijjjijijiji inj in iii".to_string();
+    let mut iter = input.chars();
+    let mut getter = || iter.next();
+    let mut stream = Stream::from(&mut getter);
+
     let fjr = FormatJobRunner::build(&spec).unwrap();
 
     //exercise
-    let res = fjr.format(&"i ij ijjjijijiji inj in iii".to_string()).unwrap();
+    let res = fjr.format(&mut stream).unwrap();
 
     //verify
     assert_eq!(res, "iijijjjijijijiinjiii");
@@ -116,8 +132,13 @@ fn test_fjr(case_name: &str, spec_name: &str){
     //setup
     let fjr = FormatJobRunner::build(&load_spec(spec_name)).unwrap();
 
+    let input = load_input(case_name);
+    let mut iter = input.chars();
+    let mut getter = || iter.next();
+    let mut stream = Stream::from(&mut getter);
+
     //exercise
-    let res = fjr.format(&load_input(case_name)).unwrap();
+    let res = fjr.format(&mut stream).unwrap();
 
     //verify
     assert_matches_file(res, case_name)
