@@ -9,8 +9,9 @@ use core::parse::Production;
 use core::parse::Tree;
 use core::scan;
 use core::scan::State;
-use core::scan::DFA;
-use core::scan::CompileTransitionDelta;
+use core::scan::compile;
+use core::scan::compile::DFA;
+use core::scan::compile::CompileTransitionDelta;
 use core::scan::runtime;
 use core::scan::runtime::CDFABuilder;
 use core::scan::runtime::ecdfa::EncodedCDFA;
@@ -393,7 +394,7 @@ fn generate_grammar_ids<'a, 'b>(ids_node: &'a Tree, accumulator: &'b mut Vec<Str
 
 pub fn parse_spec(input: &str) -> Result<Tree, ParseError> {
     SPEC_DFA.with(|f| -> Result<Tree, ParseError> {
-        let tokens = scan::def_scanner().scan(input, f)?;
+        let tokens = compile::def_scanner().scan(input, f)?;
         let parse = parse::def_parser().parse(tokens, &SPEC_GRAMMAR)?;
         Ok(parse)
     })
@@ -814,11 +815,10 @@ w -> WHITESPACE ``;
         let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
 
         let scanner = runtime::def_scanner();
-        let parser = parse::def_parser();
 
         let tree = parse_spec(spec);
         let parse = tree.unwrap();
-        let (cdfa, grammar, formatter) = generate_spec(&parse).unwrap();
+        let (cdfa, _, _) = generate_spec(&parse).unwrap();
 
         //exercise
         let tokens = scanner.scan(&mut stream, &cdfa).unwrap();

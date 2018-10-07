@@ -1,10 +1,10 @@
+use std::cmp;
 use core::spec::DEF_MATCHER;
 use core::scan;
-use core::scan::DFA;
 use core::scan::Token;
-use core::scan::Scanner;
 use core::scan::FAIL_SEQUENCE_LENGTH;
-use std::cmp;
+use core::scan::compile::DFA;
+use core::scan::compile::Scanner;
 
 pub struct MaximalMunchScanner;
 
@@ -30,11 +30,8 @@ impl<State : PartialEq + Clone> Scanner<State> for MaximalMunchScanner {
                     character = 1;
                 }
 
-                //TODO remove with CDFA
-                if dfa.td.should_advance_scanner(head, &state) {
-                    scanned += 1;
-                    input = &input[1..];
-                }
+                scanned += 1;
+                input = &input[1..];
 
                 state = dfa.transition(&state, head);
 

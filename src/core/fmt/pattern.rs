@@ -1,15 +1,15 @@
 use std::error;
 use std::fmt;
 use core::parse::build_prods;
-use core::scan::def_scanner;
 use core::parse::def_parser;
 use core::parse;
 use core::parse::Grammar;
 use core::parse::Production;
 use core::parse::Tree;
 use core::scan;
-use core::scan::DFA;
-use core::scan::CompileTransitionDelta;
+use core::scan::compile;
+use core::scan::compile::DFA;
+use core::scan::compile::CompileTransitionDelta;
 
 static PATTERN_ALPHABET: &'static str = "{}[];=1234567890abcdefghijklmnopqrstuvwxyz \n\t";
 
@@ -223,7 +223,7 @@ fn parse_decl(decl: &Tree, prod: &Production) -> Result<Declaration, BuildError>
 
 fn parse_pattern(input: &str) -> Result<Tree, BuildError> {
     PATTERN_DFA.with(|f| -> Result<Tree, BuildError> {
-        let tokens = def_scanner().scan(input, f)?;
+        let tokens = compile::def_scanner().scan(input, f)?;
         let parse = def_parser().parse(tokens, &PATTERN_GRAMMAR)?;
         Ok(parse)
     })
