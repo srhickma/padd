@@ -5,12 +5,15 @@ use self::regex::Regex;
 use self::stopwatch::Stopwatch;
 use padd;
 use padd::FormatJobRunner;
+use padd::Stream;
 use std::env;
 use std::io;
 use std::io::Read;
 use std::io::Write;
 use std::io::Seek;
 use std::io::SeekFrom;
+use std::io::BufRead;
+use std::io::BufReader;
 use std::process;
 use std::fs::File;
 use std::fs::OpenOptions;
@@ -173,17 +176,42 @@ fn format_file_internal(target_path: &Path, fjr: &FormatJobRunner) -> bool {
     match target_file {
         Ok(_) => {
             let mut target = target_file.unwrap();
-            let mut input = String::new();
 
-            match target.read_to_string(&mut input) {
-                Ok(_) => {},
-                Err(e) => {
-                    println!("Could not read target file \"{}\": {}", &target_path.to_string_lossy(), e);
-                    return false;
-                },
-            }
+            let result = {
+                let mut reader = BufReader::new(&target);
 
-            match fjr.format(&input){
+                let mut buffer: Vec<char> = Vec::new();
+                let mut cursor: usize = 0;
+
+                let mut getter = &mut || {
+                    match buffer.get(cursor) {
+                        None => {},
+                        Some(c) => {
+                            cursor += 1;
+                            return Some(*c)
+                        }
+                    };
+
+                    let mut in_buf = String::new();
+                    match reader.read_line(&mut in_buf) {
+                        Ok(_) => {},
+                        Err(e) => {
+                            println!("Could not read target file \"{}\": {}", &target_path.to_string_lossy(), e);
+                            return None;
+                        },
+                    };
+
+                    buffer = in_buf.chars().collect();
+                    cursor = 1;
+                    in_buf.chars().next()
+                };
+
+                let mut stream = Stream::from(&mut getter);
+
+                fjr.format(&mut stream)
+            };
+
+            match result {
                 Ok(res) => {
                     match target.seek(SeekFrom::Start(0)) {
                         Ok(_) => {},

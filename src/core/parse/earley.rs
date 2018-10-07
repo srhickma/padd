@@ -149,13 +149,19 @@ impl Parser for EarleyParser {
                 })
             }
         } else {
-            Err(parse::Error{
-                message: format!(
-                    "Recognition failed at token {}: {}",
-                    i,
-                    scan[i - 1].to_string()
-                ),
-            })
+            if scan.len() == 0 {
+                Err(parse::Error{
+                    message: "No tokens scanned".to_string(),
+                })
+            } else {
+                Err(parse::Error{
+                    message: format!(
+                        "Recognition failed at token {}: {}",
+                        i,
+                        scan[i - 1].to_string()
+                    ),
+                })
+            }
         };
 
         //TODO refactor to reduce long and duplicated parameter lists

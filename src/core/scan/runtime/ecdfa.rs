@@ -334,9 +334,7 @@ mod tests {
         let input = "000011010101".to_string();
         let mut iter = input.chars();
 
-        let mut getter = || {
-            iter.next()
-        };
+        let mut getter = || iter.next();
 
         let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
 
@@ -386,9 +384,7 @@ NZ <- '11010101'
         let input = "  {{\n}{}{} \t{} \t{}}".to_string();
         let mut iter = input.chars();
 
-        let mut getter = || {
-            iter.next()
-        };
+        let mut getter = || iter.next();
 
         let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
 
@@ -448,9 +444,7 @@ RBR <- '}'
         let input = "  {{\n}{}{} \t{} \t{}}".to_string();
         let mut iter = input.chars();
 
-        let mut getter = || {
-            iter.next()
-        };
+        let mut getter = || iter.next();
 
         let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
 
@@ -506,9 +500,7 @@ RBR <- '}'
         let input = "  {{\n}{}{} \tx{} \t{}}".to_string();
         let mut iter = input.chars();
 
-        let mut getter = || {
-            iter.next()
-        };
+        let mut getter = || iter.next();
 
         let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
 
@@ -555,9 +547,7 @@ RBR <- '}'
         let input = "   {  {  {{{\t}}}\n {} }  }   { {}\n }   {  {  {{{\t}}}\n {} }  } xyz  { {}\n }   {  {  {{{\t}}}\n {} }  }   { {}\n } ".to_string();
         let mut iter = input.chars();
 
-        let mut getter = || {
-            iter.next()
-        };
+        let mut getter = || iter.next();
 
         let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
 
@@ -597,9 +587,7 @@ RBR <- '}'
         let input = "fivefourfourfourfivefivefourfive".to_string();
         let mut iter = input.chars();
 
-        let mut getter = || {
-            iter.next()
-        };
+        let mut getter = || iter.next();
 
         let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
 
@@ -646,9 +634,7 @@ FIVE <- 'five'
         let input = "fdk".to_string();
         let mut iter = input.chars();
 
-        let mut getter = || {
-            iter.next()
-        };
+        let mut getter = || iter.next();
 
         let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
 

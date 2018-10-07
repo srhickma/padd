@@ -38,16 +38,9 @@ impl FormatJobRunner {
         })
     }
 
-    pub fn format(&self, input: &String) -> Result<String, FormatError> {
-        //TODO take a stream as input here?
-
-        let mut iter = input.chars();
-        let mut getter = || {
-            iter.next()
-        };
-        let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
-
-        let tokens = self.scanner.scan(&mut stream, &self.cdfa)?;
+    pub fn format(&self, stream: &mut Stream<char>) -> Result<String, FormatError> {
+        let mut source = StreamSource::observe(stream.getter);
+        let tokens = self.scanner.scan(&mut source, &self.cdfa)?;
         let parse = self.parser.parse(tokens, &self.grammar)?;
         Ok(self.formatter.format(&parse))
     }
@@ -125,6 +118,16 @@ impl From<parse::Error> for FormatError {
     }
 }
 
+pub struct Stream<'g, T: 'g + Clone> {
+    getter: &'g mut FnMut() -> Option<T>,
+}
+
+impl<'g, T: 'g + Clone> Stream<'g, T> {
+    pub fn from(getter: &'g mut FnMut() -> Option<T>) -> Stream<'g, T> {
+        Stream { getter }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -140,10 +143,15 @@ start 'a' -> ^ACC;
 s -> ACC;
     ".to_string();
 
+        let input = "b".to_string();
+        let mut iter = input.chars();
+        let mut getter = || iter.next();
+        let mut stream = Stream::from(&mut getter);
+
         let fjr = FormatJobRunner::build(&spec).unwrap();
 
         //exercise
-        let res = fjr.format(&"b".to_string());
+        let res = fjr.format(&mut stream);
 
         //verify
         assert!(res.is_err());
@@ -164,10 +172,15 @@ start 'a' -> ^ACC;
 s -> B;
     ".to_string();
 
+        let input = "a".to_string();
+        let mut iter = input.chars();
+        let mut getter = || iter.next();
+        let mut stream = Stream::from(&mut getter);
+
         let fjr = FormatJobRunner::build(&spec).unwrap();
 
         //exercise
-        let res = fjr.format(&"a".to_string());
+        let res = fjr.format(&mut stream);
 
         //verify
         assert!(res.is_err());
