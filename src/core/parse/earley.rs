@@ -268,6 +268,7 @@ impl<'a> Item<'a> {
 }
 
 impl<'a> Data for Item<'a> {
+    #[cfg_attr(tarpaulin, skip)]
     fn to_string(&self) -> String {
         let mut rule_string = format!("{} -> ", self.rule.lhs);
         for i in 0..self.rule.rhs.len() {
@@ -291,6 +292,7 @@ struct Edge<'a> {
 }
 
 impl<'a> Data for Edge<'a> {
+    #[cfg_attr(tarpaulin, skip)]
     fn to_string(&self) -> String {
         match self.rule {
             None => format!("NONE ({})", self.finish),
