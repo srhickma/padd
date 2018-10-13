@@ -366,6 +366,6 @@ kind=RBRACKET lexeme=}"
         for token in tokens {
             res = format!("{}\nkind={} lexeme={}", res, token.kind, token.lexeme)
         }
-        return res;
+        res
     }
 }

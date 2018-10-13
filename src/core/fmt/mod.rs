@@ -43,7 +43,7 @@ struct FormatJob<'a> {
 
 impl<'a> FormatJob<'a> {
     fn run(&self) -> String {
-        return self.recur(self.parse, &HashMap::new());
+        self.recur(self.parse, &HashMap::new())
     }
 
     fn recur(&self, node: &Tree, scope: &HashMap<String, String>) -> String {
@@ -62,7 +62,7 @@ impl<'a> FormatJob<'a> {
                 for child in &node.children {
                     res = format!("{}{}", res, self.recur(child, scope));
                 }
-                return res;
+                res
             }
         }
     }
@@ -95,13 +95,14 @@ impl<'a> FormatJob<'a> {
                     }
                 }
             }
+
             match children.get(capture.child_index) {
-                Some(child) => return self.recur(child, &inner_scope),
+                Some(child) => self.recur(child, &inner_scope),
                 None => panic!("Pattern index out of bounds: index={} children={}", capture.child_index, children.len()),
             }
         } else {
             match children.get(capture.child_index) {
-                Some(child) => return self.recur(child, outer_scope),
+                Some(child) => self.recur(child, outer_scope),
                 None => panic!("Pattern index out of bounds: index={} children={}", capture.child_index, children.len()),
             }
         }

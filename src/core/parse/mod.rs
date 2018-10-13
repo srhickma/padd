@@ -13,7 +13,7 @@ pub trait Parser {
 }
 
 pub fn def_parser() -> Box<Parser> {
-    return Box::new(earley::EarleyParser);
+    Box::new(earley::EarleyParser)
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -40,13 +40,13 @@ impl Tree {
     }
 
     pub fn null() -> Tree {
-        return Tree {
+        Tree {
             lhs: Token {
                 kind: "".to_string(),
                 lexeme: "NULL".to_string(),
             },
             children: vec![],
-        };
+        }
     }
 
     fn to_string_internal(&self, prefix: String, is_tail: bool) -> String {
@@ -132,14 +132,14 @@ impl Grammar {
             .collect();
         let start = productions[0].lhs.clone();
 
-        return Grammar {
+        Grammar {
             productions,
             nss,
             non_terminals,
             terminals,
             symbols,
             start,
-        };
+        }
     }
 
     fn build_nss(productions: &Vec<Production>) -> HashSet<String> {
@@ -201,7 +201,7 @@ pub fn build_prods<'a>(strings: &'a [&'a str]) -> Vec<Production> {
     for string in strings {
         productions.push(prod_from_string(string));
     }
-    return productions;
+    productions
 }
 
 fn prod_from_string(string: &str) -> Production {
@@ -218,10 +218,10 @@ fn prod_from_string(string: &str) -> Production {
         i += 1;
     }
 
-    return Production {
+    Production {
         lhs,
         rhs,
-    };
+    }
 }
 
 #[cfg(test)]
