@@ -4,6 +4,7 @@ extern crate stopwatch;
 
 use std::error;
 use std::fmt;
+
 use core::data::stream::StreamSource;
 use core::scan;
 use core::scan::runtime;

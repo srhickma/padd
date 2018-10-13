@@ -16,7 +16,7 @@ impl Parser for EarleyParser {
         grammar.productions.iter()
             .filter(|prod| prod.lhs == grammar.start)
             .for_each(|prod| {
-                let item = Item{
+                let item = Item {
                     rule: prod,
                     start: 0,
                     next: 0,
@@ -36,18 +36,18 @@ impl Parser for EarleyParser {
                     None => {
                         complete_op(&item, i, &mut chart);
 
-                        parse_chart[item.start].push(Edge{
+                        parse_chart[item.start].push(Edge {
                             rule: Some(item.rule),
-                            finish: i
+                            finish: i,
                         });
-                    },
+                    }
                     Some(symbol) => {
                         if grammar.terminals.contains(symbol) {
                             scan_op(&item, i, symbol, &scan, &mut chart);
                         } else {
                             predict_op(&item, i, symbol, grammar, &mut chart);
                         }
-                    },
+                    }
                 }
                 j += 1;
             }
@@ -59,22 +59,22 @@ impl Parser for EarleyParser {
                 .filter(|prod| prod.lhs == symbol)
                 .for_each(|prod| {
                     append(
-                        Item{
+                        Item {
                             rule: prod,
                             start: i,
                             next: 0,
                         },
-                        &mut chart[i]
+                        &mut chart[i],
                     );
 
                     if grammar.nullable(&prod) {
                         append(
-                            Item{
+                            Item {
                                 rule: item.rule,
                                 start: item.start,
                                 next: item.next + 1,
                             },
-                            &mut chart[i]
+                            &mut chart[i],
                         );
                     }
                 });
@@ -87,12 +87,12 @@ impl Parser for EarleyParser {
                 }
 
                 unsafe_append(
-                    Item{
+                    Item {
                         rule: item.rule,
                         start: item.start,
                         next: item.next + 1,
                     },
-                    &mut chart[i+1]
+                    &mut chart[i + 1],
                 );
             }
         }
@@ -105,7 +105,7 @@ impl Parser for EarleyParser {
                     None => false,
                     Some(sym) => sym == item.rule.lhs,
                 })
-                .for_each(|old_item| advanced.push(Item{
+                .for_each(|old_item| advanced.push(Item {
                     rule: old_item.rule,
                     start: old_item.start,
                     next: old_item.next + 1,
@@ -116,7 +116,7 @@ impl Parser for EarleyParser {
             }
         }
 
-        fn append<'a, 'b>(item: Item<'a>, item_set: &'b mut Vec<Item<'a>>){
+        fn append<'a, 'b>(item: Item<'a>, item_set: &'b mut Vec<Item<'a>>) {
             for j in 0..item_set.len() {
                 if item_set[j] == item {
                     return;
@@ -125,7 +125,7 @@ impl Parser for EarleyParser {
             unsafe_append(item, item_set);
         }
 
-        fn unsafe_append<'a, 'b>(item: Item<'a>, item_set: &'b mut Vec<Item<'a>>){
+        fn unsafe_append<'a, 'b>(item: Item<'a>, item_set: &'b mut Vec<Item<'a>>) {
             item_set.push(item);
         }
 
@@ -140,41 +140,32 @@ impl Parser for EarleyParser {
             if i - 1 == scan.len() {
                 Ok(parse_tree(grammar, &scan, parse_chart))
             } else {
-                Err(parse::Error{
-                    message: format!(
-                        "Largest parse did not consume all tokens: {} of {}",
-                        i - 1,
-                        scan.len()
-                    ),
+                Err(parse::Error {
+                    message: format!("Largest parse did not consume all tokens: {} of {}", i - 1, scan.len()),
                 })
             }
         } else {
             if scan.len() == 0 {
-                Err(parse::Error{
+                Err(parse::Error {
                     message: "No tokens scanned".to_string(),
                 })
             } else {
-                Err(parse::Error{
-                    message: format!(
-                        "Recognition failed at token {}: {}",
-                        i,
-                        scan[i - 1].to_string()
-                    ),
+                Err(parse::Error {
+                    message: format!("Recognition failed at token {}: {}", i, scan[i - 1].to_string()),
                 })
             }
         };
 
         //TODO refactor to reduce long and duplicated parameter lists
         fn parse_tree<'a>(grammar: &'a Grammar, scan: &'a Vec<Token<String>>, chart: Vec<Vec<Edge<'a>>>) -> Tree {
-
             fn recur<'a>(start: Node, edge: &Edge, grammar: &'a Grammar, scan: &'a Vec<Token<String>>, chart: &Vec<Vec<Edge>>) -> Tree {
-                match edge.rule{
-                    None => Tree{ //Non-empty rhs
+                match edge.rule {
+                    None => Tree { //Non-empty rhs
                         lhs: scan[start].clone(),
                         children: vec![],
                     },
-                    Some(rule) => Tree{
-                        lhs: Token{
+                    Some(rule) => Tree {
+                        lhs: Token {
                             kind: rule.lhs.clone(),
                             lexeme: String::new(),
                         },
@@ -216,16 +207,16 @@ impl Parser for EarleyParser {
                     let symbol = &symbols[depth];
                     if grammar.terminals.contains(symbol) {
                         if scan[node].kind == *symbol {
-                            return vec![Edge{
+                            return vec![Edge {
                                 rule: None,
-                                finish: node + 1
-                            }]
+                                finish: node + 1,
+                            }];
                         }
                     } else { //TODO return iterators instead to avoid collection and cloning
                         return chart[node].iter()
                             .filter(|edge| edge.rule.unwrap().lhs == *symbol)
                             .cloned()
-                            .collect()
+                            .collect();
                     }
                 }
                 vec![]
@@ -240,7 +231,7 @@ impl Parser for EarleyParser {
                 } else {
                     for edge in edges(depth, root) {
                         match df_search(edges, leaf, depth + 1, edge.finish) {
-                            None => {},
+                            None => {}
                             Some(mut path) => {
                                 path.push((root, edge));
                                 return Some(path);
@@ -259,7 +250,7 @@ impl Parser for EarleyParser {
     }
 }
 
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Clone, Debug)]
 struct Item<'a> {
     rule: &'a Production,
     start: usize,
@@ -274,8 +265,9 @@ impl<'a> Item<'a> {
             None
         }
     }
+}
 
-    #[allow(dead_code)]
+impl<'a> Data for Item<'a> {
     fn to_string(&self) -> String {
         let mut rule_string = format!("{} -> ", self.rule.lhs);
         for i in 0..self.rule.rhs.len() {
@@ -292,15 +284,14 @@ impl<'a> Item<'a> {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Debug)]
 struct Edge<'a> {
     rule: Option<&'a Production>,
     finish: usize,
 }
 
-impl<'a> Edge<'a> {
-    #[allow(dead_code)]
-    fn to_string(&'a self) -> String {
+impl<'a> Data for Edge<'a> {
+    fn to_string(&self) -> String {
         match self.rule {
             None => format!("NONE ({})", self.finish),
             Some(rule) => {

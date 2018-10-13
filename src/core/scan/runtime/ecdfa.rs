@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 use std::collections::HashMap;
 use std::usize;
+
 use core::data::stream::StreamConsumer;
 use core::data::map::CEHashMap;
 use core::scan::runtime::CDFA;

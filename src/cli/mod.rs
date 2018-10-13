@@ -3,9 +3,7 @@ extern crate stopwatch;
 
 use self::regex::Regex;
 use self::stopwatch::Stopwatch;
-use padd;
-use padd::FormatJobRunner;
-use padd::Stream;
+
 use std::env;
 use std::io;
 use std::io::Read;
@@ -21,10 +19,14 @@ use std::fs;
 use std::path::Path;
 use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
 
+use padd;
+use padd::FormatJobRunner;
+use padd::Stream;
+
 static FORMATTED: AtomicUsize = ATOMIC_USIZE_INIT;
 static TOTAL: AtomicUsize = ATOMIC_USIZE_INIT;
 
-pub fn run(){
+pub fn run() {
     let args: Vec<_> = env::args().collect();
 
     if args.len() < 2 {
@@ -56,13 +58,13 @@ pub fn run(){
                         error("Missing directory path".to_string());
                     }
                     directory = Some(Path::new(&args[i + 1]));
-                },
+                }
                 "-t" | "--target" => {
                     if args.len() == i + 1 {
                         error("Missing target path".to_string());
                     }
                     target = Some(Path::new(&args[i + 1]));
-                },
+                }
                 "-m" | "--matching" => {
                     if args.len() == i + 1 {
                         error("Missing file regex".to_string());
@@ -71,7 +73,7 @@ pub fn run(){
                         Ok(fn_regex) => file_regex = Some(fn_regex),
                         Err(e) => error(format!("Failed to build file name regex: {}", e)),
                     }
-                },
+                }
                 a => error(format!("Unrecognized parameter {}", a)),
             }
         }
@@ -88,7 +90,7 @@ pub fn run(){
                 error("Invalid arguments: Target file and file regex both specified".to_string());
             }
             format_file(target_path, &fjr)
-        },
+        }
         None => match directory {
             Some(dir_path) => {
                 let fn_regex = match file_regex {
@@ -97,7 +99,7 @@ pub fn run(){
                 };
 
                 dir_recur(dir_path, &fn_regex, &fjr)
-            },
+            }
             None => term_loop(&fjr),
         }
     }
@@ -108,7 +110,7 @@ pub fn run(){
     println!("COMPLETE: {}ms : {} processed, {} formatted, {} failed", sw.elapsed_ms(), total, formatted, total - formatted);
 }
 
-fn dir_recur(dir_path: &Path, fn_regex: &Regex, fjr: &FormatJobRunner){
+fn dir_recur(dir_path: &Path, fn_regex: &Regex, fjr: &FormatJobRunner) {
     fs::read_dir(dir_path).unwrap()
         .for_each(|res| {
             match res {
@@ -120,7 +122,7 @@ fn dir_recur(dir_path: &Path, fn_regex: &Regex, fjr: &FormatJobRunner){
                     } else if fn_regex.is_match(file_name) {
                         format_file(path.as_path(), &fjr);
                     }
-                },
+                }
                 Err(e) => println!("An error occurred while searching directory {}: {}", dir_path.to_string_lossy(), e),
             }
         });
@@ -133,28 +135,28 @@ fn load_spec(spec_path: &String) -> Result<FormatJobRunner, padd::BuildError> {
     match spec_file {
         Ok(_) => {
             match spec_file.unwrap().read_to_string(&mut spec) {
-                Ok(_) => {},
+                Ok(_) => {}
                 Err(e) => {
                     error(format!("Could not read specification file \"{}\": {}", &spec_path, e));
-                },
+                }
             }
-        },
+        }
         Err(e) => error(format!("Could not find specification file \"{}\": {}", &spec_path, e)),
     }
 
     FormatJobRunner::build(&spec)
 }
 
-fn term_loop(fjr: &FormatJobRunner){
+fn term_loop(fjr: &FormatJobRunner) {
     loop {
         let mut target_path = String::new();
 
-        match io::stdin().read_line(&mut target_path){
-            Ok(_) => {},
+        match io::stdin().read_line(&mut target_path) {
+            Ok(_) => {}
             Err(e) => {
                 println!("Failed to read target file \"{}\": {}", target_path, e);
                 continue;
-            },
+            }
         }
 
         target_path.pop();
@@ -163,7 +165,7 @@ fn term_loop(fjr: &FormatJobRunner){
     }
 }
 
-fn format_file(target_path: &Path, fjr: &FormatJobRunner){
+fn format_file(target_path: &Path, fjr: &FormatJobRunner) {
     TOTAL.fetch_add(1, Ordering::SeqCst);
     if format_file_internal(target_path, fjr) {
         FORMATTED.fetch_add(1, Ordering::SeqCst);
@@ -185,20 +187,20 @@ fn format_file_internal(target_path: &Path, fjr: &FormatJobRunner) -> bool {
 
                 let mut getter = &mut || {
                     match buffer.get(cursor) {
-                        None => {},
+                        None => {}
                         Some(c) => {
                             cursor += 1;
-                            return Some(*c)
+                            return Some(*c);
                         }
                     };
 
                     let mut in_buf = String::new();
                     match reader.read_line(&mut in_buf) {
-                        Ok(_) => {},
+                        Ok(_) => {}
                         Err(e) => {
                             println!("Could not read target file \"{}\": {}", &target_path.to_string_lossy(), e);
                             return None;
-                        },
+                        }
                     };
 
                     buffer = in_buf.chars().collect();
@@ -214,42 +216,42 @@ fn format_file_internal(target_path: &Path, fjr: &FormatJobRunner) -> bool {
             match result {
                 Ok(res) => {
                     match target.seek(SeekFrom::Start(0)) {
-                        Ok(_) => {},
+                        Ok(_) => {}
                         Err(e) => {
                             println!("Could not seek to start of target file \"{}\": {}", &target_path.to_string_lossy(), e);
                             return false;
-                        },
+                        }
                     }
                     match target.set_len(0) {
-                        Ok(_) => {},
+                        Ok(_) => {}
                         Err(e) => {
                             println!("Could not clear target file \"{}\": {}", &target_path.to_string_lossy(), e);
                             return false;
-                        },
+                        }
                     }
                     match target.write_all(res.as_bytes()) {
-                        Ok(_) => {println!("OK")},
+                        Ok(_) => { println!("OK") }
                         Err(e) => {
                             println!("Could not write to target file \"{}\": {}", &target_path.to_string_lossy(), e);
                             return false;
-                        },
+                        }
                     }
-                },
+                }
                 Err(e) => {
                     println!("Error formatting {}: {}", &target_path.to_string_lossy(), e);
                     return false;
-                },
+                }
             }
-        },
+        }
         Err(e) => {
             println!("Could not find target file \"{}\": {}", &target_path.to_string_lossy(), e);
             return false;
-        },
+        }
     }
     true
 }
 
-fn error(err_text: String){
+fn error(err_text: String) {
     println!("ERROR: {}", err_text);
     println!("Usage: padd specification [-t target | -d directory [-m regex]]");
     process::exit(0);

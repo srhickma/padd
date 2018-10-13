@@ -1,4 +1,5 @@
 use std::collections::LinkedList;
+
 use core::scan;
 use core::scan::FAIL_SEQUENCE_LENGTH;
 use core::scan::runtime::CDFA;

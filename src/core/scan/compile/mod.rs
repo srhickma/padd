@@ -8,26 +8,29 @@ pub trait Scanner<State: PartialEq + Clone> {
     fn scan<'a, 'b>(&self, input: &'a str, dfa: &'b DFA<State>) -> Result<Vec<Token<String>>, Error>;
 }
 
-pub fn def_scanner<State : PartialEq + Clone>() -> Box<Scanner<State>> {
+pub fn def_scanner<State: PartialEq + Clone>() -> Box<Scanner<State>> {
     Box::new(maximal_munch::MaximalMunchScanner)
 }
 
-pub struct DFA<State : PartialEq + Clone> {
+pub struct DFA<State: PartialEq + Clone> {
     pub alphabet: String,
     pub start: State,
     pub td: Box<TransitionDelta<State>>,
 }
 
-impl<State : PartialEq + Clone> DFA<State> {
+impl<State: PartialEq + Clone> DFA<State> {
     fn has_transition(&self, c: char, state: &State) -> bool {
         self.alphabet.chars().any(|x| c == x) && self.transition(state, c) != self.td.fail_state()
     }
+
     fn accepts(&self, state: &State) -> bool {
         self.td.tokenize(state).is_some()
     }
+
     fn transition(&self, state: &State, c: char) -> State {
         self.td.transition(state, c)
     }
+
     fn tokenize(&self, state: &State) -> Option<Kind> {
         self.td.tokenize(state)
     }
@@ -42,10 +45,10 @@ pub trait TransitionDelta<State> {
 pub struct CompileTransitionDelta<State> {
     delta: fn(State, char) -> State,
     tokenizer: fn(State) -> String,
-    pub fail_state: State
+    fail_state: State,
 }
 
-impl<State : PartialEq + Clone> TransitionDelta<State> for CompileTransitionDelta<State> {
+impl<State: PartialEq + Clone> TransitionDelta<State> for CompileTransitionDelta<State> {
     fn transition<'a>(&'a self, state: &State, c: char) -> State {
         (self.delta)(state.clone(), c)
     }
@@ -64,12 +67,12 @@ impl<State : PartialEq + Clone> TransitionDelta<State> for CompileTransitionDelt
     }
 }
 
-impl<State : PartialEq + Clone> CompileTransitionDelta<State> {
+impl<State: PartialEq + Clone> CompileTransitionDelta<State> {
     pub fn build<'a>(delta: fn(State, char) -> State, tokenizer: fn(State) -> String, fail_state: State) -> CompileTransitionDelta<State> {
-        CompileTransitionDelta{
+        CompileTransitionDelta {
             delta,
             tokenizer,
-            fail_state
+            fail_state,
         }
     }
 }
@@ -86,7 +89,7 @@ mod tests {
             START,
             ZERO,
             NOTZERO,
-            FAIL
+            FAIL,
         }
 
         let alphabet = "01".to_string();
@@ -102,7 +105,7 @@ mod tests {
             _ => "",
         }.to_string();
 
-        let dfa = DFA{
+        let dfa = DFA {
             alphabet,
             start: S::START,
             td: Box::new(CompileTransitionDelta::build(delta, tokenizer, S::FAIL)),
@@ -112,7 +115,7 @@ mod tests {
 
         let scanner = def_scanner();
 
-        //execute
+        //exercise
         let tokens = scanner.scan(&input, &dfa);
 
         //verify
@@ -135,7 +138,7 @@ kind=NZ lexeme=11010101"
             WS,
             LBR,
             RBR,
-            FAIL
+            FAIL,
         }
 
         let alphabet = "{} \t\n".to_string();
@@ -157,7 +160,7 @@ kind=NZ lexeme=11010101"
             _ => "",
         }.to_string();
 
-        let dfa = DFA{
+        let dfa = DFA {
             alphabet,
             start: S::START,
             td: Box::new(CompileTransitionDelta::build(delta, tokenizer, S::FAIL)),
@@ -167,7 +170,7 @@ kind=NZ lexeme=11010101"
 
         let scanner = def_scanner();
 
-        //execute
+        //exercise
         let tokens = scanner.scan(&input, &dfa);
 
         //verify
@@ -200,7 +203,7 @@ kind=RBRACKET lexeme=}"
             WS,
             LBR,
             RBR,
-            FAIL
+            FAIL,
         }
 
         let alphabet = "{} \t\n".to_string();
@@ -222,7 +225,7 @@ kind=RBRACKET lexeme=}"
             _ => "",
         }.to_string();
 
-        let dfa = DFA{
+        let dfa = DFA {
             alphabet,
             start: S::START,
             td: Box::new(CompileTransitionDelta::build(delta, tokenizer, S::FAIL)),
@@ -232,7 +235,7 @@ kind=RBRACKET lexeme=}"
 
         let scanner = def_scanner();
 
-        //execute
+        //exercise
         let tokens = scanner.scan(&input, &dfa);
 
         //verify
@@ -262,7 +265,7 @@ kind=RBRACKET lexeme=}"
             WS,
             LBR,
             RBR,
-            FAIL
+            FAIL,
         }
 
         let alphabet = "{} \t\n".to_string();
@@ -284,7 +287,7 @@ kind=RBRACKET lexeme=}"
             _ => "",
         }.to_string();
 
-        let dfa = DFA{
+        let dfa = DFA {
             alphabet,
             start: S::START,
             td: Box::new(CompileTransitionDelta::build(delta, tokenizer, S::FAIL)),
@@ -294,7 +297,7 @@ kind=RBRACKET lexeme=}"
 
         let scanner = def_scanner();
 
-        //execute
+        //exercise
         let tokens = scanner.scan(&input, &dfa);
 
         //verify
@@ -314,7 +317,7 @@ kind=RBRACKET lexeme=}"
             WS,
             LBR,
             RBR,
-            FAIL
+            FAIL,
         }
 
         let alphabet = "{} \t\n".to_string();
@@ -336,7 +339,7 @@ kind=RBRACKET lexeme=}"
             _ => "",
         }.to_string();
 
-        let dfa = DFA{
+        let dfa = DFA {
             alphabet,
             start: S::START,
             td: Box::new(CompileTransitionDelta::build(delta, tokenizer, S::FAIL)),
@@ -346,7 +349,7 @@ kind=RBRACKET lexeme=}"
 
         let scanner = def_scanner();
 
-        //execute
+        //exercise
         let tokens = scanner.scan(&input, &dfa);
 
         //verify
