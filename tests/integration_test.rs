@@ -7,12 +7,12 @@ use std::io::Write;
 use std::fs::File;
 
 #[test]
-fn test_balanced_brackets(){
+fn test_balanced_brackets() {
     test_fjr("balanced_brackets", "balanced_brackets");
 }
 
 #[test]
-fn test_def_input_matcher(){
+fn test_def_input_matcher() {
     //setup
     let spec = "
 'abcdefghijklmnopqrstuvwxyz'
@@ -41,19 +41,19 @@ acc -> ACC;
 
     //verify
     assert_eq!(res,
-"ab
+               "ab
 asdfergrthergergher
 a"
     );
 }
 
 #[test]
-fn test_lacs_simple(){
+fn test_lacs_simple() {
     test_fjr("lacs_simple", "lacs");
 }
 
 #[test]
-fn test_lacs_medium(){
+fn test_lacs_medium() {
     test_fjr("lacs_medium", "lacs");
 }
 
@@ -128,7 +128,7 @@ fn test_advanced_operators() {
     assert_eq!(res, "iijijjjijijijiinjiii");
 }
 
-fn test_fjr(case_name: &str, spec_name: &str){
+fn test_fjr(case_name: &str, spec_name: &str) {
     //setup
     let fjr = FormatJobRunner::build(&load_spec(spec_name)).unwrap();
 
@@ -150,7 +150,7 @@ fn load_spec(name: &str) -> String {
     match spec_file {
         Ok(_) => {
             spec_file.unwrap().read_to_string(&mut spec).unwrap();
-        },
+        }
         Err(e) => panic!("Could't find specification file: {}", e),
     }
     spec
@@ -162,30 +162,30 @@ fn load_input(name: &str) -> String {
     match input_file {
         Ok(_) => {
             input_file.unwrap().read_to_string(&mut input).unwrap();
-        },
+        }
         Err(e) => panic!("Could't find input file: {}", e),
     }
     input
 }
 
-fn assert_matches_file(result: String, file_name: &str){
+fn assert_matches_file(result: String, file_name: &str) {
     let file_path = format!("tests/output/{}", file_name);
     let mut output = String::new();
     let output_file = File::open(&file_path);
     match output_file {
         Ok(_) => {
             output_file.unwrap().read_to_string(&mut output).unwrap();
-        },
+        }
         Err(_) => {
             let mut output_file = File::create(&file_path);
             match output_file {
                 Ok(_) => {
                     output_file.unwrap().write(result.as_bytes()).unwrap();
-                },
+                }
                 Err(e) => panic!("Couldn't create output file: {}", e),
             }
             panic!("Couldn't find output file, creating new file with results");
-        },
+        }
     }
 
     assert_eq!(output, result);

@@ -1,4 +1,5 @@
 use std::cmp;
+
 use core::spec::DEF_MATCHER;
 use core::scan;
 use core::scan::Token;
@@ -8,10 +9,9 @@ use core::scan::compile::Scanner;
 
 pub struct MaximalMunchScanner;
 
-impl<State : PartialEq + Clone> Scanner<State> for MaximalMunchScanner {
+impl<State: PartialEq + Clone> Scanner<State> for MaximalMunchScanner {
     fn scan<'a, 'b>(&self, input: &'a str, dfa: &'b DFA<State>) -> Result<Vec<Token<String>>, scan::Error> {
-
-        fn scan_one<'a, 'b, State : PartialEq + Clone>(input: &'a [char], line: usize, character: usize, dfa: &'b DFA<State>) -> (usize, State, usize, usize) {
+        fn scan_one<'a, 'b, State: PartialEq + Clone>(input: &'a [char], line: usize, character: usize, dfa: &'b DFA<State>) -> (usize, State, usize, usize) {
             let mut input: &[char] = input;
 
             let mut scanned: usize = 0;
@@ -43,7 +43,7 @@ impl<State : PartialEq + Clone> Scanner<State> for MaximalMunchScanner {
             last_accepting
         }
 
-        let chars : Vec<char> = input.chars().map(|c| {
+        let chars: Vec<char> = input.chars().map(|c| {
             c
         }).collect();
 
@@ -64,7 +64,7 @@ impl<State : PartialEq + Clone> Scanner<State> for MaximalMunchScanner {
             if scanned == 0 {
                 let seq_len = cmp::min(input.len(), FAIL_SEQUENCE_LENGTH);
 
-                return Err(scan::Error{
+                return Err(scan::Error {
                     sequence: input.iter().take(seq_len).collect(),
                     line,
                     character,

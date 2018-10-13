@@ -4,6 +4,7 @@ extern crate stopwatch;
 
 use std::error;
 use std::fmt;
+
 use core::data::stream::StreamSource;
 use core::scan;
 use core::scan::runtime;
@@ -131,9 +132,10 @@ impl<'g, T: 'g + Clone> Stream<'g, T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::error::Error;
 
     #[test]
-    fn test_failed_scan_input() {
+    fn failed_scan_input() {
         //setup
         let spec = "
 'ab'
@@ -155,14 +157,24 @@ s -> ACC;
 
         //verify
         assert!(res.is_err());
+
+        let mut err: &Error = &res.err().unwrap();
         assert_eq!(
-            format!("{}", res.err().unwrap()),
+            format!("{}", err),
             "Failed to scan input: No accepting scans after (1,1): b..."
         );
+
+        err = err.cause().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "No accepting scans after (1,1): b..."
+        );
+
+        assert!(err.cause().is_none());
     }
 
     #[test]
-    fn test_failed_parse_input() {
+    fn failed_parse_input() {
         //setup
         let spec = "
 'a'
@@ -184,14 +196,24 @@ s -> B;
 
         //verify
         assert!(res.is_err());
+
+        let mut err: &Error = &res.err().unwrap();
         assert_eq!(
-            format!("{}", res.err().unwrap()),
+            format!("{}", err),
             "Failed to parse input: Recognition failed at token 1: ACC <- 'a'"
         );
+
+        err = err.cause().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "Recognition failed at token 1: ACC <- 'a'"
+        );
+
+        assert!(err.cause().is_none());
     }
 
     #[test]
-    fn test_failed_scan_spec() {
+    fn failed_scan_spec() {
         //setup
         let spec = "
 'ab'~
@@ -206,14 +228,30 @@ s -> ACC;
 
         //verify
         assert!(res.is_err());
+
+        let mut err: &Error = &res.err().unwrap();
         assert_eq!(
-            format!("{}", res.err().unwrap()),
+            format!("{}", err),
             "Failed to parse specification: Scan error: No accepting scans after (2,5): ~\n\nstart \'..."
         );
+
+        err = err.cause().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "Scan error: No accepting scans after (2,5): ~\n\nstart \'..."
+        );
+
+        err = err.cause().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "No accepting scans after (2,5): ~\n\nstart \'..."
+        );
+
+        assert!(err.cause().is_none());
     }
 
     #[test]
-    fn test_failed_parse_spec() {
+    fn failed_parse_spec() {
         //setup
         let spec = "
 start 'a' -> ^ACC;
@@ -226,14 +264,62 @@ s -> B;
 
         //verify
         assert!(res.is_err());
+
+        let mut err: &Error = &res.err().unwrap();
         assert_eq!(
-            format!("{}", res.err().unwrap()),
+            format!("{}", err),
             "Failed to parse specification: Parse error: Recognition failed at token 1: ID <- 'start'"
         );
+
+        err = err.cause().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "Parse error: Recognition failed at token 1: ID <- 'start'"
+        );
+
+        err = err.cause().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "Recognition failed at token 1: ID <- 'start'"
+        );
+
+        assert!(err.cause().is_none());
     }
 
     #[test]
-    fn test_failed_cdfa_multiple_def_matchers() {
+    fn failed_empty_scan() {
+        //setup
+        let spec = "".to_string();
+
+        //exercise
+        let res = FormatJobRunner::build(&spec);
+
+        //verify
+        assert!(res.is_err());
+
+        let mut err: &Error = &res.err().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "Failed to parse specification: Parse error: No tokens scanned"
+        );
+
+        err = err.cause().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "Parse error: No tokens scanned"
+        );
+
+        err = err.cause().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "No tokens scanned"
+        );
+
+        assert!(err.cause().is_none());
+    }
+
+    #[test]
+    fn failed_cdfa_multiple_def_matchers() {
         //setup
         let spec = "
 ''
@@ -250,14 +336,30 @@ s ->;
 
         //verify
         assert!(res.is_err());
+
+        let mut err: &Error = &res.err().unwrap();
         assert_eq!(
-            format!("{}", res.err().unwrap()),
+            format!("{}", err),
             "Failed to generate specification: ECDFA generation error: Failed to build CDFA: Default matcher used twice"
         );
+
+        err = err.cause().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "ECDFA generation error: Failed to build CDFA: Default matcher used twice"
+        );
+
+        err = err.cause().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "Failed to build CDFA: Default matcher used twice"
+        );
+
+        assert!(err.cause().is_none());
     }
 
     #[test]
-    fn test_failed_cdfa_non_prefix_free() {
+    fn failed_cdfa_non_prefix_free() {
         //setup
         let spec = "
 ''
@@ -274,9 +376,25 @@ s ->;
 
         //verify
         assert!(res.is_err());
+
+        let mut err: &Error = &res.err().unwrap();
         assert_eq!(
-            format!("{}", res.err().unwrap()),
+            format!("{}", err),
             "Failed to generate specification: ECDFA generation error: Failed to build CDFA: Transition trie is not prefix free"
         );
+
+        err = err.cause().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "ECDFA generation error: Failed to build CDFA: Transition trie is not prefix free"
+        );
+
+        err = err.cause().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "Failed to build CDFA: Transition trie is not prefix free"
+        );
+
+        assert!(err.cause().is_none());
     }
 }

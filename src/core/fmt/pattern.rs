@@ -1,5 +1,7 @@
 use std::error;
 use std::fmt;
+
+use core::data::Data;
 use core::parse::build_prods;
 use core::parse::def_parser;
 use core::parse;
@@ -26,7 +28,7 @@ enum S {
     NUM,
     ALPHA,
     WS,
-    FAIL
+    FAIL,
 }
 
 thread_local! {
@@ -88,7 +90,7 @@ thread_local! {
 
 lazy_static! {
     static ref PATTERN_PRODUCTIONS: Vec<Production> = {
-        return build_prods(&[
+        build_prods(&[
             "pattern segs",
 
             "segs segs seg",
@@ -117,11 +119,11 @@ lazy_static! {
             "val pattern",
             "val ",
 
-        ]);
+        ])
     };
 
     static ref PATTERN_GRAMMAR: Grammar = {
-        return Grammar::from(PATTERN_PRODUCTIONS.clone());
+        Grammar::from(PATTERN_PRODUCTIONS.clone())
     };
 }
 
@@ -150,20 +152,20 @@ pub fn generate_pattern(input: &str, prod: &Production) -> Result<Pattern, Build
     generate_pattern_internal(&parse, prod)
 }
 
-pub fn generate_pattern_internal<'a>(root: &'a Tree, prod: &Production) -> Result<Pattern, BuildError>  {
+pub fn generate_pattern_internal<'a>(root: &'a Tree, prod: &Production) -> Result<Pattern, BuildError> {
     let mut segments: Vec<Segment> = vec![];
     generate_pattern_recursive(&root, &mut segments, prod)?;
-    Ok(Pattern{segments})
+    Ok(Pattern { segments })
 }
 
 fn generate_pattern_recursive<'a>(node: &'a Tree, accumulator: &'a mut Vec<Segment>, prod: &Production) -> Result<(), BuildError> {
     match &node.lhs.kind[..] {
         "WHITESPACE" => {
             accumulator.push(Segment::Filler(node.lhs.lexeme.clone()));
-        },
+        }
         "sub" => {
             accumulator.push(Segment::Substitution(node.get_child(1).lhs.lexeme.clone()));
-        },
+        }
         "capdesc" => {
             let declarations: Vec<Declaration> = if node.children.len() == 3 {
                 parse_decls(&node.get_child(2), prod)?
@@ -182,13 +184,13 @@ fn generate_pattern_recursive<'a>(node: &'a Tree, accumulator: &'a mut Vec<Segme
                 )));
             }
 
-            accumulator.push(Segment::Capture(Capture{child_index, declarations}));
-        },
+            accumulator.push(Segment::Capture(Capture { child_index, declarations }));
+        }
         _ => {
             for child in &node.children {
                 generate_pattern_recursive(child, accumulator, prod)?;
             }
-        },
+        }
     }
     Ok(())
 }
@@ -211,7 +213,7 @@ fn parse_decls_opt<'a>(declsopt_node: &'a Tree, accumulator: &'a mut Vec<Declara
 
 fn parse_decl(decl: &Tree, prod: &Production) -> Result<Declaration, BuildError> {
     let val_node = decl.get_child(2).get_child(0);
-    Ok(Declaration{
+    Ok(Declaration {
         key: decl.get_child(0).lhs.lexeme.clone(),
         value: if val_node.is_null() {
             None
@@ -233,7 +235,7 @@ fn parse_pattern(input: &str) -> Result<Tree, BuildError> {
 pub enum BuildError {
     ScanErr(scan::Error),
     ParseErr(parse::Error),
-    CaptureErr(String)
+    CaptureErr(String),
 }
 
 impl fmt::Display for BuildError {
@@ -277,12 +279,12 @@ mod tests {
         //setup
         let input = "\t \n\n\n\n{1}  {2}  {45;something=\n\n \t} {46;somethinelse=\n\n \t;some=}";
 
-        //execute
+        //exercise
         let tree = parse_pattern(input);
 
         //verify
         assert_eq!(tree.unwrap().to_string(),
-"└── pattern
+                   "└── pattern
     └── segs
         ├── segs
         │   ├── segs
@@ -373,12 +375,12 @@ mod tests {
     fn generate_pattern_simple() {
         //setup
         let input = "\t \n\n\n\n{1}  {2}  {4;something=\n\n \t} {3;somethinelse=\n\n \t;some=}";
-        let prod = Production{
+        let prod = Production {
             lhs: String::new(),
-            rhs: vec![String::new(),String::new(),String::new(),String::new(),String::new()]
+            rhs: vec![String::new(), String::new(), String::new(), String::new(), String::new()],
         };
 
-        //execute
+        //exercise
         let pattern = generate_pattern(input, &prod).unwrap();
 
         //verify
@@ -429,12 +431,12 @@ mod tests {
     fn pattern_scan_error() {
         //setup
         let input = "#";
-        let prod = Production{
+        let prod = Production {
             lhs: String::new(),
-            rhs: vec![]
+            rhs: vec![],
         };
 
-        //execute
+        //exercise
         let res = generate_pattern(input, &prod);
 
         //verify
@@ -449,12 +451,12 @@ mod tests {
     fn pattern_parse_error() {
         //setup
         let input = "4";
-        let prod = Production{
+        let prod = Production {
             lhs: String::new(),
-            rhs: vec![]
+            rhs: vec![],
         };
 
-        //execute
+        //exercise
         let res = generate_pattern(input, &prod);
 
         //verify
@@ -469,12 +471,12 @@ mod tests {
     fn pattern_capture_error() {
         //setup
         let input = "{1}";
-        let prod = Production{
+        let prod = Production {
             lhs: String::from("lhs"),
-            rhs: vec![String::from("rhs_item")]
+            rhs: vec![String::from("rhs_item")],
         };
 
-        //execute
+        //exercise
         let res = generate_pattern(input, &prod);
 
         //verify

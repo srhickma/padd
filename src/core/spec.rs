@@ -1,5 +1,6 @@
 use std;
 use std::error;
+
 use core::fmt;
 use core::fmt::PatternPair;
 use core::fmt::Formatter;
@@ -479,7 +480,7 @@ mod tests {
         //setup
         let input = "' 'start;s->s b;";
 
-        //execute
+        //exercise
         let tree = parse_spec(input);
 
         //verify
@@ -546,7 +547,7 @@ w -> WHITESPACE `[prefix]{0}\n\n{1;prefix=[prefix]\t}[prefix]{2}\n\n`
 ;
         ";
 
-        //execute
+        //exercise
         let tree = parse_spec(input);
 
         //verify
@@ -877,7 +878,7 @@ s -> ;";
         let parse = tree.unwrap();
         let (cdfa, _, _) = generate_spec(&parse).unwrap();
 
-        //execute
+        //exercise
         let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
 
         //verify
@@ -928,7 +929,7 @@ kind=ID lexeme=f")
             -> ID s
             -> ID;";
 
-        //execute
+        //exercise
         let tree = parse_spec(input);
 
         //verify
@@ -1024,12 +1025,12 @@ kind=ID lexeme=f")
     }
 
     #[test]
-    fn test_replace_escapes() {
+    fn replace_escapes() {
         //setup
         let input = "ffffnt\'ff\\n\\t\\\\\\\\ffff\\ff\'\\f\\\'fff";
 
-        //execute
-        let res = replace_escapes(input);
+        //exercise
+        let res = super::replace_escapes(input);
 
         //verify
         assert_eq!(res, "ffffnt\'ff\n\t\\\\ffffff\'f\'fff");

@@ -1,5 +1,6 @@
 use std::error;
 use std::fmt;
+
 use core::data::Data;
 
 pub mod compile;
@@ -10,7 +11,7 @@ static FAIL_SEQUENCE_LENGTH: usize = 10;
 #[derive(PartialEq, Clone, Debug)]
 pub struct Token<Kind: fmt::Debug> {
     pub kind: Kind,
-    pub lexeme: String
+    pub lexeme: String,
 }
 
 impl<Kind: Data> Data for Token<Kind> {

@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use std::collections::HashMap;
 use std::error;
 use std::fmt;
+
 use core::scan::Token;
 use core::data::Data;
 
@@ -12,10 +13,10 @@ pub trait Parser {
 }
 
 pub fn def_parser() -> Box<Parser> {
-    return Box::new(earley::EarleyParser);
+    Box::new(earley::EarleyParser)
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct Tree {
     pub lhs: Token<String>,
     pub children: Vec<Tree>,
@@ -23,57 +24,61 @@ pub struct Tree {
 
 impl Tree {
     pub fn get_child(&self, i: usize) -> &Tree {
-        return self.children.get(i).unwrap();
+        self.children.get(i).unwrap()
     }
+
     pub fn is_leaf(&self) -> bool {
-        return self.children.len() == 0;
+        self.children.len() == 0
     }
+
     pub fn is_empty(&self) -> bool {
-        return self.children.len() == 1 && self.get_child(0).is_null();
+        self.children.len() == 1 && self.get_child(0).is_null()
     }
+
     pub fn is_null(&self) -> bool {
-        return self.lhs.kind == "";
+        self.lhs.kind == ""
     }
+
     pub fn null() -> Tree {
-        return Tree{
-            lhs: Token{
+        Tree {
+            lhs: Token {
                 kind: "".to_string(),
                 lexeme: "NULL".to_string(),
             },
             children: vec![],
         }
     }
-    #[allow(dead_code)]
-    pub fn print(&self){
-        println!("{}", self.to_string());
-    }
-    #[allow(dead_code)]
-    pub fn to_string(&self) -> String {
-        return self.to_string_internal("".to_string(), true)
-    }
-    #[allow(dead_code)]
+
     fn to_string_internal(&self, prefix: String, is_tail: bool) -> String {
         if self.children.len() == 0 {
-            return format!("{}{}{}", prefix, if is_tail {"└── "} else {"├── "}, self.lhs.to_string());
-        }
-        else {
-            let mut s = format!("{}{}{}", prefix, if is_tail {"└── "} else {"├── "}, self.lhs.kind);
+            format!("{}{}{}", prefix, if is_tail { "└── " } else { "├── " }, self.lhs.to_string())
+        } else {
+            let mut s = format!("{}{}{}", prefix, if is_tail { "└── " } else { "├── " }, self.lhs.kind);
             let mut i = 0;
             let len = self.children.len();
             for child in &self.children {
-                if i == len - 1{
-                    s = format!("{}\n{}", s, child.to_string_internal(format!("{}{}", prefix, if is_tail {"    "} else {"│   "}), true));
+                if i == len - 1 {
+                    s = format!("{}\n{}", s, child.to_string_internal(format!("{}{}", prefix, if is_tail { "    " } else { "│   " }), true));
                 } else {
-                    s = format!("{}\n{}", s, child.to_string_internal(format!("{}{}", prefix, if is_tail {"    "} else {"│   "}), false));
+                    s = format!("{}\n{}", s, child.to_string_internal(format!("{}{}", prefix, if is_tail { "    " } else { "│   " }), false));
                 }
                 i += 1;
             }
-            return s;
+            s
         }
     }
+
     pub fn production(&self) -> String {
-        let vec: Vec<String> = self.children.iter().map(|s| s.lhs.kind.clone()).collect();
-        return format!("{} {}", self.lhs.kind, (&vec[..]).join(" "));
+        let vec: Vec<String> = self.children.iter()
+            .map(|s| s.lhs.kind.clone())
+            .collect();
+        format!("{} {}", self.lhs.kind, (&vec[..]).join(" "))
+    }
+}
+
+impl Data for Tree {
+    fn to_string(&self) -> String {
+        self.to_string_internal("".to_string(), true)
     }
 }
 
@@ -127,17 +132,17 @@ impl Grammar {
             .collect();
         let start = productions[0].lhs.clone();
 
-        return Grammar {
+        Grammar {
             productions,
             nss,
             non_terminals,
             terminals,
             symbols,
             start,
-        };
+        }
     }
 
-    fn build_nss(productions: &Vec<Production>) ->  HashSet<String> {
+    fn build_nss(productions: &Vec<Production>) -> HashSet<String> {
         let mut nss: HashSet<String> = HashSet::new();
         let mut prods_by_rhs: HashMap<&String, Vec<&Production>> = HashMap::new();
         let mut work_stack: Vec<&String> = Vec::new();
@@ -160,7 +165,7 @@ impl Grammar {
                 None => break,
                 Some(work_symbol) => {
                     match prods_by_rhs.get(work_symbol) {
-                        None => {},
+                        None => {}
                         Some(prods) => {
                             for prod in prods {
                                 if !nss.contains(&prod.lhs)
@@ -179,25 +184,24 @@ impl Grammar {
     }
 }
 
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Clone, Debug)]
 pub struct Production {
     pub lhs: String,
     pub rhs: Vec<String>,
 }
 
-impl Production {
-    #[allow(dead_code)]
-    pub fn to_string(&self) -> String {
+impl Data for Production {
+    fn to_string(&self) -> String {
         format!("{} {}", self.lhs, (&self.rhs[..]).join(" "))
     }
 }
 
-pub fn build_prods<'a>(strings: &'a[&'a str]) -> Vec<Production> {
+pub fn build_prods<'a>(strings: &'a [&'a str]) -> Vec<Production> {
     let mut productions: Vec<Production> = vec![];
     for string in strings {
         productions.push(prod_from_string(string));
     }
-    return productions;
+    productions
 }
 
 fn prod_from_string(string: &str) -> Production {
@@ -214,7 +218,7 @@ fn prod_from_string(string: &str) -> Production {
         i += 1;
     }
 
-    return Production{
+    Production {
         lhs,
         rhs,
     }
@@ -235,11 +239,11 @@ mod tests {
         let grammar = Grammar::from(productions);
 
         let scan = vec![
-            Token{
+            Token {
                 kind: "mary".to_string(),
                 lexeme: "Hello".to_string(),
             },
-            Token{
+            Token {
                 kind: "runs".to_string(),
                 lexeme: "World!".to_string(),
             }
@@ -247,12 +251,12 @@ mod tests {
 
         let parser = def_parser();
 
-        //execute
+        //exercise
         let tree = parser.parse(scan, &grammar);
 
         //verify
         assert_eq!(tree.unwrap().to_string(),
-"└── Sentence
+                   "└── Sentence
     ├── Noun
     │   └── mary <- 'Hello'
     └── Verb
@@ -271,15 +275,15 @@ mod tests {
         let grammar = Grammar::from(productions);
 
         let scan = vec![
-            Token{
+            Token {
                 kind: "BOF".to_string(),
                 lexeme: "a".to_string(),
             },
-            Token{
+            Token {
                 kind: "x".to_string(),
                 lexeme: "b".to_string(),
             },
-            Token{
+            Token {
                 kind: "EOF".to_string(),
                 lexeme: "c".to_string(),
             }
@@ -287,12 +291,12 @@ mod tests {
 
         let parser = def_parser();
 
-        //execute
+        //exercise
         let tree = parser.parse(scan, &grammar);
 
         //verify
         assert_eq!(tree.unwrap().to_string(),
-"└── S
+                   "└── S
     ├── BOF <- 'a'
     ├── A
     │   └── x <- 'b'
@@ -312,19 +316,19 @@ mod tests {
         let grammar = Grammar::from(productions);
 
         let scan = "( ID OP ID ) OP ID OP ( ID )".split_whitespace()
-            .map(|kind| Token{
+            .map(|kind| Token {
                 kind: kind.to_string(),
                 lexeme: "xy".to_string(),
-            },).collect();
+            }, ).collect();
 
         let parser = def_parser();
 
-        //execute
+        //exercise
         let tree = parser.parse(scan, &grammar);
 
         //verify
         assert_eq!(tree.unwrap().to_string(),
-"└── S
+                   "└── S
     ├── S
     │   ├── S
     │   │   └── expr
@@ -365,19 +369,19 @@ mod tests {
         let grammar = Grammar::from(productions);
 
         let scan = "NUM AS LPAREN NUM MD NUM AS NUM RPAREN".split_whitespace()
-            .map(|kind| Token{
+            .map(|kind| Token {
                 kind: kind.to_string(),
                 lexeme: "xy".to_string(),
-            },).collect();
+            }, ).collect();
 
         let parser = def_parser();
 
-        //execute
+        //exercise
         let tree = parser.parse(scan, &grammar);
 
         //verify
         assert_eq!(tree.unwrap().to_string(),
-"└── Sum
+                   "└── Sum
     ├── Sum
     │   └── Product
     │       └── Factor
@@ -420,19 +424,19 @@ mod tests {
         let grammar = Grammar::from(productions);
 
         let scan = "WHITESPACE LBRACKET WHITESPACE LBRACKET WHITESPACE RBRACKET WHITESPACE RBRACKET LBRACKET RBRACKET WHITESPACE".split_whitespace()
-            .map(|kind| Token{
+            .map(|kind| Token {
                 kind: kind.to_string(),
                 lexeme: "xy".to_string(),
-            },).collect();
+            }, ).collect();
 
         let parser = def_parser();
 
-        //execute
+        //exercise
         let tree = parser.parse(scan, &grammar);
 
         //verify
         assert_eq!(tree.unwrap().to_string(),
-"└── s
+                   "└── s
     ├── s
     │   ├── s
     │   │   ├── s
@@ -486,19 +490,19 @@ mod tests {
         let grammar = Grammar::from(productions);
 
         let scan = "WHITESPACE".split_whitespace()
-            .map(|kind| Token{
+            .map(|kind| Token {
                 kind: kind.to_string(),
                 lexeme: "xy".to_string(),
-            },).collect();
+            }, ).collect();
 
         let parser = def_parser();
 
-        //execute
+        //exercise
         let tree = parser.parse(scan, &grammar);
 
         //verify
         assert_eq!(tree.unwrap().to_string(),
-"└── s
+                   "└── s
     ├── w
     │   └──  <- 'NULL'
     ├── w
@@ -511,7 +515,7 @@ mod tests {
     }
 
     #[test]
-    fn advanced_parse_build(){
+    fn advanced_parse_build() {
         //setup
         let productions = build_prods(&[
             "sum sum PM prod",
@@ -526,25 +530,25 @@ mod tests {
         let grammar = Grammar::from(productions);
 
         let scan = vec![
-            Token{ kind: "DIGIT".to_string(), lexeme: "1".to_string() },
-            Token{ kind: "PM".to_string(), lexeme: "+".to_string() },
-            Token{ kind: "LPAREN".to_string(), lexeme: "(".to_string() },
-            Token{ kind: "DIGIT".to_string(), lexeme: "2".to_string() },
-            Token{ kind: "MD".to_string(), lexeme: "*".to_string() },
-            Token{ kind: "DIGIT".to_string(), lexeme: "3".to_string() },
-            Token{ kind: "PM".to_string(), lexeme: "-".to_string() },
-            Token{ kind: "DIGIT".to_string(), lexeme: "4".to_string() },
-            Token{ kind: "RPAREN".to_string(), lexeme: ")".to_string() },
+            Token { kind: "DIGIT".to_string(), lexeme: "1".to_string() },
+            Token { kind: "PM".to_string(), lexeme: "+".to_string() },
+            Token { kind: "LPAREN".to_string(), lexeme: "(".to_string() },
+            Token { kind: "DIGIT".to_string(), lexeme: "2".to_string() },
+            Token { kind: "MD".to_string(), lexeme: "*".to_string() },
+            Token { kind: "DIGIT".to_string(), lexeme: "3".to_string() },
+            Token { kind: "PM".to_string(), lexeme: "-".to_string() },
+            Token { kind: "DIGIT".to_string(), lexeme: "4".to_string() },
+            Token { kind: "RPAREN".to_string(), lexeme: ")".to_string() },
         ];
 
         let parser = def_parser();
 
-        //execute
+        //exercise
         let tree = parser.parse(scan, &grammar);
 
         //verify
         assert_eq!(tree.unwrap().to_string(),
-"└── sum
+                   "└── sum
     ├── sum
     │   └── prod
     │       └── fac
@@ -580,14 +584,14 @@ mod tests {
         let productions = build_prods(&["s "]);
         let grammar = Grammar::from(productions);
 
-        let scan = vec![Token{
+        let scan = vec![Token {
             kind: "kind".to_string(),
             lexeme: "lexeme".to_string(),
         }];
 
         let parser = def_parser();
 
-        //execute
+        //exercise
         let res = parser.parse(scan, &grammar);
 
         //verify
