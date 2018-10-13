@@ -1025,12 +1025,12 @@ kind=ID lexeme=f")
     }
 
     #[test]
-    fn test_replace_escapes() {
+    fn replace_escapes() {
         //setup
         let input = "ffffnt\'ff\\n\\t\\\\\\\\ffff\\ff\'\\f\\\'fff";
 
         //exercise
-        let res = replace_escapes(input);
+        let res = super::replace_escapes(input);
 
         //verify
         assert_eq!(res, "ffffnt\'ff\n\t\\\\ffffff\'f\'fff");

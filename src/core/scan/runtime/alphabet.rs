@@ -25,3 +25,30 @@ impl Alphabet for HashedAlphabet {
         self.alphabet.contains(&c)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn contains() {
+        //setup
+        let mut alphabet = HashedAlphabet::new();
+
+        //exercise/verify
+        alphabet.insert('a');
+        assert!(alphabet.contains('a'));
+        assert!(!alphabet.contains('c'));
+        assert!(!alphabet.contains('e'));
+
+        alphabet.insert('e');
+        assert!(alphabet.contains('a'));
+        assert!(!alphabet.contains('c'));
+        assert!(alphabet.contains('e'));
+
+        alphabet.insert('c');
+        assert!(alphabet.contains('a'));
+        assert!(alphabet.contains('c'));
+        assert!(alphabet.contains('e'));
+    }
+}

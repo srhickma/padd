@@ -135,7 +135,7 @@ mod tests {
     use std::error::Error;
 
     #[test]
-    fn test_failed_scan_input() {
+    fn failed_scan_input() {
         //setup
         let spec = "
 'ab'
@@ -174,7 +174,7 @@ s -> ACC;
     }
 
     #[test]
-    fn test_failed_parse_input() {
+    fn failed_parse_input() {
         //setup
         let spec = "
 'a'
@@ -213,7 +213,7 @@ s -> B;
     }
 
     #[test]
-    fn test_failed_scan_spec() {
+    fn failed_scan_spec() {
         //setup
         let spec = "
 'ab'~
@@ -251,7 +251,7 @@ s -> ACC;
     }
 
     #[test]
-    fn test_failed_parse_spec() {
+    fn failed_parse_spec() {
         //setup
         let spec = "
 start 'a' -> ^ACC;
@@ -287,7 +287,7 @@ s -> B;
     }
 
     #[test]
-    fn test_failed_empty_scan() {
+    fn failed_empty_scan() {
         //setup
         let spec = "".to_string();
 
@@ -319,7 +319,7 @@ s -> B;
     }
 
     #[test]
-    fn test_failed_cdfa_multiple_def_matchers() {
+    fn failed_cdfa_multiple_def_matchers() {
         //setup
         let spec = "
 ''
@@ -359,7 +359,7 @@ s ->;
     }
 
     #[test]
-    fn test_failed_cdfa_non_prefix_free() {
+    fn failed_cdfa_non_prefix_free() {
         //setup
         let spec = "
 ''
