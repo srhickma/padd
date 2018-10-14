@@ -256,7 +256,7 @@ impl TransitionTrie {
             };
             node.add_child(c, child);
         } else if last {
-            return Err(CDFAError::BuildErr("Transition trie is not prefix free".to_string()));
+            return Err(CDFAError::BuildErr(format!("Transition trie is not prefix free on character '{}'", c)));
         }
         Ok(())
     }

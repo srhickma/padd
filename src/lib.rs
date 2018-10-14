@@ -380,19 +380,19 @@ s ->;
         let mut err: &Error = &res.err().unwrap();
         assert_eq!(
             format!("{}", err),
-            "Failed to generate specification: ECDFA generation error: Failed to build CDFA: Transition trie is not prefix free"
+            "Failed to generate specification: ECDFA generation error: Failed to build CDFA: Transition trie is not prefix free on character 'a'"
         );
 
         err = err.cause().unwrap();
         assert_eq!(
             format!("{}", err),
-            "ECDFA generation error: Failed to build CDFA: Transition trie is not prefix free"
+            "ECDFA generation error: Failed to build CDFA: Transition trie is not prefix free on character 'a'"
         );
 
         err = err.cause().unwrap();
         assert_eq!(
             format!("{}", err),
-            "Failed to build CDFA: Transition trie is not prefix free"
+            "Failed to build CDFA: Transition trie is not prefix free on character 'a'"
         );
 
         assert!(err.cause().is_none());
