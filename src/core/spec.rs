@@ -19,7 +19,7 @@ use core::scan::runtime::ecdfa::EncodedCDFA;
 use core::scan::runtime::ecdfa::EncodedCDFABuilder;
 
 static SPEC_ALPHABET: &'static str = "`-=~!@#$%^&*()_+{}|[]\\;':\"<>?,./QWERTYUIOPASDFGHJKLZXCVBNM1234567890abcdefghijklmnopqrstuvwxyz \n\t";
-pub static DEF_MATCHER: char = '_';
+pub static DEF_MATCHER: &'static str = "_";
 
 #[derive(PartialEq, Clone)]
 enum S {
@@ -334,7 +334,7 @@ fn generate_ecdfa_mtcs<'a>(mtcs_node: &'a Tree, sources: &Vec<&State>, dest: &St
 
 fn add_ecdfa_tokenizer(state: &State, kind: &String, builder: &mut EncodedCDFABuilder) {
     builder.mark_accepting(state);
-    if kind != "_" { //TODO
+    if kind != DEF_MATCHER {
         builder.mark_token(state, kind);
     }
 }

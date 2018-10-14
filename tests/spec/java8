@@ -55,8 +55,7 @@ start
     'class' -> ^CLASS
     'continue' -> ^CONTINUE
     'default' -> ^DEFAULT
-    'do' -> ^DO
-    'double' -> ^PRIM
+    'do' -> do
     'else' -> ^ELSE
     'enum' -> ^ENUM
     'extends' -> ^EXTENDS
@@ -213,6 +212,12 @@ floatexp
 # MISC
 #
 
+do      ^DO
+    'ouble' -> ^PRIM
+    '\'' | '"' | '.' | '?' | '|' | '^' | '&' | '~' | '/' | '%' | '*' | '-' | '+' | '!' | '>' | '<' | '=' | '@' | ':'
+        | ';' | ',' | ']' | '[' | ')' | '(' | '}' | '{' | ' ' | '\t' | '\n' | '#' | '\\' | '$' | '`' -> fail
+    _ -> id;
+
 throw   ^THROW
     's' -> ^THROWS
     '\'' | '"' | '.' | '?' | '|' | '^' | '&' | '~' | '/' | '%' | '*' | '-' | '+' | '!' | '>' | '<' | '=' | '@' | ':'
@@ -327,8 +332,8 @@ class_body_decs_opt
     -> class_body_decs
     ->;
 class_body_decs
-    -> class_body_dec class_body_decs `{0}\n\n{1}`
-    -> class_body_dec `{0}\n\n`;
+    -> class_body_dec class_body_decs `{0}\n{1}`
+    -> class_body_dec `{0}`;
 class_body_dec
     -> class_member_dec
     -> block
@@ -368,7 +373,7 @@ argument_list
     -> expr;
 
 field_dec
-    -> modifiers_opt type variable_declarator_list SEMI `{0}{1} {2}{3}`;
+    -> modifiers_opt type variable_declarator_list SEMI `{0}{1} {2}{3}\n`;
 
 method_dec
     -> modifiers_opt method_header method_body;
@@ -379,7 +384,7 @@ method_declarator
     -> ID LPAREN formal_parameter_list_opt RPAREN array_dims_opt;
 method_body
     -> block
-    -> SEMI;
+    -> SEMI `{0}\n`;
 
 formal_parameter_list_opt
     -> formal_parameter_list
@@ -687,7 +692,7 @@ block_statement
     -> statement;
 
 lvar_dec_statement
-    -> lvar_dec SEMI;
+    -> lvar_dec SEMI `{0}{1}\n`;
 lvar_dec
     -> modifiers_opt type variable_declarator_list;
 
@@ -726,7 +731,7 @@ statement_expression
     -> class_icreation_expr;
 
 assignment
-    -> lhs ASSN expr;
+    -> lhs ASSN expr `{0} {1} {2}`;
 
 assert_statement
     -> ASSERT expr SEMI `{0} {1}{2}`
@@ -863,9 +868,12 @@ expr_opt
     -> expr
     ->;
 expr
+    -> non_assn_expr
+    -> lhs ASSN expr `{0} {1} {2}`;
+
+non_assn_expr
     -> lambda_expr
-    -> conditional_expr
-    -> lhs ASSN expr;
+    -> conditional_expr;
 
 lhs
     -> expr_name
@@ -886,56 +894,47 @@ lambda_body
 
 conditional_expr
     -> conditional_or_expr
-    -> conditional_or_expr QST expr COLON conditional_expr
-    -> conditional_or_expr QST expr COLON lambda_expr;
+    -> conditional_or_expr QST expr COLON non_assn_expr `{0} {1} {2} {3} {4}`;
 
 conditional_or_expr
     -> conditional_and_expr
-    -> conditional_or_expr OR_L conditional_and_expr;
+    -> conditional_or_expr OR_L conditional_and_expr `{0} {1} {2}`;
 
 conditional_and_expr
     -> inclusive_or_expr
-    -> conditional_and_expr AND_L inclusive_or_expr;
+    -> conditional_and_expr AND_L inclusive_or_expr `{0} {1} {2}`;
 
 inclusive_or_expr
     -> exclusive_or_expr
-    -> inclusive_or_expr OR_BI exclusive_or_expr;
+    -> inclusive_or_expr OR_BI exclusive_or_expr `{0} {1} {2}`;
 
 exclusive_or_expr
     -> and_expr
-    -> exclusive_or_expr OR_BE and_expr;
+    -> exclusive_or_expr OR_BE and_expr `{0} {1} {2}`;
 
 and_expr
     -> equality_expr
-    -> and_expr AND equality_expr;
+    -> and_expr AND equality_expr `{0} {1} {2}`;
 
 equality_expr
     -> relational_expr
-    -> equality_expr CMP_EQ relational_expr;
+    -> equality_expr CMP_EQ relational_expr `{0} {1} {2}`;
 
 relational_expr
     -> shift_expr
-    -> relational_expr CMP_REL shift_expr
-    -> relational_expr LT shift_expr
-    -> relational_expr GT shift_expr
-    -> relational_expr INSTANCEOF type;
+    -> relational_expr relational_op shift_expr `{0} {1} {2}`;
 
 shift_expr
     -> additive_expr
-    -> shift_expr LT LT additive_expr
-    -> shift_expr GT GT additive_expr
-    -> shift_expr GT GT GT additive_expr;
+    -> shift_expr shift_op additive_expr `{0} {1} {2}`;
 
 additive_expr
     -> multiplicative_expr
-    -> additive_expr PLUS multiplicative_expr
-    -> additive_expr MINUS multiplicative_expr;
+    -> additive_expr additive_op multiplicative_expr `{0} {1} {2}`;
 
 multiplicative_expr
     -> unary_expr
-    -> multiplicative_expr STAR unary_expr
-    -> multiplicative_expr PCT unary_expr
-    -> multiplicative_expr SLASH unary_expr;
+    -> multiplicative_expr multiplicative_op unary_expr `{0} {1} {2}`;
 
 unary_expr
     -> INC unary_expr
@@ -1051,3 +1050,27 @@ modifier
     -> STATIC
     -> FINAL
     -> DEFAULT;
+
+#
+# OPERATORS
+#
+
+shift_op
+    -> LT LT
+    -> GT GT
+    -> GT GT GT;
+
+relational_op
+    -> CMP_REL
+    -> LT
+    -> GT
+    -> INSTANCEOF;
+
+additive_op
+    -> PLUS
+    -> MINUS;
+
+multiplicative_op
+    -> STAR
+    -> PCT
+    -> SLASH;
