@@ -327,13 +327,13 @@ class_body_opt
     -> class_body
     ->;
 class_body
-    -> LBRACE class_body_decs_opt RBRACE `{0}\n\n{1}{2}\n`;
+    -> LBRACE class_body_decs_opt RBRACE `{0}\n{1;prefix=[prefix]\t}[prefix]{2}\n`;
 class_body_decs_opt
     -> class_body_decs
     ->;
 class_body_decs
-    -> class_body_dec class_body_decs `{0}\n{1}`
-    -> class_body_dec `{0}`;
+    -> class_body_dec class_body_decs `[prefix]{0}\n{1}`
+    -> class_body_dec `[prefix]{0}`;
 class_body_dec
     -> class_member_dec
     -> block
@@ -378,7 +378,7 @@ field_dec
 method_dec
     -> modifiers_opt method_header method_body;
 method_header
-    -> result method_declarator throws_opt `{0} {1}{2}`
+    -> result method_declarator throws_opt `{0} {1} {2}`
     -> type_parameters annotations_opt result method_declarator throws_opt `{0} {1}{2} {3}{4}`;
 method_declarator
     -> ID LPAREN formal_parameter_list_opt RPAREN array_dims_opt;
@@ -674,25 +674,25 @@ array_initializer
     -> LBRACE variable_initializers_opt comma_opt RBRACE;
 
 block
-    -> LBRACE block_statements_opt RBRACE `{0}\n{1}{2}\n`;
+    -> LBRACE block_statements_opt RBRACE `{0}\n{1;prefix=[prefix]\t}[prefix]{2}\n`;
 
 #
 # STATEMENTS
 #
 
 block_statements_opt
-    -> block_statements
+    -> block_statements `[prefix]{0}`
     ->;
 block_statements
-    -> block_statement block_statements
-    -> block_statement;
+    -> block_statement block_statements `{0}\n[prefix]{1}`
+    -> block_statement `{0}\n`;
 block_statement
     -> lvar_dec_statement
     -> class_dec
     -> statement;
 
 lvar_dec_statement
-    -> lvar_dec SEMI `{0}{1}\n`;
+    -> lvar_dec SEMI `[prefix]{0}{1}\n`;
 lvar_dec
     -> modifiers_opt type variable_declarator_list;
 
@@ -706,16 +706,16 @@ statement
 
 statement_without_trailing_substatement
     -> block
-    -> SEMI `{0}\n`
-    -> statement_expression SEMI `{0}{1}\n`
-    -> assert_statement `{0}\n`
+    -> SEMI
+    -> statement_expression SEMI
+    -> assert_statement
     -> switch_statement
     -> do_statement
-    -> break_statement `{0}\n`
-    -> continue_statement `{0}\n`
-    -> return_statement `{0}\n`
+    -> break_statement
+    -> continue_statement
+    -> return_statement
     -> synchronized_statement
-    -> throw_statement `{0}\n`
+    -> throw_statement
     -> try_statement;
 
 statement_expression_list
