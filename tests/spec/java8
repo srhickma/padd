@@ -327,7 +327,7 @@ class_body_opt
     -> class_body
     ->;
 class_body
-    -> LBRACE class_body_decs_opt RBRACE `{0}\n{1;prefix=[prefix]\t}[prefix]{2}\n`;
+    -> LBRACE class_body_decs_opt RBRACE `{0}\n{1;prefix=[prefix]    }[prefix]{2}\n`;
 class_body_decs_opt
     -> class_body_decs
     ->;
@@ -352,12 +352,12 @@ class_member_dec
 constructor_dec
     -> modifiers_opt constructor_declarator throws_opt constructor_body `{0}{1} {2}{3}`;
 constructor_body
-    -> LBRACE explicit_constructor_invocation_opt block_statements_opt RBRACE `{0}\n{1}{2}{3}`;
+    -> LBRACE explicit_constructor_invocation_opt block_statements_opt RBRACE `{0}\n{1;prefix=[prefix]    }{2;prefix=[prefix]    }[prefix]{3}\n`;
 constructor_declarator
     -> type_parameters_opt ID LPAREN formal_parameter_list_opt RPAREN;
 
 explicit_constructor_invocation_opt
-    -> explicit_constructor_invocation `{0}\n\n`
+    -> explicit_constructor_invocation `[prefix]{0}\n\n`
     ->;
 explicit_constructor_invocation
     -> type_arguments_opt THIS LPAREN argument_list_opt RPAREN SEMI
@@ -674,7 +674,7 @@ array_initializer
     -> LBRACE variable_initializers_opt comma_opt RBRACE;
 
 block
-    -> LBRACE block_statements_opt RBRACE `{0}\n{1;prefix=[prefix]\t}[prefix]{2}\n`;
+    -> LBRACE block_statements_opt RBRACE `{0}\n{1;prefix=[prefix]    }[prefix]{2}\n`;
 
 #
 # STATEMENTS
@@ -692,9 +692,9 @@ block_statement
     -> statement;
 
 lvar_dec_statement
-    -> lvar_dec SEMI `[prefix]{0}{1}\n`;
+    -> lvar_dec SEMI `{0}{1}\n`;
 lvar_dec
-    -> modifiers_opt type variable_declarator_list;
+    -> modifiers_opt type variable_declarator_list `{0}{1} {2}`;
 
 statement
     -> statement_without_trailing_substatement
