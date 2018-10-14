@@ -328,6 +328,11 @@ class_body_opt
     ->;
 class_body
     -> LBRACE class_body_decs_opt RBRACE `{0}\n{1;prefix=[prefix]    }[prefix]{2}\n`;
+inline_class_body_opt
+    -> inline_class_body
+    ->;
+inline_class_body
+    -> LBRACE class_body_decs_opt RBRACE ` {0}\n{1;prefix=[prefix]    }[prefix]{2}`;
 class_body_decs_opt
     -> class_body_decs
     ->;
@@ -336,8 +341,8 @@ class_body_decs
     -> class_body_dec `[prefix]{0}`;
 class_body_dec
     -> class_member_dec
-    -> block
-    -> STATIC block
+    -> block `{0}\n`
+    -> STATIC block `{0} {1}\n`
     -> constructor_dec;
 
 class_member_dec
@@ -376,7 +381,7 @@ field_dec
     -> modifiers_opt type variable_declarator_list SEMI `{0}{1} {2}{3}\n`;
 
 method_dec
-    -> modifiers_opt method_header method_body;
+    -> modifiers_opt method_header method_body `{0}{1}{2}\n`;
 method_header
     -> result method_declarator throws_opt `{0} {1} {2}`
     -> type_parameters annotations_opt result method_declarator throws_opt `{0} {1}{2} {3}{4}`;
@@ -384,7 +389,7 @@ method_declarator
     -> ID LPAREN formal_parameter_list_opt RPAREN array_dims_opt;
 method_body
     -> block
-    -> SEMI `{0}\n`;
+    -> SEMI;
 
 formal_parameter_list_opt
     -> formal_parameter_list
@@ -674,7 +679,7 @@ array_initializer
     -> LBRACE variable_initializers_opt comma_opt RBRACE;
 
 block
-    -> LBRACE block_statements_opt RBRACE `{0}\n{1;prefix=[prefix]    }[prefix]{2}\n`;
+    -> LBRACE block_statements_opt RBRACE `{0}\n{1;prefix=[prefix]    }[prefix]{2}`;
 
 #
 # STATEMENTS
@@ -684,28 +689,36 @@ block_statements_opt
     -> block_statements `[prefix]{0}`
     ->;
 block_statements
-    -> block_statement block_statements `{0}\n[prefix]{1}`
-    -> block_statement `{0}\n`;
-block_statement
+    -> isolated_block_statement block_statements `{0}\n[prefix]{1}`
+    -> grouped_statements isolated_block_statement block_statements `{0}\n\n[prefix]{1}\n[prefix]{2}`
+    -> grouped_statements isolated_block_statement `{0}\n\n[prefix]{1}`
+    -> isolated_block_statement
+    -> grouped_statements `{0}\n`;
+
+isolated_block_statement
+    -> class_dec `{0}\n`
+    -> block `{0}\n`
     -> lvar_dec_statement
-    -> class_dec
-    -> statement;
+    -> isolated_statement `{0}\n`;
 
 lvar_dec_statement
-    -> lvar_dec SEMI `{0}{1}\n`;
+    -> lvar_dec SEMI;
 lvar_dec
     -> modifiers_opt type variable_declarator_list `{0}{1} {2}`;
 
 statement
-    -> statement_without_trailing_substatement
-    -> labeled_statement
-    -> if_then_statement
-    -> if_then_else_statement
-    -> while_statement
-    -> for_statement;
-
-statement_without_trailing_substatement
     -> block
+    -> inline_statement;
+
+inline_statement
+    -> grouped_statement
+    -> isolated_statement;
+
+grouped_statements
+    -> grouped_statement grouped_statements `{0}\n[prefix]{1}`
+    -> grouped_statement;
+grouped_statement
+    -> labeled_statement
     -> SEMI
     -> statement_expression SEMI
     -> assert_statement
@@ -714,8 +727,14 @@ statement_without_trailing_substatement
     -> break_statement
     -> continue_statement
     -> return_statement
+    -> throw_statement;
+
+isolated_statement
+    -> if_then_statement
+    -> if_then_else_statement
+    -> while_statement
+    -> for_statement
     -> synchronized_statement
-    -> throw_statement
     -> try_statement;
 
 statement_expression_list
@@ -741,7 +760,7 @@ switch_statement
     -> SWITCH LPAREN expr RPAREN switch_block `{0} {1}{2}{3} {4}`;
 
 switch_block
-    -> LBRACE switch_bsgs_opt switch_labels_opt RBRACE `{0}\n{1}{2}{3}\n`;
+    -> LBRACE switch_bsgs_opt switch_labels_opt RBRACE `{0}\n{1}{2}{3}`;
 
 switch_bsgs_opt
     -> switch_bsgs
@@ -785,12 +804,12 @@ throw_statement
     -> THROW expr SEMI `{0} {1}{2}`;
 
 try_statement
-    -> TRY block catches `{0} {1}{2}`
-    -> TRY block catches_opt finally `{0} {1}{2}{3}`
+    -> TRY block catches `{0} {1}\n{2}`
+    -> TRY block catches_opt finally `{0} {1}\n{2}[prefix]{3}`
     -> try_with_resources_statement;
 
 try_with_resources_statement
-    -> TRY resources_specification block catches_opt finally_opt `{0} {1} {2}{3}{4}`;
+    -> TRY resources_specification block catches_opt finally_opt `{0} {1} {2}\n{3}{4}`;
 resources_specification
     -> LPAREN resources semi_opt RPAREN;
 resources
@@ -803,14 +822,14 @@ finally_opt
     -> finally
     ->;
 finally
-    -> FINALLY block `{0} {1}`;
+    -> FINALLY block `{0} {1}\n`;
 
 catches_opt
     -> catches
     ->;
 catches
-    -> catch_clause catches
-    -> catch_clause;
+    -> catch_clause catches `[prefix]{0}{1}`
+    -> catch_clause `[prefix]{0}`;
 catch_clause
     -> CATCH LPAREN catch_formal_parameter RPAREN block `{0} {1}{2}{3} {4}`;
 catch_formal_parameter
@@ -828,7 +847,8 @@ if_then_statement
     -> IF LPAREN expr RPAREN statement `{0} {1}{2}{3} {4}`;
 
 if_then_else_statement
-    -> IF LPAREN expr RPAREN statement ELSE statement `{0} {1}{2}{3} {4}{5} {6}`;
+    -> IF LPAREN expr RPAREN inline_statement ELSE statement `{0} {1}{2}{3} {4}{5} {6}`
+    -> IF LPAREN expr RPAREN block ELSE statement `{0} {1}{2}{3} {4}\n[prefix]{5} {6}`;
 
 while_statement
     -> WHILE LPAREN expr RPAREN statement `{0} {1}{2}{3} {4}`;
@@ -890,7 +910,7 @@ lambda_parameters
 
 lambda_body
     -> expr
-    -> block;
+    -> block `{0}`;
 
 conditional_expr
     -> conditional_or_expr
@@ -986,7 +1006,8 @@ class_icreation_expr
     -> primary DOT unqualified_class_icreation_expr;
 
 unqualified_class_icreation_expr
-    -> NEW type_arguments_opt class_type_to_instantiate LPAREN arguments_opt RPAREN class_body_opt;
+    -> NEW type_arguments_opt class_type_to_instantiate LPAREN arguments_opt RPAREN inline_class_body_opt
+    `{0} {1}{2}{3}{4}{5}{6}`;
 
 field_access
     -> primary DOT ID
@@ -1038,18 +1059,31 @@ dim_expr
 #
 
 modifiers_opt
-    -> modifiers
+    -> annotation_modifiers_opt non_annotation_modifiers_opt;
+
+annotation_modifiers_opt
+    -> annotation_modifiers
     ->;
-modifiers
-    -> modifier modifiers `{0} {1}`
-    -> modifier `{0} `;
-modifier
-    -> annotation
+annotation_modifiers
+    -> annotation annotation_modifiers `{0}\n[prefix]{1}`
+    -> annotation `{0}\n[prefix]`;
+
+non_annotation_modifiers_opt
+    -> first_modifier modifiers `{0} {1}`
+    -> first_modifier `{0} `
+    ->;
+first_modifier
     -> MOD
     -> SYNCHRONIZED
     -> STATIC
     -> FINAL
     -> DEFAULT;
+modifiers
+    -> modifier modifiers `{0} {1}`
+    -> modifier `{0} `;
+modifier
+    -> annotation
+    -> first_modifier;
 
 #
 # OPERATORS

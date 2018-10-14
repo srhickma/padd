@@ -11,8 +11,7 @@ public abstract class ConfigFileLoader {
     }
 
     public static ConfigLoadResult load(String configName) {
-        ConfigFile config = newConfigFile(getConfigPath(configName));
-
+        ConfigFile config = new ConfigFile(getConfigPath(configName));
         if (!config.exists()) {
             return ConfigLoadResult.miss();
         }
@@ -31,11 +30,11 @@ public abstract class ConfigFileLoader {
         }
 
         private static ConfigLoadResult hit(ConfigFile file) {
-            return newConfigLoadResult(file, true);
+            return new ConfigLoadResult(file, true);
         }
 
         private static ConfigLoadResult miss() {
-            return newConfigLoadResult(null, false);
+            return new ConfigLoadResult(null, false);
         }
 
         public ConfigLoadResult onHit(Consumer<ConfigFile> consumer) {
