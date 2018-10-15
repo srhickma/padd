@@ -23,7 +23,7 @@ a^ACC
 'a' -> fail
 _ -> a;
 
-s -> acc s `{0}\\n{1}`
+s -> acc s `{}\\n{}`
 -> acc;
 
 acc -> ACC;
@@ -75,7 +75,7 @@ a^ACC
 'a' -> a
 _ -> fail;
 
-s -> acc s `{0} {1}`
+s -> acc s `{} {}`
 -> acc;
 
 acc -> ACC;
