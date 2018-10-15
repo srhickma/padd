@@ -93,7 +93,7 @@ lazy_static! {
         build_prods(&[
             "pattern segs",
 
-            "segs segs seg",
+            "segs seg segs",
             "segs ",
 
             "seg filler",
@@ -106,13 +106,14 @@ lazy_static! {
 
             "cap LBRACE capdesc RBRACE",
 
-            "capdesc NUM",
-            "capdesc NUM SEMI decls",
+            "capdesc capindex",
+            "capdesc capindex SEMI decls",
 
-            "decls decl declsopt",
+            "capindex NUM",
+            "capindex ",
 
-            "declsopt SEMI decl declsopt",
-            "declsopt ",
+            "decls decls SEMI decl",
+            "decls decl",
 
             "decl ALPHA EQ val",
 
@@ -154,11 +155,11 @@ pub fn generate_pattern(input: &str, prod: &Production) -> Result<Pattern, Build
 
 pub fn generate_pattern_internal<'a>(root: &'a Tree, prod: &Production) -> Result<Pattern, BuildError> {
     let mut segments: Vec<Segment> = vec![];
-    generate_pattern_recursive(&root, &mut segments, prod)?;
+    generate_pattern_recursive(&root, &mut segments, prod, 0)?;
     Ok(Pattern { segments })
 }
 
-fn generate_pattern_recursive<'a>(node: &'a Tree, accumulator: &'a mut Vec<Segment>, prod: &Production) -> Result<(), BuildError> {
+fn generate_pattern_recursive<'a>(node: &'a Tree, accumulator: &'a mut Vec<Segment>, prod: &Production, captures: usize) -> Result<usize, BuildError> {
     match &node.lhs.kind[..] {
         "WHITESPACE" => {
             accumulator.push(Segment::Filler(node.lhs.lexeme.clone()));
@@ -167,13 +168,17 @@ fn generate_pattern_recursive<'a>(node: &'a Tree, accumulator: &'a mut Vec<Segme
             accumulator.push(Segment::Substitution(node.get_child(1).lhs.lexeme.clone()));
         }
         "capdesc" => {
-            let declarations: Vec<Declaration> = if node.children.len() == 3 {
-                parse_decls(&node.get_child(2), prod)?
-            } else { //No declarations
-                vec![]
-            };
+            let mut declarations: Vec<Declaration> = Vec::new();
+            if node.children.len() == 3 {
+                parse_decls(&node.get_child(2), &mut declarations, prod)?
+            }
 
-            let child_index = node.get_child(0).lhs.lexeme.parse::<usize>().unwrap();
+            let cap_index = node.get_child(0);
+            let child_index = if cap_index.is_empty() {
+                captures
+            } else {
+                cap_index.get_child(0).lhs.lexeme.parse::<usize>().unwrap()
+            };
 
             if child_index >= prod.rhs.len() {
                 return Err(BuildError::CaptureErr(format!(
@@ -185,28 +190,23 @@ fn generate_pattern_recursive<'a>(node: &'a Tree, accumulator: &'a mut Vec<Segme
             }
 
             accumulator.push(Segment::Capture(Capture { child_index, declarations }));
+            return Ok(captures + 1);
         }
         _ => {
+            let mut new_captures = captures;
             for child in &node.children {
-                generate_pattern_recursive(child, accumulator, prod)?;
+                new_captures = generate_pattern_recursive(child, accumulator, prod, new_captures)?;
             }
+            return Ok(new_captures);
         }
     }
-    Ok(())
+    Ok(captures)
 }
 
-fn parse_decls<'a>(decls_node: &'a Tree, prod: &Production) -> Result<Vec<Declaration>, BuildError> {
-    let mut declarations: Vec<Declaration> = vec![
-        parse_decl(decls_node.get_child(0), prod)?,
-    ];
-    parse_decls_opt(decls_node.get_child(1), &mut declarations, prod)?;
-    Ok(declarations)
-}
-
-fn parse_decls_opt<'a>(declsopt_node: &'a Tree, accumulator: &'a mut Vec<Declaration>, prod: &Production) -> Result<(), BuildError> {
-    if declsopt_node.children.len() == 3 {
-        accumulator.push(parse_decl(declsopt_node.get_child(1), prod)?);
-        parse_decls_opt(declsopt_node.get_child(2), accumulator, prod)?;
+fn parse_decls<'a>(decls_node: &'a Tree, accumulator: &'a mut Vec<Declaration>, prod: &Production) -> Result<(), BuildError> {
+    accumulator.push(parse_decl(decls_node.children.last().unwrap(), prod)?);
+    if decls_node.children.len() == 3 {
+        parse_decls(decls_node.get_child(0), accumulator, prod)?;
     }
     Ok(())
 }
@@ -286,88 +286,88 @@ mod tests {
         assert_eq!(tree.unwrap().to_string(),
                    "└── pattern
     └── segs
-        ├── segs
-        │   ├── segs
-        │   │   ├── segs
-        │   │   │   ├── segs
-        │   │   │   │   ├── segs
-        │   │   │   │   │   ├── segs
-        │   │   │   │   │   │   ├── segs
-        │   │   │   │   │   │   │   ├── segs
-        │   │   │   │   │   │   │   │   └──  <- 'NULL'
-        │   │   │   │   │   │   │   └── seg
-        │   │   │   │   │   │   │       └── filler
-        │   │   │   │   │   │   │           └── WHITESPACE <- '\\t \\n\\n\\n\\n'
-        │   │   │   │   │   │   └── seg
-        │   │   │   │   │   │       └── cap
-        │   │   │   │   │   │           ├── LBRACE <- '{'
-        │   │   │   │   │   │           ├── capdesc
-        │   │   │   │   │   │           │   └── NUM <- '1'
-        │   │   │   │   │   │           └── RBRACE <- '}'
-        │   │   │   │   │   └── seg
-        │   │   │   │   │       └── filler
-        │   │   │   │   │           └── WHITESPACE <- '  '
-        │   │   │   │   └── seg
-        │   │   │   │       └── cap
-        │   │   │   │           ├── LBRACE <- '{'
-        │   │   │   │           ├── capdesc
-        │   │   │   │           │   └── NUM <- '2'
-        │   │   │   │           └── RBRACE <- '}'
-        │   │   │   └── seg
-        │   │   │       └── filler
-        │   │   │           └── WHITESPACE <- '  '
-        │   │   └── seg
-        │   │       └── cap
-        │   │           ├── LBRACE <- '{'
-        │   │           ├── capdesc
-        │   │           │   ├── NUM <- '45'
-        │   │           │   ├── SEMI <- ';'
-        │   │           │   └── decls
-        │   │           │       ├── decl
-        │   │           │       │   ├── ALPHA <- 'something'
-        │   │           │       │   ├── EQ <- '='
-        │   │           │       │   └── val
-        │   │           │       │       └── pattern
-        │   │           │       │           └── segs
-        │   │           │       │               ├── segs
-        │   │           │       │               │   └──  <- 'NULL'
-        │   │           │       │               └── seg
-        │   │           │       │                   └── filler
-        │   │           │       │                       └── WHITESPACE <- '\\n\\n \\t'
-        │   │           │       └── declsopt
-        │   │           │           └──  <- 'NULL'
-        │   │           └── RBRACE <- '}'
-        │   └── seg
-        │       └── filler
-        │           └── WHITESPACE <- ' '
-        └── seg
-            └── cap
-                ├── LBRACE <- '{'
-                ├── capdesc
-                │   ├── NUM <- '46'
-                │   ├── SEMI <- ';'
-                │   └── decls
-                │       ├── decl
-                │       │   ├── ALPHA <- 'somethinelse'
-                │       │   ├── EQ <- '='
-                │       │   └── val
-                │       │       └── pattern
-                │       │           └── segs
-                │       │               ├── segs
-                │       │               │   └──  <- 'NULL'
-                │       │               └── seg
-                │       │                   └── filler
-                │       │                       └── WHITESPACE <- '\\n\\n \\t'
-                │       └── declsopt
-                │           ├── SEMI <- ';'
-                │           ├── decl
-                │           │   ├── ALPHA <- 'some'
-                │           │   ├── EQ <- '='
-                │           │   └── val
-                │           │       └──  <- 'NULL'
-                │           └── declsopt
-                │               └──  <- 'NULL'
-                └── RBRACE <- '}'"
+        ├── seg
+        │   └── filler
+        │       └── WHITESPACE <- '\\t \\n\\n\\n\\n'
+        └── segs
+            ├── seg
+            │   └── cap
+            │       ├── LBRACE <- '{'
+            │       ├── capdesc
+            │       │   └── capindex
+            │       │       └── NUM <- '1'
+            │       └── RBRACE <- '}'
+            └── segs
+                ├── seg
+                │   └── filler
+                │       └── WHITESPACE <- '  '
+                └── segs
+                    ├── seg
+                    │   └── cap
+                    │       ├── LBRACE <- '{'
+                    │       ├── capdesc
+                    │       │   └── capindex
+                    │       │       └── NUM <- '2'
+                    │       └── RBRACE <- '}'
+                    └── segs
+                        ├── seg
+                        │   └── filler
+                        │       └── WHITESPACE <- '  '
+                        └── segs
+                            ├── seg
+                            │   └── cap
+                            │       ├── LBRACE <- '{'
+                            │       ├── capdesc
+                            │       │   ├── capindex
+                            │       │   │   └── NUM <- '45'
+                            │       │   ├── SEMI <- ';'
+                            │       │   └── decls
+                            │       │       └── decl
+                            │       │           ├── ALPHA <- 'something'
+                            │       │           ├── EQ <- '='
+                            │       │           └── val
+                            │       │               └── pattern
+                            │       │                   └── segs
+                            │       │                       ├── seg
+                            │       │                       │   └── filler
+                            │       │                       │       └── WHITESPACE <- '\\n\\n \\t'
+                            │       │                       └── segs
+                            │       │                           └──  <- 'NULL'
+                            │       └── RBRACE <- '}'
+                            └── segs
+                                ├── seg
+                                │   └── filler
+                                │       └── WHITESPACE <- ' '
+                                └── segs
+                                    ├── seg
+                                    │   └── cap
+                                    │       ├── LBRACE <- '{'
+                                    │       ├── capdesc
+                                    │       │   ├── capindex
+                                    │       │   │   └── NUM <- '46'
+                                    │       │   ├── SEMI <- ';'
+                                    │       │   └── decls
+                                    │       │       ├── decls
+                                    │       │       │   └── decl
+                                    │       │       │       ├── ALPHA <- 'somethinelse'
+                                    │       │       │       ├── EQ <- '='
+                                    │       │       │       └── val
+                                    │       │       │           └── pattern
+                                    │       │       │               └── segs
+                                    │       │       │                   ├── seg
+                                    │       │       │                   │   └── filler
+                                    │       │       │                   │       └── WHITESPACE <- '\\n\\n \\t'
+                                    │       │       │                   └── segs
+                                    │       │       │                       └──  <- 'NULL'
+                                    │       │       ├── SEMI <- ';'
+                                    │       │       └── decl
+                                    │       │           ├── ALPHA <- 'some'
+                                    │       │           ├── EQ <- '='
+                                    │       │           └── val
+                                    │       │               └──  <- 'NULL'
+                                    │       └── RBRACE <- '}'
+                                    └── segs
+                                        └──  <- 'NULL'"
         );
     }
 
@@ -414,6 +414,62 @@ mod tests {
             &Segment::Filler(_) => false,
             &Segment::Substitution(_) => false,
             &Segment::Capture(ref c) => c.child_index == 4 && c.declarations.len() == 1,
+        });
+        assert!(match pattern.segments.get(4).unwrap() {
+            &Segment::Filler(ref s) => "  " == *s,
+            &Segment::Substitution(_) => false,
+            &Segment::Capture(_) => false,
+        });
+        assert!(match pattern.segments.get(7).unwrap() {
+            &Segment::Filler(_) => false,
+            &Segment::Substitution(_) => false,
+            &Segment::Capture(ref c) => c.child_index == 3 && c.declarations.len() == 2,
+        });
+    }
+
+    #[test]
+    fn generate_auto_indexed_pattern_simple() {
+        //setup
+        let input = "\t \n\n\n\n{1}  {}  {;something=\n\n \t} {;somethinelse=\n\n \t;some=}";
+        let prod = Production {
+            lhs: String::new(),
+            rhs: vec![String::new(), String::new(), String::new(), String::new(), String::new()],
+        };
+
+        //exercise
+        let pattern = generate_pattern(input, &prod).unwrap();
+
+        //verify
+        assert_eq!(pattern.segments.len(), 8);
+        assert!(match pattern.segments.get(0).unwrap() {
+            &Segment::Filler(ref s) => "\t \n\n\n\n" == *s,
+            &Segment::Substitution(_) => false,
+            &Segment::Capture(_) => false,
+        });
+        assert!(match pattern.segments.get(1).unwrap() {
+            &Segment::Filler(_) => false,
+            &Segment::Substitution(_) => false,
+            &Segment::Capture(ref c) => c.child_index == 1 && c.declarations.len() == 0,
+        });
+        assert!(match pattern.segments.get(2).unwrap() {
+            &Segment::Filler(ref s) => "  " == *s,
+            &Segment::Substitution(_) => false,
+            &Segment::Capture(_) => false,
+        });
+        assert!(match pattern.segments.get(3).unwrap() {
+            &Segment::Filler(_) => false,
+            &Segment::Substitution(_) => false,
+            &Segment::Capture(ref c) => c.child_index == 1 && c.declarations.len() == 0,
+        });
+        assert!(match pattern.segments.get(4).unwrap() {
+            &Segment::Filler(ref s) => "  " == *s,
+            &Segment::Substitution(_) => false,
+            &Segment::Capture(_) => false,
+        });
+        assert!(match pattern.segments.get(5).unwrap() {
+            &Segment::Filler(_) => false,
+            &Segment::Substitution(_) => false,
+            &Segment::Capture(ref c) => c.child_index == 2 && c.declarations.len() == 1,
         });
         assert!(match pattern.segments.get(4).unwrap() {
             &Segment::Filler(ref s) => "  " == *s,
