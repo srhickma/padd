@@ -87,7 +87,7 @@ start
 # grammar
 s -> s b
   ->;
-b -> LBRACKET s RBRACKET `[prefix]{}\n\n{1;prefix=[prefix]\t}[prefix]{}\n\n`;
+b -> LBRACKET s RBRACKET `[prefix]{}\n\n{;prefix=[prefix]\t}[prefix]{}\n\n`;
 ```
 The input:
 ```
