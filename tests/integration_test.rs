@@ -63,6 +63,26 @@ fn test_lacs_complex() {
 }
 
 #[test]
+fn test_java8_simple(){
+    test_fjr("java8_simple", "java8");
+}
+
+#[test]
+fn test_java8_medium(){
+    test_fjr("java8_medium", "java8");
+}
+
+#[test]
+fn test_java8_complex_spring(){
+    test_fjr("java8_complex_spring", "java8");
+}
+
+#[test]
+fn test_java8_complex_guice(){
+    test_fjr("java8_complex_guice", "java8");
+}
+
+#[test]
 fn test_ignore_tokens() {
     //setup
     let spec = "

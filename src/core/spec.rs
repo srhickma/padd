@@ -19,7 +19,7 @@ use core::scan::runtime::ecdfa::EncodedCDFA;
 use core::scan::runtime::ecdfa::EncodedCDFABuilder;
 
 static SPEC_ALPHABET: &'static str = "`-=~!@#$%^&*()_+{}|[]\\;':\"<>?,./QWERTYUIOPASDFGHJKLZXCVBNM1234567890abcdefghijklmnopqrstuvwxyz \n\t";
-pub static DEF_MATCHER: char = '_';
+pub static DEF_MATCHER: &'static str = "_";
 
 #[derive(PartialEq, Clone)]
 enum S {
@@ -132,14 +132,14 @@ lazy_static! {
             "states states state",
             "states state",
 
-            "state sdec transopt SEMI ",
+            "state sdec transopt SEMI",
 
             "sdec targets",
             "sdec targets HAT ID",
             "sdec targets HAT DEF",
 
             "targets ID",
-            "targets ID OR targets",
+            "targets targets OR ID",
 
             "transopt trans",
             "transopt ",
@@ -154,12 +154,12 @@ lazy_static! {
             "trand HAT ID",
             "trand HAT DEF",
 
-            "mtcs CILC OR mtcs",
+            "mtcs mtcs OR CILC",
             "mtcs CILC",
 
             "gram prods",
 
-            "prods prod prods",
+            "prods prods prod",
             "prods prod",
 
             "prod ID rhss SEMI",
@@ -172,7 +172,7 @@ lazy_static! {
             "pattopt PATTC",
             "pattopt ",
 
-            "ids ID ids",
+            "ids ids ID",
             "ids ",
         ]);
 
@@ -245,11 +245,11 @@ fn generate_ecdfa_states<'a>(states_node: &Tree, builder: &mut EncodedCDFABuilde
     let sdec_node = state_node.get_child(0);
 
     let targets_node = sdec_node.get_child(0);
-    let head_state = &targets_node.get_child(0).lhs.lexeme;
+    let head_state = &targets_node.get_child(targets_node.children.len() - 1).lhs.lexeme;
 
     let mut states: Vec<&State> = vec![head_state];
     if targets_node.children.len() == 3 {
-        generate_ecdfa_targets(targets_node.get_child(2), &mut states);
+        generate_ecdfa_targets(targets_node.get_child(0), &mut states);
     }
 
     if sdec_node.children.len() == 3 {
@@ -274,9 +274,9 @@ fn generate_ecdfa_states<'a>(states_node: &Tree, builder: &mut EncodedCDFABuilde
 }
 
 fn generate_ecdfa_targets<'a>(targets_node: &'a Tree, accumulator: &mut Vec<&'a State>) {
-    accumulator.push(&targets_node.get_child(0).lhs.lexeme);
+    accumulator.push(&targets_node.get_child(targets_node.children.len() - 1).lhs.lexeme);
     if targets_node.children.len() == 3 {
-        generate_ecdfa_targets(targets_node.get_child(2), accumulator);
+        generate_ecdfa_targets(targets_node.get_child(0), accumulator);
     }
 }
 
@@ -309,8 +309,11 @@ fn generate_ecdfa_trans<'a>(trans_node: &'a Tree, sources: &Vec<&State>, builder
 }
 
 fn generate_ecdfa_mtcs<'a>(mtcs_node: &'a Tree, sources: &Vec<&State>, dest: &State, builder: &mut EncodedCDFABuilder) -> Result<(), runtime::CDFAError> {
-    let matcher = mtcs_node.children.first().unwrap();
-    let matcher_string = matcher.lhs.lexeme.trim_matches('\'');
+    let matcher = mtcs_node.children.last().unwrap();
+    let matcher_string: String = matcher.lhs.lexeme.chars()
+        .skip(1)
+        .take(matcher.lhs.lexeme.len() - 2)
+        .collect();
     let matcher_cleaned = replace_escapes(&matcher_string);
     if matcher_cleaned.len() == 1 {
         for source in sources {
@@ -323,7 +326,7 @@ fn generate_ecdfa_mtcs<'a>(mtcs_node: &'a Tree, sources: &Vec<&State>, dest: &St
     }
 
     if mtcs_node.children.len() == 3 {
-        generate_ecdfa_mtcs(mtcs_node.get_child(2), sources, dest, builder)
+        generate_ecdfa_mtcs(mtcs_node.get_child(0), sources, dest, builder)
     } else {
         Ok(())
     }
@@ -331,7 +334,7 @@ fn generate_ecdfa_mtcs<'a>(mtcs_node: &'a Tree, sources: &Vec<&State>, dest: &St
 
 fn add_ecdfa_tokenizer(state: &State, kind: &String, builder: &mut EncodedCDFABuilder) {
     builder.mark_accepting(state);
-    if kind != "_" { //TODO
+    if kind != DEF_MATCHER {
         builder.mark_token(state, kind);
     }
 }
@@ -344,16 +347,16 @@ fn generate_grammar(tree: &Tree) -> (Grammar, Vec<PatternPair>) {
     (Grammar::from(productions), pattern_pairs)
 }
 
-fn generate_grammar_prods<'a, 'b>(prods_node: &'a Tree, accumulator: &'b mut Vec<Production>, pp_accumulator: &'b mut Vec<PatternPair>) {
-    let prod_node = prods_node.get_child(0);
+fn generate_grammar_prods<'a, 'b>(prods_node: &'a Tree, accumulator: &'b mut Vec<Production>, pp_accumulator: &'b mut Vec<PatternPair>){
+    if prods_node.children.len() == 2 {
+        generate_grammar_prods(prods_node.get_child(0), accumulator, pp_accumulator);
+    }
+
+    let prod_node = prods_node.get_child(prods_node.children.len() - 1);
 
     let id = &prod_node.get_child(0).lhs.lexeme;
 
     generate_grammar_rhss(prod_node.get_child(1), id, accumulator, pp_accumulator);
-
-    if prods_node.children.len() == 2 {
-        generate_grammar_prods(prods_node.get_child(1), accumulator, pp_accumulator);
-    }
 }
 
 fn generate_grammar_rhss<'a, 'b>(rhss_node: &'a Tree, lhs: &'a String, accumulator: &'b mut Vec<Production>, pp_accumulator: &'b mut Vec<PatternPair>) {
@@ -388,11 +391,11 @@ fn generate_grammar_rhss<'a, 'b>(rhss_node: &'a Tree, lhs: &'a String, accumulat
 
 fn generate_grammar_ids<'a, 'b>(ids_node: &'a Tree, accumulator: &'b mut Vec<String>) {
     if !ids_node.is_empty() {
-        let id = ids_node.get_child(0).lhs.lexeme.clone();
+        let id = ids_node.get_child(1).lhs.lexeme.clone();
+
+        generate_grammar_ids(ids_node.get_child(0), accumulator);
 
         accumulator.push(id);
-
-        generate_grammar_ids(ids_node.get_child(1), accumulator)
     }
 }
 
@@ -504,11 +507,11 @@ mod tests {
                 │   └── rhs
                 │       ├── ARROW <- '->'
                 │       ├── ids
-                │       │   ├── ID <- 's'
-                │       │   └── ids
-                │       │       ├── ID <- 'b'
-                │       │       └── ids
-                │       │           └──  <- 'NULL'
+                │       │   ├── ids
+                │       │   │   ├── ids
+                │       │   │   │   └──  <- 'NULL'
+                │       │   │   └── ID <- 's'
+                │       │   └── ID <- 'b'
                 │       └── pattopt
                 │           └──  <- 'NULL'
                 └── SEMI <- ';'"
@@ -649,66 +652,66 @@ w -> WHITESPACE `[prefix]{0}\n\n{1;prefix=[prefix]\t}[prefix]{2}\n\n`
     │           └── SEMI <- ';'
     └── gram
         └── prods
-            ├── prod
-            │   ├── ID <- 's'
-            │   ├── rhss
-            │   │   ├── rhss
-            │   │   │   └── rhs
-            │   │   │       ├── ARROW <- '->'
-            │   │   │       ├── ids
-            │   │   │       │   ├── ID <- 's'
-            │   │   │       │   └── ids
-            │   │   │       │       ├── ID <- 'b'
-            │   │   │       │       └── ids
-            │   │   │       │           └──  <- 'NULL'
-            │   │   │       └── pattopt
-            │   │   │           └──  <- 'NULL'
-            │   │   └── rhs
-            │   │       ├── ARROW <- '->'
-            │   │       ├── ids
-            │   │       │   └──  <- 'NULL'
-            │   │       └── pattopt
-            │   │           └──  <- 'NULL'
-            │   └── SEMI <- ';'
-            └── prods
-                ├── prod
-                │   ├── ID <- 'b'
-                │   ├── rhss
-                │   │   ├── rhss
-                │   │   │   └── rhs
-                │   │   │       ├── ARROW <- '->'
-                │   │   │       ├── ids
-                │   │   │       │   ├── ID <- 'LBRACKET'
-                │   │   │       │   └── ids
-                │   │   │       │       ├── ID <- 's'
-                │   │   │       │       └── ids
-                │   │   │       │           ├── ID <- 'RBRACKET'
-                │   │   │       │           └── ids
-                │   │   │       │               └──  <- 'NULL'
-                │   │   │       └── pattopt
-                │   │   │           └── PATTC <- '``'
-                │   │   └── rhs
-                │   │       ├── ARROW <- '->'
-                │   │       ├── ids
-                │   │       │   ├── ID <- 'w'
-                │   │       │   └── ids
-                │   │       │       └──  <- 'NULL'
-                │   │       └── pattopt
-                │   │           └──  <- 'NULL'
-                │   └── SEMI <- ';'
-                └── prods
-                    └── prod
-                        ├── ID <- 'w'
-                        ├── rhss
-                        │   └── rhs
-                        │       ├── ARROW <- '->'
-                        │       ├── ids
-                        │       │   ├── ID <- 'WHITESPACE'
-                        │       │   └── ids
-                        │       │       └──  <- 'NULL'
-                        │       └── pattopt
-                        │           └── PATTC <- '`[prefix]{0}\\n\\n{1;prefix=[prefix]\\t}[prefix]{2}\\n\\n`'
-                        └── SEMI <- ';'"
+            ├── prods
+            │   ├── prods
+            │   │   └── prod
+            │   │       ├── ID <- 's'
+            │   │       ├── rhss
+            │   │       │   ├── rhss
+            │   │       │   │   └── rhs
+            │   │       │   │       ├── ARROW <- '->'
+            │   │       │   │       ├── ids
+            │   │       │   │       │   ├── ids
+            │   │       │   │       │   │   ├── ids
+            │   │       │   │       │   │   │   └──  <- 'NULL'
+            │   │       │   │       │   │   └── ID <- 's'
+            │   │       │   │       │   └── ID <- 'b'
+            │   │       │   │       └── pattopt
+            │   │       │   │           └──  <- 'NULL'
+            │   │       │   └── rhs
+            │   │       │       ├── ARROW <- '->'
+            │   │       │       ├── ids
+            │   │       │       │   └──  <- 'NULL'
+            │   │       │       └── pattopt
+            │   │       │           └──  <- 'NULL'
+            │   │       └── SEMI <- ';'
+            │   └── prod
+            │       ├── ID <- 'b'
+            │       ├── rhss
+            │       │   ├── rhss
+            │       │   │   └── rhs
+            │       │   │       ├── ARROW <- '->'
+            │       │   │       ├── ids
+            │       │   │       │   ├── ids
+            │       │   │       │   │   ├── ids
+            │       │   │       │   │   │   ├── ids
+            │       │   │       │   │   │   │   └──  <- 'NULL'
+            │       │   │       │   │   │   └── ID <- 'LBRACKET'
+            │       │   │       │   │   └── ID <- 's'
+            │       │   │       │   └── ID <- 'RBRACKET'
+            │       │   │       └── pattopt
+            │       │   │           └── PATTC <- '``'
+            │       │   └── rhs
+            │       │       ├── ARROW <- '->'
+            │       │       ├── ids
+            │       │       │   ├── ids
+            │       │       │   │   └──  <- 'NULL'
+            │       │       │   └── ID <- 'w'
+            │       │       └── pattopt
+            │       │           └──  <- 'NULL'
+            │       └── SEMI <- ';'
+            └── prod
+                ├── ID <- 'w'
+                ├── rhss
+                │   └── rhs
+                │       ├── ARROW <- '->'
+                │       ├── ids
+                │       │   ├── ids
+                │       │   │   └──  <- 'NULL'
+                │       │   └── ID <- 'WHITESPACE'
+                │       └── pattopt
+                │           └── PATTC <- '`[prefix]{0}\\n\\n{1;prefix=[prefix]\\t}[prefix]{2}\\n\\n`'
+                └── SEMI <- ';'"
         );
     }
 
@@ -845,6 +848,95 @@ ID <- 'iii'
     }
 
     #[test]
+    fn default_matcher_conflict() {
+        //setup
+        let spec = "
+' c'
+
+start
+    ' ' -> ^WS
+    'c' -> id;
+
+id      ^ID
+    'c' | '_' -> id;
+
+s ->;
+        ";
+
+        let input = "c c".to_string();
+        let mut iter = input.chars();
+        let mut getter = || {
+            iter.next()
+        };
+        let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
+
+        let scanner = runtime::def_scanner();
+
+        let tree = parse_spec(spec);
+        let parse = tree.unwrap();
+        let (cdfa, _, _) = generate_spec(&parse).unwrap();
+
+        //exercise
+        let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
+
+        //verify
+        let mut res_string = String::new();
+        for token in tokens {
+            res_string = format!("{}\nkind={} lexeme={}", res_string, token.kind, token.lexeme);
+        }
+
+        assert_eq!(res_string, "\nkind=ID lexeme=c\nkind=WS lexeme= \nkind=ID lexeme=c")
+    }
+
+    #[test]
+    fn complex_id() {
+        //setup
+        let spec = "
+' ab_'
+
+start
+    ' ' -> ws
+    _ -> id;
+
+ws      ^_;
+
+id      ^ID
+    'a' | 'b' | '_' -> id;
+
+s
+    -> ids
+    ->;
+ids
+    -> ids ID
+    -> ID;
+        ";
+
+        let input = "a ababab _abab ab_abba_".to_string();
+        let mut iter = input.chars();
+        let mut getter = || {
+            iter.next()
+        };
+        let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
+
+        let scanner = runtime::def_scanner();
+
+        let tree = parse_spec(spec);
+        let parse = tree.unwrap();
+        let (cdfa, _, _) = generate_spec(&parse).unwrap();
+
+        //exercise
+        let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
+
+        //verify
+        let mut res_string = String::new();
+        for token in tokens {
+            res_string = format!("{}\nkind={} lexeme={}", res_string, token.kind, token.lexeme);
+        }
+
+        assert_eq!(res_string, "\nkind=ID lexeme=a\nkind=ID lexeme=ababab\nkind=ID lexeme=_abab\nkind=ID lexeme=ab_abba_")
+    }
+
+    #[test]
     fn multi_character_lexing() {
         //setup
         let spec = "
@@ -977,10 +1069,10 @@ kind=ID lexeme=f")
     │       └── state
     │           ├── sdec
     │           │   └── targets
-    │           │       ├── ID <- 'ID'
+    │           │       ├── targets
+    │           │       │   └── ID <- 'ID'
     │           │       ├── OR <- '|'
-    │           │       └── targets
-    │           │           └── ID <- 'ki'
+    │           │       └── ID <- 'ki'
     │           ├── transopt
     │           │   └── trans
     │           │       ├── trans
@@ -1005,19 +1097,19 @@ kind=ID lexeme=f")
                 │   │   └── rhs
                 │   │       ├── ARROW <- '->'
                 │   │       ├── ids
-                │   │       │   ├── ID <- 'ID'
-                │   │       │   └── ids
-                │   │       │       ├── ID <- 's'
-                │   │       │       └── ids
-                │   │       │           └──  <- 'NULL'
+                │   │       │   ├── ids
+                │   │       │   │   ├── ids
+                │   │       │   │   │   └──  <- 'NULL'
+                │   │       │   │   └── ID <- 'ID'
+                │   │       │   └── ID <- 's'
                 │   │       └── pattopt
                 │   │           └──  <- 'NULL'
                 │   └── rhs
                 │       ├── ARROW <- '->'
                 │       ├── ids
-                │       │   ├── ID <- 'ID'
-                │       │   └── ids
-                │       │       └──  <- 'NULL'
+                │       │   ├── ids
+                │       │   │   └──  <- 'NULL'
+                │       │   └── ID <- 'ID'
                 │       └── pattopt
                 │           └──  <- 'NULL'
                 └── SEMI <- ';'"
