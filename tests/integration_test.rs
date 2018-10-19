@@ -83,6 +83,11 @@ fn test_java8_complex_guice(){
 }
 
 #[test]
+fn test_java8_concepts(){
+    test_fjr("java8_concepts", "java8");
+}
+
+#[test]
 fn test_ignore_tokens() {
     //setup
     let spec = "
