@@ -38,6 +38,8 @@ enum S {
     OR,
     WS,
     ID,
+    OPTID,
+    COPTID,
     ARROW,
     FAIL,
 }
@@ -54,6 +56,7 @@ thread_local! {
             (S::START, ';') => S::SEMI,
             (S::START, '_') => S::DEF,
             (S::START, '|') => S::OR,
+            (S::START, '[') => S::OPTID,
             (S::START, ' ') | (S::START, '\t') | (S::START, '\n') => S::WS,
             (S::START, '0') | (S::START, '1') | (S::START, '2') | (S::START, '3') | (S::START, '4') |
             (S::START, '5') | (S::START, '6') | (S::START, '7') | (S::START, '8') | (S::START, '9') |
@@ -70,6 +73,22 @@ thread_local! {
             (S::START, 'Z') | (S::START, 'F') => S::ID,
 
             (S::MINUS, '>') => S::ARROW,
+
+            (S::OPTID, '0') | (S::OPTID, '1') | (S::OPTID, '2') | (S::OPTID, '3') | (S::OPTID, '4') |
+            (S::OPTID, '5') | (S::OPTID, '6') | (S::OPTID, '7') | (S::OPTID, '8') | (S::OPTID, '9') |
+            (S::OPTID, 'a') | (S::OPTID, 'g') | (S::OPTID, 'l') | (S::OPTID, 'q') | (S::OPTID, 'v') |
+            (S::OPTID, 'b') | (S::OPTID, 'h') | (S::OPTID, 'm') | (S::OPTID, 'r') | (S::OPTID, 'w') |
+            (S::OPTID, 'c') | (S::OPTID, 'i') | (S::OPTID, 'n') | (S::OPTID, 's') | (S::OPTID, 'x') |
+            (S::OPTID, 'd') | (S::OPTID, 'j') | (S::OPTID, 'o') | (S::OPTID, 't') | (S::OPTID, 'y') |
+            (S::OPTID, 'e') | (S::OPTID, 'k') | (S::OPTID, 'p') | (S::OPTID, 'u') | (S::OPTID, 'z') |
+            (S::OPTID, 'f') | (S::OPTID, 'A') | (S::OPTID, 'G') | (S::OPTID, 'L') | (S::OPTID, 'Q') |
+            (S::OPTID, 'V') | (S::OPTID, 'B') | (S::OPTID, 'H') | (S::OPTID, 'M') | (S::OPTID, 'R') |
+            (S::OPTID, 'W') | (S::OPTID, 'C') | (S::OPTID, 'I') | (S::OPTID, 'N') | (S::OPTID, 'S') |
+            (S::OPTID, 'X') | (S::OPTID, 'D') | (S::OPTID, 'J') | (S::OPTID, 'O') | (S::OPTID, 'T') |
+            (S::OPTID, 'Y') | (S::OPTID, 'E') | (S::OPTID, 'K') | (S::OPTID, 'P') | (S::OPTID, 'U') |
+            (S::OPTID, 'Z') | (S::OPTID, 'F') | (S::OPTID, '_') => S::OPTID,
+
+            (S::OPTID, ']') => S::COPTID,
 
             (S::ID, '0') | (S::ID, '1') | (S::ID, '2') | (S::ID, '3') | (S::ID, '4') |
             (S::ID, '5') | (S::ID, '6') | (S::ID, '7') | (S::ID, '8') | (S::ID, '9') |
@@ -109,6 +128,7 @@ thread_local! {
             S::COMMENT => "_",
             S::WS => "_",
             S::ID => "ID",
+            S::COPTID => "COPTID",
             S::DEF => "DEF",
             S::SEMI => "SEMI",
             S::OR => "OR",
@@ -173,6 +193,7 @@ lazy_static! {
             "pattopt ",
 
             "ids ids ID",
+            "ids ids COPTID",
             "ids ",
         ]);
 
@@ -347,7 +368,7 @@ fn generate_grammar(tree: &Tree) -> (Grammar, Vec<PatternPair>) {
     (Grammar::from(productions), pattern_pairs)
 }
 
-fn generate_grammar_prods<'a, 'b>(prods_node: &'a Tree, accumulator: &'b mut Vec<Production>, pp_accumulator: &'b mut Vec<PatternPair>){
+fn generate_grammar_prods<'a, 'b>(prods_node: &'a Tree, accumulator: &'b mut Vec<Production>, pp_accumulator: &'b mut Vec<PatternPair>) {
     if prods_node.children.len() == 2 {
         generate_grammar_prods(prods_node.get_child(0), accumulator, pp_accumulator);
     }
@@ -363,7 +384,7 @@ fn generate_grammar_rhss<'a, 'b>(rhss_node: &'a Tree, lhs: &'a String, accumulat
     let rhs_node = rhss_node.get_child(rhss_node.children.len() - 1);
 
     let mut ids: Vec<String> = vec![];
-    generate_grammar_ids(rhs_node.get_child(1), &mut ids);
+    generate_grammar_ids(rhs_node.get_child(1), &mut ids, accumulator);
 
     let production = Production {
         lhs: lhs.clone(),
@@ -389,13 +410,39 @@ fn generate_grammar_rhss<'a, 'b>(rhss_node: &'a Tree, lhs: &'a String, accumulat
     }
 }
 
-fn generate_grammar_ids<'a, 'b>(ids_node: &'a Tree, accumulator: &'b mut Vec<String>) {
+//TODO use a builder to generate the grammar productions
+fn generate_grammar_ids<'a, 'b>(ids_node: &'a Tree, ids_accumulator: &'b mut Vec<String>, production_accumulator: &'b mut Vec<Production>) {
     if !ids_node.is_empty() {
-        let id = ids_node.get_child(1).lhs.lexeme.clone();
+        let id_node = ids_node.get_child(1);
 
-        generate_grammar_ids(ids_node.get_child(0), accumulator);
+        generate_grammar_ids(ids_node.get_child(0), ids_accumulator, production_accumulator);
 
-        accumulator.push(id);
+        let id = match &id_node.lhs.kind[..] {
+            "ID" => id_node.lhs.lexeme.clone(),
+            "COPTID" => {
+                let lex = &id_node.lhs.lexeme[..];
+                let dest = &lex[1..lex.len() - 1];
+
+                //TODO have a more generic way of adding "internal" states of the form name#real_name
+                let opt_state: String = format!("opt#{}", dest);
+
+                if !production_accumulator.iter().any(|prod| prod.lhs == opt_state) {
+                    production_accumulator.push(Production {
+                        lhs: opt_state.clone(),
+                        rhs: vec![String::from(dest)],
+                    });
+                    production_accumulator.push(Production {
+                        lhs: opt_state.clone(),
+                        rhs: Vec::new(),
+                    });
+                }
+
+                opt_state
+            }
+            &_ => panic!("Production identifier is neither an ID or a COPTID")
+        };
+
+        ids_accumulator.push(id);
     }
 }
 
@@ -1126,5 +1173,140 @@ kind=ID lexeme=f")
 
         //verify
         assert_eq!(res, "ffffnt\'ff\n\t\\\\ffffff\'f\'fff");
+    }
+
+    #[test]
+    fn parse_spec_optional_shorthand() {
+        //setup
+        let spec = "
+'ab'
+
+start
+  'a' -> ^A
+  'b' -> ^B;
+
+s -> A [B] s
+  ->;
+  ";
+
+        //exercise
+        let tree = parse_spec(spec).unwrap();
+
+        //verify
+        assert_eq!(tree.to_string(),
+                   "└── spec
+    ├── dfa
+    │   ├── CILC <- ''ab''
+    │   └── states
+    │       └── state
+    │           ├── sdec
+    │           │   └── targets
+    │           │       └── ID <- 'start'
+    │           ├── transopt
+    │           │   └── trans
+    │           │       ├── trans
+    │           │       │   └── tran
+    │           │       │       ├── mtcs
+    │           │       │       │   └── CILC <- ''a''
+    │           │       │       ├── ARROW <- '->'
+    │           │       │       └── trand
+    │           │       │           ├── HAT <- '^'
+    │           │       │           └── ID <- 'A'
+    │           │       └── tran
+    │           │           ├── mtcs
+    │           │           │   └── CILC <- ''b''
+    │           │           ├── ARROW <- '->'
+    │           │           └── trand
+    │           │               ├── HAT <- '^'
+    │           │               └── ID <- 'B'
+    │           └── SEMI <- ';'
+    └── gram
+        └── prods
+            └── prod
+                ├── ID <- 's'
+                ├── rhss
+                │   ├── rhss
+                │   │   └── rhs
+                │   │       ├── ARROW <- '->'
+                │   │       ├── ids
+                │   │       │   ├── ids
+                │   │       │   │   ├── ids
+                │   │       │   │   │   ├── ids
+                │   │       │   │   │   │   └──  <- 'NULL'
+                │   │       │   │   │   └── ID <- 'A'
+                │   │       │   │   └── COPTID <- '[B]'
+                │   │       │   └── ID <- 's'
+                │   │       └── pattopt
+                │   │           └──  <- 'NULL'
+                │   └── rhs
+                │       ├── ARROW <- '->'
+                │       ├── ids
+                │       │   └──  <- 'NULL'
+                │       └── pattopt
+                │           └──  <- 'NULL'
+                └── SEMI <- ';'"
+        );
+    }
+
+    #[test]
+    fn single_reference_optional_shorthand() {
+        //setup
+        let spec = "
+'ab'
+
+start
+  'a' -> ^A
+  'b' -> ^B;
+
+s -> A [B] s
+  ->;
+  ";
+
+        let input = "ababaaaba".to_string();
+        let mut iter = input.chars();
+        let mut getter = || {
+            iter.next()
+        };
+        let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
+
+        let scanner = runtime::def_scanner();
+        let tree = parse_spec(spec);
+        let parse = tree.unwrap();
+        let (cdfa, grammar, _) = generate_spec(&parse).unwrap();
+        let parser = parse::def_parser();
+
+        //exercise
+        let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
+        let tree = parser.parse(tokens, &grammar).unwrap();
+
+        //verify
+        assert_eq!(tree.to_string(),
+                   "└── s
+    ├── A <- 'a'
+    ├── opt#B
+    │   └── B <- 'b'
+    └── s
+        ├── A <- 'a'
+        ├── opt#B
+        │   └── B <- 'b'
+        └── s
+            ├── A <- 'a'
+            ├── opt#B
+            │   └──  <- 'NULL'
+            └── s
+                ├── A <- 'a'
+                ├── opt#B
+                │   └──  <- 'NULL'
+                └── s
+                    ├── A <- 'a'
+                    ├── opt#B
+                    │   └── B <- 'b'
+                    └── s
+                        ├── A <- 'a'
+                        ├── opt#B
+                        │   └──  <- 'NULL'
+                        └── s
+                            └──  <- 'NULL'"
+        );
     }
 }
