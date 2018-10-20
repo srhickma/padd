@@ -149,6 +149,10 @@ impl Parser for EarleyParser {
                 Err(parse::Error {
                     message: "No tokens scanned".to_string(),
                 })
+            } else if i - 1 == scan.len() {
+                Err(parse::Error {
+                    message: format!("Recognition failed after consuming all tokens"),
+                })
             } else {
                 Err(parse::Error {
                     message: format!("Recognition failed at token {}: {}", i, scan[i - 1].to_string()),
