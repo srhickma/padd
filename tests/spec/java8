@@ -270,27 +270,20 @@ id      ^ID
 #----------------------------------------------------------------------------------------------------------------------#
 
 cmp_unit
-    -> package_decl_opt import_decls_opt type_decls_opt;
+    -> [package_decl] [import_decls] [type_decls];
 
-package_decl_opt
-    -> [annotations] PACKAGE id_chain SEMI `{}{} {}{}\n\n`
-    ->;
+package_decl
+    -> [annotations] PACKAGE id_chain SEMI `{}{} {}{}\n\n`;
 
-import_decls_opt
-    -> import_decls `{}\n\n`
-    ->;
 import_decls
     -> import_decl import_decls `{}\n{}`
-    -> import_decl;
+    -> import_decl `{}\n\n`;
 import_decl
     -> IMPORT typename SEMI `{} {}{}`
     -> IMPORT typename DOT STAR SEMI `{} {}{}{}{}`
     -> IMPORT STATIC typename DOT ID SEMI `{} {} {}{}{}{}`
     -> IMPORT STATIC typename DOT STAR SEMI `{} {} {}{}{}{}`;
 
-type_decls_opt
-    -> type_decls
-    ->;
 type_decls
     -> type_decl type_decls `{}\n{}`
     -> type_decl;

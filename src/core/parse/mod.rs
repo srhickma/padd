@@ -116,6 +116,12 @@ impl Grammar {
     }
 
     pub fn from(productions: Vec<Production>) -> Grammar {
+
+        println!("BEGIN PRODUCTIONS");
+        for prod in &productions {
+            println!("{}", prod.to_string());
+        }
+
         let nss = Grammar::build_nss(&productions);
         let non_terminals: HashSet<String> = productions.iter().cloned()
             .map(|prod| prod.lhs)

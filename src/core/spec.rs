@@ -383,8 +383,9 @@ fn generate_grammar_prods<'a, 'b>(prods_node: &'a Tree, accumulator: &'b mut Vec
 fn generate_grammar_rhss<'a, 'b>(rhss_node: &'a Tree, lhs: &'a String, accumulator: &'b mut Vec<Production>, pp_accumulator: &'b mut Vec<PatternPair>) {
     let rhs_node = rhss_node.get_child(rhss_node.children.len() - 1);
 
-    let mut ids: Vec<String> = vec![];
-    generate_grammar_ids(rhs_node.get_child(1), &mut ids, accumulator);
+    let mut ids: Vec<String> = Vec::new();
+    let mut optional_productions: Vec<Production> = Vec::new();
+    generate_grammar_ids(rhs_node.get_child(1), &mut ids, &mut optional_productions);
 
     let production = Production {
         lhs: lhs.clone(),
@@ -405,6 +406,8 @@ fn generate_grammar_rhss<'a, 'b>(rhss_node: &'a Tree, lhs: &'a String, accumulat
         });
     }
 
+    accumulator.append(&mut optional_productions);
+
     if rhss_node.children.len() == 2 {
         generate_grammar_rhss(rhss_node.get_child(0), lhs, accumulator, pp_accumulator);
     }
@@ -413,10 +416,9 @@ fn generate_grammar_rhss<'a, 'b>(rhss_node: &'a Tree, lhs: &'a String, accumulat
 //TODO use a builder to generate the grammar productions
 fn generate_grammar_ids<'a, 'b>(ids_node: &'a Tree, ids_accumulator: &'b mut Vec<String>, production_accumulator: &'b mut Vec<Production>) {
     if !ids_node.is_empty() {
-        let id_node = ids_node.get_child(1);
-
         generate_grammar_ids(ids_node.get_child(0), ids_accumulator, production_accumulator);
 
+        let id_node = ids_node.get_child(1);
         let id = match &id_node.lhs.kind[..] {
             "ID" => id_node.lhs.lexeme.clone(),
             "COPTID" => {

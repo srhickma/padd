@@ -213,6 +213,33 @@ b -> B [b] `\n{} {}`;
     assert_eq!(res, "a\nb \nb \nb a\nb aaaa\nb \nb \nb \nb a\nb a\nb aa\nb a");
 }
 
+#[test]
+fn test_optional_shorthand_state_order() {
+    //setup
+    let spec = "
+'ab'
+
+start
+  'a' -> ^A
+  'b' -> ^B;
+
+s -> [A] [B];
+    ".to_string();
+
+    let input = "ab".to_string();
+    let mut iter = input.chars();
+    let mut getter = || iter.next();
+    let mut stream = Stream::from(&mut getter);
+
+    let fjr = FormatJobRunner::build(&spec).unwrap();
+
+    //exercise
+    let res = fjr.format(&mut stream).unwrap();
+
+    //verify
+    assert_eq!(res, "ab");
+}
+
 fn test_fjr(case_name: &str, spec_name: &str) {
     //setup
     let fjr = FormatJobRunner::build(&load_spec(spec_name)).unwrap();
