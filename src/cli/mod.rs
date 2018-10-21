@@ -1,83 +1,56 @@
 extern crate regex;
 extern crate stopwatch;
+extern crate clap;
 
 use self::regex::Regex;
 use self::stopwatch::Stopwatch;
+use self::clap::{Arg, ArgGroup, ArgMatches, App};
 
-use std::env;
-use std::io;
-use std::io::Read;
-use std::io::Write;
-use std::io::Seek;
-use std::io::SeekFrom;
-use std::io::BufRead;
-use std::io::BufReader;
+use std::io::{self, Read, Write, Seek, SeekFrom, BufRead, BufReader};
 use std::process;
-use std::fs::File;
-use std::fs::OpenOptions;
-use std::fs;
+use std::fs::{self, File, OpenOptions};
 use std::path::Path;
 use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
 
-use padd;
-use padd::FormatJobRunner;
-use padd::Stream;
+use padd::{self, FormatJobRunner, Stream};
 
 static FORMATTED: AtomicUsize = ATOMIC_USIZE_INIT;
 static TOTAL: AtomicUsize = ATOMIC_USIZE_INIT;
 
 pub fn run() {
-    let args: Vec<_> = env::args().collect();
+    let matches = build_app();
 
-    if args.len() < 2 {
-        error("Missing specification file path".to_string());
-    }
-
-    let spec_path = args.get(1).unwrap();
-
-    let fjr_res = load_spec(&spec_path);
-    if fjr_res.is_err() {
-        error(format!("Error loading specification {}: {}", &spec_path, fjr_res.err().unwrap()));
-        return;
-    }
-
-    let fjr = fjr_res.unwrap();
+    let spec_path = matches.value_of("spec").unwrap();
+    let fjr = match load_spec(&spec_path) {
+        Err(err) => {
+            error(format!("Error loading specification {}: {}", &spec_path, err));
+            return;
+        }
+        Ok(fjr) => fjr
+    };
 
     println!("Successfully loaded specification");
 
-    let mut directory: Option<&Path> = None;
-    let mut file_regex: Option<Regex> = None;
-    let mut target: Option<&Path> = None;
+    let directory: Option<&Path> = match matches.value_of("directory") {
+        None => None,
+        Some(dir) => Some(Path::new(dir))
+    };
 
-    for i in 2..args.len() {
-        let arg: &String = &args[i];
-        if arg.starts_with("-") {
-            match &arg[..] {
-                "-d" | "--directory" => {
-                    if args.len() == i + 1 {
-                        error("Missing directory path".to_string());
-                    }
-                    directory = Some(Path::new(&args[i + 1]));
-                }
-                "-t" | "--target" => {
-                    if args.len() == i + 1 {
-                        error("Missing target path".to_string());
-                    }
-                    target = Some(Path::new(&args[i + 1]));
-                }
-                "-m" | "--matching" => {
-                    if args.len() == i + 1 {
-                        error("Missing file regex".to_string());
-                    }
-                    match Regex::new(format!(r#"{}"#, &args[i + 1]).as_str()) {
-                        Ok(fn_regex) => file_regex = Some(fn_regex),
-                        Err(e) => error(format!("Failed to build file name regex: {}", e)),
-                    }
-                }
-                a => error(format!("Unrecognized parameter {}", a)),
+    let file_regex: Option<Regex> = match matches.value_of("matching") {
+        None => None,
+        Some(regex) => match Regex::new(format!(r#"{}"#, regex).as_str()) {
+            Ok(fn_regex) => Some(fn_regex),
+            Err(e) => {
+                error(format!("Failed to build file name regex: {}", e));
+                None
             }
         }
-    }
+    };
+
+    let target: Option<&Path> = match matches.value_of("target") {
+        None => None,
+        Some(file) => Some(Path::new(file))
+    };
 
     let mut sw = Stopwatch::new();
     sw.start();
@@ -85,9 +58,9 @@ pub fn run() {
     match target {
         Some(target_path) => {
             if directory.is_some() {
-                error("Invalid arguments: Target file and directory both specified".to_string());
+                panic!("Target file and directory both specified");
             } else if file_regex.is_some() {
-                error("Invalid arguments: Target file and file regex both specified".to_string());
+                panic!("Target file and file regex both specified");
             }
             format_file(target_path, &fjr)
         }
@@ -110,6 +83,46 @@ pub fn run() {
     println!("COMPLETE: {}ms : {} processed, {} formatted, {} failed", sw.elapsed_ms(), total, formatted, total - formatted);
 }
 
+fn build_app<'a>() -> ArgMatches<'a> {
+    App::new("padd")
+        .version("0.1.0")
+        .author("Shane Hickman <srhickma@edu.uwaterloo.ca>")
+        .about("Text formatter for context-free languages")
+        .arg(Arg::with_name("spec")
+            .help("Specification file path")
+            .takes_value(true)
+            .value_name("SPECIFICATION")
+            .required(true)
+        )
+        .arg(Arg::with_name("target")
+            .short("t")
+            .long("target")
+            .help("Sets a single file to format")
+            .takes_value(true)
+            .value_name("FILE")
+        )
+        .arg(Arg::with_name("directory")
+            .short("d")
+            .long("directory")
+            .help("Sets the directory to format files under")
+            .takes_value(true)
+            .value_name("DIRECTORY")
+        )
+        .arg(Arg::with_name("matching")
+            .short("m")
+            .long("matching")
+            .help("Sets the regex for file names to format")
+            .takes_value(true)
+            .value_name("REGEX")
+            .requires_all(&["directory"])
+        )
+        .group(ArgGroup::with_name("input")
+            .args(&["target", "directory"])
+            .required(true)
+        )
+        .get_matches()
+}
+
 fn dir_recur(dir_path: &Path, fn_regex: &Regex, fjr: &FormatJobRunner) {
     fs::read_dir(dir_path).unwrap()
         .for_each(|res| {
@@ -128,7 +141,7 @@ fn dir_recur(dir_path: &Path, fn_regex: &Regex, fjr: &FormatJobRunner) {
         });
 }
 
-fn load_spec(spec_path: &String) -> Result<FormatJobRunner, padd::BuildError> {
+fn load_spec(spec_path: &str) -> Result<FormatJobRunner, padd::BuildError> {
     let mut spec = String::new();
 
     let spec_file = File::open(spec_path);
@@ -253,6 +266,5 @@ fn format_file_internal(target_path: &Path, fjr: &FormatJobRunner) -> bool {
 
 fn error(err_text: String) {
     println!("ERROR: {}", err_text);
-    println!("Usage: padd specification [-t target | -d directory [-m regex]]");
     process::exit(0);
 }
