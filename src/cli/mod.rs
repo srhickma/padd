@@ -4,15 +4,20 @@ extern crate clap;
 
 use self::regex::Regex;
 use self::stopwatch::Stopwatch;
-use self::clap::{Arg, ArgGroup, ArgMatches, App};
+use self::clap::{Arg, ArgMatches, App};
 
 use std::io::{self, Read, Write, Seek, SeekFrom, BufRead, BufReader};
 use std::process;
 use std::fs::{self, File, OpenOptions};
 use std::path::Path;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
 
 use padd::{self, FormatJobRunner, Stream};
+
+use cli::thread_pool::ThreadPool;
+
+mod thread_pool;
 
 static FORMATTED: AtomicUsize = ATOMIC_USIZE_INIT;
 static TOTAL: AtomicUsize = ATOMIC_USIZE_INIT;
@@ -31,9 +36,9 @@ pub fn run() {
 
     println!("Successfully loaded specification");
 
-    let directory: Option<&Path> = match matches.value_of("directory") {
+    let target: Option<&Path> = match matches.value_of("target") {
         None => None,
-        Some(dir) => Some(Path::new(dir))
+        Some(file) => Some(Path::new(file))
     };
 
     let file_regex: Option<Regex> = match matches.value_of("matching") {
@@ -47,35 +52,52 @@ pub fn run() {
         }
     };
 
-    let target: Option<&Path> = match matches.value_of("target") {
-        None => None,
-        Some(file) => Some(Path::new(file))
+    let thread_count: usize = match matches.value_of("threads") {
+        None => 1,
+        Some(threads) => match str::parse::<usize>(threads) {
+            Err(_) => {
+                println!("Invalid number of threads: '{}'", threads);
+                println!("Falling back to one thread");
+                1
+            },
+            Ok(threads) => {
+                if threads == 0 {
+                    println!("Invalid number of threads: '{}'", threads);
+                    println!("Falling back to one thread");
+                    1
+                } else {
+                    threads
+                }
+            }
+        }
     };
 
     let mut sw = Stopwatch::new();
     sw.start();
 
+    let fjr_arc: Arc<FormatJobRunner> = Arc::new(fjr);
+
+    let pool: ThreadPool<FormatPayload> = ThreadPool::new(
+        thread_count,
+        | payload: FormatPayload | {
+            let file_path = Path::new(&payload.file_path);
+            format_file(&file_path, &payload.fjr_arc)
+        }
+    );
+
     match target {
         Some(target_path) => {
-            if directory.is_some() {
-                panic!("Target file and directory both specified");
-            } else if file_regex.is_some() {
-                panic!("Target file and file regex both specified");
-            }
-            format_file(target_path, &fjr)
-        }
-        None => match directory {
-            Some(dir_path) => {
-                let fn_regex = match file_regex {
-                    Some(regex) => regex,
-                    None => Regex::new(r#".*"#).unwrap(),
-                };
+            let fn_regex = match file_regex {
+                Some(regex) => regex,
+                None => Regex::new(r#".*"#).unwrap(),
+            };
 
-                dir_recur(dir_path, &fn_regex, &fjr)
-            }
-            None => term_loop(&fjr),
+            format_target(target_path, &fn_regex, &fjr_arc, &pool)
         }
+        None => term_loop(&fjr_arc)
     }
+
+    pool.terminate_and_join();
 
     sw.stop();
     let total = TOTAL.load(Ordering::Relaxed);
@@ -97,16 +119,9 @@ fn build_app<'a>() -> ArgMatches<'a> {
         .arg(Arg::with_name("target")
             .short("t")
             .long("target")
-            .help("Sets a single file to format")
+            .help("Sets a the path to format files under")
             .takes_value(true)
-            .value_name("FILE")
-        )
-        .arg(Arg::with_name("directory")
-            .short("d")
-            .long("directory")
-            .help("Sets the directory to format files under")
-            .takes_value(true)
-            .value_name("DIRECTORY")
+            .value_name("PATH")
         )
         .arg(Arg::with_name("matching")
             .short("m")
@@ -114,31 +129,34 @@ fn build_app<'a>() -> ArgMatches<'a> {
             .help("Sets the regex for file names to format")
             .takes_value(true)
             .value_name("REGEX")
-            .requires_all(&["directory"])
+            .requires("target")
         )
-        .group(ArgGroup::with_name("input")
-            .args(&["target", "directory"])
-            .required(true)
+        .arg(Arg::with_name("threads")
+            .long("threads")
+            .help("Sets the number of worker threads")
+            .takes_value(true)
+            .value_name("NUM")
         )
         .get_matches()
 }
 
-fn dir_recur(dir_path: &Path, fn_regex: &Regex, fjr: &FormatJobRunner) {
-    fs::read_dir(dir_path).unwrap()
-        .for_each(|res| {
-            match res {
-                Ok(dir_item) => {
-                    let path = dir_item.path();
-                    let file_name = path.file_name().unwrap().to_str().unwrap();
-                    if path.is_dir() {
-                        dir_recur(path.as_path(), fn_regex, fjr);
-                    } else if fn_regex.is_match(file_name) {
-                        format_file(path.as_path(), &fjr);
-                    }
+fn format_target(target_path: &Path, fn_regex: &Regex, fjr_arc: &Arc<FormatJobRunner>, pool: &ThreadPool<FormatPayload>) {
+    let file_name = target_path.file_name().unwrap().to_str().unwrap();
+    if target_path.is_dir() {
+        fs::read_dir(target_path).unwrap()
+            .for_each(|res| {
+                match res {
+                    Ok(dir_item) => format_target(&dir_item.path(), fn_regex, fjr_arc, pool),
+                    Err(e) => println!("An error occurred while searching directory {}: {}", target_path.to_string_lossy(), e),
                 }
-                Err(e) => println!("An error occurred while searching directory {}: {}", dir_path.to_string_lossy(), e),
-            }
+            });
+    } else if fn_regex.is_match(file_name) {
+        pool.enqueue(FormatPayload {
+            fjr_arc: fjr_arc.clone(),
+            file_path: target_path.to_string_lossy().to_string()
         });
+        //TODO should make the main thread sleep if the queue gets too big
+    }
 }
 
 fn load_spec(spec_path: &str) -> Result<FormatJobRunner, padd::BuildError> {
@@ -160,7 +178,7 @@ fn load_spec(spec_path: &str) -> Result<FormatJobRunner, padd::BuildError> {
     FormatJobRunner::build(&spec)
 }
 
-fn term_loop(fjr: &FormatJobRunner) {
+fn term_loop(fjr_arc: &Arc<FormatJobRunner>) {
     loop {
         let mut target_path = String::new();
 
@@ -174,7 +192,7 @@ fn term_loop(fjr: &FormatJobRunner) {
 
         target_path.pop();
 
-        format_file(&Path::new(&target_path), &fjr);
+        format_file(&Path::new(&target_path), &fjr_arc);
     }
 }
 
@@ -186,7 +204,7 @@ fn format_file(target_path: &Path, fjr: &FormatJobRunner) {
 }
 
 fn format_file_internal(target_path: &Path, fjr: &FormatJobRunner) -> bool {
-    print!(">> Formatting {}: ", target_path.to_string_lossy());
+    print!(">> Formatting {}... ", target_path.to_string_lossy());
     let target_file = OpenOptions::new().read(true).write(true).open(&target_path);
     match target_file {
         Ok(_) => {
@@ -267,4 +285,9 @@ fn format_file_internal(target_path: &Path, fjr: &FormatJobRunner) -> bool {
 fn error(err_text: String) {
     println!("ERROR: {}", err_text);
     process::exit(0);
+}
+
+struct FormatPayload {
+    fjr_arc: Arc<FormatJobRunner>,
+    file_path: String
 }
