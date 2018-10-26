@@ -8,7 +8,7 @@ use core::data::Data;
 
 mod earley;
 
-pub trait Parser {
+pub trait Parser: 'static + Send + Sync {
     fn parse(&self, scan: Vec<Token<String>>, grammar: &Grammar) -> Result<Tree, Error>;
 }
 
@@ -116,12 +116,6 @@ impl Grammar {
     }
 
     pub fn from(productions: Vec<Production>) -> Grammar {
-
-        println!("BEGIN PRODUCTIONS");
-        for prod in &productions {
-            println!("{}", prod.to_string());
-        }
-
         let nss = Grammar::build_nss(&productions);
         let non_terminals: HashSet<String> = productions.iter().cloned()
             .map(|prod| prod.lhs)

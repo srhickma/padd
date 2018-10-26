@@ -4,7 +4,7 @@ use core::scan::Error;
 
 mod maximal_munch;
 
-pub trait Scanner<State: PartialEq + Clone> {
+pub trait Scanner<State: PartialEq + Clone>: 'static + Send + Sync {
     fn scan<'a, 'b>(&self, input: &'a str, dfa: &'b DFA<State>) -> Result<Vec<Token<String>>, Error>;
 }
 

@@ -11,7 +11,7 @@ pub mod alphabet;
 pub mod ecdfa;
 pub mod maximal_munch;
 
-pub trait Scanner<State: Data, Kind: Data> {
+pub trait Scanner<State: Data, Kind: Data>: 'static + Send + Sync {
     fn scan<'a, 'b>(&self, stream: &'a mut StreamSource<char>, cdfa: &'b CDFA<State, Kind>) -> Result<Vec<Token<Kind>>, scan::Error>;
 }
 
