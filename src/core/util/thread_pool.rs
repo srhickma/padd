@@ -178,3 +178,167 @@ enum WorkerStatus {
     TERM,
     IDLE,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::time::Duration;
+
+    #[test]
+    fn single_worker_fast_main() {
+        //setup
+        let counter = Arc::new(AtomicUsize::new(0));
+
+        let pool = ThreadPool::spawn(1, 10, |(payload, counter): (usize, Arc<AtomicUsize>)| {
+            assert_eq!(counter.fetch_add(1, Ordering::SeqCst), payload);
+        });
+
+        //exercise/verify
+        for i in 0..10 {
+            pool.enqueue((i, counter.clone()));
+        }
+
+        assert_eq!(counter.load(Ordering::Relaxed), 0);
+
+        pool.terminate_and_join();
+
+        assert_eq!(counter.load(Ordering::Relaxed), 10);
+    }
+
+    #[test]
+    fn single_worker_slow_main() {
+        //setup
+        let counter = Arc::new(AtomicUsize::new(0));
+
+        let pool = ThreadPool::spawn(1, 10, |(payload, counter): (usize, Arc<AtomicUsize>)| {
+            assert_eq!(counter.fetch_add(1, Ordering::SeqCst), payload);
+        });
+
+        //exercise/verify
+        for i in 0..10 {
+            pool.enqueue((i, counter.clone()));
+            thread::sleep(Duration::new(0, 10))
+        }
+
+        assert_eq!(counter.load(Ordering::Relaxed), 10);
+
+        pool.terminate_and_join();
+
+        assert_eq!(counter.load(Ordering::Relaxed), 10);
+    }
+
+    #[test]
+    fn many_workers() {
+        //setup
+        let counter = Arc::new(AtomicUsize::new(0));
+
+        let pool = ThreadPool::spawn(
+            4,
+            16,
+            |(payload, counter): (usize, Arc<AtomicUsize>)| {
+                thread::sleep(Duration::new(0, 100000000));
+                counter.fetch_add(1, Ordering::SeqCst);
+            });
+
+        //exercise
+        for i in 0..16 {
+            pool.enqueue((i, counter.clone()));
+        }
+
+        //verify
+        assert_eq!(counter.load(Ordering::Relaxed), 0);
+
+        thread::sleep(Duration::new(0, 120000000));
+        assert_eq!(counter.load(Ordering::Relaxed), 4);
+
+        thread::sleep(Duration::new(0, 120000000));
+        assert_eq!(counter.load(Ordering::Relaxed), 8);
+
+        thread::sleep(Duration::new(0, 120000000));
+        assert_eq!(counter.load(Ordering::Relaxed), 12);
+
+        thread::sleep(Duration::new(0, 120000000));
+        assert_eq!(counter.load(Ordering::Relaxed), 16);
+
+        pool.terminate_and_join();
+
+        assert_eq!(counter.load(Ordering::Relaxed), 16);
+    }
+
+    #[test]
+    fn terminate_and_join() {
+        //setup
+        let counter = Arc::new(AtomicUsize::new(0));
+
+        let pool = ThreadPool::spawn(
+            4,
+            16,
+            |(payload, counter): (usize, Arc<AtomicUsize>)| {
+                thread::sleep(Duration::new(0, 1000));
+                counter.fetch_add(1, Ordering::SeqCst);
+            });
+
+        //exercise
+        for i in 0..16 {
+            pool.enqueue((i, counter.clone()));
+        }
+
+        assert_eq!(counter.load(Ordering::Relaxed), 0);
+
+        //verify
+        pool.terminate_and_join();
+        assert_eq!(counter.load(Ordering::Relaxed), 16);
+    }
+
+    #[test]
+    fn sync_sender_throttle() {
+        //setup
+        let counter = Arc::new(AtomicUsize::new(0));
+
+        let pool = ThreadPool::spawn(
+            4,
+            4,
+            |(payload, counter): (usize, Arc<AtomicUsize>)| {
+                thread::sleep(Duration::new(0, 1000000));
+                counter.fetch_add(1, Ordering::SeqCst);
+            });
+
+        //exercise
+        for i in 0..100 {
+            pool.enqueue((i, counter.clone()));
+        }
+
+        //verify
+        let result = counter.load(Ordering::SeqCst);
+        assert!(result > 90 && result < 96);
+
+        pool.terminate_and_join();
+        assert_eq!(counter.load(Ordering::Relaxed), 100);
+    }
+
+    #[test]
+    fn sync_sender_large_buffer() {
+        //setup
+        let counter = Arc::new(AtomicUsize::new(0));
+
+        let pool = ThreadPool::spawn(
+            4,
+            100,
+            |(payload, counter): (usize, Arc<AtomicUsize>)| {
+                thread::sleep(Duration::new(0, 1000000));
+                counter.fetch_add(1, Ordering::SeqCst);
+            });
+
+        //exercise
+        for i in 0..100 {
+            pool.enqueue((i, counter.clone()));
+        }
+
+        //verify
+        assert_eq!(counter.load(Ordering::Relaxed), 0);
+
+        pool.terminate_and_join();
+        assert_eq!(counter.load(Ordering::Relaxed), 100);
+    }
+}
