@@ -124,10 +124,7 @@ impl WorkerMux {
                 }
             }
 
-            match term_tx.send(()) {
-                Err(err) => panic!("Worker mux term tx failed to send: {}", err),
-                Ok(()) => {}
-            }
+            term_tx.send(()).unwrap();
         });
 
         WorkerMux {}
@@ -164,10 +161,7 @@ impl<Payload: 'static + Send> Worker<Payload> {
                     id,
                     status: WorkerStatus::IDLE,
                 };
-                match mux_tx.send(report) {
-                    Err(err) => panic!("Worker mux tx failed to report idle: {}", err),
-                    Ok(()) => {}
-                }
+                mux_tx.send(report).unwrap();
 
                 let sig = Worker::join_job(&rx, id);
                 match sig {
@@ -182,27 +176,18 @@ impl<Payload: 'static + Send> Worker<Payload> {
                 id,
                 status: WorkerStatus::TERM,
             };
-            match mux_tx.send(report) {
-                Err(err) => panic!("Worker mux tx failed to report term: {}", err),
-                Ok(()) => {}
-            }
+            mux_tx.send(report).unwrap();
         });
 
         Worker { tx }
     }
 
     fn run_job(&self, payload: Payload) {
-        match self.tx.send(Signal::JOB(payload)) {
-            Err(err) => panic!("Worker tx failed to send job: {}", err),
-            Ok(()) => {}
-        }
+        self.tx.send(Signal::JOB(payload)).unwrap();
     }
 
     fn terminate(&self) {
-        match self.tx.send(Signal::TERM) {
-            Err(err) => panic!("Worker tx failed to send term: {}", err),
-            Ok(()) => {}
-        }
+        self.tx.send(Signal::TERM).unwrap();
     }
 
     fn join_job(rx: &Receiver<Signal<Payload>>, id: WorkerId) -> Signal<Payload> {
