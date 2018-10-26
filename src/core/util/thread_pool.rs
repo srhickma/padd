@@ -3,7 +3,6 @@ use std::sync::Arc;
 use std::sync::mpsc::{self, Sender, SyncSender, Receiver};
 use std::collections::LinkedList;
 
-//TODO move this into the library code?
 //TODO add tests
 
 pub struct ThreadPool<Payload: 'static + Send> {

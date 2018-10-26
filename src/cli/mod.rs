@@ -14,12 +14,9 @@ use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
 
-use padd::{self, FormatJobRunner, Stream};
-
-use cli::thread_pool::ThreadPool;
+use padd::{self, FormatJobRunner, Stream, ThreadPool};
 
 mod logger;
-mod thread_pool;
 
 static FORMATTED: AtomicUsize = ATOMIC_USIZE_INIT;
 static TOTAL: AtomicUsize = ATOMIC_USIZE_INIT;

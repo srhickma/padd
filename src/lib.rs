@@ -129,6 +129,8 @@ impl<'g, T: 'g + Clone> Stream<'g, T> {
     }
 }
 
+pub type ThreadPool<Payload> = core::util::thread_pool::ThreadPool<Payload>;
+
 #[cfg(test)]
 mod tests {
     use super::*;
