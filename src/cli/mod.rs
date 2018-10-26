@@ -100,7 +100,7 @@ pub fn run() {
         None => term_loop(&fjr_arc)
     }
 
-    pool.terminate_and_join();
+    pool.terminate_and_join().unwrap();
 
     sw.stop();
 
@@ -176,7 +176,7 @@ fn format_target(target_path: &Path, fn_regex: &Regex, fjr_arc: &Arc<FormatJobRu
         pool.enqueue(FormatPayload {
             fjr_arc: fjr_arc.clone(),
             file_path: target_path.to_string_lossy().to_string(),
-        });
+        }).unwrap();
     }
 }
 

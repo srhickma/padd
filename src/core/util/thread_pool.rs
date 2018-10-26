@@ -2,8 +2,8 @@ use std::thread;
 use std::sync::Arc;
 use std::sync::mpsc::{self, Sender, SyncSender, Receiver};
 use std::collections::LinkedList;
-
-//TODO add tests
+use std::fmt;
+use std::error;
 
 pub struct ThreadPool<Payload: 'static + Send> {
     queue_tx: SyncSender<Signal<Payload>>,
@@ -25,13 +25,47 @@ impl<Payload: 'static + Send> ThreadPool<Payload> {
         }
     }
 
-    pub fn enqueue(&self, payload: Payload) {
-        self.queue_tx.send(Signal::JOB(payload));
+    pub fn enqueue(&self, payload: Payload) -> Result<(), ThreadPoolError> {
+        match self.queue_tx.send(Signal::JOB(payload)) {
+            Err(err) => Err(ThreadPoolError::QueueErr(err.to_string())),
+            Ok(()) => Ok(())
+        }
     }
 
-    pub fn terminate_and_join(&self) {
-        self.queue_tx.send(Signal::TERM);
-        self.term_rx.recv();
+    pub fn terminate_and_join(&self) -> Result<(), ThreadPoolError> {
+        match self.queue_tx.send(Signal::TERM) {
+            Err(err) => Err(ThreadPoolError::TermError(err.to_string())),
+            Ok(()) => match self.term_rx.recv() {
+                Err(err) => panic!("Worker mux term tx closed before termination signal: {}", err),
+                Ok(()) => Ok(())
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum ThreadPoolError {
+    QueueErr(String),
+    TermError(String),
+}
+
+impl fmt::Display for ThreadPoolError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            ThreadPoolError::QueueErr(ref err) =>
+                write!(f, "Error enqueuing worker job: {}", err),
+            ThreadPoolError::TermError(ref err) =>
+                write!(f, "Error enqueuing worker termination signal: {}", err),
+        }
+    }
+}
+
+impl error::Error for ThreadPoolError {
+    fn cause(&self) -> Option<&error::Error> {
+        match *self {
+            ThreadPoolError::QueueErr(_) => None,
+            ThreadPoolError::TermError(_) => None,
+        }
     }
 }
 
@@ -90,7 +124,10 @@ impl WorkerMux {
                 }
             }
 
-            term_tx.send(());
+            match term_tx.send(()) {
+                Err(err) => panic!("Worker mux term tx failed to send: {}", err),
+                Ok(()) => {}
+            }
         });
 
         WorkerMux {}
@@ -123,10 +160,14 @@ impl<Payload: 'static + Send> Worker<Payload> {
 
         thread::spawn(move || {
             loop {
-                mux_tx.send(WorkerReport {
+                let report = WorkerReport {
                     id,
                     status: WorkerStatus::IDLE,
-                });
+                };
+                match mux_tx.send(report) {
+                    Err(err) => panic!("Worker mux tx failed to report idle: {}", err),
+                    Ok(()) => {}
+                }
 
                 let sig = Worker::join_job(&rx, id);
                 match sig {
@@ -137,21 +178,31 @@ impl<Payload: 'static + Send> Worker<Payload> {
                 }
             }
 
-            mux_tx.send(WorkerReport {
+            let report = WorkerReport {
                 id,
                 status: WorkerStatus::TERM,
-            });
+            };
+            match mux_tx.send(report) {
+                Err(err) => panic!("Worker mux tx failed to report term: {}", err),
+                Ok(()) => {}
+            }
         });
 
         Worker { tx }
     }
 
     fn run_job(&self, payload: Payload) {
-        self.tx.send(Signal::JOB(payload));
+        match self.tx.send(Signal::JOB(payload)) {
+            Err(err) => panic!("Worker tx failed to send job: {}", err),
+            Ok(()) => {}
+        }
     }
 
     fn terminate(&self) {
-        self.tx.send(Signal::TERM);
+        match self.tx.send(Signal::TERM) {
+            Err(err) => panic!("Worker tx failed to send term: {}", err),
+            Ok(()) => {}
+        }
     }
 
     fn join_job(rx: &Receiver<Signal<Payload>>, id: WorkerId) -> Signal<Payload> {
@@ -162,7 +213,8 @@ impl<Payload: 'static + Send> Worker<Payload> {
     }
 }
 
-enum Signal<Payload: 'static + Send> {
+#[derive(Debug)]
+pub enum Signal<Payload: 'static + Send> {
     TERM,
     JOB(Payload),
 }
@@ -184,6 +236,7 @@ mod tests {
     use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::Duration;
+    use std::error::Error;
 
     #[test]
     fn single_worker_fast_main() {
@@ -196,12 +249,12 @@ mod tests {
 
         //exercise/verify
         for i in 0..10 {
-            pool.enqueue((i, counter.clone()));
+            pool.enqueue((i, counter.clone())).unwrap();
         }
 
         assert_eq!(counter.load(Ordering::Relaxed), 0);
 
-        pool.terminate_and_join();
+        pool.terminate_and_join().unwrap();
 
         assert_eq!(counter.load(Ordering::Relaxed), 10);
     }
@@ -217,13 +270,13 @@ mod tests {
 
         //exercise/verify
         for i in 0..10 {
-            pool.enqueue((i, counter.clone()));
-            thread::sleep(Duration::new(0, 10))
+            pool.enqueue((i, counter.clone())).unwrap();
+            thread::sleep(Duration::new(0, 1000000))
         }
 
-        assert_eq!(counter.load(Ordering::Relaxed), 10);
+        assert!(counter.load(Ordering::Relaxed) > 0);
 
-        pool.terminate_and_join();
+        pool.terminate_and_join().unwrap();
 
         assert_eq!(counter.load(Ordering::Relaxed), 10);
     }
@@ -236,14 +289,14 @@ mod tests {
         let pool = ThreadPool::spawn(
             4,
             16,
-            |(payload, counter): (usize, Arc<AtomicUsize>)| {
+            |(_, counter): (usize, Arc<AtomicUsize>)| {
                 thread::sleep(Duration::new(0, 100000000));
                 counter.fetch_add(1, Ordering::SeqCst);
             });
 
         //exercise
         for i in 0..16 {
-            pool.enqueue((i, counter.clone()));
+            pool.enqueue((i, counter.clone())).unwrap();
         }
 
         //verify
@@ -261,7 +314,7 @@ mod tests {
         thread::sleep(Duration::new(0, 120000000));
         assert_eq!(counter.load(Ordering::Relaxed), 16);
 
-        pool.terminate_and_join();
+        pool.terminate_and_join().unwrap();
 
         assert_eq!(counter.load(Ordering::Relaxed), 16);
     }
@@ -274,20 +327,20 @@ mod tests {
         let pool = ThreadPool::spawn(
             4,
             16,
-            |(payload, counter): (usize, Arc<AtomicUsize>)| {
+            |(_, counter): (usize, Arc<AtomicUsize>)| {
                 thread::sleep(Duration::new(0, 1000));
                 counter.fetch_add(1, Ordering::SeqCst);
             });
 
         //exercise
         for i in 0..16 {
-            pool.enqueue((i, counter.clone()));
+            pool.enqueue((i, counter.clone())).unwrap();
         }
 
         assert_eq!(counter.load(Ordering::Relaxed), 0);
 
         //verify
-        pool.terminate_and_join();
+        pool.terminate_and_join().unwrap();
         assert_eq!(counter.load(Ordering::Relaxed), 16);
     }
 
@@ -299,21 +352,21 @@ mod tests {
         let pool = ThreadPool::spawn(
             4,
             4,
-            |(payload, counter): (usize, Arc<AtomicUsize>)| {
+            |(_, counter): (usize, Arc<AtomicUsize>)| {
                 thread::sleep(Duration::new(0, 1000000));
                 counter.fetch_add(1, Ordering::SeqCst);
             });
 
         //exercise
         for i in 0..100 {
-            pool.enqueue((i, counter.clone()));
+            pool.enqueue((i, counter.clone())).unwrap();
         }
 
         //verify
         let result = counter.load(Ordering::SeqCst);
         assert!(result > 90 && result < 96);
 
-        pool.terminate_and_join();
+        pool.terminate_and_join().unwrap();
         assert_eq!(counter.load(Ordering::Relaxed), 100);
     }
 
@@ -325,20 +378,54 @@ mod tests {
         let pool = ThreadPool::spawn(
             4,
             100,
-            |(payload, counter): (usize, Arc<AtomicUsize>)| {
+            |(_, counter): (usize, Arc<AtomicUsize>)| {
                 thread::sleep(Duration::new(0, 1000000));
                 counter.fetch_add(1, Ordering::SeqCst);
             });
 
         //exercise
         for i in 0..100 {
-            pool.enqueue((i, counter.clone()));
+            pool.enqueue((i, counter.clone())).unwrap();
         }
 
         //verify
         assert_eq!(counter.load(Ordering::Relaxed), 0);
 
-        pool.terminate_and_join();
+        pool.terminate_and_join().unwrap();
         assert_eq!(counter.load(Ordering::Relaxed), 100);
+    }
+
+    #[test]
+    fn queue_error() {
+        //setup
+        let pool = ThreadPool::spawn(1, 1, |_: usize| {});
+        pool.terminate_and_join().unwrap();
+        thread::sleep(Duration::new(0, 1000000));
+
+        //exercise
+        let result = pool.enqueue(1);
+
+        //verify
+        let err = result.err().unwrap();
+        assert_eq!(format!("{}", err), "Error enqueuing worker job: sending on a closed channel");
+
+        assert!(err.cause().is_none());
+    }
+
+    #[test]
+    fn termination_error() {
+        //setup
+        let pool = ThreadPool::spawn(1, 1, |_: usize| {});
+        pool.terminate_and_join().unwrap();
+        thread::sleep(Duration::new(0, 1000000));
+
+        //exercise
+        let result = pool.terminate_and_join();
+
+        //verify
+        let err = result.err().unwrap();
+        assert_eq!(format!("{}", err), "Error enqueuing worker termination signal: sending on a closed channel");
+
+        assert!(err.cause().is_none());
     }
 }
