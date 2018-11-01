@@ -601,8 +601,8 @@ prefixed_block_statements
 block_statements
     -> isolated_block_statement block_statements `{}\n[prefix]{}`
     -> grouped_statements isolated_block_statement block_statements `{}\n\n[prefix]{}\n[prefix]{}`
-    -> grouped_statements isolated_block_statement `{}\n\n[prefix]{}`
-    -> isolated_block_statement
+    -> grouped_statements inline_isolated_block_statement `{}\n\n[prefix]{}\n`
+    -> inline_isolated_block_statement `{}\n`
     -> grouped_statements `{}\n`;
 
 isolated_block_statement
@@ -610,6 +610,12 @@ isolated_block_statement
     -> block `{}\n`
     -> lvar_dec_statement
     -> isolated_statement `{}\n`;
+
+inline_isolated_block_statement
+    -> class_dec
+    -> block
+    -> lvar_dec_statement
+    -> isolated_statement;
 
 lvar_dec_statement
     -> lvar_dec SEMI;

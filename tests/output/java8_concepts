@@ -48,7 +48,8 @@ public class JavaConcepts<T extends List<int[]> , X> extends Base implements Ser
         int a = (z) + y;
         a = (+z) + y;
 
-        byte b = (byte)+y;    }
+        byte b = (byte)+y;
+    }
 
     List<String> diamond1 = new LinkedList<>();
 
@@ -222,7 +223,8 @@ public class JavaConcepts<T extends List<int[]> , X> extends Base implements Ser
             }
 
             label: {
-                int iii = 1;            }
+                int iii = 1;
+            }
             ;
             ;
 
@@ -382,7 +384,8 @@ case 2:if (t instanceof Base) {
             public int compare(Object o1, Object o2) {
                 try {
                     A<Integer> a = new <String>A<Integer>(new Integer(11), "foo") {
-                    };                }
+                    };
+                }
                 catch (Exception e) {
                 }
 
@@ -393,7 +396,8 @@ case 2:if (t instanceof Base) {
             public boolean equals(Object obj) {
                 return super.equals(obj);
             }
-        };    }
+        };
+    }
 
     private static InputStream createInputStream() {
         return new ByteArrayInputStream(null);
