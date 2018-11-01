@@ -656,7 +656,7 @@ isolated_statement
     -> try_statement;
 
 statement_expression_list
-    -> statement_expression COMMA statement_expression_list
+    -> statement_expression COMMA statement_expression_list `{}{} {}`
     -> statement_expression;
 statement_expression
     -> assignment
@@ -695,7 +695,7 @@ switch_label
     -> DEFAULT COLON `[prefix]{}{}`;
 
 do_statement
-    -> DO statement WHILE LPAREN expr RPAREN SEMI;
+    -> DO statement WHILE LPAREN expr RPAREN SEMI `{} {} {} {}{}{}{}`;
 
 break_statement
     -> BREAK SEMI
@@ -753,7 +753,7 @@ if_then_statement
     -> IF LPAREN expr RPAREN statement `{} {}{}{} {}`;
 
 if_then_else_statement
-    -> IF LPAREN expr RPAREN inline_statement ELSE statement `{} {}{}{} {}{} {}`
+    -> IF LPAREN expr RPAREN inline_statement ELSE statement `{} {}{}{} {} {} {}`
     -> IF LPAREN expr RPAREN block ELSE statement `{} {}{}{} {}\n[prefix]{} {}`;
 
 while_statement
@@ -767,7 +767,7 @@ basic_for_statement
     -> FOR LPAREN [for_init] SEMI [for_expr] SEMI [for_update] RPAREN `{} {}{}{}{}{}{}{}`;
 
 for_init
-    -> lvar_dec
+    -> [inline_modifiers] type variable_declarator_list `{}{} {}`
     -> statement_expression_list;
 for_expr
     -> expr ` {}`;
@@ -970,7 +970,7 @@ annotation_modifiers
     -> annotation `{}\n[prefix]`;
 
 non_annotation_modifiers
-    -> first_modifier modifiers `{} {}`
+    -> first_modifier inline_modifiers `{} {}`
     -> first_modifier `{} `;
 first_modifier
     -> MOD
@@ -978,8 +978,8 @@ first_modifier
     -> STATIC
     -> FINAL
     -> DEFAULT;
-modifiers
-    -> modifier modifiers `{} {}`
+inline_modifiers
+    -> modifier inline_modifiers `{} {}`
     -> modifier `{} `;
 modifier
     -> annotation

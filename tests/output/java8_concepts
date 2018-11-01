@@ -275,31 +275,30 @@ public class JavaConcepts<T extends List<int[]> , X> extends Base implements Ser
             x = x == 0 ? 2 : 4;
         }
 
-        if (true) x = 1;else x = 3;
+        if (true) x = 1; else x = 3;
 
-        if (true) x = 1;else if (false) x = 3;else x = 2;
+        if (true) x = 1; else if (false) x = 3; else x = 2;
 
         while (true) {
             xxx: while (x == 3) continue xxx;
             break;
         }
 
-        do{
+        do {
             x++;
-        }while(x < 100);
-        dox++;while(x < 100);
+        } while (x < 100);
+        do x++; while (x < 100);
 
         for (@Deprecated int i : arr4[0]) {
             x--;
         }
 
-        for (@Deprecated
-        final int i = 0, j = 1; i < 10; x++) {
+        for (@Deprecated final int i = 0, j = 1; i < 10; x++) {
             break;
         }
 
         int i, j;
-        for (i = 0,j = 1; i < 10 && j < 2; i++,j--) {
+        for (i = 0, j = 1; i < 10 && j < 2; i++, j--) {
             break;
         }
     }
