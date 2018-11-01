@@ -59,7 +59,7 @@ public final class CollectionFactory {
     }
 
     @SuppressWarnings({"unchecked", "cast", "rawtypes"})
-    public static <E> Collection<E> createApproximateCollection(@Nullable Object collection, int capacity){
+    public static <E> Collection<E> createApproximateCollection(@Nullable Object collection, int capacity) {
         if (collection instanceof LinkedList) {
             return new LinkedList<>();
         }
@@ -79,12 +79,12 @@ public final class CollectionFactory {
         }
     }
 
-    public static <E> Collection<E> createCollection(Class<?> collectionType, int capacity){
+    public static <E> Collection<E> createCollection(Class<?> collectionType, int capacity) {
         return createCollection(collectionType, null, capacity);
     }
 
     @SuppressWarnings({"unchecked", "cast"})
-    public static <E> Collection<E> createCollection(Class<?> collectionType, @Nullable Class<?> elementType, int capacity){
+    public static <E> Collection<E> createCollection(Class<?> collectionType, @Nullable Class<?> elementType, int capacity) {
         Assert.notNull(collectionType, "Collection type must not be null");
 
         if (collectionType.isInterface()) {
@@ -124,7 +124,7 @@ public final class CollectionFactory {
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
-    public static <K, V> Map<K, V> createApproximateMap(@Nullable Object map, int capacity){
+    public static <K, V> Map<K, V> createApproximateMap(@Nullable Object map, int capacity) {
         if (map instanceof EnumMap) {
             EnumMap enumMap = new EnumMap((EnumMap)map);
             enumMap.clear();
@@ -138,12 +138,12 @@ public final class CollectionFactory {
         }
     }
 
-    public static <K, V> Map<K, V> createMap(Class<?> mapType, int capacity){
+    public static <K, V> Map<K, V> createMap(Class<?> mapType, int capacity) {
         return createMap(mapType, null, capacity);
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
-    public static <K, V> Map<K, V> createMap(Class<?> mapType, @Nullable Class<?> keyType, int capacity){
+    public static <K, V> Map<K, V> createMap(Class<?> mapType, @Nullable Class<?> keyType, int capacity) {
         Assert.notNull(mapType, "Map type must not be null");
 
         if (mapType.isInterface()) {

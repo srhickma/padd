@@ -348,13 +348,15 @@ field_dec
 method_dec
     -> modifiers_opt method_header method_body `{}{}{}\n`;
 method_header
-    -> result method_declarator [throws] `{} {} {}`
-    -> type_parameters [annotations] result method_declarator [throws] `{} {}{} {}{}`;
+    -> result method_declarator [method_throws] `{} {}{}`
+    -> type_parameters [annotations] result method_declarator [method_throws] `{} {}{} {}{}`;
 method_declarator
     -> ID LPAREN [formal_parameter_list] RPAREN [array_dims];
 method_body
-    -> block
+    -> block ` {}`
     -> SEMI;
+method_throws
+    -> throws ` {}`;
 
 formal_parameter_list
     -> receiver_parameter

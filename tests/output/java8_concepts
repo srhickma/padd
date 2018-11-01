@@ -142,7 +142,7 @@ public class JavaConcepts<T extends List<int[]> , X> extends Base implements Ser
             }
         }
         ;
-        native void nnn() ;
+        native void nnn();
 
         transient int x;
 
@@ -150,7 +150,7 @@ public class JavaConcepts<T extends List<int[]> , X> extends Base implements Ser
             this.x = x;
         }
 
-        abstract void mm() ;
+        abstract void mm();
     }
 
     strictfp double ddd() {
@@ -255,7 +255,7 @@ case 2:if (t instanceof Base) {
         }
     }
 
-    public static void main(String[] args) throws ParseException, IOException {
+    public static void main(String[] args) throws ParseException, IOException  {
         int x = 2;
         CompilationUnit cu = parse(new File("src/japa/parser/javacc/Parser.java"));
         System.out.println(cu);
@@ -301,7 +301,7 @@ case 2:if (t instanceof Base) {
         }
     }
 
-    public static CompilationUnit parse(@Deprecated File file) throws ParseException, IOException {
+    public static CompilationUnit parse(@Deprecated File file) throws ParseException, IOException  {
         String a = ((String)"qwe");
         String x = ((String)clz1.getName());
         int y = ((Integer)(Object)x).intValue();
@@ -379,7 +379,7 @@ case 2:if (t instanceof Base) {
         }
     }
 
-    private <Y> void x(Map<? extends X, ? super T> x){
+    private <Y> void x(Map<? extends X, ? super T> x) {
         @Deprecated Comparator c = new Comparator() {
             public int compare(Object o1, Object o2) {
                 try {
@@ -405,7 +405,7 @@ case 2:if (t instanceof Base) {
 }
 
 class Base {
-    public <A, B> void check2(A val1, B val2){
+    public <A, B> void check2(A val1, B val2) {
     }
 }
 
