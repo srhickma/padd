@@ -300,16 +300,16 @@ type_decl
 
 class_dec
     -> modifiers_opt CLASS ID [type_parameters] [superclass] [superinterfaces] class_body
-        `{}{} {}{} {}{}{}`;
+        `{}{} {}{}{}{}{}`;
 
 superclass
-    -> EXTENDS class_type `{} {} `;
+    -> EXTENDS class_type ` {} {}`;
 
 superinterfaces
-    -> IMPLEMENTS class_type_list `{} {} `;
+    -> IMPLEMENTS class_type_list ` {} {}`;
 
 class_body
-    -> LBRACE [class_body_decs] RBRACE `{}\n{;prefix=[prefix][indent]}[prefix]{}\n`;
+    -> inline_class_body `{}\n`;
 inline_class_body
     -> LBRACE [class_body_decs] RBRACE ` {}\n{;prefix=[prefix][indent]}[prefix]{}`;
 class_body_decs
@@ -333,19 +333,10 @@ class_member_dec
 constructor_dec
     -> modifiers_opt constructor_declarator [throws] constructor_body `{}{} {}{}`;
 constructor_body
-    -> LBRACE explicit_constructor_invocation_opt [prefixed_block_statements] RBRACE
-        `{}\n{;prefix=[prefix][indent]}{;prefix=[prefix][indent]}[prefix]{}\n`;
+    -> LBRACE constructor_statements RBRACE
+        `{}\n{;prefix=[prefix][indent]}[prefix]{}\n`;
 constructor_declarator
     -> [type_parameters] ID LPAREN [formal_parameter_list] RPAREN;
-
-explicit_constructor_invocation_opt
-    -> explicit_constructor_invocation `[prefix]{}\n\n`
-    ->;
-explicit_constructor_invocation
-    -> [type_arguments] THIS LPAREN [argument_list] RPAREN SEMI
-    -> [type_arguments] SUPER LPAREN [argument_list] RPAREN SEMI
-    -> expr_name DOT [type_arguments] SUPER LPAREN [argument_list] RPAREN SEMI
-    -> primary DOT [type_arguments] SUPER LPAREN [argument_list] RPAREN SEMI;
 
 argument_list
     -> expr COMMA argument_list `{}{} {}`
@@ -380,7 +371,7 @@ receiver_parameter
     -> [annotations] type ID DOT THIS `{}{} {}{}{}`
     -> [annotations] type THIS `{}{} {}`;
 last_formal_parameter
-    -> modifiers_opt type [annotations] TRIDOT variable_declarator_id `{}{}{} {}`
+    -> modifiers_opt type [annotations] TRIDOT variable_declarator_id `{}{}{}{} {}`
     -> formal_parameter;
 
 throws
@@ -586,7 +577,7 @@ variable_declarator_id
     -> ID [array_dims];
 
 variable_initializers
-    -> variable_initializer COMMA variable_initializers
+    -> variable_initializer COMMA variable_initializers `{}{} {}`
     -> variable_initializer;
 variable_initializer_opt
     -> ASSN variable_initializer ` {} {}`
@@ -778,6 +769,17 @@ for_update
 enhanced_for_statement
     -> FOR LPAREN modifiers_opt type variable_declarator_id COLON expr RPAREN `{} {}{}{} {} {} {}{}`;
 
+constructor_statements
+    -> [prefixed_block_statements]
+    -> explicit_constructor_invocation_statement prefixed_block_statements `[prefix]{}\n\n{}`
+    -> explicit_constructor_invocation_statement `[prefix]{}\n`;
+
+explicit_constructor_invocation_statement
+    -> [type_arguments] THIS LPAREN [argument_list] RPAREN SEMI
+    -> [type_arguments] SUPER LPAREN [argument_list] RPAREN SEMI
+    -> expr_name DOT [type_arguments] SUPER LPAREN [argument_list] RPAREN SEMI
+    -> primary DOT [type_arguments] SUPER LPAREN [argument_list] RPAREN SEMI;
+
 #
 # EXPRESSIONS
 #
@@ -935,10 +937,12 @@ method_reference
     -> array_type M_REF NEW;
 
 array_creation_expr
-    -> NEW PRIM dim_exprs [array_dims]
-    -> NEW class_type dim_exprs [array_dims]
-    -> NEW PRIM array_dims array_initializer
-    -> NEW class_type array_dims array_initializer;
+    -> array_creation_type dim_exprs [array_dims]
+    -> array_creation_type array_dims array_initializer;
+
+array_creation_type
+    -> NEW PRIM `{} {}`
+    -> NEW class_type `{} {}`;
 
 dim_exprs
     -> dim_expr dim_exprs

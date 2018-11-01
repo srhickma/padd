@@ -300,5 +300,8 @@ fn assert_matches_file(result: String, file_name: &str) {
         }
     }
 
-    assert_eq!(output, result);
+    if output != result {
+        println!("EXPECTED:\n{}\nBUT FOUND:\n{}", output, result);
+        panic!("Output did not match file")
+    }
 }
