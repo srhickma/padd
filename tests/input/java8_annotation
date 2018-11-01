@@ -1,0 +1,6 @@
+package com.domain.app.module;@interface AnnotationClass {
+float x();float y();
+int failures() default 0;
+String name() default "Bob";
+Double[][] matrix();
+}

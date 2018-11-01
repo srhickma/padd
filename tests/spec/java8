@@ -270,7 +270,7 @@ id      ^ID
 #----------------------------------------------------------------------------------------------------------------------#
 
 cmp_unit
-    -> [package_decl] [import_decls] [type_decls];
+    -> [package_decl] [import_decls] [type_decls] `{}{}{;indent=    }`;
 
 package_decl
     -> [annotations] PACKAGE id_chain SEMI `{}{} {}{}\n\n`;
@@ -300,18 +300,18 @@ type_decl
 
 class_dec
     -> modifiers_opt CLASS ID [type_parameters] [superclass] [superinterfaces] class_body
-        `{}{} {}{} {}{}{}`;
+        `{}{} {}{}{}{}{}`;
 
 superclass
-    -> EXTENDS class_type `{} {} `;
+    -> EXTENDS class_type ` {} {}`;
 
 superinterfaces
-    -> IMPLEMENTS class_type_list `{} {} `;
+    -> IMPLEMENTS class_type_list ` {} {}`;
 
 class_body
-    -> LBRACE [class_body_decs] RBRACE `{}\n{;prefix=[prefix]    }[prefix]{}\n`;
+    -> inline_class_body `{}\n`;
 inline_class_body
-    -> LBRACE [class_body_decs] RBRACE ` {}\n{;prefix=[prefix]    }[prefix]{}`;
+    -> LBRACE [class_body_decs] RBRACE ` {}\n{;prefix=[prefix][indent]}[prefix]{}`;
 class_body_decs
     -> class_body_dec class_body_decs `[prefix]{}\n{}`
     -> class_body_dec `[prefix]{}`;
@@ -333,18 +333,10 @@ class_member_dec
 constructor_dec
     -> modifiers_opt constructor_declarator [throws] constructor_body `{}{} {}{}`;
 constructor_body
-    -> LBRACE explicit_constructor_invocation_opt [prefixed_block_statements] RBRACE `{}\n{;prefix=[prefix]    }{;prefix=[prefix]    }[prefix]{}\n`;
+    -> LBRACE constructor_statements RBRACE
+        `{}\n{;prefix=[prefix][indent]}[prefix]{}\n`;
 constructor_declarator
     -> [type_parameters] ID LPAREN [formal_parameter_list] RPAREN;
-
-explicit_constructor_invocation_opt
-    -> explicit_constructor_invocation `[prefix]{}\n\n`
-    ->;
-explicit_constructor_invocation
-    -> [type_arguments] THIS LPAREN [argument_list] RPAREN SEMI
-    -> [type_arguments] SUPER LPAREN [argument_list] RPAREN SEMI
-    -> expr_name DOT [type_arguments] SUPER LPAREN [argument_list] RPAREN SEMI
-    -> primary DOT [type_arguments] SUPER LPAREN [argument_list] RPAREN SEMI;
 
 argument_list
     -> expr COMMA argument_list `{}{} {}`
@@ -356,13 +348,15 @@ field_dec
 method_dec
     -> modifiers_opt method_header method_body `{}{}{}\n`;
 method_header
-    -> result method_declarator [throws] `{} {} {}`
-    -> type_parameters [annotations] result method_declarator [throws] `{} {}{} {}{}`;
+    -> result method_declarator [method_throws] `{} {}{}`
+    -> type_parameters [annotations] result method_declarator [method_throws] `{} {}{} {}{}`;
 method_declarator
     -> ID LPAREN [formal_parameter_list] RPAREN [array_dims];
 method_body
-    -> block
+    -> block ` {}`
     -> SEMI;
+method_throws
+    -> throws ` {}`;
 
 formal_parameter_list
     -> receiver_parameter
@@ -379,7 +373,7 @@ receiver_parameter
     -> [annotations] type ID DOT THIS `{}{} {}{}{}`
     -> [annotations] type THIS `{}{} {}`;
 last_formal_parameter
-    -> modifiers_opt type [annotations] TRIDOT variable_declarator_id `{}{}{} {}`
+    -> modifiers_opt type [annotations] TRIDOT variable_declarator_id `{}{}{}{} {}`
     -> formal_parameter;
 
 throws
@@ -404,18 +398,19 @@ enum_dec
     -> modifiers_opt ENUM ID [superinterfaces] enum_body `{}{} {} {}{}`;
 
 enum_body
-    -> LBRACE [enum_const_list] [COMMA] [enum_body_declarations] RBRACE `{}\n{}{}\n{}{}\n`;
+    -> LBRACE [enum_const_list] [COMMA] [enum_body_declarations] RBRACE
+        `{}\n{;prefix=[prefix][indent]}{}\n{;prefix=[prefix][indent]}[prefix]{}\n`;
 
 enum_const_list
-    -> enum_const COMMA enum_const_list `{}{}\n{}`
-    -> enum_const;
+    -> enum_const COMMA enum_const_list `[prefix]{}{}\n{}`
+    -> enum_const `[prefix]{}`;
 enum_const
-    -> [annotations] ID [enum_const_arg_list] [class_body];
+    -> [annotations] ID [enum_const_arg_list] [inline_class_body];
 enum_const_arg_list
     -> LPAREN [argument_list] RPAREN;
 
 enum_body_declarations
-    -> SEMI [class_body_decs] `{}\n\n{}\n\n`;
+    -> SEMI [class_body_decs] `[prefix]{}\n{}`;
 
 #
 # INTERFACE
@@ -428,11 +423,11 @@ extends_interfaces
     -> EXTENDS class_type_list `{} {} `;
 
 interface_body
-    -> LBRACE [interface_member_decs] RBRACE `{}\n\n{}{}\n`;
+    -> LBRACE [interface_member_decs] RBRACE `{}\n{;prefix=[prefix][indent]}{}\n`;
 
 interface_member_decs
-    -> class_member_dec interface_member_decs `{}\n\n{}`
-    -> class_member_dec `{}\n\n`;
+    -> class_member_dec interface_member_decs `[prefix]{}\n{}`
+    -> class_member_dec `[prefix]{}`;
 
 #
 # ANNOTATION
@@ -442,17 +437,17 @@ annotation_dec
     -> modifiers_opt AT INTERFACE ID annotation_body `{}{}{} {} {}`;
 
 annotation_body
-    -> LBRACE [annotation_member_decs] RBRACE `{}\n\n{}{}\n`;
+    -> LBRACE [annotation_member_decs] RBRACE `{}\n{;prefix=[prefix][indent]}{}\n`;
 
 annotation_member_decs
-    -> annotation_member_dec annotation_member_decs `{}\n\n{}`
-    -> annotation_member_dec `{}\n\n`;
+    -> annotation_member_dec annotation_member_decs `[prefix]{}\n{}`
+    -> annotation_member_dec `[prefix]{}`;
 annotation_member_dec
     -> annotation_element_dec
     -> class_member_dec;
 
 annotation_element_dec
-    -> modifiers_opt type ID LPAREN RPAREN [array_dims] [default_value] SEMI `{}{} {}{}{}{}{}{}`;
+    -> modifiers_opt type ID LPAREN RPAREN [array_dims] [default_value] SEMI `{}{} {}{}{}{}{}{}\n`;
 
 default_value
     -> DEFAULT element_value ` {} {}`;
@@ -584,7 +579,7 @@ variable_declarator_id
     -> ID [array_dims];
 
 variable_initializers
-    -> variable_initializer COMMA variable_initializers
+    -> variable_initializer COMMA variable_initializers `{}{} {}`
     -> variable_initializer;
 variable_initializer_opt
     -> ASSN variable_initializer ` {} {}`
@@ -597,7 +592,7 @@ array_initializer
     -> LBRACE [variable_initializers] [COMMA] RBRACE;
 
 block
-    -> LBRACE [prefixed_block_statements] RBRACE `{}\n{;prefix=[prefix]    }[prefix]{}`;
+    -> LBRACE [prefixed_block_statements] RBRACE `{}\n{;prefix=[prefix][indent]}[prefix]{}`;
 
 #
 # STATEMENTS
@@ -608,8 +603,8 @@ prefixed_block_statements
 block_statements
     -> isolated_block_statement block_statements `{}\n[prefix]{}`
     -> grouped_statements isolated_block_statement block_statements `{}\n\n[prefix]{}\n[prefix]{}`
-    -> grouped_statements isolated_block_statement `{}\n\n[prefix]{}`
-    -> isolated_block_statement
+    -> grouped_statements inline_isolated_block_statement `{}\n\n[prefix]{}\n`
+    -> inline_isolated_block_statement `{}\n`
     -> grouped_statements `{}\n`;
 
 isolated_block_statement
@@ -617,6 +612,12 @@ isolated_block_statement
     -> block `{}\n`
     -> lvar_dec_statement
     -> isolated_statement `{}\n`;
+
+inline_isolated_block_statement
+    -> class_dec
+    -> block
+    -> lvar_dec_statement
+    -> isolated_statement;
 
 lvar_dec_statement
     -> lvar_dec SEMI;
@@ -655,7 +656,7 @@ isolated_statement
     -> try_statement;
 
 statement_expression_list
-    -> statement_expression COMMA statement_expression_list
+    -> statement_expression COMMA statement_expression_list `{}{} {}`
     -> statement_expression;
 statement_expression
     -> assignment
@@ -677,24 +678,24 @@ switch_statement
     -> SWITCH LPAREN expr RPAREN switch_block `{} {}{}{} {}`;
 
 switch_block
-    -> LBRACE [switch_bsgs] [switch_labels] RBRACE `{}\n{}{}{}`;
+    -> LBRACE [switch_bsgs] [switch_labels] RBRACE `{}\n{;prefix=[prefix][indent]}{;prefix=[prefix][indent]}[prefix]{}`;
 
 switch_bsgs
     -> switch_bsg switch_bsgs
     -> switch_bsg;
 switch_bsg
-    -> switch_labels block_statements;
+    -> switch_labels prefixed_block_statements `{}\n{;prefix=[prefix][indent]}`;
 
 switch_labels
     -> switch_label switch_labels
     -> switch_label;
 switch_label
-    -> CASE expr COLON `{} {}{}`
-    -> CASE ID COLON `{} {}{}`
-    -> DEFAULT COLON;
+    -> CASE expr COLON `[prefix]{} {}{}`
+    -> CASE ID COLON `[prefix]{} {}{}`
+    -> DEFAULT COLON `[prefix]{}{}`;
 
 do_statement
-    -> DO statement WHILE LPAREN expr RPAREN SEMI;
+    -> DO statement WHILE LPAREN expr RPAREN SEMI `{} {} {} {}{}{}{}`;
 
 break_statement
     -> BREAK SEMI
@@ -715,25 +716,28 @@ throw_statement
     -> THROW expr SEMI `{} {}{}`;
 
 try_statement
-    -> TRY block catches `{} {}\n{}`
-    -> TRY block [catches] finally `{} {}\n{}[prefix]{}`
-    -> try_with_resources_statement;
+    -> try_header
+    -> try_header catches `{}\n{}`
+    -> try_header finally `{}\n{}`
+    -> try_header catches finally `{}\n{}\n{}`;
 
-try_with_resources_statement
-    -> TRY resources_specification block [catches] [finally] `{} {} {}\n{}{}`;
+try_header
+    -> TRY block `{} {}`
+    -> TRY resources_specification block `{} {} {}`;
+
 resources_specification
     -> LPAREN resources [SEMI] RPAREN;
 resources
     -> resource SEMI resources `{}{} {}`
     -> resource;
 resource
-    -> modifiers_opt type variable_declarator_id ASSN expr `{}{} {} {} {}`;
+    -> [inline_modifiers] type variable_declarator_id ASSN expr `{}{} {} {} {}`;
 
 finally
-    -> FINALLY block `{} {}\n`;
+    -> FINALLY block `[prefix]{} {}`;
 
 catches
-    -> catch_clause catches `[prefix]{}{}`
+    -> catch_clause catches `[prefix]{}\n{}`
     -> catch_clause `[prefix]{}`;
 catch_clause
     -> CATCH LPAREN catch_formal_parameter RPAREN block `{} {}{}{} {}`;
@@ -752,7 +756,7 @@ if_then_statement
     -> IF LPAREN expr RPAREN statement `{} {}{}{} {}`;
 
 if_then_else_statement
-    -> IF LPAREN expr RPAREN inline_statement ELSE statement `{} {}{}{} {}{} {}`
+    -> IF LPAREN expr RPAREN inline_statement ELSE statement `{} {}{}{} {} {} {}`
     -> IF LPAREN expr RPAREN block ELSE statement `{} {}{}{} {}\n[prefix]{} {}`;
 
 while_statement
@@ -766,7 +770,7 @@ basic_for_statement
     -> FOR LPAREN [for_init] SEMI [for_expr] SEMI [for_update] RPAREN `{} {}{}{}{}{}{}{}`;
 
 for_init
-    -> lvar_dec
+    -> [inline_modifiers] type variable_declarator_list `{}{} {}`
     -> statement_expression_list;
 for_expr
     -> expr ` {}`;
@@ -775,6 +779,17 @@ for_update
 
 enhanced_for_statement
     -> FOR LPAREN modifiers_opt type variable_declarator_id COLON expr RPAREN `{} {}{}{} {} {} {}{}`;
+
+constructor_statements
+    -> [prefixed_block_statements]
+    -> explicit_constructor_invocation_statement prefixed_block_statements `[prefix]{}\n\n{}`
+    -> explicit_constructor_invocation_statement `[prefix]{}\n`;
+
+explicit_constructor_invocation_statement
+    -> [type_arguments] THIS LPAREN [argument_list] RPAREN SEMI
+    -> [type_arguments] SUPER LPAREN [argument_list] RPAREN SEMI
+    -> expr_name DOT [type_arguments] SUPER LPAREN [argument_list] RPAREN SEMI
+    -> primary DOT [type_arguments] SUPER LPAREN [argument_list] RPAREN SEMI;
 
 #
 # EXPRESSIONS
@@ -933,10 +948,12 @@ method_reference
     -> array_type M_REF NEW;
 
 array_creation_expr
-    -> NEW PRIM dim_exprs [array_dims]
-    -> NEW class_type dim_exprs [array_dims]
-    -> NEW PRIM array_dims array_initializer
-    -> NEW class_type array_dims array_initializer;
+    -> array_creation_type dim_exprs [array_dims]
+    -> array_creation_type array_dims array_initializer;
+
+array_creation_type
+    -> NEW PRIM `{} {}`
+    -> NEW class_type `{} {}`;
 
 dim_exprs
     -> dim_expr dim_exprs
@@ -956,7 +973,7 @@ annotation_modifiers
     -> annotation `{}\n[prefix]`;
 
 non_annotation_modifiers
-    -> first_modifier modifiers `{} {}`
+    -> first_modifier inline_modifiers `{} {}`
     -> first_modifier `{} `;
 first_modifier
     -> MOD
@@ -964,8 +981,8 @@ first_modifier
     -> STATIC
     -> FINAL
     -> DEFAULT;
-modifiers
-    -> modifier modifiers `{} {}`
+inline_modifiers
+    -> modifier inline_modifiers `{} {}`
     -> modifier `{} `;
 modifier
     -> annotation

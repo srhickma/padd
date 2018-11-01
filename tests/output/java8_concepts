@@ -18,7 +18,7 @@ public class JavaConcepts<T extends List<int[]> , X> extends Base implements Ser
 
     Class clz4 = (int.class);
 
-    int[] arr = newint[10];
+    int[] arr = new int[10];
 
     byte bye = 0;
 
@@ -40,7 +40,7 @@ public class JavaConcepts<T extends List<int[]> , X> extends Base implements Ser
 
     int binaryLiteral = 0b101101;
 
-    List<String>[][] arrLS = (List<String>[][])newList<?>[10][];
+    List<String>[][] arrLS = (List<String>[][])new List<?>[10][];
 
     ;
     {
@@ -48,7 +48,8 @@ public class JavaConcepts<T extends List<int[]> , X> extends Base implements Ser
         int a = (z) + y;
         a = (+z) + y;
 
-        byte b = (byte)+y;    }
+        byte b = (byte)+y;
+    }
 
     List<String> diamond1 = new LinkedList<>();
 
@@ -92,73 +93,65 @@ public class JavaConcepts<T extends List<int[]> , X> extends Base implements Ser
     }
 
     ;
-    @Deprecated() int[][][][] arr2 = newint[10][2][1][0];
+    @Deprecated() int[][][][] arr2 = new int[10][2][1][0];
 
     volatile float fff = 0x1.fffeP + 127f;
 
     char cc = 'a';
 
-    int[][] arr3 = {{1,2},{3,4}};
+    int[][] arr3 = {{1, 2}, {3, 4}};
 
     static int[] arr4[] = {};
 
     public static JavaConcepts t;
 
     static {
-        arr4 = newint[][]{{2},{1}};
+        arr4 = new int[][]{{2}, {1}};
     }
 
     {
-        arr3 = newint[][]{{2},{1}};
+        arr3 = new int[][]{{2}, {1}};
     }
 
     public enum Teste {
-asc,
-def
-}
-
-    public enum Sexo {
-m,
-@Deprecated f
-;
-
-    public enum Sexo_ implements Serializable, Cloneable {
-
-}
-
-    private Sexo() {
+        asc,
+        def
     }
 
+    public enum Sexo {
+        m,
+        @Deprecated f
+        ;
+        public enum Sexo_  implements Serializable, Cloneable{
 
-}
+        }
+
+        private Sexo() {
+        }
+    }
 
     @Deprecated
     public enum Enum {
-m(1){
-        @Override
-        void mm() {
+        m(1) {
+            @Override
+            void mm() {
+            }
+        },
+        f(2) {
+            void mm() {
+            }
         }
-    }
-,
-f(2){
-        void mm() {
+        ;
+        native void nnn();
+
+        transient int x;
+
+        private Enum(int x) {
+            this.x = x;
         }
+
+        abstract void mm();
     }
-
-;
-
-    native void nnn() ;
-
-    transient int x;
-
-    private Enum(int x) {
-        this.x = x;
-    }
-
-    abstract void mm() ;
-
-
-}
 
     strictfp double ddd() {
         return 0.0;
@@ -195,12 +188,10 @@ f(2){
 
             public Y(int y) {
                 super();
-
             }
 
             public Y(long x) {
                 this();
-
             }
         }
 
@@ -215,12 +206,11 @@ f(2){
 
         int i = (int)-1;
 
-        public QWE(String ...) {
+        public QWE(String... x) {
             <String>super(x[0]);
-
         }
 
-        public QWE(int ...) {
+        public QWE(int... x) {
             super(x[0]);
 
             i = x[0];
@@ -233,7 +223,8 @@ f(2){
             }
 
             label: {
-                int iii = 1;            }
+                int iii = 1;
+            }
             ;
             ;
 
@@ -241,30 +232,33 @@ f(2){
             long sl = 123123123123l;
             long minl = -9223372036854775808L;
             switch (i) {
-}
+            }
             ll: switch (i) {
-case 1:System.out.println(1);
-            break ll;
-default:{
-                System.out.println("default");
-                break;
-            }
-case 2:if (t instanceof Base) {
-                System.out.println(1);
-            }
+                case 1:
+                    System.out.println(1);
+                    break ll;
+                default:
+                    {
+                        System.out.println("default");
+                        break;
+                    }
+                case 2:
+                    if (t instanceof Base) {
+                        System.out.println(1);
+                    }
 
-            i++;
-            ++i;
-}
+                    i++;
+                    ++i;
+            }
         }
 
         private synchronized int doSomething()[] {
             List<? extends Number> x = new ArrayList<Integer>();
-            return newint[]{1};
+            return new int[]{1};
         }
     }
 
-    public static void main(String[] args) throws ParseException, IOException {
+    public static void main(String[] args) throws ParseException, IOException  {
         int x = 2;
         CompilationUnit cu = parse(new File("src/japa/parser/javacc/Parser.java"));
         System.out.println(cu);
@@ -281,36 +275,35 @@ case 2:if (t instanceof Base) {
             x = x == 0 ? 2 : 4;
         }
 
-        if (true) x = 1;else x = 3;
+        if (true) x = 1; else x = 3;
 
-        if (true) x = 1;else if (false) x = 3;else x = 2;
+        if (true) x = 1; else if (false) x = 3; else x = 2;
 
         while (true) {
             xxx: while (x == 3) continue xxx;
             break;
         }
 
-        do{
+        do {
             x++;
-        }while(x < 100);
-        dox++;while(x < 100);
+        } while (x < 100);
+        do x++; while (x < 100);
 
         for (@Deprecated int i : arr4[0]) {
             x--;
         }
 
-        for (@Deprecated
-        final int i = 0, j = 1; i < 10; x++) {
+        for (@Deprecated final int i = 0, j = 1; i < 10; x++) {
             break;
         }
 
         int i, j;
-        for (i = 0,j = 1; i < 10 && j < 2; i++,j--) {
+        for (i = 0, j = 1; i < 10 && j < 2; i++, j--) {
             break;
         }
     }
 
-    public static CompilationUnit parse(@Deprecated File file) throws ParseException, IOException {
+    public static CompilationUnit parse(@Deprecated File file) throws ParseException, IOException  {
         String a = ((String)"qwe");
         String x = ((String)clz1.getName());
         int y = ((Integer)(Object)x).intValue();
@@ -326,12 +319,13 @@ case 2:if (t instanceof Base) {
         }
         catch (final NullPointerException e) {
             System.out.println("catch");
-        }        catch (RuntimeException e) {
+        }
+        catch (RuntimeException e) {
             System.out.println("catch");
-        }        finally {
+        }
+        finally {
             System.out.println("finally");
         }
-
 
         try {
             if (file == null) {
@@ -341,7 +335,6 @@ case 2:if (t instanceof Base) {
         finally {
             System.out.println("finally");
         }
-
 
         try {
             if (file == null) {
@@ -370,13 +363,13 @@ case 2:if (t instanceof Base) {
             System.out.println(in);
         }
 
-
         try {
             System.out.println("whatever");
         }
         catch (RuntimeException e) {
             System.out.println(e);
-        }        catch (final Exception | Error e) {
+        }
+        catch (final Exception | Error e) {
             System.out.println(e);
         }
 
@@ -388,12 +381,13 @@ case 2:if (t instanceof Base) {
         }
     }
 
-    private <Y> void x(Map<? extends X, ? super T> x){
+    private <Y> void x(Map<? extends X, ? super T> x) {
         @Deprecated Comparator c = new Comparator() {
             public int compare(Object o1, Object o2) {
                 try {
                     A<Integer> a = new <String>A<Integer>(new Integer(11), "foo") {
-                    };                }
+                    };
+                }
                 catch (Exception e) {
                 }
 
@@ -404,7 +398,8 @@ case 2:if (t instanceof Base) {
             public boolean equals(Object obj) {
                 return super.equals(obj);
             }
-        };    }
+        };
+    }
 
     private static InputStream createInputStream() {
         return new ByteArrayInputStream(null);
@@ -412,10 +407,9 @@ case 2:if (t instanceof Base) {
 }
 
 class Base {
-    public <A, B> void check2(A val1, B val2){
+    public <A, B> void check2(A val1, B val2) {
     }
 }
 
 interface XXX extends Serializable, Cloneable {
-
 }

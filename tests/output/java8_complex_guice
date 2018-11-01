@@ -56,7 +56,7 @@ final class InheritingState implements State {
 
     @Override
     @SuppressWarnings("unchecked")
-    public <T> BindingImpl<T> getExplicitBinding(Key<T> key){
+    public <T> BindingImpl<T> getExplicitBinding(Key<T> key) {
         Binding<?> binding = explicitBindings.get(key);
         return binding != null ? (BindingImpl<T>)binding : parent.getExplicitBinding(key);
     }
