@@ -232,21 +232,24 @@ public class JavaConcepts<T extends List<int[]> , X> extends Base implements Ser
             long sl = 123123123123l;
             long minl = -9223372036854775808L;
             switch (i) {
-}
+            }
             ll: switch (i) {
-case 1:System.out.println(1);
-            break ll;
-default:{
-                System.out.println("default");
-                break;
-            }
-case 2:if (t instanceof Base) {
-                System.out.println(1);
-            }
+                case 1:
+                    System.out.println(1);
+                    break ll;
+                default:
+                    {
+                        System.out.println("default");
+                        break;
+                    }
+                case 2:
+                    if (t instanceof Base) {
+                        System.out.println(1);
+                    }
 
-            i++;
-            ++i;
-}
+                    i++;
+                    ++i;
+            }
         }
 
         private synchronized int doSomething()[] {

@@ -678,21 +678,21 @@ switch_statement
     -> SWITCH LPAREN expr RPAREN switch_block `{} {}{}{} {}`;
 
 switch_block
-    -> LBRACE [switch_bsgs] [switch_labels] RBRACE `{}\n{}{}{}`;
+    -> LBRACE [switch_bsgs] [switch_labels] RBRACE `{}\n{;prefix=[prefix][indent]}{;prefix=[prefix][indent]}[prefix]{}`;
 
 switch_bsgs
     -> switch_bsg switch_bsgs
     -> switch_bsg;
 switch_bsg
-    -> switch_labels block_statements;
+    -> switch_labels prefixed_block_statements `{}\n{;prefix=[prefix][indent]}`;
 
 switch_labels
     -> switch_label switch_labels
     -> switch_label;
 switch_label
-    -> CASE expr COLON `{} {}{}`
-    -> CASE ID COLON `{} {}{}`
-    -> DEFAULT COLON;
+    -> CASE expr COLON `[prefix]{} {}{}`
+    -> CASE ID COLON `[prefix]{} {}{}`
+    -> DEFAULT COLON `[prefix]{}{}`;
 
 do_statement
     -> DO statement WHILE LPAREN expr RPAREN SEMI;
