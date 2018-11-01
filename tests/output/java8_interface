@@ -1,0 +1,5 @@
+package com.konjex.util.provide;
+
+public interface Providable<MatchType> extends DataClass {
+    MatchType getProviderKey();
+}

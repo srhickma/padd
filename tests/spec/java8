@@ -423,11 +423,11 @@ extends_interfaces
     -> EXTENDS class_type_list `{} {} `;
 
 interface_body
-    -> LBRACE [interface_member_decs] RBRACE `{}\n{}{}\n`;
+    -> LBRACE [interface_member_decs] RBRACE `{}\n{;prefix=[prefix][indent]}{}\n`;
 
 interface_member_decs
-    -> class_member_dec interface_member_decs `{}\n\n{}`
-    -> class_member_dec `{}\n\n`;
+    -> class_member_dec interface_member_decs `[prefix]{}\n{}`
+    -> class_member_dec `[prefix]{}`;
 
 #
 # ANNOTATION
@@ -437,17 +437,17 @@ annotation_dec
     -> modifiers_opt AT INTERFACE ID annotation_body `{}{}{} {} {}`;
 
 annotation_body
-    -> LBRACE [annotation_member_decs] RBRACE `{}\n\n{}{}\n`;
+    -> LBRACE [annotation_member_decs] RBRACE `{}\n{;prefix=[prefix][indent]}{}\n`;
 
 annotation_member_decs
-    -> annotation_member_dec annotation_member_decs `{}\n\n{}`
-    -> annotation_member_dec `{}\n\n`;
+    -> annotation_member_dec annotation_member_decs `[prefix]{}\n{}`
+    -> annotation_member_dec `[prefix]{}`;
 annotation_member_dec
     -> annotation_element_dec
     -> class_member_dec;
 
 annotation_element_dec
-    -> modifiers_opt type ID LPAREN RPAREN [array_dims] [default_value] SEMI `{}{} {}{}{}{}{}{}`;
+    -> modifiers_opt type ID LPAREN RPAREN [array_dims] [default_value] SEMI `{}{} {}{}{}{}{}{}\n`;
 
 default_value
     -> DEFAULT element_value ` {} {}`;

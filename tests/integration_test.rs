@@ -63,28 +63,38 @@ fn test_lacs_complex() {
 }
 
 #[test]
-fn test_java8_simple(){
+fn test_java8_simple() {
     test_fjr("java8_simple", "java8");
 }
 
 #[test]
-fn test_java8_medium(){
+fn test_java8_medium() {
     test_fjr("java8_medium", "java8");
 }
 
 #[test]
-fn test_java8_complex_spring(){
+fn test_java8_complex_spring() {
     test_fjr("java8_complex_spring", "java8");
 }
 
 #[test]
-fn test_java8_complex_guice(){
+fn test_java8_complex_guice() {
     test_fjr("java8_complex_guice", "java8");
 }
 
 #[test]
-fn test_java8_concepts(){
+fn test_java8_concepts() {
     test_fjr("java8_concepts", "java8");
+}
+
+#[test]
+fn test_java8_annotation() {
+    test_fjr("java8_annotation", "java8");
+}
+
+#[test]
+fn test_java8_interface() {
+    test_fjr("java8_interface", "java8");
 }
 
 #[test]
