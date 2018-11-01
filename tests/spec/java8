@@ -423,7 +423,7 @@ extends_interfaces
     -> EXTENDS class_type_list `{} {} `;
 
 interface_body
-    -> LBRACE [interface_member_decs] RBRACE `{}\n\n{}{}\n`;
+    -> LBRACE [interface_member_decs] RBRACE `{}\n{}{}\n`;
 
 interface_member_decs
     -> class_member_dec interface_member_decs `{}\n\n{}`
@@ -716,25 +716,28 @@ throw_statement
     -> THROW expr SEMI `{} {}{}`;
 
 try_statement
-    -> TRY block catches `{} {}\n{}`
-    -> TRY block [catches] finally `{} {}\n{}[prefix]{}`
-    -> try_with_resources_statement;
+    -> try_header
+    -> try_header catches `{}\n{}`
+    -> try_header finally `{}\n{}`
+    -> try_header catches finally `{}\n{}\n{}`;
 
-try_with_resources_statement
-    -> TRY resources_specification block [catches] [finally] `{} {} {}\n{}{}`;
+try_header
+    -> TRY block `{} {}`
+    -> TRY resources_specification block `{} {} {}`;
+
 resources_specification
     -> LPAREN resources [SEMI] RPAREN;
 resources
     -> resource SEMI resources `{}{} {}`
     -> resource;
 resource
-    -> modifiers_opt type variable_declarator_id ASSN expr `{}{} {} {} {}`;
+    -> [inline_modifiers] type variable_declarator_id ASSN expr `{}{} {} {} {}`;
 
 finally
-    -> FINALLY block `{} {}\n`;
+    -> FINALLY block `[prefix]{} {}`;
 
 catches
-    -> catch_clause catches `[prefix]{}{}`
+    -> catch_clause catches `[prefix]{}\n{}`
     -> catch_clause `[prefix]{}`;
 catch_clause
     -> CATCH LPAREN catch_formal_parameter RPAREN block `{} {}{}{} {}`;
