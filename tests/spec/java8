@@ -270,7 +270,7 @@ id      ^ID
 #----------------------------------------------------------------------------------------------------------------------#
 
 cmp_unit
-    -> [package_decl] [import_decls] [type_decls];
+    -> [package_decl] [import_decls] [type_decls] `{}{}{;indent=    }`;
 
 package_decl
     -> [annotations] PACKAGE id_chain SEMI `{}{} {}{}\n\n`;
@@ -309,9 +309,9 @@ superinterfaces
     -> IMPLEMENTS class_type_list `{} {} `;
 
 class_body
-    -> LBRACE [class_body_decs] RBRACE `{}\n{;prefix=[prefix]    }[prefix]{}\n`;
+    -> LBRACE [class_body_decs] RBRACE `{}\n{;prefix=[prefix][indent]}[prefix]{}\n`;
 inline_class_body
-    -> LBRACE [class_body_decs] RBRACE ` {}\n{;prefix=[prefix]    }[prefix]{}`;
+    -> LBRACE [class_body_decs] RBRACE ` {}\n{;prefix=[prefix][indent]}[prefix]{}`;
 class_body_decs
     -> class_body_dec class_body_decs `[prefix]{}\n{}`
     -> class_body_dec `[prefix]{}`;
@@ -333,7 +333,8 @@ class_member_dec
 constructor_dec
     -> modifiers_opt constructor_declarator [throws] constructor_body `{}{} {}{}`;
 constructor_body
-    -> LBRACE explicit_constructor_invocation_opt [prefixed_block_statements] RBRACE `{}\n{;prefix=[prefix]    }{;prefix=[prefix]    }[prefix]{}\n`;
+    -> LBRACE explicit_constructor_invocation_opt [prefixed_block_statements] RBRACE
+        `{}\n{;prefix=[prefix][indent]}{;prefix=[prefix][indent]}[prefix]{}\n`;
 constructor_declarator
     -> [type_parameters] ID LPAREN [formal_parameter_list] RPAREN;
 
@@ -404,18 +405,19 @@ enum_dec
     -> modifiers_opt ENUM ID [superinterfaces] enum_body `{}{} {} {}{}`;
 
 enum_body
-    -> LBRACE [enum_const_list] [COMMA] [enum_body_declarations] RBRACE `{}\n{}{}\n{}{}\n`;
+    -> LBRACE [enum_const_list] [COMMA] [enum_body_declarations] RBRACE
+        `{}\n{;prefix=[prefix][indent]}{}\n{;prefix=[prefix][indent]}[prefix]{}\n`;
 
 enum_const_list
-    -> enum_const COMMA enum_const_list `{}{}\n{}`
-    -> enum_const;
+    -> enum_const COMMA enum_const_list `[prefix]{}{}\n{}`
+    -> enum_const `[prefix]{}`;
 enum_const
-    -> [annotations] ID [enum_const_arg_list] [class_body];
+    -> [annotations] ID [enum_const_arg_list] [inline_class_body];
 enum_const_arg_list
     -> LPAREN [argument_list] RPAREN;
 
 enum_body_declarations
-    -> SEMI [class_body_decs] `{}\n\n{}\n\n`;
+    -> SEMI [class_body_decs] `[prefix]{}\n{}`;
 
 #
 # INTERFACE
@@ -597,7 +599,7 @@ array_initializer
     -> LBRACE [variable_initializers] [COMMA] RBRACE;
 
 block
-    -> LBRACE [prefixed_block_statements] RBRACE `{}\n{;prefix=[prefix]    }[prefix]{}`;
+    -> LBRACE [prefixed_block_statements] RBRACE `{}\n{;prefix=[prefix][indent]}[prefix]{}`;
 
 #
 # STATEMENTS

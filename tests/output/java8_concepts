@@ -113,52 +113,44 @@ public class JavaConcepts<T extends List<int[]> , X> extends Base implements Ser
     }
 
     public enum Teste {
-asc,
-def
-}
-
-    public enum Sexo {
-m,
-@Deprecated f
-;
-
-    public enum Sexo_ implements Serializable, Cloneable {
-
-}
-
-    private Sexo() {
+        asc,
+        def
     }
 
+    public enum Sexo {
+        m,
+        @Deprecated f
+        ;
+        public enum Sexo_ implements Serializable, Cloneable {
 
-}
+        }
+
+        private Sexo() {
+        }
+    }
 
     @Deprecated
     public enum Enum {
-m(1){
-        @Override
-        void mm() {
+        m(1) {
+            @Override
+            void mm() {
+            }
+        },
+        f(2) {
+            void mm() {
+            }
         }
-    }
-,
-f(2){
-        void mm() {
+        ;
+        native void nnn() ;
+
+        transient int x;
+
+        private Enum(int x) {
+            this.x = x;
         }
+
+        abstract void mm() ;
     }
-
-;
-
-    native void nnn() ;
-
-    transient int x;
-
-    private Enum(int x) {
-        this.x = x;
-    }
-
-    abstract void mm() ;
-
-
-}
 
     strictfp double ddd() {
         return 0.0;
