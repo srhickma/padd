@@ -250,6 +250,38 @@ s -> [A] [B];
     assert_eq!(res, "ab");
 }
 
+#[test]
+fn test_escapable_patterns() {
+    //setup
+    let spec = "
+' \t\n{}'
+
+# dfa
+start
+ ' ' | '\t' | '\n' -> ^_
+ '{' -> ^LBRACKET
+ '}' -> ^RBRACKET;
+
+# grammar
+s -> s b `\\\\[@LAYER s\\\\={} b\\\\={}\\\\]`
+  ->;
+b -> LBRACKET s RBRACKET `[prefix]{}{;prefix=[prefix]\t}[prefix]{}`;
+    ".to_string();
+
+    let input = " {{} }  { {}}".to_string();
+    let mut iter = input.chars();
+    let mut getter = || iter.next();
+    let mut stream = Stream::from(&mut getter);
+
+    let fjr = FormatJobRunner::build(&spec).unwrap();
+
+    //exercise
+    let res = fjr.format(&mut stream).unwrap();
+
+    //verify
+    assert_eq!(res, "[@LAYER s=[@LAYER s= b={[@LAYER s= b=\t{\t}]}] b={[@LAYER s= b=\t{\t}]}]");
+}
+
 fn test_fjr(case_name: &str, spec_name: &str) {
     //setup
     let fjr = FormatJobRunner::build(&load_spec(spec_name)).unwrap();
