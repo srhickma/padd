@@ -13,7 +13,8 @@ use core::scan::compile;
 use core::scan::compile::DFA;
 use core::scan::compile::CompileTransitionDelta;
 
-static PATTERN_ALPHABET: &'static str = "{}[];=1234567890abcdefghijklmnopqrstuvwxyz \n\t";
+static PATTERN_ALPHABET: &'static str =
+    "{}[];=1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ \n\t`~!@#$%^&*()_-+:'\"<>,.?/\\|";
 
 #[derive(PartialEq, Clone)]
 enum S {
@@ -27,7 +28,8 @@ enum S {
     ZERO,
     NUM,
     ALPHA,
-    WS,
+    FILLER,
+    ESC,
     FAIL,
 }
 
@@ -40,6 +42,7 @@ thread_local! {
             (S::START, ']') => S::RBRACKET,
             (S::START, ';') => S::SEMI,
             (S::START, '=') => S::EQ,
+            (S::START, '\\') => S::ESC,
             (S::START, '0') => S::ZERO,
             (S::START, '1') | (S::START, '2') | (S::START, '3') | (S::START, '4') | (S::START, '5') |
             (S::START, '6') | (S::START, '7') | (S::START, '8') | (S::START, '9') => S::NUM,
@@ -48,8 +51,20 @@ thread_local! {
             (S::START, 'c') | (S::START, 'i') | (S::START, 'n') | (S::START, 's') | (S::START, 'x') |
             (S::START, 'd') | (S::START, 'j') | (S::START, 'o') | (S::START, 't') | (S::START, 'y') |
             (S::START, 'e') | (S::START, 'k') | (S::START, 'p') | (S::START, 'u') | (S::START, 'z') |
-            (S::START, 'f') => S::ALPHA,
-            (S::START, ' ') | (S::START, '\t') | (S::START, '\n') => S::WS,
+            (S::START, 'f') | (S::START, 'A') | (S::START, 'B') | (S::START, 'C') | (S::START, 'D') |
+            (S::START, 'E') | (S::START, 'F') | (S::START, 'G') | (S::START, 'H') | (S::START, 'I') |
+            (S::START, 'J') | (S::START, 'K') | (S::START, 'L') | (S::START, 'M') | (S::START, 'N') |
+            (S::START, 'O') | (S::START, 'P') | (S::START, 'Q') | (S::START, 'R') | (S::START, 'S') |
+            (S::START, 'T') | (S::START, 'U') | (S::START, 'V') | (S::START, 'W') | (S::START, 'X') |
+            (S::START, 'Y') | (S::START, 'Z') => S::ALPHA,
+            (S::START, _) => S::FILLER,
+
+            (S::FILLER, '\\') => S::ESC,
+            (S::FILLER, '{') | (S::FILLER, '}') | (S::FILLER, '[') | (S::FILLER, ';') |
+            (S::FILLER, '=')  => S::FAIL,
+            (S::FILLER, _) => S::FILLER,
+
+            (S::ESC, _) => S::FILLER,
 
             (S::NUM, '0') | (S::NUM, '1') | (S::NUM, '2') | (S::NUM, '3') | (S::NUM, '4') |
             (S::NUM, '5') | (S::NUM, '6') | (S::NUM, '7') | (S::NUM, '8') | (S::NUM, '9') => S::NUM,
@@ -59,9 +74,12 @@ thread_local! {
             (S::ALPHA, 'c') | (S::ALPHA, 'i') | (S::ALPHA, 'n') | (S::ALPHA, 's') | (S::ALPHA, 'x') |
             (S::ALPHA, 'd') | (S::ALPHA, 'j') | (S::ALPHA, 'o') | (S::ALPHA, 't') | (S::ALPHA, 'y') |
             (S::ALPHA, 'e') | (S::ALPHA, 'k') | (S::ALPHA, 'p') | (S::ALPHA, 'u') | (S::ALPHA, 'z') |
-            (S::ALPHA, 'f') => S::ALPHA,
-
-            (S::WS, ' ') | (S::WS, '\t') | (S::WS, '\n') => S::WS,
+            (S::ALPHA, 'f') | (S::ALPHA, 'A') | (S::ALPHA, 'B') | (S::ALPHA, 'C') | (S::ALPHA, 'D') |
+            (S::ALPHA, 'E') | (S::ALPHA, 'F') | (S::ALPHA, 'G') | (S::ALPHA, 'H') | (S::ALPHA, 'I') |
+            (S::ALPHA, 'J') | (S::ALPHA, 'K') | (S::ALPHA, 'L') | (S::ALPHA, 'M') | (S::ALPHA, 'N') |
+            (S::ALPHA, 'O') | (S::ALPHA, 'P') | (S::ALPHA, 'Q') | (S::ALPHA, 'R') | (S::ALPHA, 'S') |
+            (S::ALPHA, 'T') | (S::ALPHA, 'U') | (S::ALPHA, 'V') | (S::ALPHA, 'W') | (S::ALPHA, 'X') |
+            (S::ALPHA, 'Y') | (S::ALPHA, 'Z') => S::ALPHA,
 
             (_, _) => S::FAIL,
         };
@@ -75,7 +93,7 @@ thread_local! {
             S::ZERO => "NUM",
             S::NUM => "NUM",
             S::ALPHA => "ALPHA",
-            S::WS => "WHITESPACE",
+            S::FILLER => "FILLER",
             _ => "",
         }.to_string();
 
@@ -100,7 +118,9 @@ lazy_static! {
             "seg sub",
             "seg cap",
 
-            "filler WHITESPACE", //For now, only allow whitespace in filler
+            "filler FILLER",
+            "filler ALPHA",
+            "filler NUM",
 
             "sub LBRACKET ALPHA RBRACKET",
 
@@ -161,8 +181,8 @@ pub fn generate_pattern_internal<'a>(root: &'a Tree, prod: &Production) -> Resul
 
 fn generate_pattern_recursive<'a>(node: &'a Tree, accumulator: &'a mut Vec<Segment>, prod: &Production, captures: usize) -> Result<usize, BuildError> {
     match &node.lhs.kind[..] {
-        "WHITESPACE" => {
-            accumulator.push(Segment::Filler(node.lhs.lexeme.clone()));
+        "FILLER" | "ALPHA" | "NUM" => {
+            accumulator.push(Segment::Filler(replace_escapes(&node.lhs.lexeme[..])));
         }
         "sub" => {
             accumulator.push(Segment::Substitution(node.get_child(1).lhs.lexeme.clone()));
@@ -231,6 +251,35 @@ fn parse_pattern(input: &str) -> Result<Tree, BuildError> {
     })
 }
 
+fn replace_escapes(input: &str) -> String {
+    let mut res = String::with_capacity(input.as_bytes().len());
+    let mut i = 0;
+    let mut last_char: char = ' ';
+    for c in input.chars() {
+        let mut hit_double_slash = false;
+        if i != 0 && last_char == '\\' {
+            res.push(match c {
+                'n' => '\n',
+                't' => '\t',
+                '\'' => '\'',
+                '\\' => {
+                    last_char = ' '; //Stop \\\\ -> \\\ rather than \\
+                    hit_double_slash = true;
+                    '\\'
+                }
+                _ => c,
+            });
+        } else if c != '\\' {
+            res.push(c);
+        }
+        if !hit_double_slash {
+            last_char = c;
+        }
+        i += 1;
+    }
+    res
+}
+
 #[derive(Debug)]
 pub enum BuildError {
     ScanErr(scan::Error),
@@ -288,7 +337,7 @@ mod tests {
     └── segs
         ├── seg
         │   └── filler
-        │       └── WHITESPACE <- '\\t \\n\\n\\n\\n'
+        │       └── FILLER <- '\\t \\n\\n\\n\\n'
         └── segs
             ├── seg
             │   └── cap
@@ -300,7 +349,7 @@ mod tests {
             └── segs
                 ├── seg
                 │   └── filler
-                │       └── WHITESPACE <- '  '
+                │       └── FILLER <- '  '
                 └── segs
                     ├── seg
                     │   └── cap
@@ -312,7 +361,7 @@ mod tests {
                     └── segs
                         ├── seg
                         │   └── filler
-                        │       └── WHITESPACE <- '  '
+                        │       └── FILLER <- '  '
                         └── segs
                             ├── seg
                             │   └── cap
@@ -330,14 +379,14 @@ mod tests {
                             │       │                   └── segs
                             │       │                       ├── seg
                             │       │                       │   └── filler
-                            │       │                       │       └── WHITESPACE <- '\\n\\n \\t'
+                            │       │                       │       └── FILLER <- '\\n\\n \\t'
                             │       │                       └── segs
                             │       │                           └──  <- 'NULL'
                             │       └── RBRACE <- '}'
                             └── segs
                                 ├── seg
                                 │   └── filler
-                                │       └── WHITESPACE <- ' '
+                                │       └── FILLER <- ' '
                                 └── segs
                                     ├── seg
                                     │   └── cap
@@ -356,7 +405,7 @@ mod tests {
                                     │       │       │               └── segs
                                     │       │       │                   ├── seg
                                     │       │       │                   │   └── filler
-                                    │       │       │                   │       └── WHITESPACE <- '\\n\\n \\t'
+                                    │       │       │                   │       └── FILLER <- '\\n\\n \\t'
                                     │       │       │                   └── segs
                                     │       │       │                       └──  <- 'NULL'
                                     │       │       ├── SEMI <- ';'
@@ -484,9 +533,106 @@ mod tests {
     }
 
     #[test]
+    fn generate_pattern_substitutions() {
+        //setup
+        let input = "\t \n[a]{1}  {} [prefix] ";
+        let prod = Production {
+            lhs: String::new(),
+            rhs: vec![String::new(), String::new()],
+        };
+
+        //exercise
+        let pattern = generate_pattern(input, &prod).unwrap();
+
+        //verify
+        assert_eq!(pattern.segments.len(), 8);
+        assert!(match pattern.segments.get(0).unwrap() {
+            &Segment::Filler(ref s) => "\t \n" == *s,
+            &Segment::Substitution(_) => false,
+            &Segment::Capture(_) => false,
+        });
+        assert!(match pattern.segments.get(1).unwrap() {
+            &Segment::Filler(_) => false,
+            &Segment::Substitution(ref s) => "a" == *s,
+            &Segment::Capture(_) => false,
+        });
+        assert!(match pattern.segments.get(2).unwrap() {
+            &Segment::Filler(_) => false,
+            &Segment::Substitution(_) => false,
+            &Segment::Capture(ref c) => c.child_index == 1 && c.declarations.len() == 0,
+        });
+        assert!(match pattern.segments.get(3).unwrap() {
+            &Segment::Filler(ref s) => "  " == *s,
+            &Segment::Substitution(_) => false,
+            &Segment::Capture(_) => false,
+        });
+        assert!(match pattern.segments.get(4).unwrap() {
+            &Segment::Filler(_) => false,
+            &Segment::Substitution(_) => false,
+            &Segment::Capture(ref c) => c.child_index == 1 && c.declarations.len() == 0,
+        });
+        assert!(match pattern.segments.get(5).unwrap() {
+            &Segment::Filler(ref s) => " " == *s,
+            &Segment::Substitution(_) => false,
+            &Segment::Capture(_) => false,
+        });
+        assert!(match pattern.segments.get(6).unwrap() {
+            &Segment::Filler(_) => false,
+            &Segment::Substitution(ref s) => "prefix" == *s,
+            &Segment::Capture(_) => false,
+        });
+        assert!(match pattern.segments.get(7).unwrap() {
+            &Segment::Filler(ref s) => " " == *s,
+            &Segment::Substitution(_) => false,
+            &Segment::Capture(_) => false,
+        });
+    }
+
+    #[test]
+    fn generate_pattern_escaped_filler() {
+        //setup
+        let input = "1234567890abcdefghijklmnopqrstuvwxyz \n\t`~!@#$%^&*()_-+:'\"<>,.?/|{}\\{\\}\\[\\]\\;\\=\\\\";
+        let prod = Production {
+            lhs: String::new(),
+            rhs: vec![String::new()],
+        };
+
+        //exercise
+        let pattern = generate_pattern(input, &prod).unwrap();
+
+        //verify
+        assert_eq!(pattern.segments.len(), 5);
+        assert!(match pattern.segments.get(0).unwrap() {
+            &Segment::Filler(ref s) => "1234567890" == *s,
+            &Segment::Substitution(_) => false,
+            &Segment::Capture(_) => false,
+        });
+        assert!(match pattern.segments.get(1).unwrap() {
+            &Segment::Filler(ref s) => "abcdefghijklmnopqrstuvwxyz" == *s,
+            &Segment::Substitution(_) => false,
+            &Segment::Capture(_) => false,
+        });
+        assert!(match pattern.segments.get(2).unwrap() {
+            &Segment::Filler(ref s) => " \n\t`~!@#$%^&*()_-+:'\"<>,.?/|" == *s,
+            &Segment::Substitution(_) => false,
+            &Segment::Capture(_) => false,
+        });
+        assert!(match pattern.segments.get(3).unwrap() {
+            &Segment::Filler(_) => false,
+            &Segment::Substitution(_) => false,
+            &Segment::Capture(ref c) => c.child_index == 0 && c.declarations.len() == 0,
+        });
+        assert!(match pattern.segments.get(4).unwrap() {
+            &Segment::Filler(ref s) => "{}[];=\\" == *s,
+            &Segment::Substitution(_) => false,
+            &Segment::Capture(_) => false,
+        });
+    }
+
+    #[test]
     fn pattern_scan_error() {
         //setup
-        let input = "#";
+        let input = "\\";
         let prod = Production {
             lhs: String::new(),
             rhs: vec![],
@@ -499,14 +645,14 @@ mod tests {
         assert!(res.is_err());
         assert_eq!(
             format!("{}", res.err().unwrap()),
-            "Pattern scan error: No accepting scans after (1,1): #..."
+            "Pattern scan error: No accepting scans after (1,1): \\..."
         );
     }
 
     #[test]
     fn pattern_parse_error() {
         //setup
-        let input = "4";
+        let input = "{";
         let prod = Production {
             lhs: String::new(),
             rhs: vec![],
@@ -519,7 +665,7 @@ mod tests {
         assert!(res.is_err());
         assert_eq!(
             format!("{}", res.err().unwrap()),
-            "Pattern parse error: Largest parse did not consume all tokens: 0 of 1"
+            "Pattern parse error: Recognition failed after consuming all tokens"
         );
     }
 
