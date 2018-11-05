@@ -59,7 +59,7 @@ ws      ^WHITESPACE
 # lacs grammar
 
 S
-    -> defdefs;
+    -> defdefs w;
 inner_defdefs
     -> defdefs `{0}\n\n`;
 defdefs
