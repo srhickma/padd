@@ -1,6 +1,7 @@
 use std;
 use std::error;
 
+use core::util::string_utils;
 use core::fmt;
 use core::fmt::PatternPair;
 use core::fmt::Formatter;
@@ -255,7 +256,7 @@ fn generate_ecdfa(tree: &Tree) -> Result<EncodedCDFA, runtime::CDFAError> {
 
 fn generate_ecdfa_alphabet(tree: &Tree, builder: &mut EncodedCDFABuilder) {
     let alphabet_string = tree.get_child(0).lhs.lexeme.trim_matches('\'');
-    let alphabet = replace_escapes(&alphabet_string);
+    let alphabet = string_utils::replace_escapes(&alphabet_string);
 
     builder.set_alphabet(alphabet.chars());
 }
@@ -335,7 +336,7 @@ fn generate_ecdfa_mtcs<'a>(mtcs_node: &'a Tree, sources: &Vec<&State>, dest: &St
         .skip(1)
         .take(matcher.lhs.lexeme.len() - 2)
         .collect();
-    let matcher_cleaned = replace_escapes(&matcher_string);
+    let matcher_cleaned = string_utils::replace_escapes(&matcher_string);
     if matcher_cleaned.len() == 1 {
         for source in sources {
             builder.mark_trans(source, dest, matcher_cleaned.chars().next().unwrap())?;
@@ -398,7 +399,7 @@ fn generate_grammar_rhss<'a, 'b>(rhss_node: &'a Tree, lhs: &'a String, accumulat
     if !pattopt_node.is_empty() {
         let pattc = &pattopt_node.get_child(0).lhs.lexeme;
         let pattern_string = &pattc[..].trim_matches('`');
-        let pattern = replace_escapes(pattern_string);
+        let pattern = string_utils::replace_escapes(pattern_string);
 
         pp_accumulator.push(PatternPair {
             production: accumulator.last().unwrap().clone(),
@@ -490,35 +491,6 @@ impl From<parse::Error> for ParseError {
     fn from(err: parse::Error) -> ParseError {
         ParseError::ParseErr(err)
     }
-}
-
-fn replace_escapes(input: &str) -> String {
-    let mut res = String::with_capacity(input.as_bytes().len());
-    let mut i = 0;
-    let mut last_char: char = ' ';
-    for c in input.chars() {
-        let mut hit_double_slash = false;
-        if i != 0 && last_char == '\\' {
-            res.push(match c {
-                'n' => '\n',
-                't' => '\t',
-                '\'' => '\'',
-                '\\' => {
-                    last_char = ' '; //Stop \\\\ -> \\\ rather than \\
-                    hit_double_slash = true;
-                    '\\'
-                }
-                _ => c,
-            });
-        } else if c != '\\' {
-            res.push(c);
-        }
-        if !hit_double_slash {
-            last_char = c;
-        }
-        i += 1;
-    }
-    res
 }
 
 #[cfg(test)]
@@ -1171,7 +1143,7 @@ kind=ID lexeme=f")
         let input = "ffffnt\'ff\\n\\t\\\\\\\\ffff\\ff\'\\f\\\'fff";
 
         //exercise
-        let res = super::replace_escapes(input);
+        let res = string_utils::replace_escapes(input);
 
         //verify
         assert_eq!(res, "ffffnt\'ff\n\t\\\\ffffff\'f\'fff");
