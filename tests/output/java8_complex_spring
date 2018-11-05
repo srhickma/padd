@@ -103,8 +103,7 @@ public final class CollectionFactory {
 
             try {
                 return (Collection<E>)ReflectionUtils.accessibleConstructor(collectionType).newInstance();
-            }
-            catch (Throwable ex) {
+            } catch (Throwable ex) {
                 throw new IllegalArgumentException("Could not instantiate Collection type: " + collectionType.getName(), ex);
             }
         }
@@ -155,8 +154,7 @@ public final class CollectionFactory {
 
             try {
                 return (Map<K, V>)ReflectionUtils.accessibleConstructor(mapType).newInstance();
-            }
-            catch (Throwable ex) {
+            } catch (Throwable ex) {
                 throw new IllegalArgumentException("Could not instantiate Map type: " + mapType.getName(), ex);
             }
         }
