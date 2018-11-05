@@ -1,0 +1,115 @@
+package com.padd.tests;
+
+public class InlineStatements {
+    public void test() {
+        if (x) {
+            call();
+            call();
+            call();
+
+            int x = y;
+        }
+
+        if (x) {
+            call();
+        }
+
+        if (x) {
+            call();
+            call();
+        } else {
+            call();
+            call();
+        }
+
+        if (x) {
+            call();
+        } else {
+            call();
+        }
+
+        if (x) {
+            call();
+        } else {
+            call();
+        }
+
+        if (x) {
+            call();
+        } else {
+            call();
+        }
+
+        if (x) {
+            call();
+        } else if (y) {
+            call();
+        } else if (z) {
+            call();
+        } else {
+            call();
+        }
+
+        if (x) {
+            call();
+        } else if (y) {
+            call();
+        } else if (z) {
+            call();
+        } else {
+            call();
+        }
+
+        if (x) {
+            call();
+        } else if (y) {
+            call();
+        } else if (z) {
+            call();
+        } else {
+            call();
+        }
+
+        if (x) {
+            call();
+        } else if (y) {
+            call();
+        } else if (z) {
+            call();
+        } else {
+            call();
+        }
+
+        while (x) {
+            call();
+        }
+
+        while (x) {
+            call();
+        }
+
+        do {
+            call();
+        } while (x);
+
+        do {
+            call();
+        } while (x);
+
+        for (int i = 0; i < x; ++i) {
+            call();
+        }
+
+        for (Object o : objects) {
+            call();
+        }
+
+        for (int i = 0; i < x; ++i) {
+            call();
+        }
+
+        for (Object o : objects) {
+            call();
+        }
+    }
+}

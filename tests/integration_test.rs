@@ -98,6 +98,11 @@ fn test_java8_interface() {
 }
 
 #[test]
+fn test_java8_inline() {
+    test_fjr("java8_inline", "java8");
+}
+
+#[test]
 fn test_ignore_tokens() {
     //setup
     let spec = "

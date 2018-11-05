@@ -1,0 +1,99 @@
+package com.padd.tests;
+
+public class InlineStatements {
+    public void test() {
+        // Normal if-then
+        if (x) {
+            call();
+            call();
+            call();
+            int x = y;
+        }
+
+        // Inline if-then
+        if (x) call();
+
+        // Normal if-then-else
+        if (x) {
+            call();
+            call();
+        } else {
+            call();
+            call();
+        }
+
+        // Inline if-then-else
+        if (x) call(); else call();
+
+        if (x) {
+            call();
+        } else call();
+
+        if (x) call(); else {
+            call();
+        }
+
+        // Normal if-then-else if
+        if (x) {
+            call();
+        } else if (y) {
+            call();
+        } else if (z) {
+            call();
+        } else {
+            call();
+        }
+
+        // Inline if-then-else if
+        if (x) call();
+        else if (y) call();
+        else if (z) call();
+        else call();
+
+        if (x) call();
+        else if (y) {
+            call();
+        } else if (z) {
+            call();
+        } else {
+            call();
+        }
+
+        if (x) {
+            call();
+        } else if (y) call();
+        else if (z) {
+            call();
+        } else call();
+
+        // Normal while
+        while (x) {
+            call();
+        }
+
+        // Inline while
+        while (x) call();
+
+        // Normal do-while
+        do {
+            call();
+        } while(x);
+
+        // Inline do-while
+        do call(); while(x);
+
+        // Normal for
+        for (int i = 0; i < x; ++i) {
+            call();
+        }
+
+        for (Object o : objects) {
+            call();
+        }
+
+        // Inline for
+        for (int i = 0; i < x; ++i) call();
+
+        for (Object o : objects) call();
+    }
+}
