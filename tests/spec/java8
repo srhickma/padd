@@ -628,9 +628,17 @@ statement
     -> block
     -> inline_statement;
 
+forced_statement
+    -> block
+    -> inline_statement `\\{\n[prefix][indent]{;prefix=[prefix][indent]}\n[prefix]\\}`;
+
 inline_statement
     -> grouped_statement
     -> isolated_statement;
+
+inline_statement_no_if
+    -> grouped_statement
+    -> isolated_statement_no_if;
 
 grouped_statements
     -> grouped_statement grouped_statements `{}\n[prefix]{}`
@@ -640,20 +648,22 @@ grouped_statement
     -> SEMI
     -> statement_expression SEMI
     -> assert_statement
-    -> switch_statement
-    -> do_statement
     -> break_statement
     -> continue_statement
     -> return_statement
     -> throw_statement;
 
 isolated_statement
-    -> if_then_statement
-    -> if_then_else_statement
+    -> if_statement
+    -> isolated_statement_no_if;
+
+isolated_statement_no_if
     -> while_statement
     -> for_statement
     -> synchronized_statement
-    -> try_statement;
+    -> try_statement
+    -> do_statement
+    -> switch_statement;
 
 statement_expression_list
     -> statement_expression COMMA statement_expression_list `{}{} {}`
@@ -694,9 +704,6 @@ switch_label
     -> CASE ID COLON `[prefix]{} {}{}`
     -> DEFAULT COLON `[prefix]{}{}`;
 
-do_statement
-    -> DO statement WHILE LPAREN expr RPAREN SEMI `{} {} {} {}{}{}{}`;
-
 break_statement
     -> BREAK SEMI
     -> BREAK ID SEMI `{} {}{}`;
@@ -717,9 +724,9 @@ throw_statement
 
 try_statement
     -> try_header
-    -> try_header catches `{}\n{}`
-    -> try_header finally `{}\n{}`
-    -> try_header catches finally `{}\n{}\n{}`;
+    -> try_header catches `{} {}`
+    -> try_header finally `{} {}`
+    -> try_header catches finally `{} {} {}`;
 
 try_header
     -> TRY block `{} {}`
@@ -734,11 +741,11 @@ resource
     -> [inline_modifiers] type variable_declarator_id ASSN expr `{}{} {} {} {}`;
 
 finally
-    -> FINALLY block `[prefix]{} {}`;
+    -> FINALLY block `{} {}`;
 
 catches
-    -> catch_clause catches `[prefix]{}\n{}`
-    -> catch_clause `[prefix]{}`;
+    -> catch_clause catches `{} {}`
+    -> catch_clause `{}`;
 catch_clause
     -> CATCH LPAREN catch_formal_parameter RPAREN block `{} {}{}{} {}`;
 catch_formal_parameter
@@ -752,19 +759,33 @@ catch_type_internal
 labeled_statement
     -> ID COLON statement `{}{} {}`;
 
+if_statement
+    -> if_then_statement
+    -> if_then_else_statement;
+
 if_then_statement
-    -> IF LPAREN expr RPAREN statement `{} {}{}{} {}`;
+    -> IF LPAREN expr RPAREN forced_statement `{} {}{}{} {}`;
 
 if_then_else_statement
-    -> IF LPAREN expr RPAREN inline_statement ELSE statement `{} {}{}{} {} {} {}`
-    -> IF LPAREN expr RPAREN block ELSE statement `{} {}{}{} {}\n[prefix]{} {}`;
+    -> IF LPAREN expr RPAREN inline_statement ELSE else_statement
+        `{} {}{}{} \\{\n[prefix][indent]{;prefix=[prefix][indent]}\n[prefix]\\} {} {}`
+    -> IF LPAREN expr RPAREN block ELSE else_statement `{} {}{}{} {} {} {}`;
+
+else_statement
+    -> block
+    -> inline_statement_no_if `\\{\n[prefix][indent]{;prefix=[prefix][indent]}\n[prefix]\\}`
+    -> if_statement;
 
 while_statement
-    -> WHILE LPAREN expr RPAREN statement `{} {}{}{} {}`;
+    -> WHILE LPAREN expr RPAREN inline_statement `{} {}{}{} \\{\n[prefix][indent]{;prefix=[prefix][indent]}\n[prefix]\\}`
+    -> WHILE LPAREN expr RPAREN block `{} {}{}{} {}`;
+
+do_statement
+    -> DO forced_statement WHILE LPAREN expr RPAREN SEMI `{} {} {} {}{}{}{}`;
 
 for_statement
-    -> basic_for_statement statement `{} {}`
-    -> enhanced_for_statement statement `{} {}`;
+    -> basic_for_statement forced_statement `{} {}`
+    -> enhanced_for_statement forced_statement `{} {}`;
 
 basic_for_statement
     -> FOR LPAREN [for_init] SEMI [for_expr] SEMI [for_update] RPAREN `{} {}{}{}{}{}{}{}`;

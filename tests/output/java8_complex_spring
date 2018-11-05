@@ -62,19 +62,15 @@ public final class CollectionFactory {
     public static <E> Collection<E> createApproximateCollection(@Nullable Object collection, int capacity) {
         if (collection instanceof LinkedList) {
             return new LinkedList<>();
-        }
-        else if (collection instanceof List) {
+        } else if (collection instanceof List) {
             return new ArrayList<>(capacity);
-        }
-        else if (collection instanceof EnumSet) {
+        } else if (collection instanceof EnumSet) {
             Collection<E> enumSet = (Collection<E>)EnumSet.copyOf((EnumSet)collection);
             enumSet.clear();
             return enumSet;
-        }
-        else if (collection instanceof SortedSet) {
+        } else if (collection instanceof SortedSet) {
             return new TreeSet<>(((SortedSet<E>)collection).comparator());
-        }
-        else {
+        } else {
             return new LinkedHashSet<>(capacity);
         }
     }
@@ -90,30 +86,24 @@ public final class CollectionFactory {
         if (collectionType.isInterface()) {
             if (Set.class == collectionType || Collection.class == collectionType) {
                 return new LinkedHashSet<>(capacity);
-            }
-            else if (List.class == collectionType) {
+            } else if (List.class == collectionType) {
                 return new ArrayList<>(capacity);
-            }
-            else if (SortedSet.class == collectionType || NavigableSet.class == collectionType) {
+            } else if (SortedSet.class == collectionType || NavigableSet.class == collectionType) {
                 return new TreeSet<>();
-            }
-            else {
+            } else {
                 throw new IllegalArgumentException("Unsupported Collection interface: " + collectionType.getName());
             }
-        }
-        else if (EnumSet.class == collectionType) {
+        } else if (EnumSet.class == collectionType) {
             Assert.notNull(elementType, "Cannot create EnumSet for unknown element type");
             return (Collection<E>)EnumSet.noneOf(asEnumType(elementType));
-        }
-        else {
+        } else {
             if (!Collection.class.isAssignableFrom(collectionType)) {
                 throw new IllegalArgumentException("Unsupported Collection type: " + collectionType.getName());
             }
 
             try {
                 return (Collection<E>)ReflectionUtils.accessibleConstructor(collectionType).newInstance();
-            }
-            catch (Throwable ex) {
+            } catch (Throwable ex) {
                 throw new IllegalArgumentException("Could not instantiate Collection type: " + collectionType.getName(), ex);
             }
         }
@@ -129,11 +119,9 @@ public final class CollectionFactory {
             EnumMap enumMap = new EnumMap((EnumMap)map);
             enumMap.clear();
             return enumMap;
-        }
-        else if (map instanceof SortedMap) {
+        } else if (map instanceof SortedMap) {
             return new TreeMap<>(((SortedMap<K, V>)map).comparator());
-        }
-        else {
+        } else {
             return new LinkedHashMap<>(capacity);
         }
     }
@@ -149,30 +137,24 @@ public final class CollectionFactory {
         if (mapType.isInterface()) {
             if (Map.class == mapType) {
                 return new LinkedHashMap<>(capacity);
-            }
-            else if (SortedMap.class == mapType || NavigableMap.class == mapType) {
+            } else if (SortedMap.class == mapType || NavigableMap.class == mapType) {
                 return new TreeMap<>();
-            }
-            else if (MultiValueMap.class == mapType) {
+            } else if (MultiValueMap.class == mapType) {
                 return new LinkedMultiValueMap();
-            }
-            else {
+            } else {
                 throw new IllegalArgumentException("Unsupported Map interface: " + mapType.getName());
             }
-        }
-        else if (EnumMap.class == mapType) {
+        } else if (EnumMap.class == mapType) {
             Assert.notNull(keyType, "Cannot create EnumMap for unknown key type");
             return new EnumMap(asEnumType(keyType));
-        }
-        else {
+        } else {
             if (!Map.class.isAssignableFrom(mapType)) {
                 throw new IllegalArgumentException("Unsupported Map type: " + mapType.getName());
             }
 
             try {
                 return (Map<K, V>)ReflectionUtils.accessibleConstructor(mapType).newInstance();
-            }
-            catch (Throwable ex) {
+            } catch (Throwable ex) {
                 throw new IllegalArgumentException("Could not instantiate Map type: " + mapType.getName(), ex);
             }
         }
