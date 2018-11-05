@@ -1,6 +1,7 @@
 use std::error;
 use std::fmt;
 
+use core::util::string_utils;
 use core::data::Data;
 use core::parse::build_prods;
 use core::parse::def_parser;
@@ -182,7 +183,8 @@ pub fn generate_pattern_internal<'a>(root: &'a Tree, prod: &Production) -> Resul
 fn generate_pattern_recursive<'a>(node: &'a Tree, accumulator: &'a mut Vec<Segment>, prod: &Production, captures: usize) -> Result<usize, BuildError> {
     match &node.lhs.kind[..] {
         "FILLER" | "ALPHA" | "NUM" => {
-            accumulator.push(Segment::Filler(replace_escapes(&node.lhs.lexeme[..])));
+            let name = string_utils::replace_escapes(&node.lhs.lexeme[..]);
+            accumulator.push(Segment::Filler(name));
         }
         "sub" => {
             accumulator.push(Segment::Substitution(node.get_child(1).lhs.lexeme.clone()));
@@ -249,35 +251,6 @@ fn parse_pattern(input: &str) -> Result<Tree, BuildError> {
         let parse = def_parser().parse(tokens, &PATTERN_GRAMMAR)?;
         Ok(parse)
     })
-}
-
-fn replace_escapes(input: &str) -> String {
-    let mut res = String::with_capacity(input.as_bytes().len());
-    let mut i = 0;
-    let mut last_char: char = ' ';
-    for c in input.chars() {
-        let mut hit_double_slash = false;
-        if i != 0 && last_char == '\\' {
-            res.push(match c {
-                'n' => '\n',
-                't' => '\t',
-                '\'' => '\'',
-                '\\' => {
-                    last_char = ' '; //Stop \\\\ -> \\\ rather than \\
-                    hit_double_slash = true;
-                    '\\'
-                }
-                _ => c,
-            });
-        } else if c != '\\' {
-            res.push(c);
-        }
-        if !hit_double_slash {
-            last_char = c;
-        }
-        i += 1;
-    }
-    res
 }
 
 #[derive(Debug)]
