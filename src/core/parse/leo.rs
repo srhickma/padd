@@ -10,138 +10,187 @@ use core::scan::Token;
 
 use self::stopwatch::Stopwatch;
 
-pub struct EarleyParser;
+pub struct LeoParser;
 
-impl Parser for EarleyParser {
+impl Parser for LeoParser {
     fn parse(&self, scan: Vec<Token<String>>, grammar: &Grammar) -> Result<Tree, parse::Error> {
         let sw = Stopwatch::start_new();
 
-        let mut parse_chart: Vec<Vec<Edge>> = vec![];
-        let mut chart: Vec<Vec<Item>> = vec![vec![]];
+        let mut chart: Vec<Row> = vec![Row::new()];
 
-        grammar.productions_for_lhs(grammar.start()).unwrap().iter()
+        //TODO ensure topmost item by creating S-prime start production
+
+        grammar.productions.iter()
+            .filter(|prod| prod.lhs == grammar.start)
             .for_each(|prod| {
                 let item = Item {
                     rule: prod,
                     start: 0,
                     next: 0,
                 };
-                chart[0].push(item);
+                chart[0].items.push(item);
             });
 
         println!("Creating recognition chart took {}", sw.elapsed_ms());
 
-        let mut i = 0;
-        while i < chart.len() {
-            let mut j = 0;
-            parse_chart.push(vec![]);
-
-            if chart[i].len() == 1 {
-                println!("{}", chart[i][0].to_string());
+        let mut k = 0;
+        while k < chart[0].items.len() {
+            let item = chart[0].items[k].clone();
+            match (&item).next_symbol() {
+                None => {}
+                Some(symbol) => {
+                    if !grammar.terminals.contains(symbol) {
+                        predict_op(&item, 0, symbol, grammar, &mut chart);
+                    }
+                }
             }
 
-            while j < chart[i].len() {
-                let item = chart[i][j].clone();
+            k += 1;
+        }
+
+        let mut i = 1;
+        while i <= chart.len() && i <= scan.len() {
+
+            // Scanning
+            let mut next_row = Row::new();
+            let a_i = &scan[i - 1].kind[..];
+            cross(&chart[i - 1].items, a_i, &mut next_row.items, grammar);
+            if next_row.items.is_empty() {
+                break;
+            }
+            chart.push(next_row);
+
+            // Completion
+            let mut j = 0;
+            while j < chart[i].items.len() {
+                let item = chart[i].items[j].clone();
                 let next = (&item).next_symbol();
                 match next {
                     None => {
-                        complete_op(&item, i, &mut chart);
+                        let mut accumulator: Vec<Item> = Vec::new();
+                        cross(&chart[item.start].items, &item.rule.lhs[..], &mut accumulator, grammar);
 
-                        parse_chart[item.start].push(Edge {
-                            rule: Some(item.rule),
-                            finish: i,
-                        });
+                        chart[i].items.append(&mut accumulator);
                     }
+                    Some(symbol) => {}
+                }
+                j += 1;
+            }
+
+            // Prediction
+            let mut k = 0;
+            while k < chart[i].items.len() {
+                let item = chart[i].items[k].clone();
+                match (&item).next_symbol() {
+                    None => {}
                     Some(symbol) => {
-                        if grammar.is_terminal(symbol) {
-                            scan_op(&item, i, symbol, &scan, &mut chart);
-                        } else {
+                        if !grammar.terminals.contains(symbol) {
                             predict_op(&item, i, symbol, grammar, &mut chart);
                         }
                     }
                 }
-                j += 1;
+
+                k += 1;
             }
+
             i += 1;
         }
 
         println!("Filling recognition chart took {} for {} tokens", sw.elapsed_ms(), scan.len());
 
-        fn predict_op<'a, 'b>(item: &Item<'a>, i: usize, symbol: &'a str, grammar: &'a Grammar, chart: &'b mut Vec<Vec<Item<'a>>>) {
-            let mut nullable_found = false;
-            let mut items_to_add = Vec::new();
+        fn t_update<'a, 'b>(
+            item: &Item<'a>,
+            i: usize,
+            grammar: &'a Grammar,
+            chart: &'b mut Vec<Row<'a>>,
+        ) {}
 
-            for prod in grammar.productions_for_lhs(symbol).unwrap() {
-                let new_item = Item {
-                    rule: prod,
-                    start: i,
-                    next: 0,
-                };
-
-                if !chart[i].contains(&new_item) {
-                    items_to_add.push(new_item);
-                }
-
-                if !nullable_found && grammar.is_nullable(&prod) {
-                    nullable_found = true;
-                }
-            }
-
-            for new_item in items_to_add {
-                unsafe_append(new_item, &mut chart[i]);
-            }
-
-            if nullable_found {
-                append(
-                    Item {
-                        rule: item.rule,
-                        start: item.start,
-                        next: item.next + 1,
-                    },
-                    &mut chart[i],
-                );
-            }
-        }
-
-        fn scan_op<'a, 'b>(item: &Item<'a>, i: usize, symbol: &'a str, scan: &'a Vec<Token<String>>, chart: &'b mut Vec<Vec<Item<'a>>>) {
-            if i < scan.len() && scan[i].kind == symbol.to_string() {
-                if chart.len() <= i + 1 {
-                    chart.push(Vec::new())
-                }
-
-                unsafe_append(
-                    Item {
-                        rule: item.rule,
-                        start: item.start,
-                        next: item.next + 1,
-                    },
-                    &mut chart[i + 1],
-                );
-            }
-        }
-
-        fn complete_op<'a, 'b>(item: &Item<'a>, i: usize, chart: &'b mut Vec<Vec<Item<'a>>>) {
-            let mut items_to_add: Vec<Item> = Vec::new();
-
-            for old_item in &chart[item.start] {
-                match old_item.next_symbol() {
+        fn cross<'a>(
+            src: &Vec<Item<'a>>,
+            symbol: &'a str,
+            dest: &mut Vec<Item<'a>>,
+            grammar: &'a Grammar,
+        ) {
+            for item in src {
+                let next = item.next_symbol();
+                match next {
                     None => {}
-                    Some(sym) => if sym == item.rule.lhs {
-                        let new_item = Item {
-                            rule: old_item.rule,
-                            start: old_item.start,
-                            next: old_item.next + 1,
-                        };
+                    Some(sym) => {
+                        if sym == symbol {
+                            let mut last_item = Item {
+                                rule: item.rule,
+                                start: item.start,
+                                next: item.next + 1,
+                            };
 
-                        if !chart[i].contains(&new_item) {
-                            items_to_add.push(new_item);
+                            unsafe_append(last_item.clone(), dest);
+
+                            loop {
+                                match last_item.next_symbol() {
+                                    None => break,
+                                    Some(sym) => {
+                                        let sym_string = sym.to_string();
+                                        if !grammar.nullable_nt(&sym_string) {
+                                            break;
+                                        }
+                                        last_item = Item {
+                                            rule: last_item.rule,
+                                            start: last_item.start,
+                                            next: last_item.next + 1,
+                                        };
+
+                                        unsafe_append(last_item.clone(), dest);
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             }
+        }
 
-            for new_item in items_to_add {
-                unsafe_append(new_item, &mut chart[i]);
+        fn predict_op<'a, 'b>(item: &Item<'a>, i: usize, symbol: &'a str, grammar: &'a Grammar, chart: &'b mut Vec<Row<'a>>) {
+            grammar.productions.iter()
+                .filter(|prod| prod.lhs == symbol)
+                .for_each(|prod| {
+                    append(
+                        Item {
+                            rule: prod,
+                            start: i,
+                            next: 0,
+                        },
+                        &mut chart[i].items,
+                    );
+
+                    if grammar.nullable(&prod) {
+                        append(
+                            Item {
+                                rule: item.rule,
+                                start: item.start,
+                                next: item.next + 1,
+                            },
+                            &mut chart[i].items,
+                        );
+                    }
+                });
+        }
+
+        fn complete_op<'a, 'b>(item: &Item<'a>, i: usize, chart: &'b mut Vec<Row<'a>>) {
+            let mut advanced: Vec<Item> = vec![];
+
+            chart[item.start].items.iter()
+                .filter(|old_item| match old_item.next_symbol() {
+                    None => false,
+                    Some(sym) => sym == item.rule.lhs,
+                })
+                .for_each(|old_item| advanced.push(Item {
+                    rule: old_item.rule,
+                    start: old_item.start,
+                    next: old_item.next + 1,
+                }));
+
+            for item in advanced {
+                append(item, &mut chart[i].items);
             }
         }
 
@@ -158,16 +207,26 @@ impl Parser for EarleyParser {
             item_set.push(item);
         }
 
-        fn recognized<'a, 'b>(grammar: &'a Grammar, chart: &'b Vec<Vec<Item<'a>>>) -> bool {
-            chart.last().unwrap().iter()
-                .any(|item| item.rule.lhs == *grammar.start()
+        fn recognized<'a, 'b>(grammar: &'a Grammar, chart: &'b Vec<Row<'a>>) -> bool {
+            chart.last().unwrap().items.iter()
+                .any(|item| item.rule.lhs == grammar.start
                     && item.next >= item.rule.rhs.len()
                     && item.start == 0)
         }
 
+        println!("-----------------------------------------------------");
+        for i in 0..chart.len() {
+            println!("SET {}", i);
+            for j in 0..chart[i].items.len() {
+                println!("{}", chart[i].items[j].to_string());
+            }
+            println!();
+        }
+        println!("-----------------------------------------------------");
+
         return if recognized(grammar, &chart) {
             if i - 1 == scan.len() {
-                Ok(parse_tree(grammar, &scan, parse_chart))
+                Ok(parse_tree(grammar, &scan, chart))
             } else {
                 Err(parse::Error {
                     message: format!("Largest parse did not consume all tokens: {} of {}", i - 1, scan.len()),
@@ -190,7 +249,7 @@ impl Parser for EarleyParser {
         };
 
         //TODO refactor to reduce long and duplicated parameter lists
-        fn parse_tree<'a>(grammar: &'a Grammar, scan: &'a Vec<Token<String>>, chart: Vec<Vec<Edge<'a>>>) -> Tree {
+        fn parse_tree<'a>(grammar: &'a Grammar, scan: &'a Vec<Token<String>>, chart: Vec<Row<'a>>) -> Tree {
             fn recur<'a>(start: Node, edge: &Edge, grammar: &'a Grammar, scan: &'a Vec<Token<String>>, chart: &Vec<Vec<Edge>>) -> Tree {
                 match edge.rule {
                     None => Tree { //Non-empty rhs
@@ -207,7 +266,7 @@ impl Parser for EarleyParser {
                                 top_list(start, edge, grammar, scan, chart).iter().rev()
                                     .map(|&(node, ref edge)| recur(node, &edge, grammar, scan, chart))
                                     .collect();
-                            if children.is_empty() { //Empty rhs
+                            if children.is_empty() { //empty rhs
                                 children.push(Tree::null());
                             }
                             children
@@ -216,32 +275,33 @@ impl Parser for EarleyParser {
                 }
             }
 
-            println!("-----------------------------------------------------");
-            for i in 0..chart.len() {
-                println!("SET {}", i);
-                for j in 0..chart[i].len() {
-                    println!("{}", chart[i][j].to_string());
-                }
-                println!();
-            }
-            println!("-----------------------------------------------------");
-
-            let sw = Stopwatch::start_new();
-
             let start: Node = 0;
             let finish: Node = chart.len() - 1;
 
-            let first_edge = chart[start].iter()
-                .find(|edge| edge.finish == finish && edge.rule.unwrap().lhs == *grammar.start());
-            let res = match first_edge {
+            //TODO build the parse chart during the main loop
+            let mut parse_chart: Vec<Vec<Edge>> = Vec::with_capacity(chart.len());
+            for _ in 0..chart.len() {
+                parse_chart.push(vec![]);
+            }
+            for i in 0..chart.len() {
+                for item in &chart[i].items {
+                    if item.next_symbol().is_none() {
+                        parse_chart[item.start].push(Edge {
+                            rule: Some(item.rule),
+                            finish: i,
+                        })
+                    }
+                }
+            }
+
+            let first_edge = parse_chart[start].iter()
+                .find(|edge| edge.finish == finish && edge.rule.unwrap().lhs == grammar.start);
+            match first_edge {
                 None => panic!("Failed to find start item to begin parse"),
-                Some(edge) => recur(start, edge, grammar, scan, &chart)
-            };
-
-            println!("Parse tree construction took {}", sw.elapsed_ms());
-
-            res
+                Some(edge) => recur(start, edge, grammar, scan, &parse_chart)
+            }
         }
+
 
         fn top_list<'a>(start: Node,
                         edge: &Edge,
@@ -254,7 +314,7 @@ impl Parser for EarleyParser {
             let edges = |depth: usize, node: Node| -> Vec<Edge> {
                 if depth < bottom {
                     let symbol = &symbols[depth];
-                    if grammar.is_terminal(symbol) {
+                    if grammar.terminals.contains(symbol) {
                         if scan[node].kind == *symbol {
                             return vec![Edge {
                                 rule: None,
@@ -297,6 +357,28 @@ impl Parser for EarleyParser {
             }
         }
     }
+}
+
+struct Row<'a> {
+    items: Vec<Item<'a>>,
+    transitive_items: Vec<TransitiveItem<'a>>,
+}
+
+impl<'a> Row<'a> {
+    fn new() -> Row<'a> {
+        Row {
+            items: Vec::new(),
+            transitive_items: Vec::new(),
+        }
+    }
+}
+
+#[derive(PartialEq, Clone, Debug)]
+struct TransitiveItem<'a> {
+    rule: &'a Production,
+    start: usize,
+    next: usize,
+    captor: String, // Non-Terminal
 }
 
 #[derive(PartialEq, Clone, Debug)]

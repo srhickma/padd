@@ -6,6 +6,7 @@ use core::parse::grammar::Grammar;
 use core::scan::Token;
 
 mod earley;
+mod leo;
 pub mod grammar;
 
 pub trait Parser: 'static + Send + Sync {
@@ -13,7 +14,8 @@ pub trait Parser: 'static + Send + Sync {
 }
 
 pub fn def_parser() -> Box<Parser> {
-    Box::new(earley::EarleyParser)
+    //Box::new(earley::EarleyParser)
+    Box::new(leo::LeoParser)
 }
 
 #[derive(Clone, PartialEq, Debug)]

@@ -17,6 +17,10 @@ impl Grammar {
         self.nss.contains(&prod.lhs)
     }
 
+    pub fn is_nullable_nt(&self, non_terminal: &String) -> bool {
+        self.nss.contains(non_terminal)
+    }
+
     pub fn is_terminal(&self, symbol: &str) -> bool {
         self.terminals.contains(symbol)
     }
