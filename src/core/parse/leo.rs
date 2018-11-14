@@ -33,20 +33,7 @@ impl Parser for LeoParser {
 
         println!("Creating recognition chart took {}", sw.elapsed_ms());
 
-        let mut k = 0;
-        while k < chart[0].items.len() {
-            let item = chart[0].items[k].clone();
-            match (&item).next_symbol() {
-                None => {}
-                Some(symbol) => {
-                    if !grammar.terminals.contains(symbol) {
-                        predict_op(&item, 0, symbol, grammar, &mut chart);
-                    }
-                }
-            }
-
-            k += 1;
-        }
+        predict_full(0, grammar, &mut chart);
 
         let mut i = 1;
         while i <= chart.len() && i <= scan.len() {
@@ -67,10 +54,30 @@ impl Parser for LeoParser {
                 let next = (&item).next_symbol();
                 match next {
                     None => {
-                        let mut accumulator: Vec<Item> = Vec::new();
-                        cross(&chart[item.start].items, &item.rule.lhs[..], &mut accumulator, grammar);
+                        t_update(&item, grammar, &mut chart);
 
-                        chart[i].items.append(&mut accumulator);
+                        let mut trans_res: Option<Item> = None;
+                        for t_item in &chart[item.start].transitive_items {
+                            if t_item.captor == item.rule.lhs {
+                                trans_res = Some(Item { //TODO abstract into factory method
+                                    rule: t_item.rule,
+                                    start: t_item.start,
+                                    next: t_item.next,
+                                });
+                                break;
+                            }
+                        }
+
+                        match trans_res {
+                            Some(item) => append(item, &mut chart[i].items),
+                            None => {
+                                let mut accumulator: Vec<Item> = Vec::new();
+                                cross(&chart[item.start].items, &item.rule.lhs[..], &mut accumulator, grammar);
+                                for completed_item in accumulator {
+                                    append(completed_item, &mut chart[i].items)
+                                }
+                            }
+                        }
                     }
                     Some(symbol) => {}
                 }
@@ -78,20 +85,7 @@ impl Parser for LeoParser {
             }
 
             // Prediction
-            let mut k = 0;
-            while k < chart[i].items.len() {
-                let item = chart[i].items[k].clone();
-                match (&item).next_symbol() {
-                    None => {}
-                    Some(symbol) => {
-                        if !grammar.terminals.contains(symbol) {
-                            predict_op(&item, i, symbol, grammar, &mut chart);
-                        }
-                    }
-                }
-
-                k += 1;
-            }
+            predict_full(i, grammar, &mut chart);
 
             i += 1;
         }
@@ -100,10 +94,82 @@ impl Parser for LeoParser {
 
         fn t_update<'a, 'b>(
             item: &Item<'a>,
-            i: usize,
             grammar: &'a Grammar,
             chart: &'b mut Vec<Row<'a>>,
-        ) {}
+        ) -> Item<'a> {
+            println!("t_update for {}", item.to_string());
+
+            let mut trans_res: Option<Item> = None;
+            for t_item in &chart[item.start].transitive_items {
+                if t_item.captor == item.rule.lhs {
+                    trans_res = Some(Item { //TODO abstract into factory method
+                        rule: t_item.rule,
+                        start: t_item.start,
+                        next: t_item.next,
+                    });
+                    break;
+                }
+            }
+
+            match trans_res {
+                Some(trans_item) => return trans_item,
+                None => {
+                    let mut target_res: Option<Item> = None;
+                    for step_back_item in &chart[item.start].items {
+                        match step_back_item.next_symbol() {
+                            None => {}
+                            Some(sym) => {
+                                if &item.rule.lhs[..] == sym {
+                                    // Allow at most one target_res
+                                    if target_res.is_some() {
+                                        target_res = None;
+                                        break;
+                                    }
+
+                                    target_res = Some(step_back_item.clone());
+                                }
+                            }
+                        }
+                    }
+
+                    match target_res {
+                        Some(target_item) => {
+                            if target_item.is_quasi_complete_in(grammar) {
+                                let new_item = Item {
+                                    rule: target_item.rule,
+                                    start: target_item.start,
+                                    next: target_item.rule.rhs.len(),
+                                };
+
+                                let rec_item = t_update(&new_item, grammar, chart);
+                                let transtive_item = TransitiveItem {
+                                    rule: rec_item.rule,
+                                    start: rec_item.start,
+                                    next: rec_item.next,
+                                    captor: item.rule.lhs.clone(),
+                                };
+
+                                // Add transition item
+                                let mut has_transition_item = false;
+                                for t_item in &chart[item.start].transitive_items {
+                                    if *t_item == transtive_item {
+                                        has_transition_item = true;
+                                    }
+                                }
+
+                                if !has_transition_item {
+                                    chart[item.start].transitive_items.push(transtive_item);
+                                }
+
+                                return rec_item;
+                            }
+                        }
+                        None => {}
+                    }
+                    return item.clone();
+                }
+            }
+        }
 
         fn cross<'a>(
             src: &Vec<Item<'a>>,
@@ -149,6 +215,23 @@ impl Parser for LeoParser {
             }
         }
 
+        fn predict_full<'a, 'b>(i: usize, grammar: &'a Grammar, chart: &'b mut Vec<Row<'a>>) {
+            let mut k = 0;
+            while k < chart[i].items.len() {
+                let item = chart[i].items[k].clone();
+                match (&item).next_symbol() {
+                    None => {}
+                    Some(symbol) => {
+                        if !grammar.terminals.contains(symbol) {
+                            predict_op(&item, i, symbol, grammar, chart);
+                        }
+                    }
+                }
+
+                k += 1;
+            }
+        }
+
         fn predict_op<'a, 'b>(item: &Item<'a>, i: usize, symbol: &'a str, grammar: &'a Grammar, chart: &'b mut Vec<Row<'a>>) {
             grammar.productions.iter()
                 .filter(|prod| prod.lhs == symbol)
@@ -175,25 +258,6 @@ impl Parser for LeoParser {
                 });
         }
 
-        fn complete_op<'a, 'b>(item: &Item<'a>, i: usize, chart: &'b mut Vec<Row<'a>>) {
-            let mut advanced: Vec<Item> = vec![];
-
-            chart[item.start].items.iter()
-                .filter(|old_item| match old_item.next_symbol() {
-                    None => false,
-                    Some(sym) => sym == item.rule.lhs,
-                })
-                .for_each(|old_item| advanced.push(Item {
-                    rule: old_item.rule,
-                    start: old_item.start,
-                    next: old_item.next + 1,
-                }));
-
-            for item in advanced {
-                append(item, &mut chart[i].items);
-            }
-        }
-
         fn append<'a, 'b>(item: Item<'a>, item_set: &'b mut Vec<Item<'a>>) {
             for j in 0..item_set.len() {
                 if item_set[j] == item {
@@ -214,15 +278,15 @@ impl Parser for LeoParser {
                     && item.start == 0)
         }
 
-        println!("-----------------------------------------------------");
-        for i in 0..chart.len() {
-            println!("SET {}", i);
-            for j in 0..chart[i].items.len() {
-                println!("{}", chart[i].items[j].to_string());
-            }
-            println!();
-        }
-        println!("-----------------------------------------------------");
+//        println!("-----------------------------------------------------");
+//        for i in 0..chart.len() {
+//            println!("SET {}", i);
+//            for j in 0..chart[i].items.len() {
+//                println!("{}", chart[i].items[j].to_string());
+//            }
+//            println!();
+//        }
+//        println!("-----------------------------------------------------");
 
         return if recognized(grammar, &chart) {
             if i - 1 == scan.len() {
@@ -285,7 +349,7 @@ impl Parser for LeoParser {
             }
             for i in 0..chart.len() {
                 for item in &chart[i].items {
-                    if item.next_symbol().is_none() {
+                    if item.is_complete() {
                         parse_chart[item.start].push(Edge {
                             rule: Some(item.rule),
                             finish: i,
@@ -293,6 +357,16 @@ impl Parser for LeoParser {
                     }
                 }
             }
+
+            println!("-----------------------------------------------------");
+            for i in 0..parse_chart.len() {
+                println!("SET {}", i);
+                for j in 0..parse_chart[i].len() {
+                    println!("{}", parse_chart[i][j].to_string());
+                }
+                println!();
+            }
+            println!("-----------------------------------------------------");
 
             let first_edge = parse_chart[start].iter()
                 .find(|edge| edge.finish == finish && edge.rule.unwrap().lhs == grammar.start);
@@ -359,6 +433,7 @@ impl Parser for LeoParser {
     }
 }
 
+//TODO should use sets, so that we do not have to use the slow append
 struct Row<'a> {
     items: Vec<Item<'a>>,
     transitive_items: Vec<TransitiveItem<'a>>,
@@ -395,6 +470,27 @@ impl<'a> Item<'a> {
         } else {
             None
         }
+    }
+
+    fn is_complete(&self) -> bool {
+        self.next >= self.rule.rhs.len()
+    }
+
+    fn is_quasi_complete_in(&self, grammar: &Grammar) -> bool {
+        let mut next = self.next;
+        let mut item = self.next_symbol();
+
+        for i in next..self.rule.rhs.len() {
+            //TODO find a better way to do this so that we don't have to convert to strings
+            //TODO this could be solved when the parser is encrypted
+            if !grammar.nullable_nt(&self.rule.rhs[next]) {
+                return false;
+            }
+
+            next += 1;
+        }
+
+        true
     }
 }
 

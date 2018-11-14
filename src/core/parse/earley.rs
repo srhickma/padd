@@ -36,9 +36,9 @@ impl Parser for EarleyParser {
             let mut j = 0;
             parse_chart.push(vec![]);
 
-            if chart[i].len() == 1 {
-                println!("{}", chart[i][0].to_string());
-            }
+//            if chart[i].len() == 1 {
+//                println!("{}", chart[i][0].to_string());
+//            }
 
             while j < chart[i].len() {
                 let item = chart[i][j].clone();
