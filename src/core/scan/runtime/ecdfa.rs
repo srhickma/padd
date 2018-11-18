@@ -40,7 +40,7 @@ impl EncodedCDFABuilder {
     }
 }
 
-impl CDFABuilder<String, String> for EncodedCDFABuilder {
+impl CDFABuilder<String, String, EncodedCDFA> for EncodedCDFABuilder {
     fn new() -> Self {
         EncodedCDFABuilder {
             encoder: HashMap::new(),
@@ -51,6 +51,22 @@ impl CDFABuilder<String, String> for EncodedCDFABuilder {
             t_delta: CEHashMap::new(),
             tokenizer: CEHashMap::new(),
             start: usize::max_value(),
+        }
+    }
+
+    fn build(self) -> Result<EncodedCDFA, CDFAError> {
+        if self.start == usize::max_value() {
+            Err(CDFAError::BuildErr("No start state was set".to_string()))
+        } else if self.start > self.t_delta.size() {
+            Err(CDFAError::BuildErr("Invalid start state".to_string()))
+        } else {
+            Ok(EncodedCDFA {
+                alphabet: self.alphabet,
+                accepting: self.accepting,
+                t_delta: self.t_delta,
+                tokenizer: self.tokenizer,
+                start: self.start,
+            })
         }
     }
 
@@ -119,29 +135,13 @@ impl CDFABuilder<String, String> for EncodedCDFABuilder {
 }
 
 pub struct EncodedCDFA {
+    //TODO add separate error message if character not in alphabet
+    #[allow(dead_code)]
     alphabet: HashedAlphabet,
     accepting: HashSet<usize>,
     t_delta: CEHashMap<TransitionTrie>,
     tokenizer: CEHashMap<String>,
     start: usize,
-}
-
-impl EncodedCDFA {
-    pub fn build_from(builder: EncodedCDFABuilder) -> Result<Self, CDFAError> {
-        if builder.start == usize::max_value() {
-            Err(CDFAError::BuildErr("No start state was set".to_string()))
-        } else if builder.start > builder.t_delta.size() {
-            Err(CDFAError::BuildErr("Invalid start state".to_string()))
-        } else {
-            Ok(EncodedCDFA {
-                alphabet: builder.alphabet,
-                accepting: builder.accepting,
-                t_delta: builder.t_delta,
-                tokenizer: builder.tokenizer,
-                start: builder.start,
-            })
-        }
-    }
 }
 
 impl CDFA<usize, String> for EncodedCDFA {
@@ -331,7 +331,7 @@ mod tests {
             .mark_accepting(&"zero".to_string())
             .mark_accepting(&"notzero".to_string());
 
-        let cdfa: EncodedCDFA = EncodedCDFA::build_from(builder).unwrap();
+        let cdfa: EncodedCDFA = builder.build().unwrap();
 
         let input = "000011010101".to_string();
         let mut iter = input.chars();
@@ -381,7 +381,7 @@ NZ <- '11010101'
             .mark_accepting(&"rbr".to_string())
             .mark_accepting(&"ws".to_string());
 
-        let cdfa: EncodedCDFA = EncodedCDFA::build_from(builder).unwrap();
+        let cdfa: EncodedCDFA = builder.build().unwrap();
 
         let input = "  {{\n}{}{} \t{} \t{}}".to_string();
         let mut iter = input.chars();
@@ -441,7 +441,7 @@ RBR <- '}'
             .mark_accepting(&"rbr".to_string())
             .mark_accepting(&"ws".to_string());
 
-        let cdfa: EncodedCDFA = EncodedCDFA::build_from(builder).unwrap();
+        let cdfa: EncodedCDFA = builder.build().unwrap();
 
         let input = "  {{\n}{}{} \t{} \t{}}".to_string();
         let mut iter = input.chars();
@@ -497,7 +497,7 @@ RBR <- '}'
             .mark_accepting(&"rbr".to_string())
             .mark_accepting(&"ws".to_string());
 
-        let cdfa: EncodedCDFA = EncodedCDFA::build_from(builder).unwrap();
+        let cdfa: EncodedCDFA = builder.build().unwrap();
 
         let input = "  {{\n}{}{} \tx{} \t{}}".to_string();
         let mut iter = input.chars();
@@ -544,7 +544,7 @@ RBR <- '}'
             .mark_accepting(&"rbr".to_string())
             .mark_accepting(&"ws".to_string());
 
-        let cdfa: EncodedCDFA = EncodedCDFA::build_from(builder).unwrap();
+        let cdfa: EncodedCDFA = builder.build().unwrap();
 
         let input = "   {  {  {{{\t}}}\n {} }  }   { {}\n }   {  {  {{{\t}}}\n {} }  } xyz  { {}\n }   {  {  {{{\t}}}\n {} }  }   { {}\n } ".to_string();
         let mut iter = input.chars();
@@ -584,7 +584,7 @@ RBR <- '}'
             .mark_accepting(&"four".to_string())
             .mark_accepting(&"five".to_string());
 
-        let cdfa: EncodedCDFA = EncodedCDFA::build_from(builder).unwrap();
+        let cdfa: EncodedCDFA = builder.build().unwrap();
 
         let input = "fivefourfourfourfivefivefourfive".to_string();
         let mut iter = input.chars();
@@ -631,7 +631,7 @@ FIVE <- 'five'
             .mark_accepting(&"FOR".to_string())
             .mark_accepting(&"id".to_string());
 
-        let cdfa: EncodedCDFA = EncodedCDFA::build_from(builder).unwrap();
+        let cdfa: EncodedCDFA = builder.build().unwrap();
 
         let input = "fdk".to_string();
         let mut iter = input.chars();

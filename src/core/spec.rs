@@ -257,7 +257,7 @@ fn generate_ecdfa(tree: &Tree) -> Result<EncodedCDFA, runtime::CDFAError> {
 
     generate_ecdfa_states(tree.get_child(1), &mut builder)?;
 
-    EncodedCDFA::build_from(builder)
+    builder.build()
 }
 
 fn generate_ecdfa_alphabet(tree: &Tree, builder: &mut EncodedCDFABuilder) {
