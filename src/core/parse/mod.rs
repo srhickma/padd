@@ -1,12 +1,12 @@
-use std::collections::HashSet;
-use std::collections::HashMap;
 use std::error;
 use std::fmt;
 
-use core::scan::Token;
 use core::data::Data;
+use core::parse::grammar::Grammar;
+use core::scan::Token;
 
 mod earley;
+pub mod grammar;
 
 pub trait Parser: 'static + Send + Sync {
     fn parse(&self, scan: Vec<Token<String>>, grammar: &Grammar) -> Result<Tree, Error>;
@@ -99,91 +99,6 @@ impl error::Error for Error {
     }
 }
 
-pub struct Grammar {
-    pub productions: Vec<Production>,
-    nss: HashSet<String>,
-    #[allow(dead_code)]
-    non_terminals: HashSet<String>,
-    terminals: HashSet<String>,
-    #[allow(dead_code)]
-    symbols: HashSet<String>,
-    start: String,
-}
-
-impl Grammar {
-    pub fn nullable(&self, prod: &Production) -> bool {
-        self.nss.contains(&prod.lhs)
-    }
-
-    pub fn from(productions: Vec<Production>) -> Grammar {
-        let nss = Grammar::build_nss(&productions);
-        let non_terminals: HashSet<String> = productions.iter().cloned()
-            .map(|prod| prod.lhs)
-            .collect();
-        let mut symbols: HashSet<String> = productions.iter()
-            .flat_map(|prod| prod.rhs.iter())
-            .map(|x| x.clone())
-            .collect();
-        for non_terminal in &non_terminals {
-            symbols.insert(non_terminal.clone());
-        }
-        let terminals = symbols.difference(&non_terminals)
-            .map(|x| x.clone())
-            .collect();
-        let start = productions[0].lhs.clone();
-
-        Grammar {
-            productions,
-            nss,
-            non_terminals,
-            terminals,
-            symbols,
-            start,
-        }
-    }
-
-    fn build_nss(productions: &Vec<Production>) -> HashSet<String> {
-        let mut nss: HashSet<String> = HashSet::new();
-        let mut prods_by_rhs: HashMap<&String, Vec<&Production>> = HashMap::new();
-        let mut work_stack: Vec<&String> = Vec::new();
-
-        for prod in productions {
-            for s in &prod.rhs {
-                prods_by_rhs.entry(s)
-                    .or_insert(Vec::new())
-                    .push(prod);
-            }
-
-            if prod.rhs.is_empty() {
-                nss.insert(prod.lhs.clone()); //TODO can we avoid cloning here
-                work_stack.push(&prod.lhs);
-            }
-        }
-
-        loop {
-            match work_stack.pop() {
-                None => break,
-                Some(work_symbol) => {
-                    match prods_by_rhs.get(work_symbol) {
-                        None => {}
-                        Some(prods) => {
-                            for prod in prods {
-                                if !nss.contains(&prod.lhs)
-                                    && prod.rhs.iter().all(|sym| nss.contains(sym)) {
-                                    nss.insert(prod.lhs.clone());
-                                    work_stack.push(&prod.lhs);
-                                }
-                            }
-                        }
-                    }
-                }
-            };
-        }
-
-        nss
-    }
-}
-
 #[derive(PartialEq, Clone, Debug)]
 pub struct Production {
     pub lhs: String,
@@ -226,17 +141,21 @@ fn prod_from_string(string: &str) -> Production {
 
 #[cfg(test)]
 mod tests {
+    use core::parse::grammar::GrammarBuilder;
+
     use super::*;
 
     #[test]
     fn parse_example() {
         //setup
-        let productions = build_prods(&[
+        let mut grammar_builder = GrammarBuilder::new();
+        grammar_builder.add_productions(build_prods(&[
             "Sentence Noun Verb",
             "Noun mary",
             "Verb runs"
-        ]);
-        let grammar = Grammar::from(productions);
+        ]));
+        grammar_builder.try_mark_start("Sentence");
+        let grammar = grammar_builder.build();
 
         let scan = vec![
             Token {
@@ -267,12 +186,14 @@ mod tests {
     #[test]
     fn parse_simple() {
         //setup
-        let productions = build_prods(&[
+        let mut grammar_builder = GrammarBuilder::new();
+        grammar_builder.add_productions(build_prods(&[
             "S BOF A EOF",
             "A x",
             "A A x"
-        ]);
-        let grammar = Grammar::from(productions);
+        ]));
+        grammar_builder.try_mark_start("S");
+        let grammar = grammar_builder.build();
 
         let scan = vec![
             Token {
@@ -307,13 +228,15 @@ mod tests {
     #[test]
     fn parse_expressions() {
         //setup
-        let productions = build_prods(&[
+        let mut grammar_builder = GrammarBuilder::new();
+        grammar_builder.add_productions(build_prods(&[
             "S expr",
             "S S OP expr",
             "expr ( S )",
             "expr ID",
-        ]);
-        let grammar = Grammar::from(productions);
+        ]));
+        grammar_builder.try_mark_start("S");
+        let grammar = grammar_builder.build();
 
         let scan = "( ID OP ID ) OP ID OP ( ID )".split_whitespace()
             .map(|kind| Token {
@@ -357,7 +280,8 @@ mod tests {
     #[test]
     fn parse_lacs_math() {
         //setup
-        let productions = build_prods(&[
+        let mut grammar_builder = GrammarBuilder::new();
+        grammar_builder.add_productions(build_prods(&[
             "Sum Sum AS Product",
             "Sum Product",
             "Product Product MD Factor",
@@ -365,8 +289,9 @@ mod tests {
             "Factor LPAREN Sum RPAREN",
             "Factor Number",
             "Number NUM",
-        ]);
-        let grammar = Grammar::from(productions);
+        ]));
+        grammar_builder.try_mark_start("Sum");
+        let grammar = grammar_builder.build();
 
         let scan = "NUM AS LPAREN NUM MD NUM AS NUM RPAREN".split_whitespace()
             .map(|kind| Token {
@@ -414,14 +339,16 @@ mod tests {
     #[test]
     fn parse_brackets() {
         //setup
-        let productions = build_prods(&[
+        let mut grammar_builder = GrammarBuilder::new();
+        grammar_builder.add_productions(build_prods(&[
             "s s b",
             "s ",
             "b LBRACKET s RBRACKET",
             "b w",
             "w WHITESPACE",
-        ]);
-        let grammar = Grammar::from(productions);
+        ]));
+        grammar_builder.try_mark_start("s");
+        let grammar = grammar_builder.build();
 
         let scan = "WHITESPACE LBRACKET WHITESPACE LBRACKET WHITESPACE RBRACKET WHITESPACE RBRACKET LBRACKET RBRACKET WHITESPACE".split_whitespace()
             .map(|kind| Token {
@@ -482,12 +409,14 @@ mod tests {
     #[test]
     fn parse_deep_epsilon() {
         //setup
-        let productions = build_prods(&[
+        let mut grammar_builder = GrammarBuilder::new();
+        grammar_builder.add_productions(build_prods(&[
             "s w w w w",
             "w WHITESPACE",
             "w ",
-        ]);
-        let grammar = Grammar::from(productions);
+        ]));
+        grammar_builder.try_mark_start("s");
+        let grammar = grammar_builder.build();
 
         let scan = "WHITESPACE".split_whitespace()
             .map(|kind| Token {
@@ -517,7 +446,8 @@ mod tests {
     #[test]
     fn advanced_parse_build() {
         //setup
-        let productions = build_prods(&[
+        let mut grammar_builder = GrammarBuilder::new();
+        grammar_builder.add_productions(build_prods(&[
             "sum sum PM prod",
             "sum prod",
             "prod prod MD fac",
@@ -525,9 +455,10 @@ mod tests {
             "fac LPAREN sum RPAREN",
             "fac num",
             "num DIGIT num",
-            "num DIGIT"
-        ]);
-        let grammar = Grammar::from(productions);
+            "num DIGIT",
+        ]));
+        grammar_builder.try_mark_start("sum");
+        let grammar = grammar_builder.build();
 
         let scan = vec![
             Token { kind: "DIGIT".to_string(), lexeme: "1".to_string() },
@@ -581,8 +512,10 @@ mod tests {
     #[test]
     fn parse_must_consume() {
         //setup
-        let productions = build_prods(&["s "]);
-        let grammar = Grammar::from(productions);
+        let mut grammar_builder = GrammarBuilder::new();
+        grammar_builder.add_productions(build_prods(&["s "]));
+        grammar_builder.try_mark_start("s");
+        let grammar = grammar_builder.build();
 
         let scan = vec![Token {
             kind: "kind".to_string(),
