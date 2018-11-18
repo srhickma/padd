@@ -27,8 +27,9 @@ pub trait CDFA<State, Kind> {
     fn start(&self) -> State;
 }
 
-pub trait CDFABuilder<State, Kind> {
+pub trait CDFABuilder<State, Kind, CDFAType> {
     fn new() -> Self;
+    fn build(self) -> Result<CDFAType, CDFAError>;
 
     fn set_alphabet(&mut self, chars: impl Iterator<Item=char>) -> &mut Self;
     fn mark_accepting(&mut self, state: &State) -> &mut Self;
