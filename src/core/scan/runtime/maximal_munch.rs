@@ -1,11 +1,11 @@
 use std::collections::LinkedList;
 
-use core::scan;
-use core::scan::FAIL_SEQUENCE_LENGTH;
-use core::scan::runtime::CDFA;
 use core::data::Data;
 use core::data::stream::Stream;
 use core::data::stream::StreamSource;
+use core::scan;
+use core::scan::FAIL_SEQUENCE_LENGTH;
+use core::scan::runtime::CDFA;
 use core::scan::runtime::Scanner;
 use core::scan::Token;
 

@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
 use core::data::Data;
-use core::parse::Tree;
-use core::parse::Production;
 use core::fmt::pattern::*;
+use core::parse::Production;
+use core::parse::Tree;
 
 mod pattern;
 

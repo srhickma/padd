@@ -1,13 +1,13 @@
-use std::collections::HashSet;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::usize;
 
-use core::data::stream::StreamConsumer;
 use core::data::map::CEHashMap;
+use core::data::stream::StreamConsumer;
+use core::scan::runtime::alphabet::HashedAlphabet;
 use core::scan::runtime::CDFA;
 use core::scan::runtime::CDFABuilder;
 use core::scan::runtime::CDFAError;
-use core::scan::runtime::alphabet::HashedAlphabet;
 
 pub struct EncodedCDFABuilder {
     encoder: HashMap<String, usize>,
@@ -304,11 +304,12 @@ impl TransitionNode {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use core::data::Data;
     use core::data::stream::StreamSource;
-    use core::scan::Token;
     use core::scan::runtime;
+    use core::scan::Token;
+
+    use super::*;
 
     #[test]
     fn scan_binary() {
