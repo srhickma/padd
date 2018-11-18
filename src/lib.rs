@@ -6,14 +6,14 @@ use std::error;
 use std::fmt;
 
 use core::data::stream::StreamSource;
+use core::fmt::Formatter;
+use core::parse;
+use core::parse::grammar::Grammar;
+use core::parse::Parser;
 use core::scan;
 use core::scan::runtime;
-use core::scan::runtime::Scanner;
 use core::scan::runtime::ecdfa::EncodedCDFA;
-use core::parse;
-use core::parse::Grammar;
-use core::parse::Parser;
-use core::fmt::Formatter;
+use core::scan::runtime::Scanner;
 use core::spec;
 
 mod core;
@@ -133,8 +133,9 @@ pub type ThreadPool<Payload> = core::util::thread_pool::ThreadPool<Payload>;
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::error::Error;
+
+    use super::*;
 
     #[test]
     fn failed_scan_input() {

@@ -1,10 +1,10 @@
+use core::data::Data;
+use core::parse;
+use core::parse::grammar::Grammar;
 use core::parse::Parser;
-use core::parse::Grammar;
 use core::parse::Production;
 use core::parse::Tree;
-use core::parse;
 use core::scan::Token;
-use core::data::Data;
 
 pub struct EarleyParser;
 
@@ -13,8 +13,7 @@ impl Parser for EarleyParser {
         let mut parse_chart: Vec<Vec<Edge>> = vec![];
         let mut chart: Vec<Vec<Item>> = vec![vec![]];
 
-        grammar.productions.iter()
-            .filter(|prod| prod.lhs == grammar.start)
+        grammar.productions_for_lhs(grammar.start()).unwrap().iter()
             .for_each(|prod| {
                 let item = Item {
                     rule: prod,
@@ -42,7 +41,7 @@ impl Parser for EarleyParser {
                         });
                     }
                     Some(symbol) => {
-                        if grammar.terminals.contains(symbol) {
+                        if grammar.is_terminal(symbol) {
                             scan_op(&item, i, symbol, &scan, &mut chart);
                         } else {
                             predict_op(&item, i, symbol, grammar, &mut chart);
@@ -55,8 +54,7 @@ impl Parser for EarleyParser {
         }
 
         fn predict_op<'a, 'b>(item: &Item<'a>, i: usize, symbol: &'a str, grammar: &'a Grammar, chart: &'b mut Vec<Vec<Item<'a>>>) {
-            grammar.productions.iter()
-                .filter(|prod| prod.lhs == symbol)
+            grammar.productions_for_lhs(symbol).unwrap().iter()
                 .for_each(|prod| {
                     append(
                         Item {
@@ -67,7 +65,7 @@ impl Parser for EarleyParser {
                         &mut chart[i],
                     );
 
-                    if grammar.nullable(&prod) {
+                    if grammar.is_nullable(&prod) {
                         append(
                             Item {
                                 rule: item.rule,
@@ -131,7 +129,7 @@ impl Parser for EarleyParser {
 
         fn recognized<'a, 'b>(grammar: &'a Grammar, chart: &'b Vec<Vec<Item<'a>>>) -> bool {
             chart.last().unwrap().iter()
-                .any(|item| item.rule.lhs == grammar.start
+                .any(|item| item.rule.lhs == *grammar.start()
                     && item.next >= item.rule.rhs.len()
                     && item.start == 0)
         }
@@ -191,7 +189,7 @@ impl Parser for EarleyParser {
             let finish: Node = chart.len() - 1;
 
             let first_edge = chart[start].iter()
-                .find(|edge| edge.finish == finish && edge.rule.unwrap().lhs == grammar.start);
+                .find(|edge| edge.finish == finish && edge.rule.unwrap().lhs == *grammar.start());
             match first_edge {
                 None => panic!("Failed to find start item to begin parse"),
                 Some(edge) => recur(start, edge, grammar, scan, &chart)
@@ -209,7 +207,7 @@ impl Parser for EarleyParser {
             let edges = |depth: usize, node: Node| -> Vec<Edge> {
                 if depth < bottom {
                     let symbol = &symbols[depth];
-                    if grammar.terminals.contains(symbol) {
+                    if grammar.is_terminal(symbol) {
                         if scan[node].kind == *symbol {
                             return vec![Edge {
                                 rule: None,

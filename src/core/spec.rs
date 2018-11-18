@@ -1,23 +1,24 @@
 use std;
 use std::error;
 
-use core::util::string_utils;
 use core::fmt;
-use core::fmt::PatternPair;
 use core::fmt::Formatter;
+use core::fmt::PatternPair;
 use core::parse;
-use core::parse::Grammar;
+use core::parse::grammar::Grammar;
+use core::parse::grammar::GrammarBuilder;
 use core::parse::Production;
 use core::parse::Tree;
 use core::scan;
-use core::scan::State;
 use core::scan::compile;
-use core::scan::compile::DFA;
 use core::scan::compile::CompileTransitionDelta;
+use core::scan::compile::DFA;
 use core::scan::runtime;
 use core::scan::runtime::CDFABuilder;
 use core::scan::runtime::ecdfa::EncodedCDFA;
 use core::scan::runtime::ecdfa::EncodedCDFABuilder;
+use core::scan::State;
+use core::util::string_utils;
 
 static SPEC_ALPHABET: &'static str = "`-=~!@#$%^&*()_+{}|[]\\;':\"<>?,./QWERTYUIOPASDFGHJKLZXCVBNM1234567890abcdefghijklmnopqrstuvwxyz \n\t";
 pub static DEF_MATCHER: &'static str = "_";
@@ -198,7 +199,12 @@ lazy_static! {
             "ids ",
         ]);
 
-    static ref SPEC_GRAMMAR: Grammar = Grammar::from(SPEC_PRODUCTIONS.clone());
+    static ref SPEC_GRAMMAR: Grammar = {
+        let mut builder = GrammarBuilder::new();
+        builder.try_mark_start(&SPEC_PRODUCTIONS.first().unwrap().lhs);
+        builder.add_productions(SPEC_PRODUCTIONS.clone());
+        builder.build()
+    };
 }
 
 pub fn generate_spec(parse: &Tree) -> Result<(EncodedCDFA, Grammar, Formatter), GenError> {
@@ -362,38 +368,48 @@ fn add_ecdfa_tokenizer(state: &State, kind: &String, builder: &mut EncodedCDFABu
 }
 
 fn generate_grammar(tree: &Tree) -> (Grammar, Vec<PatternPair>) {
-    let mut productions: Vec<Production> = vec![];
-    let mut pattern_pairs: Vec<PatternPair> = vec![];
-    generate_grammar_prods(tree.get_child(0), &mut productions, &mut pattern_pairs);
+    let mut builder = GrammarBuilder::new();
+    let mut pattern_pairs: Vec<PatternPair> = Vec::new();
 
-    (Grammar::from(productions), pattern_pairs)
+    generate_grammar_prods(tree.get_child(0), &mut pattern_pairs, &mut builder);
+
+    (builder.build(), pattern_pairs)
 }
 
-fn generate_grammar_prods<'a, 'b>(prods_node: &'a Tree, accumulator: &'b mut Vec<Production>, pp_accumulator: &'b mut Vec<PatternPair>) {
+fn generate_grammar_prods<'a, 'b>(
+    prods_node: &'a Tree,
+    pp_accumulator: &'b mut Vec<PatternPair>,
+    builder: &'b mut GrammarBuilder,
+) {
     if prods_node.children.len() == 2 {
-        generate_grammar_prods(prods_node.get_child(0), accumulator, pp_accumulator);
+        generate_grammar_prods(prods_node.get_child(0), pp_accumulator, builder);
     }
 
     let prod_node = prods_node.get_child(prods_node.children.len() - 1);
 
     let id = &prod_node.get_child(0).lhs.lexeme;
 
-    generate_grammar_rhss(prod_node.get_child(1), id, accumulator, pp_accumulator);
+    generate_grammar_rhss(prod_node.get_child(1), id, pp_accumulator, builder);
 }
 
-fn generate_grammar_rhss<'a, 'b>(rhss_node: &'a Tree, lhs: &'a String, accumulator: &'b mut Vec<Production>, pp_accumulator: &'b mut Vec<PatternPair>) {
+fn generate_grammar_rhss<'a, 'b>(
+    rhss_node: &'a Tree,
+    lhs: &'a String,
+    pp_accumulator: &'b mut Vec<PatternPair>,
+    builder: &'b mut GrammarBuilder,
+) {
     let rhs_node = rhss_node.get_child(rhss_node.children.len() - 1);
 
     let mut ids: Vec<String> = Vec::new();
-    let mut optional_productions: Vec<Production> = Vec::new();
-    generate_grammar_ids(rhs_node.get_child(1), &mut ids, &mut optional_productions);
+    generate_grammar_ids(rhs_node.get_child(1), &mut ids, builder);
 
     let production = Production {
         lhs: lhs.clone(),
         rhs: ids,
     };
 
-    accumulator.push(production);
+    builder.try_mark_start(lhs);
+    builder.add_production(production.clone());
 
     let pattopt_node = rhs_node.get_child(2);
     if !pattopt_node.is_empty() {
@@ -402,22 +418,23 @@ fn generate_grammar_rhss<'a, 'b>(rhss_node: &'a Tree, lhs: &'a String, accumulat
         let pattern = string_utils::replace_escapes(pattern_string);
 
         pp_accumulator.push(PatternPair {
-            production: accumulator.last().unwrap().clone(),
+            production,
             pattern,
         });
     }
 
-    accumulator.append(&mut optional_productions);
-
     if rhss_node.children.len() == 2 {
-        generate_grammar_rhss(rhss_node.get_child(0), lhs, accumulator, pp_accumulator);
+        generate_grammar_rhss(rhss_node.get_child(0), lhs, pp_accumulator, builder);
     }
 }
 
-//TODO use a builder to generate the grammar productions
-fn generate_grammar_ids<'a, 'b>(ids_node: &'a Tree, ids_accumulator: &'b mut Vec<String>, production_accumulator: &'b mut Vec<Production>) {
+fn generate_grammar_ids<'a, 'b>(
+    ids_node: &'a Tree,
+    ids_accumulator: &'b mut Vec<String>,
+    builder: &'b mut GrammarBuilder,
+) {
     if !ids_node.is_empty() {
-        generate_grammar_ids(ids_node.get_child(0), ids_accumulator, production_accumulator);
+        generate_grammar_ids(ids_node.get_child(0), ids_accumulator, builder);
 
         let id_node = ids_node.get_child(1);
         let id = match &id_node.lhs.kind[..] {
@@ -425,22 +442,7 @@ fn generate_grammar_ids<'a, 'b>(ids_node: &'a Tree, ids_accumulator: &'b mut Vec
             "COPTID" => {
                 let lex = &id_node.lhs.lexeme[..];
                 let dest = &lex[1..lex.len() - 1];
-
-                //TODO have a more generic way of adding "internal" states of the form name#real_name
-                let opt_state: String = format!("opt#{}", dest);
-
-                if !production_accumulator.iter().any(|prod| prod.lhs == opt_state) {
-                    production_accumulator.push(Production {
-                        lhs: opt_state.clone(),
-                        rhs: vec![String::from(dest)],
-                    });
-                    production_accumulator.push(Production {
-                        lhs: opt_state.clone(),
-                        rhs: Vec::new(),
-                    });
-                }
-
-                opt_state
+                builder.add_optional_state(dest)
             }
             &_ => panic!("Production identifier is neither an ID or a COPTID")
         };
@@ -495,9 +497,10 @@ impl From<parse::Error> for ParseError {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use core::data::Data;
     use core::data::stream::StreamSource;
+
+    use super::*;
 
     #[test]
     fn parse_spec_spaces() {

@@ -1,18 +1,19 @@
 use std::error;
 use std::fmt;
 
-use core::util::string_utils;
 use core::data::Data;
+use core::parse;
 use core::parse::build_prods;
 use core::parse::def_parser;
-use core::parse;
-use core::parse::Grammar;
+use core::parse::grammar::Grammar;
+use core::parse::grammar::GrammarBuilder;
 use core::parse::Production;
 use core::parse::Tree;
 use core::scan;
 use core::scan::compile;
-use core::scan::compile::DFA;
 use core::scan::compile::CompileTransitionDelta;
+use core::scan::compile::DFA;
+use core::util::string_utils;
 
 static PATTERN_ALPHABET: &'static str =
     "{}[];=1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ \n\t`~!@#$%^&*()_-+:'\"<>,.?/\\|";
@@ -145,7 +146,10 @@ lazy_static! {
     };
 
     static ref PATTERN_GRAMMAR: Grammar = {
-        Grammar::from(PATTERN_PRODUCTIONS.clone())
+        let mut builder = GrammarBuilder::new();
+        builder.try_mark_start(&PATTERN_PRODUCTIONS.first().unwrap().lhs);
+        builder.add_productions(PATTERN_PRODUCTIONS.clone());
+        builder.build()
     };
 }
 
@@ -174,13 +178,18 @@ pub fn generate_pattern(input: &str, prod: &Production) -> Result<Pattern, Build
     generate_pattern_internal(&parse, prod)
 }
 
-pub fn generate_pattern_internal<'a>(root: &'a Tree, prod: &Production) -> Result<Pattern, BuildError> {
+pub fn generate_pattern_internal(root: &Tree, prod: &Production) -> Result<Pattern, BuildError> {
     let mut segments: Vec<Segment> = vec![];
     generate_pattern_recursive(&root, &mut segments, prod, 0)?;
     Ok(Pattern { segments })
 }
 
-fn generate_pattern_recursive<'a>(node: &'a Tree, accumulator: &'a mut Vec<Segment>, prod: &Production, captures: usize) -> Result<usize, BuildError> {
+fn generate_pattern_recursive<'a>(
+    node: &'a Tree,
+    accumulator: &'a mut Vec<Segment>,
+    prod: &Production,
+    captures: usize,
+) -> Result<usize, BuildError> {
     match &node.lhs.kind[..] {
         "FILLER" | "ALPHA" | "NUM" => {
             let name = string_utils::replace_escapes(&node.lhs.lexeme[..]);
@@ -225,7 +234,11 @@ fn generate_pattern_recursive<'a>(node: &'a Tree, accumulator: &'a mut Vec<Segme
     Ok(captures)
 }
 
-fn parse_decls<'a>(decls_node: &'a Tree, accumulator: &'a mut Vec<Declaration>, prod: &Production) -> Result<(), BuildError> {
+fn parse_decls<'a>(
+    decls_node: &'a Tree,
+    accumulator: &'a mut Vec<Declaration>,
+    prod: &Production,
+) -> Result<(), BuildError> {
     accumulator.push(parse_decl(decls_node.children.last().unwrap(), prod)?);
     if decls_node.children.len() == 3 {
         parse_decls(decls_node.get_child(0), accumulator, prod)?;
