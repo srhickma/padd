@@ -12,25 +12,46 @@ pub struct Formatter {
 }
 
 impl Formatter {
-    pub fn create(patterns: Vec<PatternPair>) -> Result<Formatter, BuildError> {
-        let mut pattern_map = HashMap::new();
-        for pattern_pair in patterns {
-            pattern_map.insert(
-                pattern_pair.production.to_string(),
-                generate_pattern(&pattern_pair.pattern[..], &pattern_pair.production)?,
-            );
-        }
-        Ok(Formatter {
-            pattern_map,
-        })
-    }
-
-    pub fn format<'a>(&self, parse: &'a Tree) -> String {
+    pub fn format(&self, parse: &Tree) -> String {
         let format_job = FormatJob {
             parse,
             pattern_map: &self.pattern_map,
         };
         format_job.run()
+    }
+}
+
+pub struct FormatterBuilder {
+    pattern_map: HashMap<String, Pattern>,
+    memory: HashMap<String, Pattern>,
+}
+
+impl FormatterBuilder {
+    pub fn new() -> FormatterBuilder {
+        FormatterBuilder {
+            pattern_map: HashMap::new(),
+            memory: HashMap::new(),
+        }
+    }
+
+    pub fn build(self) -> Formatter {
+        Formatter {
+            pattern_map: self.pattern_map
+        }
+    }
+
+    pub fn add_pattern(&mut self, pair: PatternPair) -> Result<(), BuildError> {
+        let key = pair.production.to_string();
+
+        if let Some(pattern) = self.memory.get(&pair.pattern) {
+            self.pattern_map.insert(key, pattern.clone());
+            return Ok(());
+        }
+
+        let pattern = generate_pattern(&pair.pattern[..], &pair.production)?;
+        self.memory.insert(pair.pattern, pattern.clone());
+        self.pattern_map.insert(key, pattern);
+        Ok(())
     }
 }
 

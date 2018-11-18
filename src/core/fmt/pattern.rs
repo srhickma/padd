@@ -153,21 +153,25 @@ lazy_static! {
     };
 }
 
+#[derive(Clone)]
 pub struct Pattern {
     pub segments: Vec<Segment>,
 }
 
+#[derive(Clone)]
 pub enum Segment {
     Filler(String),
     Substitution(String),
     Capture(Capture),
 }
 
+#[derive(Clone)]
 pub struct Capture {
     pub child_index: usize,
     pub declarations: Vec<Declaration>,
 }
 
+#[derive(Clone)]
 pub struct Declaration {
     pub key: String,
     pub value: Option<Pattern>,
