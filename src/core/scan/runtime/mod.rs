@@ -1,9 +1,9 @@
-use std::fmt;
 use std::error;
+use std::fmt;
 
 use core::data::Data;
-use core::data::stream::StreamSource;
 use core::data::stream::StreamConsumer;
+use core::data::stream::StreamSource;
 use core::scan;
 use core::scan::Token;
 

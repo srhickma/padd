@@ -1,11 +1,11 @@
 use std::cmp;
 
-use core::spec::DEF_MATCHER;
 use core::scan;
-use core::scan::Token;
-use core::scan::FAIL_SEQUENCE_LENGTH;
 use core::scan::compile::DFA;
 use core::scan::compile::Scanner;
+use core::scan::FAIL_SEQUENCE_LENGTH;
+use core::scan::Token;
+use core::spec::DEF_MATCHER;
 
 pub struct MaximalMunchScanner;
 

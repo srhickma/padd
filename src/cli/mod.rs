@@ -1,20 +1,20 @@
-extern crate regex;
-extern crate stopwatch;
 extern crate clap;
 extern crate colored;
+extern crate regex;
+extern crate stopwatch;
 
-use self::regex::Regex;
-use self::stopwatch::Stopwatch;
-use self::clap::{Arg, ArgMatches, App};
-use self::colored::{Colorize, ColoredString};
-
-use std::io::{self, Read, Write, Seek, SeekFrom, BufRead, BufReader};
 use std::fs::{self, File, OpenOptions};
+use std::io::{self, BufRead, BufReader, Read, Seek, SeekFrom, Write};
 use std::path::Path;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
+use std::sync::atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering};
 
 use padd::{self, FormatJobRunner, Stream, ThreadPool};
+
+use self::clap::{App, Arg, ArgMatches};
+use self::colored::{ColoredString, Colorize};
+use self::regex::Regex;
+use self::stopwatch::Stopwatch;
 
 mod logger;
 

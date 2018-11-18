@@ -1,9 +1,9 @@
-use std::thread;
-use std::sync::Arc;
-use std::sync::mpsc::{self, Sender, SyncSender, Receiver};
 use std::collections::LinkedList;
-use std::fmt;
 use std::error;
+use std::fmt;
+use std::sync::Arc;
+use std::sync::mpsc::{self, Receiver, Sender, SyncSender};
+use std::thread;
 
 pub struct ThreadPool<Payload: 'static + Send> {
     queue_tx: SyncSender<Signal<Payload>>,
@@ -218,10 +218,11 @@ enum WorkerStatus {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::error::Error;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::Duration;
-    use std::error::Error;
+
+    use super::*;
 
     #[test]
     fn single_worker_fast_main() {
