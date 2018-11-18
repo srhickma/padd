@@ -22,6 +22,9 @@ static FORMATTED: AtomicUsize = ATOMIC_USIZE_INIT;
 static TOTAL: AtomicUsize = ATOMIC_USIZE_INIT;
 
 pub fn run() {
+    let mut sw = Stopwatch::new();
+    sw.start();
+
     let matches = build_app();
 
     let spec_path = matches.value_of("spec").unwrap();
@@ -74,9 +77,6 @@ pub fn run() {
 
     println!();
 
-    let mut sw = Stopwatch::new();
-    sw.start();
-
     let fjr_arc: Arc<FormatJobRunner> = Arc::new(fjr);
 
     let pool: ThreadPool<FormatPayload> = ThreadPool::spawn(
@@ -103,8 +103,6 @@ pub fn run() {
     pool.terminate_and_join().unwrap();
 
     sw.stop();
-
-    println!();
     print_final_status(sw.elapsed_ms());
 }
 
@@ -303,5 +301,6 @@ fn print_final_status(elapsed_ms: i64) {
         failed_msg = failed_msg.bright_red()
     }
 
+    println!();
     logger::info(format!("COMPLETE: {}ms : {} processed, {}, {}", elapsed_ms, total, formatted_msg, failed_msg));
 }
