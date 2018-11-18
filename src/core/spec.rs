@@ -3,6 +3,7 @@ use std::error;
 
 use core::fmt;
 use core::fmt::Formatter;
+use core::fmt::FormatterBuilder;
 use core::fmt::PatternPair;
 use core::parse;
 use core::parse::grammar::Grammar;
@@ -209,8 +210,7 @@ lazy_static! {
 
 pub fn generate_spec(parse: &Tree) -> Result<(EncodedCDFA, Grammar, Formatter), GenError> {
     let ecdfa = generate_ecdfa(parse.get_child(0))?;
-    let (grammar, pattern_pairs) = generate_grammar(parse.get_child(1));
-    let formatter = Formatter::create(pattern_pairs)?;
+    let (grammar, formatter) = traverse_grammar(parse.get_child(1))?;
     Ok((ecdfa, grammar, formatter))
 }
 
@@ -267,7 +267,10 @@ fn generate_ecdfa_alphabet(tree: &Tree, builder: &mut EncodedCDFABuilder) {
     builder.set_alphabet(alphabet.chars());
 }
 
-fn generate_ecdfa_states<'a>(states_node: &Tree, builder: &mut EncodedCDFABuilder) -> Result<(), runtime::CDFAError> {
+fn generate_ecdfa_states(
+    states_node: &Tree,
+    builder: &mut EncodedCDFABuilder,
+) -> Result<(), runtime::CDFAError> {
     let state_node = states_node.get_child(states_node.children.len() - 1);
 
     let sdec_node = state_node.get_child(0);
@@ -308,7 +311,11 @@ fn generate_ecdfa_targets<'a>(targets_node: &'a Tree, accumulator: &mut Vec<&'a 
     }
 }
 
-fn generate_ecdfa_trans<'a>(trans_node: &'a Tree, sources: &Vec<&State>, builder: &mut EncodedCDFABuilder) -> Result<(), runtime::CDFAError> {
+fn generate_ecdfa_trans(
+    trans_node: &Tree,
+    sources: &Vec<&State>,
+    builder: &mut EncodedCDFABuilder,
+) -> Result<(), runtime::CDFAError> {
     let tran_node = trans_node.get_child(trans_node.children.len() - 1);
 
     let trand_node = tran_node.get_child(2);
@@ -336,7 +343,12 @@ fn generate_ecdfa_trans<'a>(trans_node: &'a Tree, sources: &Vec<&State>, builder
     }
 }
 
-fn generate_ecdfa_mtcs<'a>(mtcs_node: &'a Tree, sources: &Vec<&State>, dest: &State, builder: &mut EncodedCDFABuilder) -> Result<(), runtime::CDFAError> {
+fn generate_ecdfa_mtcs(
+    mtcs_node: &Tree,
+    sources: &Vec<&State>,
+    dest: &State,
+    builder: &mut EncodedCDFABuilder,
+) -> Result<(), runtime::CDFAError> {
     let matcher = mtcs_node.children.last().unwrap();
     let matcher_string: String = matcher.lhs.lexeme.chars()
         .skip(1)
@@ -367,49 +379,49 @@ fn add_ecdfa_tokenizer(state: &State, kind: &String, builder: &mut EncodedCDFABu
     }
 }
 
-fn generate_grammar(tree: &Tree) -> (Grammar, Vec<PatternPair>) {
-    let mut builder = GrammarBuilder::new();
-    let mut pattern_pairs: Vec<PatternPair> = Vec::new();
+fn traverse_grammar(tree: &Tree) -> Result<(Grammar, Formatter), GenError> {
+    let mut grammar_builder = GrammarBuilder::new();
+    let mut formatter_builder = FormatterBuilder::new();
 
-    generate_grammar_prods(tree.get_child(0), &mut pattern_pairs, &mut builder);
+    generate_grammar_prods(tree.get_child(0), &mut grammar_builder, &mut formatter_builder)?;
 
-    (builder.build(), pattern_pairs)
+    Ok((grammar_builder.build(), formatter_builder.build()))
 }
 
-fn generate_grammar_prods<'a, 'b>(
-    prods_node: &'a Tree,
-    pp_accumulator: &'b mut Vec<PatternPair>,
-    builder: &'b mut GrammarBuilder,
-) {
+fn generate_grammar_prods(
+    prods_node: &Tree,
+    grammar_builder: &mut GrammarBuilder,
+    formatter_builder: &mut FormatterBuilder,
+) -> Result<(), GenError> {
     if prods_node.children.len() == 2 {
-        generate_grammar_prods(prods_node.get_child(0), pp_accumulator, builder);
+        generate_grammar_prods(prods_node.get_child(0), grammar_builder, formatter_builder)?;
     }
 
     let prod_node = prods_node.get_child(prods_node.children.len() - 1);
 
     let id = &prod_node.get_child(0).lhs.lexeme;
 
-    generate_grammar_rhss(prod_node.get_child(1), id, pp_accumulator, builder);
+    generate_grammar_rhss(prod_node.get_child(1), id, grammar_builder, formatter_builder)
 }
 
-fn generate_grammar_rhss<'a, 'b>(
-    rhss_node: &'a Tree,
-    lhs: &'a String,
-    pp_accumulator: &'b mut Vec<PatternPair>,
-    builder: &'b mut GrammarBuilder,
-) {
+fn generate_grammar_rhss(
+    rhss_node: &Tree,
+    lhs: &String,
+    grammar_builder: &mut GrammarBuilder,
+    formatter_builder: &mut FormatterBuilder,
+) -> Result<(), GenError> {
     let rhs_node = rhss_node.get_child(rhss_node.children.len() - 1);
 
     let mut ids: Vec<String> = Vec::new();
-    generate_grammar_ids(rhs_node.get_child(1), &mut ids, builder);
+    generate_grammar_ids(rhs_node.get_child(1), &mut ids, grammar_builder);
 
     let production = Production {
         lhs: lhs.clone(),
         rhs: ids,
     };
 
-    builder.try_mark_start(lhs);
-    builder.add_production(production.clone());
+    grammar_builder.try_mark_start(lhs);
+    grammar_builder.add_production(production.clone());
 
     let pattopt_node = rhs_node.get_child(2);
     if !pattopt_node.is_empty() {
@@ -417,24 +429,26 @@ fn generate_grammar_rhss<'a, 'b>(
         let pattern_string = &pattc[..].trim_matches('`');
         let pattern = string_utils::replace_escapes(pattern_string);
 
-        pp_accumulator.push(PatternPair {
+        formatter_builder.add_pattern(PatternPair {
             production,
             pattern,
-        });
+        })?;
     }
 
     if rhss_node.children.len() == 2 {
-        generate_grammar_rhss(rhss_node.get_child(0), lhs, pp_accumulator, builder);
+        generate_grammar_rhss(rhss_node.get_child(0), lhs, grammar_builder, formatter_builder)?;
     }
+
+    Ok(())
 }
 
-fn generate_grammar_ids<'a, 'b>(
-    ids_node: &'a Tree,
-    ids_accumulator: &'b mut Vec<String>,
-    builder: &'b mut GrammarBuilder,
+fn generate_grammar_ids(
+    ids_node: &Tree,
+    ids_accumulator: &mut Vec<String>,
+    grammar_builder: &mut GrammarBuilder,
 ) {
     if !ids_node.is_empty() {
-        generate_grammar_ids(ids_node.get_child(0), ids_accumulator, builder);
+        generate_grammar_ids(ids_node.get_child(0), ids_accumulator, grammar_builder);
 
         let id_node = ids_node.get_child(1);
         let id = match &id_node.lhs.kind[..] {
@@ -442,7 +456,7 @@ fn generate_grammar_ids<'a, 'b>(
             "COPTID" => {
                 let lex = &id_node.lhs.lexeme[..];
                 let dest = &lex[1..lex.len() - 1];
-                builder.add_optional_state(dest)
+                grammar_builder.add_optional_state(dest)
             }
             &_ => panic!("Production identifier is neither an ID or a COPTID")
         };
