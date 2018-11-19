@@ -54,28 +54,33 @@ impl Parser for EarleyParser {
         }
 
         fn predict_op<'a, 'b>(item: &Item<'a>, i: usize, symbol: &'a str, grammar: &'a Grammar, chart: &'b mut Vec<Vec<Item<'a>>>) {
-            grammar.productions_for_lhs(symbol).unwrap().iter()
-                .for_each(|prod| {
-                    append(
-                        Item {
-                            rule: prod,
-                            start: i,
-                            next: 0,
-                        },
-                        &mut chart[i],
-                    );
+            let mut nullable_found = false;
 
-                    if grammar.is_nullable(&prod) {
-                        append(
-                            Item {
-                                rule: item.rule,
-                                start: item.start,
-                                next: item.next + 1,
-                            },
-                            &mut chart[i],
-                        );
-                    }
-                });
+            for prod in grammar.productions_for_lhs(symbol).unwrap() {
+                append(
+                    Item {
+                        rule: prod,
+                        start: i,
+                        next: 0,
+                    },
+                    &mut chart[i],
+                );
+
+                if !nullable_found && grammar.is_nullable(&prod) {
+                    nullable_found = true;
+                }
+            }
+
+            if nullable_found {
+                append(
+                    Item {
+                        rule: item.rule,
+                        start: item.start,
+                        next: item.next + 1,
+                    },
+                    &mut chart[i],
+                );
+            }
         }
 
         fn scan_op<'a, 'b>(item: &Item<'a>, i: usize, symbol: &'a str, scan: &'a Vec<Token<String>>, chart: &'b mut Vec<Vec<Item<'a>>>) {
