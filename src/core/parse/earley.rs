@@ -55,20 +55,26 @@ impl Parser for EarleyParser {
 
         fn predict_op<'a, 'b>(item: &Item<'a>, i: usize, symbol: &'a str, grammar: &'a Grammar, chart: &'b mut Vec<Vec<Item<'a>>>) {
             let mut nullable_found = false;
+            let mut items_to_add = Vec::new();
 
             for prod in grammar.productions_for_lhs(symbol).unwrap() {
-                append(
-                    Item {
-                        rule: prod,
-                        start: i,
-                        next: 0,
-                    },
-                    &mut chart[i],
-                );
+                let new_item = Item {
+                    rule: prod,
+                    start: i,
+                    next: 0,
+                };
+
+                if !chart[i].contains(&new_item) {
+                    items_to_add.push(new_item);
+                }
 
                 if !nullable_found && grammar.is_nullable(&prod) {
                     nullable_found = true;
                 }
+            }
+
+            for new_item in items_to_add {
+                unsafe_append(new_item, &mut chart[i]);
             }
 
             if nullable_found {
@@ -86,7 +92,7 @@ impl Parser for EarleyParser {
         fn scan_op<'a, 'b>(item: &Item<'a>, i: usize, symbol: &'a str, scan: &'a Vec<Token<String>>, chart: &'b mut Vec<Vec<Item<'a>>>) {
             if i < scan.len() && scan[i].kind == symbol.to_string() {
                 if chart.len() <= i + 1 {
-                    chart.push(vec![])
+                    chart.push(Vec::new())
                 }
 
                 unsafe_append(
@@ -101,21 +107,27 @@ impl Parser for EarleyParser {
         }
 
         fn complete_op<'a, 'b>(item: &Item<'a>, i: usize, chart: &'b mut Vec<Vec<Item<'a>>>) {
-            let mut advanced: Vec<Item> = vec![];
+            let mut items_to_add: Vec<Item> = Vec::new();
 
-            chart[item.start].iter()
-                .filter(|old_item| match old_item.next_symbol() {
-                    None => false,
-                    Some(sym) => sym == item.rule.lhs,
-                })
-                .for_each(|old_item| advanced.push(Item {
-                    rule: old_item.rule,
-                    start: old_item.start,
-                    next: old_item.next + 1,
-                }));
+            for old_item in &chart[item.start] {
+                match old_item.next_symbol() {
+                    None => {}
+                    Some(sym) => if sym == item.rule.lhs {
+                        let new_item = Item {
+                            rule: old_item.rule,
+                            start: old_item.start,
+                            next: old_item.next + 1,
+                        };
 
-            for item in advanced {
-                append(item, &mut chart[i]);
+                        if !chart[i].contains(&new_item) {
+                            items_to_add.push(new_item);
+                        }
+                    }
+                }
+            }
+
+            for new_item in items_to_add {
+                unsafe_append(new_item, &mut chart[i]);
             }
         }
 
