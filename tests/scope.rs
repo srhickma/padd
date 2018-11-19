@@ -67,6 +67,11 @@ fn test_java8_inline() {
     test_fjr("java8_inline", "java8");
 }
 
+#[test]
+fn test_java8_spec() {
+    FormatJobRunner::build(&load_spec("java8")).unwrap();
+}
+
 fn test_fjr(case_name: &str, spec_name: &str) {
     //setup
     let fjr = FormatJobRunner::build(&load_spec(spec_name)).unwrap();

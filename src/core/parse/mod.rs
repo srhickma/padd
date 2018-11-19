@@ -533,4 +533,111 @@ mod tests {
         assert!(res.is_err());
         assert_eq!(format!("{}", res.err().unwrap()), "Largest parse did not consume all tokens: 0 of 1")
     }
+
+    #[test]
+    fn leo_right_recursion_example() {
+        //setup
+        let mut grammar_builder = GrammarBuilder::new();
+        grammar_builder.add_productions(build_prods(&[
+            "S a S",
+            "S C",
+            "C a C b",
+            "C "
+        ]));
+        grammar_builder.try_mark_start("S");
+        let grammar = grammar_builder.build();
+
+        let scan = vec![
+            Token {
+                kind: "a".to_string(),
+                lexeme: "a".to_string(),
+            },
+            Token {
+                kind: "a".to_string(),
+                lexeme: "a".to_string(),
+            },
+            Token {
+                kind: "a".to_string(),
+                lexeme: "a".to_string(),
+            },
+            Token {
+                kind: "b".to_string(),
+                lexeme: "b".to_string(),
+            }
+        ];
+
+        let parser = def_parser();
+
+        //exercise
+        let tree = parser.parse(scan, &grammar).unwrap();
+
+        //verify
+        println!("{}", tree.to_string());
+//        assert_eq!(tree.unwrap().to_string(),
+//                   "└── S
+//    ├── Noun
+//    │   └── mary <- 'Hello'
+//    └── Verb
+//        └── runs <- 'World!'"
+//        );
+    }
+
+    #[test]
+    fn expr_right_recursion() {
+        //setup
+        let mut grammar_builder = GrammarBuilder::new();
+        grammar_builder.add_productions(build_prods(&[
+            "exp EXPR HAT exp",
+            "exp EXPR"
+        ]));
+        grammar_builder.try_mark_start("exp");
+        let grammar = grammar_builder.build();
+
+        let scan = vec![
+            Token {
+                kind: "EXPR".to_string(),
+                lexeme: "expr".to_string(),
+            },
+            Token {
+                kind: "HAT".to_string(),
+                lexeme: "^".to_string(),
+            },
+            Token {
+                kind: "EXPR".to_string(),
+                lexeme: "expr".to_string(),
+            },
+            Token {
+                kind: "HAT".to_string(),
+                lexeme: "^".to_string(),
+            },
+            Token {
+                kind: "EXPR".to_string(),
+                lexeme: "expr".to_string(),
+            },
+            Token {
+                kind: "HAT".to_string(),
+                lexeme: "^".to_string(),
+            },
+            Token {
+                kind: "EXPR".to_string(),
+                lexeme: "expr".to_string(),
+            }
+        ];
+
+        let parser = def_parser();
+
+        //exercise
+        let tree = parser.parse(scan, &grammar).unwrap();
+
+        //verify
+        println!("{}", tree.to_string());
+//        assert_eq!(tree.unwrap().to_string(),
+//                   "└── S
+//    ├── Noun
+//    │   └── mary <- 'Hello'
+//    └── Verb
+//        └── runs <- 'World!'"
+//        );
+    }
+
 }

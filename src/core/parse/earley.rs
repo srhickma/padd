@@ -1,5 +1,7 @@
 extern crate stopwatch;
 
+use std::time::Instant;
+
 use core::data::Data;
 use core::parse;
 use core::parse::grammar::Grammar;
@@ -29,10 +31,14 @@ impl Parser for EarleyParser {
                 chart[0].push(item);
             });
 
-        println!("Creating recognition chart took {}", sw.elapsed_ms());
-
         let mut i = 0;
         while i < chart.len() {
+            let start = Instant::now();
+
+            let mut scan_d = start.elapsed();
+            let mut pred_d = start.elapsed();
+            let mut comp_d = start.elapsed();
+
             let mut j = 0;
             parse_chart.push(vec![]);
 
@@ -45,23 +51,36 @@ impl Parser for EarleyParser {
                 let next = (&item).next_symbol();
                 match next {
                     None => {
+                        let x = Instant::now();
                         complete_op(&item, i, &mut chart);
 
                         parse_chart[item.start].push(Edge {
                             rule: Some(item.rule),
                             finish: i,
                         });
+                        comp_d = comp_d.checked_add(x.elapsed()).unwrap();
                     }
                     Some(symbol) => {
                         if grammar.is_terminal(symbol) {
+                            let x = Instant::now();
                             scan_op(&item, i, symbol, &scan, &mut chart);
+                            scan_d = scan_d.checked_add(x.elapsed()).unwrap();
                         } else {
+                            let x = Instant::now();
                             predict_op(&item, i, symbol, grammar, &mut chart);
+                            pred_d = pred_d.checked_add(x.elapsed()).unwrap();
                         }
                     }
                 }
                 j += 1;
             }
+
+            let time = start.elapsed().subsec_micros();
+            println!("Chart took {}μs with length {}:", time, chart[i].len());
+            println!("\tscan {}μs", scan_d.subsec_micros());
+            println!("\tcomp {}μs", comp_d.subsec_micros());
+            println!("\tpred {}μs", pred_d.subsec_micros());
+
             i += 1;
         }
 
@@ -165,6 +184,16 @@ impl Parser for EarleyParser {
                     && item.start == 0)
         }
 
+//        println!("-----------------------------------------------------");
+//        for i in 0..chart.len() {
+//            println!("SET {}", i);
+//            for j in 0..chart[i].len() {
+//                println!("{}", chart[i][j].to_string());
+//            }
+//            println!();
+//        }
+//        println!("-----------------------------------------------------");
+
         return if recognized(grammar, &chart) {
             if i - 1 == scan.len() {
                 Ok(parse_tree(grammar, &scan, parse_chart))
@@ -216,15 +245,15 @@ impl Parser for EarleyParser {
                 }
             }
 
-            println!("-----------------------------------------------------");
-            for i in 0..chart.len() {
-                println!("SET {}", i);
-                for j in 0..chart[i].len() {
-                    println!("{}", chart[i][j].to_string());
-                }
-                println!();
-            }
-            println!("-----------------------------------------------------");
+//            println!("-----------------------------------------------------");
+//            for i in 0..chart.len() {
+//                println!("SET {}", i);
+//                for j in 0..chart[i].len() {
+//                    println!("{}", chart[i][j].to_string());
+//                }
+//                println!();
+//            }
+//            println!("-----------------------------------------------------");
 
             let sw = Stopwatch::start_new();
 
@@ -238,7 +267,7 @@ impl Parser for EarleyParser {
                 Some(edge) => recur(start, edge, grammar, scan, &chart)
             };
 
-            println!("Parse tree construction took {}", sw.elapsed_ms());
+//            println!("Parse tree construction took {}", sw.elapsed_ms());
 
             res
         }
