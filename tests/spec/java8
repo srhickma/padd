@@ -941,7 +941,7 @@ unqualified_class_icreation_expr
 field_access
     -> primary DOT ID
     -> SUPER DOT ID
-    -> typename DOT super DOT ID;
+    -> typename DOT SUPER DOT ID;
 
 array_access
     -> expr_name LARRI expr RARRI
