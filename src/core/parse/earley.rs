@@ -23,53 +23,47 @@ impl Parser for EarleyParser {
                 chart[0].push(item);
             });
 
-        predict_full(grammar, &mut chart);
-
-        let mut i = 1;
+        let mut i = 0;
         while i <= chart.len() {
-            for item in &chart[i - 1] {
-                if item.is_complete() {
-                    mark_completed_item(&item, i - 1, &mut parse_chart);
-                }
-            }
-
-            if i > scan.len() {
-                break;
-            }
-
-            let a_i = &scan[i - 1].kind[..];
-            let next_row = cross(&chart[i - 1], a_i, grammar);
-            if next_row.is_empty() {
-                break;
-            }
-            chart.push(next_row);
-            parse_chart.push(Vec::new());
-
             let mut j = 0;
             while j < chart[i].len() {
-                let item = chart[i][j].clone();
-                let next = (&item).next_symbol();
-                match next {
-                    None => {
-                        let mut accumulator = cross(&chart[item.start], &item.rule.lhs[..], grammar);
+                if chart[i][j].is_complete() {
+                    let item = chart[i][j].clone();
+                    let accumulator = cross(&chart[item.start], &item.rule.lhs[..], grammar);
 
-                        let mut items_to_add = Vec::new();
-                        for completed_item in accumulator {
-                            if !chart[i].contains(&completed_item) {
-                                items_to_add.push(completed_item);
-                            }
-                        }
-
-                        for new_item in items_to_add {
-                            unsafe_append(new_item, &mut chart[i]);
+                    let mut items_to_add = Vec::new();
+                    for completed_item in accumulator {
+                        if !chart[i].contains(&completed_item) {
+                            items_to_add.push(completed_item);
                         }
                     }
-                    Some(_) => {}
+
+                    for new_item in items_to_add {
+                        unsafe_append(new_item, &mut chart[i]);
+                    }
                 }
                 j += 1;
             }
 
             predict_full(grammar, &mut chart);
+
+            for item in &chart[i] {
+                if item.is_complete() {
+                    mark_completed_item(&item, i, &mut parse_chart);
+                }
+            }
+
+            if i >= scan.len() {
+                break;
+            }
+
+            let a_i = &scan[i].kind[..];
+            let next_row = cross(&chart[i], a_i, grammar);
+            if next_row.is_empty() {
+                break;
+            }
+            chart.push(next_row);
+            parse_chart.push(Vec::new());
 
             i += 1;
         }
@@ -226,11 +220,11 @@ impl Parser for EarleyParser {
 //        println!("-----------------------------------------------------");
 
         return if recognized(grammar, &chart) {
-            if i - 1 == scan.len() {
+            if i == scan.len() {
                 Ok(parse_tree(grammar, &scan, parse_chart))
             } else {
                 Err(parse::Error {
-                    message: format!("Largest parse did not consume all tokens: {} of {}", i - 1, scan.len()),
+                    message: format!("Largest parse did not consume all tokens: {} of {}", i, scan.len()),
                 })
             }
         } else {
@@ -238,13 +232,13 @@ impl Parser for EarleyParser {
                 Err(parse::Error {
                     message: "No tokens scanned".to_string(),
                 })
-            } else if i - 1 == scan.len() {
+            } else if i == scan.len() {
                 Err(parse::Error {
                     message: format!("Recognition failed after consuming all tokens"),
                 })
             } else {
                 Err(parse::Error {
-                    message: format!("Recognition failed at token {}: {}", i, scan[i - 1].to_string()),
+                    message: format!("Recognition failed at token {}: {}", i + 1, scan[i].to_string()),
                 })
             }
         };
