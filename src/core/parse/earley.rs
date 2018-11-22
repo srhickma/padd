@@ -23,84 +23,93 @@ impl Parser for EarleyParser {
                 chart[0].push(item);
             });
 
-        let mut i = 0;
-        while i <= chart.len() {
-            let mut j = 0;
-            while j < chart[i].len() {
-                if chart[i][j].is_complete() {
-                    let item = chart[i][j].clone();
-                    let accumulator = cross(&chart[item.start], &item.rule.lhs[..], grammar);
+        let mut cursor = 0;
+        while cursor < chart.len() {
+            complete_full(cursor, grammar, &mut chart);
+            predict_full(grammar, &mut chart);
+            parse_mark_full(cursor, &chart, &mut parse_chart);
+            scan_full(cursor, &scan, grammar, &mut chart, &mut parse_chart);
+
+            cursor += 1;
+        }
+
+        fn complete_full<'a, 'b>(
+            cursor: usize,
+            grammar: &'a Grammar,
+            chart: &'b mut Vec<Vec<Item<'a>>>,
+        ) {
+            let mut i = 0;
+            while i < chart[cursor].len() {
+                if chart[cursor][i].is_complete() {
+                    let item = chart[cursor][i].clone();
+                    let accumulator = cross(&chart[item.start], &item.rule.lhs, grammar);
 
                     let mut items_to_add = Vec::new();
                     for completed_item in accumulator {
-                        if !chart[i].contains(&completed_item) {
+                        if !chart[cursor].contains(&completed_item) {
                             items_to_add.push(completed_item);
                         }
                     }
 
                     for new_item in items_to_add {
-                        unsafe_append(new_item, &mut chart[i]);
+                        unsafe_append(new_item, &mut chart[cursor]);
                     }
                 }
-                j += 1;
+                i += 1;
             }
-
-            predict_full(grammar, &mut chart);
-
-            for item in &chart[i] {
-                if item.is_complete() {
-                    mark_completed_item(&item, i, &mut parse_chart);
-                }
-            }
-
-            if i >= scan.len() {
-                break;
-            }
-
-            let a_i = &scan[i].kind[..];
-            let next_row = cross(&chart[i], a_i, grammar);
-            if next_row.is_empty() {
-                break;
-            }
-            chart.push(next_row);
-            parse_chart.push(Vec::new());
-
-            i += 1;
-        }
-
-        fn mark_completed_item<'a, 'b: 'a>(item: &'a Item<'b>, finish: usize, parse_chart: &mut Vec<Vec<Edge<'b>>>) {
-//            println!("{} in set {}", item.to_string(), finish);
-//            println!("ADDING EDGE: {} to {}", Edge {
-//                rule: Some(item.rule),
-//                finish,
-//            }.to_string(), item.start);
-
-            parse_chart[item.start].push(Edge {
-                rule: Some(item.rule),
-                finish,
-            });
         }
 
         fn predict_full<'a, 'b>(
             grammar: &'a Grammar,
             chart: &'b mut Vec<Vec<Item<'a>>>,
         ) {
-            let row = chart.len() - 1;
+            let cursor = chart.len() - 1;
 
             let mut i = 0;
-            while i < chart[row].len() {
-                let item = chart[row][i].clone(); //TODO see if we can reduce cloning here
+            while i < chart[cursor].len() {
+                let item = chart[cursor][i].clone();
                 let next = (&item).next_symbol();
                 match next {
                     None => {}
                     Some(symbol) => {
                         if !grammar.is_terminal(symbol) {
-                            predict_op(&item, row, symbol, grammar, chart);
+                            predict_op(&item, cursor, symbol, grammar, chart);
                         }
                     }
                 }
                 i += 1;
             }
+        }
+
+        fn parse_mark_full<'a, 'b>(
+            cursor: usize,
+            chart: &'b Vec<Vec<Item<'a>>>,
+            parse_chart: &mut Vec<Vec<Edge<'a>>>,
+        ) {
+            for item in &chart[cursor] {
+                if item.is_complete() {
+                    mark_completed_item(&item, cursor, parse_chart);
+                }
+            }
+        }
+
+        fn scan_full<'a, 'b>(
+            cursor: usize,
+            scan: &Vec<Token<String>>,
+            grammar: &'a Grammar,
+            chart: &'b mut Vec<Vec<Item<'a>>>,
+            parse_chart: &mut Vec<Vec<Edge<'a>>>,
+        ) {
+            if cursor == scan.len() {
+                return;
+            }
+
+            let next_row = cross(&chart[cursor], &scan[cursor].kind, grammar);
+            if next_row.is_empty() {
+                return;
+            }
+            chart.push(next_row);
+            parse_chart.push(Vec::new());
         }
 
         fn predict_op<'a, 'b>(
@@ -134,17 +143,21 @@ impl Parser for EarleyParser {
             }
 
             if nullable_found {
-                append(Item {
+                let new_item = Item {
                     rule: item.rule,
                     start: item.start,
                     next: item.next + 1,
-                }, &mut chart[i], );
+                };
+
+                if !chart[i].contains(&new_item) {
+                    unsafe_append(new_item, &mut chart[i]);
+                }
             }
         }
 
         fn cross<'a>(
             src: &Vec<Item<'a>>,
-            symbol: &'a str,
+            symbol: &String,
             grammar: &'a Grammar,
         ) -> Vec<Item<'a>> {
             let mut dest: Vec<Item> = Vec::new();
@@ -189,13 +202,15 @@ impl Parser for EarleyParser {
             dest
         }
 
-        fn append<'a, 'b>(item: Item<'a>, item_set: &'b mut Vec<Item<'a>>) {
-            for j in 0..item_set.len() {
-                if item_set[j] == item {
-                    return;
-                }
-            }
-            unsafe_append(item, item_set);
+        fn mark_completed_item<'a, 'b: 'a>(
+            item: &'a Item<'b>,
+            finish: usize,
+            parse_chart: &mut Vec<Vec<Edge<'b>>>,
+        ) {
+            parse_chart[item.start].push(Edge {
+                rule: Some(item.rule),
+                finish,
+            });
         }
 
         fn unsafe_append<'a, 'b>(item: Item<'a>, item_set: &'b mut Vec<Item<'a>>) {
@@ -220,11 +235,11 @@ impl Parser for EarleyParser {
 //        println!("-----------------------------------------------------");
 
         return if recognized(grammar, &chart) {
-            if i == scan.len() {
+            if cursor - 1 == scan.len() {
                 Ok(parse_tree(grammar, &scan, parse_chart))
             } else {
                 Err(parse::Error {
-                    message: format!("Largest parse did not consume all tokens: {} of {}", i, scan.len()),
+                    message: format!("Largest parse did not consume all tokens: {} of {}", cursor - 1, scan.len()),
                 })
             }
         } else {
@@ -232,13 +247,13 @@ impl Parser for EarleyParser {
                 Err(parse::Error {
                     message: "No tokens scanned".to_string(),
                 })
-            } else if i == scan.len() {
+            } else if cursor - 1 == scan.len() {
                 Err(parse::Error {
                     message: format!("Recognition failed after consuming all tokens"),
                 })
             } else {
                 Err(parse::Error {
-                    message: format!("Recognition failed at token {}: {}", i + 1, scan[i].to_string()),
+                    message: format!("Recognition failed at token {}: {}", cursor, scan[cursor - 1].to_string()),
                 })
             }
         };
