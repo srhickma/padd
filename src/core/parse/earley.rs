@@ -253,8 +253,18 @@ impl Parser for EarleyParser {
         };
 
         //TODO refactor to reduce long and duplicated parameter lists
-        fn parse_tree<'a>(grammar: &'a Grammar, scan: &'a Vec<Token<String>>, chart: Vec<Vec<Edge<'a>>>) -> Tree {
-            fn recur<'a>(start: Node, edge: &Edge, grammar: &'a Grammar, scan: &'a Vec<Token<String>>, chart: &Vec<Vec<Edge>>) -> Tree {
+        fn parse_tree<'a>(
+            grammar: &'a Grammar,
+            scan: &'a Vec<Token<String>>,
+            chart: Vec<Vec<Edge<'a>>>,
+        ) -> Tree {
+            fn recur<'a>(
+                start: Node,
+                edge: &Edge,
+                grammar: &'a Grammar,
+                scan: &'a Vec<Token<String>>,
+                chart: &Vec<Vec<Edge>>,
+            ) -> Tree {
                 match edge.rule {
                     None => Tree { //Non-empty rhs
                         lhs: scan[start].clone(),
@@ -290,11 +300,13 @@ impl Parser for EarleyParser {
             }
         }
 
-        fn top_list<'a>(start: Node,
-                        edge: &Edge,
-                        grammar: &'a Grammar,
-                        scan: &'a Vec<Token<String>>,
-                        chart: &Vec<Vec<Edge<'a>>>) -> Vec<(Node, Edge<'a>)> {
+        fn top_list<'a>(
+            start: Node,
+            edge: &Edge,
+            grammar: &'a Grammar,
+            scan: &'a Vec<Token<String>>,
+            chart: &Vec<Vec<Edge<'a>>>,
+        ) -> Vec<(Node, Edge<'a>)> {
             let symbols: &Vec<String> = &edge.rule.unwrap().rhs;
             let bottom: usize = symbols.len();
             let leaf = |depth: usize, node: Node| depth == bottom && node == edge.finish;
@@ -318,10 +330,12 @@ impl Parser for EarleyParser {
                 Vec::new()
             };
 
-            fn df_search<'a>(edges: &Fn(usize, Node) -> Vec<Edge<'a>>,
-                             leaf: &Fn(usize, Node) -> bool,
-                             depth: usize,
-                             root: Node) -> Option<Vec<(Node, Edge<'a>)>> {
+            fn df_search<'a>(
+                edges: &Fn(usize, Node) -> Vec<Edge<'a>>,
+                leaf: &Fn(usize, Node) -> bool,
+                depth: usize,
+                root: Node,
+            ) -> Option<Vec<(Node, Edge<'a>)>> {
                 if leaf(depth, root) {
                     Some(Vec::new())
                 } else {
