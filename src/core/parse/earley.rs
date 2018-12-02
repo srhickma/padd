@@ -163,20 +163,21 @@ impl Parser for EarleyParser {
             let mut dest: Vec<Item> = Vec::new();
 
             for item in src {
-                let next = item.next_symbol();
-                match next {
+                match item.next_symbol() {
                     None => {}
                     Some(sym) => {
                         if sym == symbol {
-                            let mut last_item = Item {
-                                rule: item.rule,
-                                start: item.start,
-                                next: item.next + 1,
-                            };
-
-                            unsafe_append(last_item.clone(), &mut dest);
+                            let mut last_item = item.clone();
 
                             loop {
+                                last_item = Item {
+                                    rule: last_item.rule,
+                                    start: last_item.start,
+                                    next: last_item.next + 1,
+                                };
+
+                                unsafe_append(last_item.clone(), &mut dest);
+
                                 match last_item.next_symbol() {
                                     None => break,
                                     Some(sym) => {
@@ -184,13 +185,6 @@ impl Parser for EarleyParser {
                                         if !grammar.is_nullable_nt(&sym_string) {
                                             break;
                                         }
-                                        last_item = Item {
-                                            rule: last_item.rule,
-                                            start: last_item.start,
-                                            next: last_item.next + 1,
-                                        };
-
-                                        unsafe_append(last_item.clone(), &mut dest);
                                     }
                                 }
                             }
@@ -264,7 +258,7 @@ impl Parser for EarleyParser {
                 match edge.rule {
                     None => Tree { //Non-empty rhs
                         lhs: scan[start].clone(),
-                        children: vec![],
+                        children: Vec::new(),
                     },
                     Some(rule) => Tree {
                         lhs: Token {
@@ -321,7 +315,7 @@ impl Parser for EarleyParser {
                             .collect();
                     }
                 }
-                vec![]
+                Vec::new()
             };
 
             fn df_search<'a>(edges: &Fn(usize, Node) -> Vec<Edge<'a>>,
@@ -329,7 +323,7 @@ impl Parser for EarleyParser {
                              depth: usize,
                              root: Node) -> Option<Vec<(Node, Edge<'a>)>> {
                 if leaf(depth, root) {
-                    Some(vec![])
+                    Some(Vec::new())
                 } else {
                     for edge in edges(depth, root) {
                         match df_search(edges, leaf, depth + 1, edge.finish) {
@@ -350,6 +344,14 @@ impl Parser for EarleyParser {
             }
         }
     }
+}
+
+struct RChart {
+    //TODO
+}
+
+struct RChartRow {
+    //TODO
 }
 
 #[derive(PartialEq, Clone, Debug)]
@@ -389,6 +391,14 @@ impl<'a> Data for Item<'a> {
         }
         format!("{} ({})", rule_string, self.start)
     }
+}
+
+struct PChart {
+    //TODO
+}
+
+struct PChartRow {
+    //TODO
 }
 
 #[derive(Clone, PartialEq, Debug)]
