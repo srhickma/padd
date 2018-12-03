@@ -41,8 +41,7 @@ impl Parser for EarleyParser {
             while i < chart.row(cursor).len() {
                 if chart.row(cursor).item(i).is_complete() {
                     let item = chart.row(cursor).item(i).clone();
-                    //TODO can we avoid direct access to items field here?
-                    let accumulator = cross(&chart.row(item.start).items, &item.rule.lhs, grammar);
+                    let accumulator = cross(chart.row(item.start).items(), &item.rule.lhs, grammar);
 
                     let mut items_to_add = Vec::new();
                     for completed_item in accumulator {
@@ -86,8 +85,7 @@ impl Parser for EarleyParser {
             chart: &'inner RChart<'grammar>,
             parse_chart: &mut PChart<'grammar>,
         ) {
-            //TODO use the proper iter here?
-            for item in &chart.row(cursor).items {
+            for item in chart.row(cursor).items() {
                 if item.is_complete() {
                     mark_completed_item(&item, cursor, parse_chart);
                 }
@@ -105,8 +103,7 @@ impl Parser for EarleyParser {
                 return;
             }
 
-            //TODO can we avoid direct access to items here
-            let next_row = cross(&chart.row(cursor).items, &scan[cursor].kind, grammar);
+            let next_row = cross(chart.row(cursor).items(), &scan[cursor].kind, grammar);
             if next_row.is_empty() {
                 return;
             }
@@ -157,8 +154,8 @@ impl Parser for EarleyParser {
             }
         }
 
-        fn cross<'grammar>(
-            src: &Vec<Item<'grammar>>,
+        fn cross<'inner, 'grammar: 'inner>(
+            src: impl Iterator<Item = &'inner Item<'grammar>>,
             symbol: &String,
             grammar: &'grammar Grammar,
         ) -> Vec<Item<'grammar>> {
@@ -210,7 +207,7 @@ impl Parser for EarleyParser {
         }
 
         fn recognized(grammar: &Grammar, chart: &RChart) -> bool {
-            chart.row(chart.len() - 1).iter()
+            chart.row(chart.len() - 1).items()
                 .any(|item| item.rule.lhs == *grammar.start()
                     && item.next >= item.rule.rhs.len()
                     && item.start == 0)
@@ -412,28 +409,24 @@ impl<'item> RChartRow<'item> {
         self.items.contains(item)
     }
 
-    fn iter<'scope>(&'scope self) -> RChartRowIterator<'scope, 'item> {
+    fn items<'scope>(&'scope self) -> RChartRowIterator<'scope, 'item> {
         RChartRowIterator {
-            row: self,
+            items: &self.items,
             index: 0,
         }
     }
 }
 
 struct RChartRowIterator<'row, 'item: 'row> {
-    row: &'row RChartRow<'item>,
+    items: &'row Vec<Item<'item>>,
     index: usize,
 }
 
 impl<'row, 'item: 'row> Iterator for RChartRowIterator<'row, 'item> {
-    type Item = &'row Item<'row>;
-    fn next(&mut self) -> Option<&'item Item<'row>> {
+    type Item = &'row Item<'item>;
+    fn next(&mut self) -> Option<&'row Item<'item>> {
         self.index += 1;
-        if self.row.len() < self.index {
-            None
-        } else {
-            Some(self.row.item(self.index - 1))
-        }
+        self.items.get(self.index - 1)
     }
 }
 
