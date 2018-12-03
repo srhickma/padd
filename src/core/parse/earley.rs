@@ -38,21 +38,24 @@ impl Parser for EarleyParser {
             chart: &'inner mut RChart<'grammar>,
         ) {
             let mut i = 0;
-            while i < chart.row(cursor).len() {
-                if chart.row(cursor).item(i).is_complete() {
-                    let item = chart.row(cursor).item(i).clone();
-                    let accumulator = cross(chart.row(item.start).items(), &item.rule.lhs, grammar);
+            while i < chart.row(cursor).complete().len() {
+                let item = chart.row(cursor).complete().item(i).clone();
 
-                    let mut items_to_add = Vec::new();
-                    for completed_item in accumulator {
-                        if !chart.row(cursor).contains(&completed_item) {
-                            items_to_add.push(completed_item);
-                        }
-                    }
+                let accumulator = cross(
+                    chart.row(item.start).incomplete().items(),
+                    &item.rule.lhs,
+                    grammar,
+                );
 
-                    for new_item in items_to_add {
-                        chart.row_mut(cursor).unsafe_append(new_item);
+                let mut items_to_add = Vec::new();
+                for completed_item in accumulator {
+                    if !chart.row(cursor).contains(&completed_item) {
+                        items_to_add.push(completed_item);
                     }
+                }
+
+                for new_item in items_to_add {
+                    chart.row_mut(cursor).unsafe_append(new_item);
                 }
                 i += 1;
             }
@@ -65,8 +68,8 @@ impl Parser for EarleyParser {
             let cursor = chart.len() - 1;
 
             let mut i = 0;
-            while i < chart.row(cursor).len() {
-                let item = chart.row(cursor).item(i).clone();
+            while i < chart.row(cursor).incomplete().len() {
+                let item = chart.row(cursor).incomplete().item(i).clone();
                 let next = (&item).next_symbol();
                 match next {
                     None => {}
@@ -85,10 +88,8 @@ impl Parser for EarleyParser {
             chart: &'inner RChart<'grammar>,
             parse_chart: &mut PChart<'grammar>,
         ) {
-            for item in chart.row(cursor).items() {
-                if item.is_complete() {
-                    mark_completed_item(&item, cursor, parse_chart);
-                }
+            for item in chart.row(cursor).complete().items() {
+                mark_completed_item(&item, cursor, parse_chart);
             }
         }
 
@@ -103,10 +104,16 @@ impl Parser for EarleyParser {
                 return;
             }
 
-            let next_row = cross(chart.row(cursor).items(), &scan[cursor].kind, grammar);
+            let next_row = cross(
+                chart.row(cursor).incomplete().items(),
+                &scan[cursor].kind,
+                grammar,
+            );
+
             if next_row.is_empty() {
                 return;
             }
+
             chart.add_row(next_row);
             parse_chart.add_row();
         }
@@ -155,7 +162,7 @@ impl Parser for EarleyParser {
         }
 
         fn cross<'inner, 'grammar: 'inner>(
-            src: impl Iterator<Item = &'inner Item<'grammar>>,
+            src: impl Iterator<Item=&'inner Item<'grammar>>,
             symbol: &String,
             grammar: &'grammar Grammar,
         ) -> Vec<Item<'grammar>> {
@@ -207,10 +214,8 @@ impl Parser for EarleyParser {
         }
 
         fn recognized(grammar: &Grammar, chart: &RChart) -> bool {
-            chart.row(chart.len() - 1).items()
-                .any(|item| item.rule.lhs == *grammar.start()
-                    && item.next >= item.rule.rhs.len()
-                    && item.start == 0)
+            chart.row(chart.len() - 1).complete().items()
+                .any(|item| item.rule.lhs == *grammar.start() && item.start == 0)
         }
 
 //        println!("-----------------------------------------------------");
@@ -383,13 +388,70 @@ impl<'item> RChart<'item> {
 }
 
 struct RChartRow<'item> {
-    items: Vec<Item<'item>>
+    incomplete: Items<'item>,
+    complete: Items<'item>,
 }
 
 impl<'item> RChartRow<'item> {
-    fn new(items: Vec<Item>) -> RChartRow {
+    fn new(scanned_items: Vec<Item>) -> RChartRow {
+        let mut incomplete = Items::new();
+        let mut complete = Items::new();
+
+        for item in scanned_items {
+            if item.is_complete() {
+                complete.unsafe_append(item);
+            } else {
+                incomplete.unsafe_append(item);
+            }
+        }
+
         RChartRow {
-            items
+            incomplete,
+            complete,
+        }
+    }
+
+    fn unsafe_append(&mut self, item: Item<'item>) {
+        if item.is_complete() {
+            self.complete.unsafe_append(item);
+        } else {
+            self.incomplete.unsafe_append(item);
+        }
+    }
+
+    fn contains(&self, item: &Item<'item>) -> bool {
+        if item.is_complete() {
+            self.complete.contains(item)
+        } else {
+            self.incomplete.contains(item)
+        }
+    }
+
+    fn incomplete(&self) -> &Items<'item> {
+        &self.incomplete
+    }
+
+    fn incomplete_mut(&mut self) -> &mut Items<'item> {
+        &mut self.incomplete
+    }
+
+    fn complete(&self) -> &Items<'item> {
+        &self.complete
+    }
+
+    fn complete_mut(&mut self) -> &mut Items<'item> {
+        &mut self.complete
+    }
+}
+
+struct Items<'item> {
+    items: Vec<Item<'item>>
+}
+
+impl<'item> Items<'item> {
+    fn new() -> Items<'item> {
+        Items {
+            items: Vec::new()
         }
     }
 
@@ -409,22 +471,22 @@ impl<'item> RChartRow<'item> {
         self.items.contains(item)
     }
 
-    fn items<'scope>(&'scope self) -> RChartRowIterator<'scope, 'item> {
-        RChartRowIterator {
+    fn items<'scope>(&'scope self) -> ItemsIterator<'scope, 'item> {
+        ItemsIterator {
             items: &self.items,
             index: 0,
         }
     }
 }
 
-struct RChartRowIterator<'row, 'item: 'row> {
-    items: &'row Vec<Item<'item>>,
+struct ItemsIterator<'scope, 'item: 'scope> {
+    items: &'scope Vec<Item<'item>>,
     index: usize,
 }
 
-impl<'row, 'item: 'row> Iterator for RChartRowIterator<'row, 'item> {
-    type Item = &'row Item<'item>;
-    fn next(&mut self) -> Option<&'row Item<'item>> {
+impl<'scope, 'item: 'scope> Iterator for ItemsIterator<'scope, 'item> {
+    type Item = &'scope Item<'item>;
+    fn next(&mut self) -> Option<&'scope Item<'item>> {
         self.index += 1;
         self.items.get(self.index - 1)
     }
