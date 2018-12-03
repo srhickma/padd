@@ -218,16 +218,6 @@ impl Parser for EarleyParser {
                 .any(|item| item.rule.lhs == *grammar.start() && item.start == 0)
         }
 
-//        println!("-----------------------------------------------------");
-//        for i in 0..chart.len() {
-//            println!("SET {}", i);
-//            for j in 0..chart[i].len() {
-//                println!("{}", chart[i][j].to_string());
-//            }
-//            println!();
-//        }
-//        println!("-----------------------------------------------------");
-
         return if recognized(grammar, &chart) {
             if cursor - 1 == scan.len() {
                 Ok(parse_tree(grammar, &scan, parse_chart))
@@ -252,7 +242,6 @@ impl Parser for EarleyParser {
             }
         };
 
-        //TODO refactor to reduce long and duplicated parameter lists
         fn parse_tree<'a>(
             grammar: &'a Grammar,
             scan: &'a Vec<Token<String>>,
@@ -291,7 +280,7 @@ impl Parser for EarleyParser {
 
             let finish: Node = chart.len() - 1;
 
-            let first_edge = chart.row(0).iter()
+            let first_edge = chart.row(0).edges()
                 .find(|edge| edge.finish == finish && edge.rule.unwrap().lhs == *grammar.start());
             match first_edge {
                 None => panic!("Failed to find start item to begin parse"),
@@ -320,7 +309,7 @@ impl Parser for EarleyParser {
                             }];
                         }
                     } else { //TODO return iterators instead to avoid collection and cloning
-                        return chart.row(node).iter()
+                        return chart.row(node).edges()
                             .filter(|edge| edge.rule.unwrap().lhs == *symbol)
                             .cloned()
                             .collect();
@@ -385,6 +374,21 @@ impl<'item> RChart<'item> {
     fn row_mut(&mut self, i: usize) -> &mut RChartRow<'item> {
         self.rows.get_mut(i).unwrap()
     }
+
+    #[allow(dead_code)]
+    fn print(&self) {
+        for i in 0..self.rows.len() {
+            println!("ROW {}", i);
+            println!("\tINCOMPLETE");
+            for item in self.rows[i].incomplete().items() {
+                println!("\t\t{}", item.to_string());
+            }
+            println!("\tCOMPLETE");
+            for item in self.rows[i].complete().items() {
+                println!("\t\t{}", item.to_string());
+            }
+        }
+    }
 }
 
 struct RChartRow<'item> {
@@ -431,16 +435,8 @@ impl<'item> RChartRow<'item> {
         &self.incomplete
     }
 
-    fn incomplete_mut(&mut self) -> &mut Items<'item> {
-        &mut self.incomplete
-    }
-
     fn complete(&self) -> &Items<'item> {
         &self.complete
-    }
-
-    fn complete_mut(&mut self) -> &mut Items<'item> {
-        &mut self.complete
     }
 }
 
@@ -556,6 +552,16 @@ impl<'edge> PChart<'edge> {
     fn row_mut(&mut self, i: usize) -> &mut PChartRow<'edge> {
         self.rows.get_mut(i).unwrap()
     }
+
+    #[allow(dead_code)]
+    fn print(&self) {
+        for i in 0..self.rows.len() {
+            println!("ROW {}", i);
+            for edge in self.rows[i].edges() {
+                println!("\t{}", edge.to_string());
+            }
+        }
+    }
 }
 
 struct PChartRow<'edge> {
@@ -577,7 +583,7 @@ impl<'edge> PChartRow<'edge> {
         self.edges.get(i)
     }
 
-    fn iter(&self) -> PChartRowIterator {
+    fn edges(&self) -> PChartRowIterator {
         PChartRowIterator {
             row: self,
             index: 0,
