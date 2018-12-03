@@ -10,8 +10,8 @@ pub struct EarleyParser;
 
 impl Parser for EarleyParser {
     fn parse(&self, scan: Vec<Token<String>>, grammar: &Grammar) -> Result<Tree, parse::Error> {
+        let mut chart: RChart = RChart::new();
         let mut parse_chart: PChart = PChart::new();
-        let mut chart: Vec<Vec<Item>> = vec![Vec::new()];
 
         grammar.productions_for_lhs(grammar.start()).unwrap().iter()
             .for_each(|prod| {
@@ -20,7 +20,7 @@ impl Parser for EarleyParser {
                     start: 0,
                     next: 0,
                 };
-                chart[0].push(item);
+                chart.row_mut(0).unsafe_append(item);
             });
 
         let mut cursor = 0;
@@ -33,41 +33,42 @@ impl Parser for EarleyParser {
             cursor += 1;
         }
 
-        fn complete_full<'a, 'b>(
+        fn complete_full<'inner, 'grammar: 'inner>(
             cursor: usize,
-            grammar: &'a Grammar,
-            chart: &'b mut Vec<Vec<Item<'a>>>,
+            grammar: &'grammar Grammar,
+            chart: &'inner mut RChart<'grammar>,
         ) {
             let mut i = 0;
-            while i < chart[cursor].len() {
-                if chart[cursor][i].is_complete() {
-                    let item = chart[cursor][i].clone();
-                    let accumulator = cross(&chart[item.start], &item.rule.lhs, grammar);
+            while i < chart.row(cursor).len() {
+                if chart.row(cursor).item(i).is_complete() {
+                    let item = chart.row(cursor).item(i).clone();
+                    //TODO can we avoid direct access to items field here?
+                    let accumulator = cross(&chart.row(item.start).items, &item.rule.lhs, grammar);
 
                     let mut items_to_add = Vec::new();
                     for completed_item in accumulator {
-                        if !chart[cursor].contains(&completed_item) {
+                        if !chart.row(cursor).contains(&completed_item) {
                             items_to_add.push(completed_item);
                         }
                     }
 
                     for new_item in items_to_add {
-                        unsafe_append(new_item, &mut chart[cursor]);
+                        chart.row_mut(cursor).unsafe_append(new_item);
                     }
                 }
                 i += 1;
             }
         }
 
-        fn predict_full<'a, 'b>(
+        fn predict_full<'a: 'b, 'b>(
             grammar: &'a Grammar,
-            chart: &'b mut Vec<Vec<Item<'a>>>,
+            chart: &'b mut RChart<'a>,
         ) {
             let cursor = chart.len() - 1;
 
             let mut i = 0;
-            while i < chart[cursor].len() {
-                let item = chart[cursor][i].clone();
+            while i < chart.row(cursor).len() {
+                let item = chart.row(cursor).item(i).clone();
                 let next = (&item).next_symbol();
                 match next {
                     None => {}
@@ -81,34 +82,36 @@ impl Parser for EarleyParser {
             }
         }
 
-        fn parse_mark_full<'a, 'b>(
+        fn parse_mark_full<'inner, 'grammar>(
             cursor: usize,
-            chart: &'b Vec<Vec<Item<'a>>>,
-            parse_chart: &mut PChart<'a>,
+            chart: &'inner RChart<'grammar>,
+            parse_chart: &mut PChart<'grammar>,
         ) {
-            for item in &chart[cursor] {
+            //TODO use the proper iter here?
+            for item in &chart.row(cursor).items {
                 if item.is_complete() {
                     mark_completed_item(&item, cursor, parse_chart);
                 }
             }
         }
 
-        fn scan_full<'a, 'b>(
+        fn scan_full<'inner, 'grammar: 'inner>(
             cursor: usize,
             scan: &Vec<Token<String>>,
-            grammar: &'a Grammar,
-            chart: &'b mut Vec<Vec<Item<'a>>>,
-            parse_chart: &mut PChart<'a>,
+            grammar: &'grammar Grammar,
+            chart: &'inner mut RChart<'grammar>,
+            parse_chart: &mut PChart<'grammar>,
         ) {
             if cursor == scan.len() {
                 return;
             }
 
-            let next_row = cross(&chart[cursor], &scan[cursor].kind, grammar);
+            //TODO can we avoid direct access to items here
+            let next_row = cross(&chart.row(cursor).items, &scan[cursor].kind, grammar);
             if next_row.is_empty() {
                 return;
             }
-            chart.push(next_row);
+            chart.add_row(next_row);
             parse_chart.add_row();
         }
 
@@ -117,7 +120,7 @@ impl Parser for EarleyParser {
             i: usize,
             symbol: &'a str,
             grammar: &'a Grammar,
-            chart: &'b mut Vec<Vec<Item<'a>>>,
+            chart: &'b mut RChart<'a>,
         ) {
             let mut nullable_found = false;
             let mut items_to_add = Vec::new();
@@ -129,7 +132,7 @@ impl Parser for EarleyParser {
                     next: 0,
                 };
 
-                if !chart[i].contains(&new_item) {
+                if !chart.row(i).contains(&new_item) {
                     items_to_add.push(new_item);
                 }
 
@@ -139,7 +142,7 @@ impl Parser for EarleyParser {
             }
 
             for new_item in items_to_add {
-                unsafe_append(new_item, &mut chart[i]);
+                chart.row_mut(i).unsafe_append(new_item);
             }
 
             if nullable_found {
@@ -149,17 +152,17 @@ impl Parser for EarleyParser {
                     next: item.next + 1,
                 };
 
-                if !chart[i].contains(&new_item) {
-                    unsafe_append(new_item, &mut chart[i]);
+                if !chart.row(i).contains(&new_item) {
+                    chart.row_mut(i).unsafe_append(new_item);
                 }
             }
         }
 
-        fn cross<'a>(
-            src: &Vec<Item<'a>>,
+        fn cross<'grammar>(
+            src: &Vec<Item<'grammar>>,
             symbol: &String,
-            grammar: &'a Grammar,
-        ) -> Vec<Item<'a>> {
+            grammar: &'grammar Grammar,
+        ) -> Vec<Item<'grammar>> {
             let mut dest: Vec<Item> = Vec::new();
 
             for item in src {
@@ -176,7 +179,7 @@ impl Parser for EarleyParser {
                                     next: last_item.next + 1,
                                 };
 
-                                unsafe_append(last_item.clone(), &mut dest);
+                                dest.push(last_item.clone());
 
                                 match last_item.next_symbol() {
                                     None => break,
@@ -196,10 +199,10 @@ impl Parser for EarleyParser {
             dest
         }
 
-        fn mark_completed_item<'a, 'b: 'a>(
-            item: &'a Item<'b>,
+        fn mark_completed_item<'inner, 'grammar: 'inner>(
+            item: &'inner Item<'grammar>,
             finish: usize,
-            parse_chart: &mut PChart<'b>,
+            parse_chart: &mut PChart<'grammar>,
         ) {
             parse_chart.row_mut(item.start).add_edge(Edge {
                 rule: Some(item.rule),
@@ -207,12 +210,8 @@ impl Parser for EarleyParser {
             });
         }
 
-        fn unsafe_append<'a, 'b>(item: Item<'a>, item_set: &'b mut Vec<Item<'a>>) {
-            item_set.push(item);
-        }
-
-        fn recognized<'a, 'b>(grammar: &'a Grammar, chart: &'b Vec<Vec<Item<'a>>>) -> bool {
-            chart.last().unwrap().iter()
+        fn recognized<'a, 'b>(grammar: &'a Grammar, chart: &'b RChart<'a>) -> bool {
+            chart.row(chart.len() - 1).iter()
                 .any(|item| item.rule.lhs == *grammar.start()
                     && item.next >= item.rule.rhs.len()
                     && item.start == 0)
@@ -359,12 +358,84 @@ impl Parser for EarleyParser {
     }
 }
 
-struct RChart {
-    //TODO
+struct RChart<'item> {
+    rows: Vec<RChartRow<'item>>
 }
 
-struct RChartRow {
-    //TODO
+impl<'item> RChart<'item> {
+    fn new() -> Self {
+        RChart {
+            rows: vec![RChartRow::new(Vec::new())]
+        }
+    }
+
+    fn len(&self) -> usize {
+        self.rows.len()
+    }
+
+    fn add_row<'grammar: 'item>(&mut self, items: Vec<Item<'grammar>>) {
+        self.rows.push(RChartRow::new(items));
+    }
+
+    fn row(&self, i: usize) -> &RChartRow<'item> {
+        self.rows.get(i).unwrap()
+    }
+
+    fn row_mut(&mut self, i: usize) -> &mut RChartRow<'item> {
+        self.rows.get_mut(i).unwrap()
+    }
+}
+
+struct RChartRow<'item> {
+    items: Vec<Item<'item>>
+}
+
+impl<'item> RChartRow<'item> {
+    fn new(items: Vec<Item>) -> RChartRow {
+        RChartRow {
+            items
+        }
+    }
+
+    fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    fn unsafe_append(&mut self, item: Item<'item>) {
+        self.items.push(item);
+    }
+
+    fn item(&self, i: usize) -> &Item<'item> {
+        self.items.get(i).unwrap()
+    }
+
+    fn contains(&self, item: &Item<'item>) -> bool {
+        self.items.contains(item)
+    }
+
+    fn iter<'scope>(&'scope self) -> RChartRowIterator<'scope, 'item> {
+        RChartRowIterator {
+            row: self,
+            index: 0,
+        }
+    }
+}
+
+struct RChartRowIterator<'row, 'item: 'row> {
+    row: &'row RChartRow<'item>,
+    index: usize,
+}
+
+impl<'row, 'item: 'row> Iterator for RChartRowIterator<'row, 'item> {
+    type Item = &'row Item<'row>;
+    fn next(&mut self) -> Option<&'item Item<'row>> {
+        self.index += 1;
+        if self.row.len() < self.index {
+            None
+        } else {
+            Some(self.row.item(self.index - 1))
+        }
+    }
 }
 
 #[derive(PartialEq, Clone, Debug)]
