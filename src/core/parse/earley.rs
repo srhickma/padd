@@ -15,12 +15,11 @@ impl Parser for EarleyParser {
 
         grammar.productions_for_lhs(grammar.start()).unwrap().iter()
             .for_each(|prod| {
-                let item = Item {
+                chart.row_mut(0).unsafe_append(Item {
                     rule: prod,
                     start: 0,
                     next: 0,
-                };
-                chart.row_mut(0).unsafe_append(item);
+                });
             });
 
         let mut cursor = 0;
@@ -60,9 +59,9 @@ impl Parser for EarleyParser {
             }
         }
 
-        fn predict_full<'a: 'b, 'b>(
-            grammar: &'a Grammar,
-            chart: &'b mut RChart<'a>,
+        fn predict_full<'inner, 'grammar: 'inner>(
+            grammar: &'grammar Grammar,
+            chart: &'inner mut RChart<'grammar>,
         ) {
             let cursor = chart.len() - 1;
 
@@ -115,12 +114,12 @@ impl Parser for EarleyParser {
             parse_chart.add_row();
         }
 
-        fn predict_op<'a, 'b>(
-            item: &Item<'a>,
+        fn predict_op<'inner, 'grammar>(
+            item: &Item<'grammar>,
             i: usize,
-            symbol: &'a str,
-            grammar: &'a Grammar,
-            chart: &'b mut RChart<'a>,
+            symbol: &'grammar str,
+            grammar: &'grammar Grammar,
+            chart: &'inner mut RChart<'grammar>,
         ) {
             let mut nullable_found = false;
             let mut items_to_add = Vec::new();
@@ -210,7 +209,7 @@ impl Parser for EarleyParser {
             });
         }
 
-        fn recognized<'a, 'b>(grammar: &'a Grammar, chart: &'b RChart<'a>) -> bool {
+        fn recognized(grammar: &Grammar, chart: &RChart) -> bool {
             chart.row(chart.len() - 1).iter()
                 .any(|item| item.rule.lhs == *grammar.start()
                     && item.next >= item.rule.rhs.len()
@@ -373,7 +372,7 @@ impl<'item> RChart<'item> {
         self.rows.len()
     }
 
-    fn add_row<'grammar: 'item>(&mut self, items: Vec<Item<'grammar>>) {
+    fn add_row(&mut self, items: Vec<Item<'item>>) {
         self.rows.push(RChartRow::new(items));
     }
 
