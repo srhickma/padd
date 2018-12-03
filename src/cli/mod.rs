@@ -3,11 +3,15 @@ extern crate colored;
 extern crate regex;
 extern crate stopwatch;
 
+use std::cmp;
+use std::collections::HashMap;
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, BufRead, BufReader, Read, Seek, SeekFrom, Write};
 use std::path::Path;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::sync::atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use padd::{self, FormatJobRunner, Stream, ThreadPool};
 
@@ -17,6 +21,8 @@ use self::regex::Regex;
 use self::stopwatch::Stopwatch;
 
 mod logger;
+
+const TRACKER_FILE_NAME: &str = ".padd.trk";
 
 static FORMATTED: AtomicUsize = ATOMIC_USIZE_INIT;
 static TOTAL: AtomicUsize = ATOMIC_USIZE_INIT;
@@ -160,21 +166,179 @@ fn load_spec(spec_path: &str) -> Result<FormatJobRunner, padd::BuildError> {
     FormatJobRunner::build(&spec)
 }
 
-fn format_target(target_path: &Path, fn_regex: &Regex, fjr_arc: &Arc<FormatJobRunner>, pool: &ThreadPool<FormatPayload>) {
+fn format_target(
+    target_path: &Path,
+    fn_regex: &Regex,
+    fjr_arc: &Arc<FormatJobRunner>,
+    pool: &ThreadPool<FormatPayload>,
+) {
     let file_name = target_path.file_name().unwrap().to_str().unwrap();
     if target_path.is_dir() {
+        let mut tracker_map = build_tracker_map(target_path);
+
         fs::read_dir(target_path).unwrap()
             .for_each(|res| {
                 match res {
-                    Ok(dir_item) => format_target(&dir_item.path(), fn_regex, fjr_arc, pool),
-                    Err(e) => logger::fmt_err(format!("An error occurred while searching directory {}: {}", target_path.to_string_lossy(), e)),
+                    Ok(dir_item) => format_target_internal(
+                        &dir_item.path(),
+                        fn_regex,
+                        fjr_arc,
+                        pool,
+                        &mut tracker_map,
+                    ),
+                    Err(e) => logger::fmt_err(format!("An error occurred while searching directory {}: {}", target_path.to_string_lossy().to_string(), e)),
                 }
             });
+
+        update_tracker_file(target_path, &tracker_map);
     } else if fn_regex.is_match(file_name) {
-        pool.enqueue(FormatPayload {
-            fjr_arc: fjr_arc.clone(),
-            file_path: target_path.to_string_lossy().to_string(),
-        }).unwrap();
+        let mut tracker_map = build_tracker_map(target_path.parent().unwrap());
+
+        format_target_internal(
+            target_path,
+            fn_regex,
+            fjr_arc,
+            pool,
+            &mut tracker_map,
+        );
+
+        update_tracker_file(target_path, &tracker_map);
+    }
+}
+
+fn format_target_internal(
+    target_path: &Path,
+    fn_regex: &Regex,
+    fjr_arc: &Arc<FormatJobRunner>,
+    pool: &ThreadPool<FormatPayload>,
+    tracker_map: &mut HashMap<String, SystemTime>,
+) {
+    let path_string = target_path.to_string_lossy().to_string();
+    let file_name = target_path.file_name().unwrap().to_str().unwrap();
+    if target_path.is_dir() {
+        let mut tracker_map = build_tracker_map(target_path);
+
+        fs::read_dir(target_path).unwrap()
+            .for_each(|res| {
+                match res {
+                    Ok(dir_item) => format_target_internal(
+                        &dir_item.path(),
+                        fn_regex,
+                        fjr_arc,
+                        pool,
+                        &mut tracker_map,
+                    ),
+                    Err(e) => logger::fmt_err(format!("An error occurred while searching directory {}: {}", path_string, e)),
+                }
+            });
+
+        update_tracker_file(target_path, &tracker_map);
+    } else if fn_regex.is_match(file_name) {
+        let mut should_skip = false;
+
+        match tracker_map.get(file_name) {
+            None => {}
+            Some(formatted_at) => {
+                let formatted_dur = formatted_at.duration_since(UNIX_EPOCH).unwrap();
+
+                match fs::metadata(target_path) {
+                    Err(err) => logger::err(format!("Failed to read metadata for {}: {}", path_string, err)),
+                    Ok(metadata) => match metadata.modified() {
+                        Err(err) => logger::err(format!("Failed to read modified for {}: {}", path_string, err)),
+                        Ok(modified_at) => {
+                            let modified_dur = modified_at.duration_since(UNIX_EPOCH).unwrap();
+
+                            if file_name == "ExpressionWithConversionTests.java" {
+                                println!("{} {}", formatted_dur.as_secs(), modified_dur.as_secs())
+                            }
+
+                            if modified_dur.cmp(&formatted_dur) != cmp::Ordering::Greater {
+                                should_skip = true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if !should_skip {
+            pool.enqueue(FormatPayload {
+                fjr_arc: fjr_arc.clone(),
+                file_path: path_string,
+            }).unwrap();
+        }
+
+        tracker_map.insert(file_name.to_string(), SystemTime::now());
+    }
+}
+
+fn build_tracker_map(dir_path: &Path) -> HashMap<String, SystemTime> {
+    let mut map: HashMap<String, SystemTime> = HashMap::new();
+
+    let mut path_buf = dir_path.to_path_buf();
+    path_buf.push(TRACKER_FILE_NAME);
+    let tracker_path = path_buf.as_path();
+    let path_string = tracker_path.to_string_lossy().to_string();
+
+    if tracker_path.exists() {
+        match File::open(tracker_path) {
+            Err(err) => logger::err(format!("Failed to open tracker file {}: {}", path_string, err)),
+            Ok(tracker_file) => {
+                let mut tracker_reader = BufReader::new(tracker_file);
+                for line in tracker_reader.lines() {
+                    match line {
+                        Err(err) => logger::err(format!("Failed to read tracker file {}: {}", path_string, err)),
+                        Ok(text) => {
+                            let split: Vec<&str> = (&text[..]).split('@')
+                                .take(2)
+                                .collect();
+
+                            if split.len() == 0 {
+                                continue;
+                            }
+
+                            let file_name = split[0];
+                            match u64::from_str(split[1]) {
+                                Err(err) => logger::err(format!("Failed to read {} as unix time: {}", split[1], err)),
+                                Ok(millis) => {
+                                    let last_formatted = UNIX_EPOCH + Duration::from_millis(millis);
+                                    map.insert(file_name.to_string(), last_formatted);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    map
+}
+
+fn update_tracker_file(
+    dir_path: &Path,
+    tracker_map: &HashMap<String, SystemTime>
+) {
+    let mut path_buf = dir_path.to_path_buf();
+    path_buf.push(TRACKER_FILE_NAME);
+    let tracker_path = path_buf.as_path();
+    let path_string = tracker_path.to_string_lossy().to_string();
+
+    match File::create(tracker_path) {
+        Err(err) => logger::err(format!("Failed to create tracker file {}: {}", path_string, err)),
+        Ok(mut tracker_file) => {
+            for (file_name, formatted_at) in tracker_map {
+                let duration = formatted_at.duration_since(UNIX_EPOCH).unwrap();
+                let elapsed_millis = duration.as_secs() * 1000 +
+                    duration.subsec_nanos() as u64 / 1_000_000;
+                let line = format!("{}@{}\n", file_name, elapsed_millis);
+
+                match tracker_file.write_all(line.as_bytes()) {
+                    Err(err) => logger::err(format!("Failed to write to tracker file {}: {}", path_string, err)),
+                    Ok(()) => {}
+                }
+            }
+        }
     }
 }
 
