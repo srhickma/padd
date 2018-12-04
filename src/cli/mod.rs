@@ -60,8 +60,8 @@ pub fn run() {
         None => None,
         Some(regex) => match Regex::new(format!(r#"{}"#, regex).as_str()) {
             Ok(fn_regex) => Some(fn_regex),
-            Err(e) => {
-                logger::fatal(format!("Failed to build file name regex: {}", e));
+            Err(err) => {
+                logger::fatal(format!("Failed to build file name regex: {}", err));
                 None
             }
         }
@@ -85,6 +85,9 @@ pub fn run() {
         }
     };
 
+    let no_skip = matches.is_present("no-skip");
+    let no_track = matches.is_present("no-track");
+
     println!();
 
     let fjr_arc: Arc<FormatJobRunner> = Arc::new(fjr);
@@ -95,7 +98,10 @@ pub fn run() {
         |payload: FormatPayload| {
             let file_path = payload.file_path.as_path();
             format_file(file_path, &payload.fjr_arc);
-            track_file(file_path, &payload.spec_sha);
+
+            if !payload.no_track {
+                track_file(file_path, &payload.spec_sha);
+            }
         },
     );
 
@@ -106,7 +112,16 @@ pub fn run() {
                 None => Regex::new(r#".*"#).unwrap(),
             };
 
-            format_target(target_path, &fn_regex, &spec_sha, &fjr_arc, &pool)
+            let criteria = TargetSearchCriteria {
+                fn_regex: &fn_regex,
+                spec_sha: &spec_sha,
+                no_skip,
+                no_track,
+                fjr_arc: &fjr_arc,
+                pool: &pool,
+            };
+
+            format_target(target_path, &criteria)
         }
         None => term_loop(&fjr_arc)
     }
@@ -149,6 +164,14 @@ fn build_app<'a>() -> ArgMatches<'a> {
             .takes_value(true)
             .value_name("NUM")
         )
+        .arg(Arg::with_name("no-skip")
+            .long("no-skip")
+            .help("Do not skip files which haven't changed since they were last formatted")
+        )
+        .arg(Arg::with_name("no-track")
+            .long("no-track")
+            .help("Do not track file changes")
+        )
         .get_matches()
 }
 
@@ -178,10 +201,7 @@ fn load_spec(spec_path: &str) -> Result<(FormatJobRunner, String), padd::BuildEr
 
 fn format_target(
     target_path: &Path,
-    fn_regex: &Regex,
-    spec_sha: &String,
-    fjr_arc: &Arc<FormatJobRunner>,
-    pool: &ThreadPool<FormatPayload>,
+    criteria: &TargetSearchCriteria,
 ) {
     let path_string = target_path.to_string_lossy().to_string();
     let file_name = target_path.file_name().unwrap().to_str().unwrap();
@@ -193,24 +213,19 @@ fn format_target(
         fs::read_dir(target_path).unwrap()
             .for_each(|res| {
                 match res {
-                    Ok(dir_item) => format_target(
-                        &dir_item.path(),
-                        fn_regex,
-                        spec_sha,
-                        fjr_arc,
-                        pool,
-                    ),
+                    Ok(dir_item) => format_target(&dir_item.path(), criteria),
                     Err(e) => logger::fmt_err(format!("An error occurred while searching directory {}: {}", path_string, e)),
                 }
             });
-    } else if fn_regex.is_match(file_name) {
+    } else if criteria.fn_regex.is_match(file_name) {
         TOTAL.fetch_add(1, Ordering::SeqCst);
 
-        if needs_formatting(target_path, spec_sha) {
-            pool.enqueue(FormatPayload {
-                fjr_arc: fjr_arc.clone(),
+        if criteria.no_skip || needs_formatting(target_path, criteria.spec_sha) {
+            criteria.pool.enqueue(FormatPayload {
+                fjr_arc: criteria.fjr_arc.clone(),
                 file_path: PathBuf::from(target_path),
-                spec_sha: spec_sha.clone(),
+                spec_sha: criteria.spec_sha.clone(),
+                no_track: criteria.no_track,
             }).unwrap();
         }
     }
@@ -431,12 +446,6 @@ fn format_file_internal(target_path: &Path, fjr: &FormatJobRunner) -> bool {
     true
 }
 
-struct FormatPayload {
-    fjr_arc: Arc<FormatJobRunner>,
-    file_path: PathBuf,
-    spec_sha: String,
-}
-
 fn print_final_status(elapsed_ms: i64) {
     let total = TOTAL.load(Ordering::Relaxed);
     let formatted = FORMATTED.load(Ordering::Relaxed);
@@ -467,4 +476,20 @@ fn print_final_status(elapsed_ms: i64) {
         formatted_msg,
         failed_msg
     ));
+}
+
+struct FormatPayload {
+    fjr_arc: Arc<FormatJobRunner>,
+    file_path: PathBuf,
+    spec_sha: String,
+    no_track: bool,
+}
+
+struct TargetSearchCriteria<'outer> {
+    fn_regex: &'outer Regex,
+    spec_sha: &'outer String,
+    no_skip: bool,
+    no_track: bool,
+    fjr_arc: &'outer Arc<FormatJobRunner>,
+    pool: &'outer ThreadPool<FormatPayload>,
 }
