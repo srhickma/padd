@@ -15,7 +15,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use padd::{self, FormatJobRunner, Stream, ThreadPool};
 
-use self::clap::{App, Arg, ArgMatches};
+use self::clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 use self::colored::{ColoredString, Colorize};
 use self::crypto::digest::Digest;
 use self::crypto::sha2::Sha256;
@@ -32,10 +32,79 @@ static FAILED: AtomicUsize = ATOMIC_USIZE_INIT;
 static TOTAL: AtomicUsize = ATOMIC_USIZE_INIT;
 
 pub fn run() {
+    let matches = build_app();
+
+    if let Some(matches) = matches.subcommand_matches("fmt") {
+        fmt(&matches);
+    }
+
+    if let Some(matches) = matches.subcommand_matches("forget") {
+        forget(&matches);
+    }
+}
+
+fn build_app<'a>() -> ArgMatches<'a> {
+    App::new("padd")
+        .version("0.1.0")
+        .author("Shane Hickman <srhickma@edu.uwaterloo.ca>")
+        .about("Text formatter for context-free languages")
+        .setting(AppSettings::SubcommandRequired)
+        .setting(AppSettings::VersionlessSubcommands)
+        .subcommand(SubCommand::with_name("fmt")
+            .about("Formatter")
+            .arg(Arg::with_name("spec")
+                .help("Specification file path")
+                .takes_value(true)
+                .value_name("SPECIFICATION")
+                .required(true)
+            )
+            .arg(Arg::with_name("target")
+                .short("t")
+                .long("target")
+                .help("Sets a the path to format files under")
+                .takes_value(true)
+                .value_name("PATH")
+            )
+            .arg(Arg::with_name("matching")
+                .short("m")
+                .long("matching")
+                .help("Sets the regex for file names to format")
+                .takes_value(true)
+                .value_name("REGEX")
+                .requires("target")
+            )
+            .arg(Arg::with_name("threads")
+                .long("threads")
+                .help("Sets the number of worker threads")
+                .takes_value(true)
+                .value_name("NUM")
+            )
+            .arg(Arg::with_name("no-skip")
+                .long("no-skip")
+                .help("Do not skip files which haven't changed since they were last formatted")
+            )
+            .arg(Arg::with_name("no-track")
+                .long("no-track")
+                .help("Do not track file changes")
+            )
+        )
+        .subcommand(SubCommand::with_name("forget")
+            .about("Clears all file tracking data")
+            .arg(Arg::with_name("target")
+                .short("t")
+                .long("target")
+                .help("Sets a the path to format files under")
+                .takes_value(true)
+                .value_name("PATH")
+                .required(true)
+            )
+        )
+        .get_matches()
+}
+
+fn fmt(matches: &ArgMatches) {
     let mut sw = Stopwatch::new();
     sw.start();
-
-    let matches = build_app();
 
     let spec_path = matches.value_of("spec").unwrap();
 
@@ -132,49 +201,6 @@ pub fn run() {
     print_final_status(sw.elapsed_ms());
 }
 
-fn build_app<'a>() -> ArgMatches<'a> {
-    App::new("padd")
-        .version("0.1.0")
-        .author("Shane Hickman <srhickma@edu.uwaterloo.ca>")
-        .about("Text formatter for context-free languages")
-        .arg(Arg::with_name("spec")
-            .help("Specification file path")
-            .takes_value(true)
-            .value_name("SPECIFICATION")
-            .required(true)
-        )
-        .arg(Arg::with_name("target")
-            .short("t")
-            .long("target")
-            .help("Sets a the path to format files under")
-            .takes_value(true)
-            .value_name("PATH")
-        )
-        .arg(Arg::with_name("matching")
-            .short("m")
-            .long("matching")
-            .help("Sets the regex for file names to format")
-            .takes_value(true)
-            .value_name("REGEX")
-            .requires("target")
-        )
-        .arg(Arg::with_name("threads")
-            .long("threads")
-            .help("Sets the number of worker threads")
-            .takes_value(true)
-            .value_name("NUM")
-        )
-        .arg(Arg::with_name("no-skip")
-            .long("no-skip")
-            .help("Do not skip files which haven't changed since they were last formatted")
-        )
-        .arg(Arg::with_name("no-track")
-            .long("no-track")
-            .help("Do not track file changes")
-        )
-        .get_matches()
-}
-
 fn load_spec(spec_path: &str) -> Result<(FormatJobRunner, String), padd::BuildError> {
     let mut spec = String::new();
 
@@ -214,7 +240,7 @@ fn format_target(
             .for_each(|res| {
                 match res {
                     Ok(dir_item) => format_target(&dir_item.path(), criteria),
-                    Err(e) => logger::fmt_err(format!("An error occurred while searching directory {}: {}", path_string, e)),
+                    Err(e) => logger::err(format!("An error occurred while searching directory {}: {}", path_string, e)),
                 }
             });
     } else if criteria.fn_regex.is_match(file_name) {
@@ -492,4 +518,43 @@ struct TargetSearchCriteria<'outer> {
     no_track: bool,
     fjr_arc: &'outer Arc<FormatJobRunner>,
     pool: &'outer ThreadPool<FormatPayload>,
+}
+
+fn forget(matches: &ArgMatches) {
+    let target: &Path = match matches.value_of("target") {
+        None => panic!("No target path specified"),
+        Some(file) => Path::new(file)
+    };
+
+    println!("Clearing all tracking data from {} ...", target.to_string_lossy().to_string());
+
+    clear_tracking(target);
+
+    let total = TOTAL.load(Ordering::Relaxed);
+    match total {
+        1 => println!("Removed 1 tracking directory"),
+        _ => println!("Removed {} tracking directories", total)
+    }
+}
+
+fn clear_tracking(target_path: &Path) {
+    let path_string = target_path.to_string_lossy().to_string();
+    if target_path.is_dir() {
+        if target_path.ends_with(TRACKER_DIR) {
+            match fs::remove_dir_all(target_path) {
+                Err(err) => logger::err(format!("Could not delete tracking directory {}: {}", path_string, err)),
+                Ok(()) => {}
+            }
+            TOTAL.fetch_add(1, Ordering::SeqCst);
+            return;
+        }
+
+        fs::read_dir(target_path).unwrap()
+            .for_each(|res| {
+                match res {
+                    Ok(dir_item) => clear_tracking(&dir_item.path()),
+                    Err(e) => logger::err(format!("An error occurred while searching directory {}: {}", path_string, e)),
+                }
+            });
+    }
 }
