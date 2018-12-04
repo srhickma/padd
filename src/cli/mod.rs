@@ -1,13 +1,13 @@
 extern crate clap;
 extern crate colored;
+extern crate crypto;
 extern crate regex;
 extern crate stopwatch;
 
 use std::cmp;
-use std::collections::HashMap;
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, BufRead, BufReader, Read, Seek, SeekFrom, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
 use std::sync::atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering};
@@ -17,14 +17,18 @@ use padd::{self, FormatJobRunner, Stream, ThreadPool};
 
 use self::clap::{App, Arg, ArgMatches};
 use self::colored::{ColoredString, Colorize};
+use self::crypto::digest::Digest;
+use self::crypto::sha2::Sha256;
 use self::regex::Regex;
 use self::stopwatch::Stopwatch;
 
 mod logger;
 
-const TRACKER_FILE_NAME: &str = ".padd.trk";
+const TRACKER_DIR: &str = ".padd";
+const TRACKER_EXTENSION: &str = ".trk";
 
 static FORMATTED: AtomicUsize = ATOMIC_USIZE_INIT;
+static FAILED: AtomicUsize = ATOMIC_USIZE_INIT;
 static TOTAL: AtomicUsize = ATOMIC_USIZE_INIT;
 
 pub fn run() {
@@ -37,7 +41,7 @@ pub fn run() {
 
     logger::info(format!("Loading specification {} ...", spec_path));
 
-    let fjr = match load_spec(&spec_path) {
+    let (fjr, spec_sha) = match load_spec(&spec_path) {
         Err(err) => {
             logger::fatal(format!("Error loading specification {}: {}", &spec_path, err));
             return;
@@ -45,7 +49,7 @@ pub fn run() {
         Ok(fjr) => fjr
     };
 
-    logger::info(format!("Successfully loaded specification"));
+    logger::info(format!("Successfully loaded specification: sha256: {}", &spec_sha));
 
     let target: Option<&Path> = match matches.value_of("target") {
         None => None,
@@ -89,8 +93,9 @@ pub fn run() {
         thread_count,
         thread_count * 2,
         |payload: FormatPayload| {
-            let file_path = Path::new(&payload.file_path);
-            format_file(&file_path, &payload.fjr_arc)
+            let file_path = payload.file_path.as_path();
+            format_file(file_path, &payload.fjr_arc);
+            track_file(file_path, &payload.spec_sha);
         },
     );
 
@@ -101,7 +106,7 @@ pub fn run() {
                 None => Regex::new(r#".*"#).unwrap(),
             };
 
-            format_target(target_path, &fn_regex, &fjr_arc, &pool)
+            format_target(target_path, &fn_regex, &spec_sha, &fjr_arc, &pool)
         }
         None => term_loop(&fjr_arc)
     }
@@ -147,7 +152,7 @@ fn build_app<'a>() -> ArgMatches<'a> {
         .get_matches()
 }
 
-fn load_spec(spec_path: &str) -> Result<FormatJobRunner, padd::BuildError> {
+fn load_spec(spec_path: &str) -> Result<(FormatJobRunner, String), padd::BuildError> {
     let mut spec = String::new();
 
     let spec_file = File::open(spec_path);
@@ -163,147 +168,137 @@ fn load_spec(spec_path: &str) -> Result<FormatJobRunner, padd::BuildError> {
         Err(e) => logger::fatal(format!("Could not find specification file \"{}\": {}", &spec_path, e)),
     }
 
-    FormatJobRunner::build(&spec)
+    let fjr = FormatJobRunner::build(&spec)?;
+
+    let mut sha = Sha256::new();
+    sha.input_str(&spec[..]);
+
+    Ok((fjr, sha.result_str().to_string()))
 }
 
 fn format_target(
     target_path: &Path,
     fn_regex: &Regex,
+    spec_sha: &String,
     fjr_arc: &Arc<FormatJobRunner>,
     pool: &ThreadPool<FormatPayload>,
-) {
-    let file_name = target_path.file_name().unwrap().to_str().unwrap();
-    if target_path.is_dir() {
-        let mut tracker_map = build_tracker_map(target_path);
-
-        fs::read_dir(target_path).unwrap()
-            .for_each(|res| {
-                match res {
-                    Ok(dir_item) => format_target_internal(
-                        &dir_item.path(),
-                        fn_regex,
-                        fjr_arc,
-                        pool,
-                        &mut tracker_map,
-                    ),
-                    Err(e) => logger::fmt_err(format!("An error occurred while searching directory {}: {}", target_path.to_string_lossy().to_string(), e)),
-                }
-            });
-
-        update_tracker_file(target_path, &tracker_map);
-    } else if fn_regex.is_match(file_name) {
-        let mut tracker_map = build_tracker_map(target_path.parent().unwrap());
-
-        format_target_internal(
-            target_path,
-            fn_regex,
-            fjr_arc,
-            pool,
-            &mut tracker_map,
-        );
-
-        update_tracker_file(target_path, &tracker_map);
-    }
-}
-
-fn format_target_internal(
-    target_path: &Path,
-    fn_regex: &Regex,
-    fjr_arc: &Arc<FormatJobRunner>,
-    pool: &ThreadPool<FormatPayload>,
-    tracker_map: &mut HashMap<String, SystemTime>,
 ) {
     let path_string = target_path.to_string_lossy().to_string();
     let file_name = target_path.file_name().unwrap().to_str().unwrap();
     if target_path.is_dir() {
-        let mut tracker_map = build_tracker_map(target_path);
+        if target_path.ends_with(TRACKER_DIR) {
+            return; // Don't format tracker files
+        }
 
         fs::read_dir(target_path).unwrap()
             .for_each(|res| {
                 match res {
-                    Ok(dir_item) => format_target_internal(
+                    Ok(dir_item) => format_target(
                         &dir_item.path(),
                         fn_regex,
+                        spec_sha,
                         fjr_arc,
                         pool,
-                        &mut tracker_map,
                     ),
                     Err(e) => logger::fmt_err(format!("An error occurred while searching directory {}: {}", path_string, e)),
                 }
             });
-
-        update_tracker_file(target_path, &tracker_map);
     } else if fn_regex.is_match(file_name) {
-        let mut should_skip = false;
+        TOTAL.fetch_add(1, Ordering::SeqCst);
 
-        match tracker_map.get(file_name) {
-            None => {}
-            Some(formatted_at) => {
-                let formatted_dur = formatted_at.duration_since(UNIX_EPOCH).unwrap();
-
-                match fs::metadata(target_path) {
-                    Err(err) => logger::err(format!("Failed to read metadata for {}: {}", path_string, err)),
-                    Ok(metadata) => match metadata.modified() {
-                        Err(err) => logger::err(format!("Failed to read modified for {}: {}", path_string, err)),
-                        Ok(modified_at) => {
-                            let modified_dur = modified_at.duration_since(UNIX_EPOCH).unwrap();
-
-                            if file_name == "ExpressionWithConversionTests.java" {
-                                println!("{} {}", formatted_dur.as_secs(), modified_dur.as_secs())
-                            }
-
-                            if modified_dur.cmp(&formatted_dur) != cmp::Ordering::Greater {
-                                should_skip = true;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        if !should_skip {
+        if needs_formatting(target_path, spec_sha) {
             pool.enqueue(FormatPayload {
                 fjr_arc: fjr_arc.clone(),
-                file_path: path_string,
+                file_path: PathBuf::from(target_path),
+                spec_sha: spec_sha.clone(),
             }).unwrap();
         }
-
-        tracker_map.insert(file_name.to_string(), SystemTime::now());
     }
 }
 
-fn build_tracker_map(dir_path: &Path) -> HashMap<String, SystemTime> {
-    let mut map: HashMap<String, SystemTime> = HashMap::new();
+fn track_file(file_path: &Path, spec_sha: &String) {
+    let tracker_path_buf = tracker_for(file_path);
+    let tracker_path = tracker_path_buf.as_path();
+    let tracker_path_string = tracker_path.to_string_lossy().to_string();
 
-    let mut path_buf = dir_path.to_path_buf();
-    path_buf.push(TRACKER_FILE_NAME);
-    let tracker_path = path_buf.as_path();
-    let path_string = tracker_path.to_string_lossy().to_string();
+    let tracker_dir_path = tracker_path.parent().unwrap();
+    if !tracker_dir_path.exists() {
+        match fs::create_dir(tracker_dir_path) {
+            Err(err) => logger::err(format!("Failed to create tracker directory for {}: {}", tracker_path_string, err)),
+            Ok(_) => {}
+        }
+    }
+
+    match File::create(tracker_path) {
+        Err(err) => logger::err(format!("Failed to create tracker file {}: {}", tracker_path_string, err)),
+        Ok(mut tracker_file) => {
+            let since_epoch = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+            let elapsed_millis = since_epoch.as_secs() * 1000 +
+                since_epoch.subsec_nanos() as u64 / 1_000_000;
+            let line = format!("{}\n{}\n", spec_sha, elapsed_millis);
+
+            match tracker_file.write_all(line.as_bytes()) {
+                Err(err) => logger::err(format!("Failed to write to tracker file {}: {}", tracker_path_string, err)),
+                Ok(()) => {}
+            }
+        }
+    }
+}
+
+fn needs_formatting(file_path: &Path, spec_sha: &String) -> bool {
+    match formatted_at(file_path, spec_sha) {
+        None => {}
+        Some(formatted_at) => match modified_at(file_path) {
+            None => {}
+            Some(modified_at) => {
+                let formatted_dur = formatted_at.duration_since(UNIX_EPOCH).unwrap();
+                let modified_dur = modified_at.duration_since(UNIX_EPOCH).unwrap();
+
+                if modified_dur.cmp(&formatted_dur) != cmp::Ordering::Greater {
+                    return false;
+                }
+            }
+        }
+    }
+
+    true
+}
+
+fn modified_at(file_path: &Path) -> Option<SystemTime> {
+    let path_string = file_path.to_string_lossy().to_string();
+
+    match fs::metadata(file_path) {
+        Err(err) => logger::err(format!("Failed to read metadata for {}: {}", path_string, err)),
+        Ok(metadata) => match metadata.modified() {
+            Err(err) => logger::err(format!("Failed to read modified for {}: {}", path_string, err)),
+            Ok(modified_at) => return Some(modified_at)
+        }
+    }
+
+    None
+}
+
+fn formatted_at(file_path: &Path, spec_sha: &String) -> Option<SystemTime> {
+    let tracker_path_buf = tracker_for(file_path);
+    let tracker_path = tracker_path_buf.as_path();
+    let tracker_path_string = tracker_path.to_string_lossy().to_string();
 
     if tracker_path.exists() {
         match File::open(tracker_path) {
-            Err(err) => logger::err(format!("Failed to open tracker file {}: {}", path_string, err)),
+            Err(err) => logger::err(format!("Failed to open tracker file {}: {}", tracker_path_string, err)),
             Ok(tracker_file) => {
                 let mut tracker_reader = BufReader::new(tracker_file);
-                for line in tracker_reader.lines() {
-                    match line {
-                        Err(err) => logger::err(format!("Failed to read tracker file {}: {}", path_string, err)),
-                        Ok(text) => {
-                            let split: Vec<&str> = (&text[..]).split('@')
-                                .take(2)
-                                .collect();
 
-                            if split.len() == 0 {
-                                continue;
-                            }
-
-                            let file_name = split[0];
-                            match u64::from_str(split[1]) {
-                                Err(err) => logger::err(format!("Failed to read {} as unix time: {}", split[1], err)),
-                                Ok(millis) => {
-                                    let last_formatted = UNIX_EPOCH + Duration::from_millis(millis);
-                                    map.insert(file_name.to_string(), last_formatted);
-                                }
+                match read_tracker_line(&mut tracker_reader) {
+                    Err(err) => logger::err(format!("Tracker missing spec sha {}: {}", tracker_path_string, err)),
+                    Ok(tracked_spec_sha) => if tracked_spec_sha == *spec_sha {
+                        match read_tracker_line(&mut tracker_reader) {
+                            Err(err) => logger::err(format!("Tracker missing timestamp {}: {}", tracker_path_string, err)),
+                            Ok(timestamp) => match u64::from_str(&timestamp[..]) {
+                                Err(err) => logger::err(format!("Failed to parse tracker timestamp {}: {}", tracker_path_string, err)),
+                                Ok(millis) => return Some(
+                                    UNIX_EPOCH + Duration::from_millis(millis)
+                                )
                             }
                         }
                     }
@@ -312,34 +307,23 @@ fn build_tracker_map(dir_path: &Path) -> HashMap<String, SystemTime> {
         }
     }
 
-    map
+    None
 }
 
-fn update_tracker_file(
-    dir_path: &Path,
-    tracker_map: &HashMap<String, SystemTime>
-) {
-    let mut path_buf = dir_path.to_path_buf();
-    path_buf.push(TRACKER_FILE_NAME);
-    let tracker_path = path_buf.as_path();
-    let path_string = tracker_path.to_string_lossy().to_string();
+fn read_tracker_line(reader: &mut BufReader<File>) -> io::Result<String> {
+    let mut line = String::new();
+    reader.read_line(&mut line)?;
 
-    match File::create(tracker_path) {
-        Err(err) => logger::err(format!("Failed to create tracker file {}: {}", path_string, err)),
-        Ok(mut tracker_file) => {
-            for (file_name, formatted_at) in tracker_map {
-                let duration = formatted_at.duration_since(UNIX_EPOCH).unwrap();
-                let elapsed_millis = duration.as_secs() * 1000 +
-                    duration.subsec_nanos() as u64 / 1_000_000;
-                let line = format!("{}@{}\n", file_name, elapsed_millis);
+    let line_len = line.len();
+    line.truncate(line_len - 1);
+    Ok(line)
+}
 
-                match tracker_file.write_all(line.as_bytes()) {
-                    Err(err) => logger::err(format!("Failed to write to tracker file {}: {}", path_string, err)),
-                    Ok(()) => {}
-                }
-            }
-        }
-    }
+fn tracker_for(file_path: &Path) -> PathBuf {
+    let mut tracker_dir_buf = file_path.parent().unwrap().to_path_buf();
+    tracker_dir_buf.push(TRACKER_DIR);
+    tracker_dir_buf.push(format!("{}{}", file_path.file_name().unwrap().to_string_lossy().to_string(), TRACKER_EXTENSION));
+    tracker_dir_buf
 }
 
 fn term_loop(fjr_arc: &Arc<FormatJobRunner>) {
@@ -361,9 +345,10 @@ fn term_loop(fjr_arc: &Arc<FormatJobRunner>) {
 }
 
 fn format_file(target_path: &Path, fjr: &FormatJobRunner) {
-    TOTAL.fetch_add(1, Ordering::SeqCst);
     if format_file_internal(target_path, fjr) {
         FORMATTED.fetch_add(1, Ordering::SeqCst);
+    } else {
+        FAILED.fetch_add(1, Ordering::SeqCst);
     }
 }
 
@@ -448,23 +433,38 @@ fn format_file_internal(target_path: &Path, fjr: &FormatJobRunner) -> bool {
 
 struct FormatPayload {
     fjr_arc: Arc<FormatJobRunner>,
-    file_path: String,
+    file_path: PathBuf,
+    spec_sha: String,
 }
 
 fn print_final_status(elapsed_ms: i64) {
     let total = TOTAL.load(Ordering::Relaxed);
     let formatted = FORMATTED.load(Ordering::Relaxed);
+    let failed = FAILED.load(Ordering::Relaxed);
+    let unchanged = total - failed - formatted;
+
+    let mut unchanged_msg = format!("{} unchanged", unchanged).normal();
+    if unchanged > 0 {
+        unchanged_msg = unchanged_msg.yellow()
+    }
 
     let mut formatted_msg: ColoredString = format!("{} formatted", formatted).normal();
     if formatted > 0 {
         formatted_msg = formatted_msg.bright_green()
     }
 
-    let mut failed_msg = format!("{} failed", total - formatted).normal();
-    if total > formatted {
+    let mut failed_msg = format!("{} failed", failed).normal();
+    if failed > 0 {
         failed_msg = failed_msg.bright_red()
     }
 
     println!();
-    logger::info(format!("COMPLETE: {}ms : {} processed, {}, {}", elapsed_ms, total, formatted_msg, failed_msg));
+    logger::info(format!(
+        "COMPLETE: {}ms : {} processed, {}, {}, {}",
+        elapsed_ms,
+        total,
+        unchanged_msg,
+        formatted_msg,
+        failed_msg
+    ));
 }
