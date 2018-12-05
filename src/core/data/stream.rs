@@ -27,7 +27,7 @@ impl<'g, T: 'g + Clone> StreamSource<'g, T> {
         self.head()
     }
 
-    pub fn detach_tail<'a>(&'a mut self) {
+    pub fn detach_tail(&mut self) {
         match self.buffers.pop_back() {
             None => {}
             Some(head) => {

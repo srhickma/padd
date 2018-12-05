@@ -1,10 +1,16 @@
-use core::data::Data;
-use core::parse;
-use core::parse::grammar::Grammar;
-use core::parse::Parser;
-use core::parse::Production;
-use core::parse::Tree;
-use core::scan::Token;
+use {
+    core::{
+        data::Data,
+        parse::{
+            self,
+            grammar::Grammar,
+            Parser,
+            Production,
+            Tree,
+        },
+        scan::Token,
+    }
+};
 
 pub struct EarleyParser;
 

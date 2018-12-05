@@ -1,7 +1,6 @@
 extern crate padd;
 
-use padd::FormatJobRunner;
-use padd::Stream;
+use padd::{FormatJobRunner, Stream};
 
 #[test]
 fn test_def_input_matcher() {

@@ -2,19 +2,27 @@
 extern crate lazy_static;
 extern crate stopwatch;
 
-use std::error;
-use std::fmt;
-
-use core::data::stream::StreamSource;
-use core::fmt::Formatter;
-use core::parse;
-use core::parse::grammar::Grammar;
-use core::parse::Parser;
-use core::scan;
-use core::scan::runtime;
-use core::scan::runtime::ecdfa::EncodedCDFA;
-use core::scan::runtime::Scanner;
-use core::spec;
+use {
+    core::{
+        data::stream::StreamSource,
+        fmt::Formatter,
+        parse::{
+            self,
+            grammar::Grammar,
+            Parser,
+        },
+        scan::{
+            self,
+            runtime::{
+                self,
+                ecdfa::EncodedCDFA,
+                Scanner,
+            },
+        },
+        spec,
+    },
+    std::{error, fmt},
+};
 
 mod core;
 

@@ -1,18 +1,24 @@
-use std::error;
-use std::fmt;
-
-use core::data::Data;
-use core::data::stream::StreamConsumer;
-use core::data::stream::StreamSource;
-use core::scan;
-use core::scan::Token;
+use {
+    core::{
+        data::{
+            Data,
+            stream::{StreamConsumer, StreamSource},
+        },
+        scan::{self, Token},
+    },
+    std::{error, fmt},
+};
 
 pub mod alphabet;
 pub mod ecdfa;
 pub mod maximal_munch;
 
 pub trait Scanner<State: Data, Kind: Data>: 'static + Send + Sync {
-    fn scan<'a, 'b>(&self, stream: &'a mut StreamSource<char>, cdfa: &'b CDFA<State, Kind>) -> Result<Vec<Token<Kind>>, scan::Error>;
+    fn scan<'a, 'b>(
+        &self,
+        stream: &'a mut StreamSource<char>,
+        cdfa: &'b CDFA<State, Kind>,
+    ) -> Result<Vec<Token<Kind>>, scan::Error>;
 }
 
 pub fn def_scanner<State: Data, Kind: Data>() -> Box<Scanner<State, Kind>> {
@@ -35,7 +41,12 @@ pub trait CDFABuilder<State, Kind, CDFAType> {
     fn mark_accepting(&mut self, state: &State) -> &mut Self;
     fn mark_start(&mut self, state: &State) -> &mut Self;
     fn mark_trans(&mut self, from: &State, to: &State, on: char) -> Result<&mut Self, CDFAError>;
-    fn mark_chain(&mut self, from: &State, to: &State, on: impl Iterator<Item=char>) -> Result<&mut Self, CDFAError>;
+    fn mark_chain(
+        &mut self,
+        from: &State,
+        to: &State,
+        on: impl Iterator<Item=char>,
+    ) -> Result<&mut Self, CDFAError>;
     fn mark_def(&mut self, from: &State, to: &State) -> Result<&mut Self, CDFAError>;
     fn mark_token(&mut self, state: &State, token: &Kind) -> &mut Self;
 }

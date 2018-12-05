@@ -1,11 +1,12 @@
 extern crate padd;
 
-use std::fs::File;
-use std::io::Read;
-use std::io::Write;
-
-use padd::FormatJobRunner;
-use padd::Stream;
+use {
+    padd::{FormatJobRunner, Stream},
+    std::{
+        fs::File,
+        io::{Read, Write},
+    },
+};
 
 #[test]
 fn test_balanced_brackets() {

@@ -1,9 +1,13 @@
-use std::collections::LinkedList;
-use std::error;
-use std::fmt;
-use std::sync::Arc;
-use std::sync::mpsc::{self, Receiver, Sender, SyncSender};
-use std::thread;
+use std::{
+    collections::LinkedList,
+    error,
+    fmt,
+    sync::{
+        Arc,
+        mpsc::{self, Receiver, Sender, SyncSender},
+    },
+    thread,
+};
 
 pub struct ThreadPool<Payload: 'static + Send> {
     queue_tx: SyncSender<Signal<Payload>>,
@@ -11,9 +15,11 @@ pub struct ThreadPool<Payload: 'static + Send> {
 }
 
 impl<Payload: 'static + Send> ThreadPool<Payload> {
-    pub fn spawn<JobRunner>(size: usize, queue_size: usize, job_runner: JobRunner) -> ThreadPool<Payload>
-        where JobRunner: Fn(Payload) + 'static + Send + Sync
-    {
+    pub fn spawn<JobRunner>(
+        size: usize,
+        queue_size: usize,
+        job_runner: JobRunner,
+    ) -> ThreadPool<Payload> where JobRunner: Fn(Payload) + 'static + Send + Sync {
         let (queue_tx, queue_rx) = mpsc::sync_channel(queue_size);
         let (term_tx, term_rx) = mpsc::channel();
 
@@ -137,7 +143,9 @@ impl WorkerMux {
         }
     }
 
-    fn join_job_queue<Payload: 'static + Send>(queue_rx: &Receiver<Signal<Payload>>) -> Signal<Payload> {
+    fn join_job_queue<Payload: 'static + Send>(
+        queue_rx: &Receiver<Signal<Payload>>
+    ) -> Signal<Payload> {
         match queue_rx.recv() {
             Err(err) => panic!("Job queue rx error on threadpool worker mux: {}", err),
             Ok(sig) => sig
@@ -150,9 +158,11 @@ struct Worker<Payload: 'static + Send> {
 }
 
 impl<Payload: 'static + Send> Worker<Payload> {
-    fn spawn<JobRunner>(id: WorkerId, mux_tx: Sender<WorkerReport>, job_runner: Arc<JobRunner>) -> Worker<Payload>
-        where JobRunner: Fn(Payload) + 'static + Send + Sync
-    {
+    fn spawn<JobRunner>(
+        id: WorkerId,
+        mux_tx: Sender<WorkerReport>,
+        job_runner: Arc<JobRunner>,
+    ) -> Worker<Payload> where JobRunner: Fn(Payload) + 'static + Send + Sync {
         let (tx, rx) = mpsc::channel();
 
         thread::spawn(move || {
@@ -218,9 +228,11 @@ enum WorkerStatus {
 
 #[cfg(test)]
 mod tests {
-    use std::error::Error;
-    use std::sync::atomic::{AtomicUsize, Ordering};
-    use std::time::Duration;
+    use std::{
+        error::Error,
+        sync::atomic::{AtomicUsize, Ordering},
+        time::Duration,
+    };
 
     use super::*;
 

@@ -1,7 +1,7 @@
-use std::collections::HashMap;
-use std::collections::HashSet;
-
-use core::parse::Production;
+use {
+    core::parse::Production,
+    std::collections::{HashMap, HashSet},
+};
 
 pub struct Grammar {
     prods_by_lhs: HashMap<String, Vec<Production>>,

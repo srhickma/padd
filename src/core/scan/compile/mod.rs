@@ -1,6 +1,4 @@
-use core::scan::Error;
-use core::scan::Kind;
-use core::scan::Token;
+use core::scan::{Error, Kind, Token};
 
 mod maximal_munch;
 

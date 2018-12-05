@@ -1,18 +1,27 @@
-use std::collections::LinkedList;
-
-use core::data::Data;
-use core::data::stream::Stream;
-use core::data::stream::StreamSource;
-use core::scan;
-use core::scan::FAIL_SEQUENCE_LENGTH;
-use core::scan::runtime::CDFA;
-use core::scan::runtime::Scanner;
-use core::scan::Token;
+use {
+    core::{
+        data::{
+            Data,
+            stream::{Stream, StreamSource},
+        },
+        scan::{
+            self,
+            FAIL_SEQUENCE_LENGTH,
+            runtime::{CDFA, Scanner},
+            Token,
+        },
+    },
+    std::collections::LinkedList,
+};
 
 pub struct MaximalMunchScanner;
 
 impl<State: Data, Kind: Data> Scanner<State, Kind> for MaximalMunchScanner {
-    fn scan<'a, 'b>(&self, stream_source: &'a mut StreamSource<char>, cdfa: &'b CDFA<State, Kind>) -> Result<Vec<Token<Kind>>, scan::Error> {
+    fn scan<'a, 'b>(
+        &self,
+        stream_source: &'a mut StreamSource<char>,
+        cdfa: &'b CDFA<State, Kind>,
+    ) -> Result<Vec<Token<Kind>>, scan::Error> {
         struct ScanOneResult<State> {
             scanned: String,
             end_state: Option<State>,
@@ -20,7 +29,12 @@ impl<State: Data, Kind: Data> Scanner<State, Kind> for MaximalMunchScanner {
             character: usize,
         }
 
-        fn scan_one<State: Data, Kind: Data>(stream_source: &mut StreamSource<char>, line: usize, character: usize, cdfa: &CDFA<State, Kind>) -> ScanOneResult<State> {
+        fn scan_one<State: Data, Kind: Data>(
+            stream_source: &mut StreamSource<char>,
+            line: usize,
+            character: usize,
+            cdfa: &CDFA<State, Kind>,
+        ) -> ScanOneResult<State> {
             let mut state: State = cdfa.start();
             let mut line: usize = line;
             let mut character: usize = character;

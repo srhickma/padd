@@ -4,23 +4,31 @@ extern crate crypto;
 extern crate regex;
 extern crate stopwatch;
 
-use std::cmp;
-use std::fs::{self, File, OpenOptions};
-use std::io::{self, BufRead, BufReader, Read, Seek, SeekFrom, Write};
-use std::path::{Path, PathBuf};
-use std::str::FromStr;
-use std::sync::Arc;
-use std::sync::atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
-
-use padd::{self, FormatJobRunner, Stream, ThreadPool};
-
-use self::clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
-use self::colored::{ColoredString, Colorize};
-use self::crypto::digest::Digest;
-use self::crypto::sha2::Sha256;
-use self::regex::Regex;
-use self::stopwatch::Stopwatch;
+use {
+    cli::{
+        clap::{App, AppSettings, Arg, ArgMatches, SubCommand},
+        colored::{ColoredString, Colorize},
+        crypto::{
+            digest::Digest,
+            sha2::Sha256,
+        },
+        regex::Regex,
+        stopwatch::Stopwatch,
+    },
+    padd::{self, FormatJobRunner, Stream, ThreadPool},
+    std::{
+        cmp,
+        fs::{self, File, OpenOptions},
+        io::{self, BufRead, BufReader, Read, Seek, SeekFrom, Write},
+        path::{Path, PathBuf},
+        str::FromStr,
+        sync::{
+            Arc,
+            atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering},
+        },
+        time::{Duration, SystemTime, UNIX_EPOCH},
+    },
+};
 
 mod logger;
 
