@@ -1,25 +1,26 @@
-use std;
-use std::error;
-
-use core::fmt;
-use core::fmt::Formatter;
-use core::fmt::FormatterBuilder;
-use core::fmt::PatternPair;
-use core::parse;
-use core::parse::grammar::Grammar;
-use core::parse::grammar::GrammarBuilder;
-use core::parse::Production;
-use core::parse::Tree;
-use core::scan;
-use core::scan::compile;
-use core::scan::compile::CompileTransitionDelta;
-use core::scan::compile::DFA;
-use core::scan::runtime;
-use core::scan::runtime::CDFABuilder;
-use core::scan::runtime::ecdfa::EncodedCDFA;
-use core::scan::runtime::ecdfa::EncodedCDFABuilder;
-use core::scan::State;
-use core::util::string_utils;
+use {
+    core::{
+        fmt::{self, Formatter, FormatterBuilder, PatternPair},
+        parse::{
+            self,
+            grammar::{Grammar, GrammarBuilder},
+            Production,
+            Tree,
+        },
+        scan::{
+            self,
+            compile::{self, CompileTransitionDelta, DFA},
+            runtime::{
+                self,
+                CDFABuilder,
+                ecdfa::{EncodedCDFA, EncodedCDFABuilder},
+            },
+            State,
+        },
+        util::string_utils,
+    },
+    std::{self, error},
+};
 
 static SPEC_ALPHABET: &'static str = "`-=~!@#$%^&*()_+{}|[]\\;':\"<>?,./QWERTYUIOPASDFGHJKLZXCVBNM1234567890abcdefghijklmnopqrstuvwxyz \n\t";
 pub static DEF_MATCHER: &'static str = "_";
@@ -511,8 +512,10 @@ impl From<parse::Error> for ParseError {
 
 #[cfg(test)]
 mod tests {
-    use core::data::Data;
-    use core::data::stream::StreamSource;
+    use core::data::{
+        Data,
+        stream::StreamSource,
+    };
 
     use super::*;
 

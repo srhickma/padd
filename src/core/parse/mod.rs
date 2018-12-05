@@ -1,9 +1,11 @@
-use std::error;
-use std::fmt;
-
-use core::data::Data;
-use core::parse::grammar::Grammar;
-use core::scan::Token;
+use {
+    core::{
+        data::Data,
+        parse::grammar::Grammar,
+        scan::Token,
+    },
+    std::{error, fmt},
+};
 
 mod earley;
 pub mod grammar;

@@ -1,7 +1,7 @@
-use std::error;
-use std::fmt;
-
-use core::data::Data;
+use {
+    core::data::Data,
+    std::{error, fmt},
+};
 
 pub mod compile;
 pub mod runtime;

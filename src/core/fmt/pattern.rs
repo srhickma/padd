@@ -1,19 +1,20 @@
-use std::error;
-use std::fmt;
-
-use core::data::Data;
-use core::parse;
-use core::parse::build_prods;
-use core::parse::def_parser;
-use core::parse::grammar::Grammar;
-use core::parse::grammar::GrammarBuilder;
-use core::parse::Production;
-use core::parse::Tree;
-use core::scan;
-use core::scan::compile;
-use core::scan::compile::CompileTransitionDelta;
-use core::scan::compile::DFA;
-use core::util::string_utils;
+use {
+    core::{
+        data::Data,
+        parse::{
+            self,
+            grammar::{Grammar, GrammarBuilder},
+            Production,
+            Tree,
+        },
+        scan::{
+            self,
+            compile::{self, CompileTransitionDelta, DFA},
+        },
+        util::string_utils,
+    },
+    std::{error, fmt},
+};
 
 static PATTERN_ALPHABET: &'static str =
     "{}[];=1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ \n\t`~!@#$%^&*()_-+:'\"<>,.?/\\|";
@@ -110,7 +111,7 @@ thread_local! {
 
 lazy_static! {
     static ref PATTERN_PRODUCTIONS: Vec<Production> = {
-        build_prods(&[
+        parse::build_prods(&[
             "pattern segs",
 
             "segs seg segs",
@@ -265,7 +266,7 @@ fn parse_decl(decl: &Tree, prod: &Production) -> Result<Declaration, BuildError>
 fn parse_pattern(input: &str) -> Result<Tree, BuildError> {
     PATTERN_DFA.with(|f| -> Result<Tree, BuildError> {
         let tokens = compile::def_scanner().scan(input, f)?;
-        let parse = def_parser().parse(tokens, &PATTERN_GRAMMAR)?;
+        let parse = parse::def_parser().parse(tokens, &PATTERN_GRAMMAR)?;
         Ok(parse)
     })
 }

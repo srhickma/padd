@@ -1,17 +1,26 @@
-use std::cmp;
-
-use core::scan;
-use core::scan::compile::DFA;
-use core::scan::compile::Scanner;
-use core::scan::FAIL_SEQUENCE_LENGTH;
-use core::scan::Token;
-use core::spec::DEF_MATCHER;
+use {
+    core::{
+        scan::{
+            self,
+            compile::{DFA, Scanner},
+            FAIL_SEQUENCE_LENGTH,
+            Token,
+        },
+        spec::DEF_MATCHER,
+    },
+    std::cmp,
+};
 
 pub struct MaximalMunchScanner;
 
 impl<State: PartialEq + Clone> Scanner<State> for MaximalMunchScanner {
-    fn scan<'a, 'b>(&self, input: &'a str, dfa: &'b DFA<State>) -> Result<Vec<Token<String>>, scan::Error> {
-        fn scan_one<'a, 'b, State: PartialEq + Clone>(input: &'a [char], line: usize, character: usize, dfa: &'b DFA<State>) -> (usize, State, usize, usize) {
+    fn scan(&self, input: &str, dfa: &DFA<State>) -> Result<Vec<Token<String>>, scan::Error> {
+        fn scan_one<State: PartialEq + Clone>(
+            input: &[char],
+            line: usize,
+            character: usize,
+            dfa: &DFA<State>,
+        ) -> (usize, State, usize, usize) {
             let mut input: &[char] = input;
 
             let mut scanned: usize = 0;

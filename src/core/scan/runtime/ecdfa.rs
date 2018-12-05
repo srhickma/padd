@@ -1,13 +1,21 @@
-use std::collections::HashMap;
-use std::collections::HashSet;
-use std::usize;
-
-use core::data::map::CEHashMap;
-use core::data::stream::StreamConsumer;
-use core::scan::runtime::alphabet::HashedAlphabet;
-use core::scan::runtime::CDFA;
-use core::scan::runtime::CDFABuilder;
-use core::scan::runtime::CDFAError;
+use {
+    core::{
+        data::{
+            map::CEHashMap,
+            stream::StreamConsumer,
+        },
+        scan::runtime::{
+            alphabet::HashedAlphabet,
+            CDFA,
+            CDFABuilder,
+            CDFAError,
+        },
+    },
+    std::{
+        collections::{HashMap, HashSet},
+        usize,
+    },
+};
 
 pub struct EncodedCDFABuilder {
     encoder: HashMap<String, usize>,
@@ -98,7 +106,12 @@ impl CDFABuilder<String, String, EncodedCDFA> for EncodedCDFABuilder {
         Ok(self)
     }
 
-    fn mark_chain(&mut self, from: &String, to: &String, on: impl Iterator<Item=char>) -> Result<&mut Self, CDFAError> {
+    fn mark_chain(
+        &mut self,
+        from: &String,
+        to: &String,
+        on: impl Iterator<Item=char>,
+    ) -> Result<&mut Self, CDFAError> {
         let from_encoded = self.encode(from);
         let to_encoded = self.encode(to);
 
@@ -238,7 +251,12 @@ impl TransitionTrie {
         TransitionTrie::insert_chain_internal(0, &mut self.root, chars, dest)
     }
 
-    fn insert_chain_internal(i: usize, node: &mut TransitionNode, chars: &Vec<char>, dest: usize) -> Result<(), CDFAError> {
+    fn insert_chain_internal(
+        i: usize,
+        node: &mut TransitionNode,
+        chars: &Vec<char>,
+        dest: usize,
+    ) -> Result<(), CDFAError> {
         if i == chars.len() {
             return Ok(());
         }
@@ -248,7 +266,12 @@ impl TransitionTrie {
         TransitionTrie::insert_chain_internal(i + 1, node.get_child_mut(c).unwrap(), chars, dest)
     }
 
-    fn insert_internal(c: char, node: &mut TransitionNode, last: bool, dest: usize) -> Result<(), CDFAError> {
+    fn insert_internal(
+        c: char,
+        node: &mut TransitionNode,
+        last: bool,
+        dest: usize,
+    ) -> Result<(), CDFAError> {
         if !node.has_child(c) {
             let child = TransitionNode {
                 children: HashMap::new(),
@@ -304,10 +327,13 @@ impl TransitionNode {
 
 #[cfg(test)]
 mod tests {
-    use core::data::Data;
-    use core::data::stream::StreamSource;
-    use core::scan::runtime;
-    use core::scan::Token;
+    use core::{
+        data::{
+            Data,
+            stream::StreamSource,
+        },
+        scan::{runtime, Token},
+    };
 
     use super::*;
 

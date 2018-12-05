@@ -1,9 +1,11 @@
-use std::collections::HashMap;
-
-use core::data::Data;
-use core::fmt::pattern::*;
-use core::parse::Production;
-use core::parse::Tree;
+use {
+    core::{
+        data::Data,
+        fmt::pattern::{Capture, Pattern, Segment},
+        parse::{Production, Tree},
+    },
+    std::collections::HashMap,
+};
 
 mod pattern;
 
@@ -48,7 +50,7 @@ impl FormatterBuilder {
             return Ok(());
         }
 
-        let pattern = generate_pattern(&pair.pattern[..], &pair.production)?;
+        let pattern = pattern::generate_pattern(&pair.pattern[..], &pair.production)?;
         self.memory.insert(pair.pattern, pattern.clone());
         self.pattern_map.insert(key, pattern);
         Ok(())
