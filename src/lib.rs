@@ -64,8 +64,12 @@ pub enum BuildError {
 impl fmt::Display for BuildError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            BuildError::SpecParseErr(ref err) => write!(f, "Failed to parse specification: {}", err),
-            BuildError::SpecGenErr(ref err) => write!(f, "Failed to generate specification: {}", err),
+            BuildError::SpecParseErr(ref err) => write!(
+                f, "Failed to parse specification: {}", err
+            ),
+            BuildError::SpecGenErr(ref err) => write!(
+                f, "Failed to generate specification: {}", err
+            ),
         }
     }
 }

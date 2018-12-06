@@ -94,7 +94,12 @@ impl CDFABuilder<String, String, EncodedCDFA> for EncodedCDFABuilder {
         self
     }
 
-    fn mark_trans(&mut self, from: &String, to: &String, on: char) -> Result<&mut Self, CDFAError> {
+    fn mark_trans(
+        &mut self,
+        from: &String,
+        to: &String,
+        on: char,
+    ) -> Result<&mut Self, CDFAError> {
         let from_encoded = self.encode(from);
         let to_encoded = self.encode(to);
 
@@ -279,7 +284,9 @@ impl TransitionTrie {
             };
             node.add_child(c, child);
         } else if last {
-            return Err(CDFAError::BuildErr(format!("Transition trie is not prefix free on character '{}'", c)));
+            return Err(CDFAError::BuildErr(format!(
+                "Transition trie is not prefix free on character '{}'", c
+            )));
         }
         Ok(())
     }

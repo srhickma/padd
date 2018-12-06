@@ -138,7 +138,10 @@ impl<'a, 'g: 'a, T: 'g + 'a + Clone> Stream<'a, 'g, T> {
         }
     }
 
-    pub fn consumer<'s>(&'s mut self, on_consume: Box<FnMut(&LinkedList<T>) + 's>) -> StreamConsumer<'s, 'a, 'g, T> {
+    pub fn consumer<'s>(
+        &'s mut self,
+        on_consume: Box<FnMut(&LinkedList<T>) + 's>,
+    ) -> StreamConsumer<'s, 'a, 'g, T> {
         StreamConsumer::new(self, on_consume)
     }
 
@@ -193,7 +196,10 @@ pub struct StreamConsumer<'s, 'a: 's, 'g: 'a + 's, T: 'g + 'a + 's + Clone> {
 
 #[allow(dead_code)]
 impl<'s, 'a: 's, 'g: 'a + 's, T: 'g + 'a + 's + Clone> StreamConsumer<'s, 'a, 'g, T> {
-    fn new(stream: &'s mut Stream<'a, 'g, T>, on_consume: Box<FnMut(&LinkedList<T>) + 's>) -> Self {
+    fn new(
+        stream: &'s mut Stream<'a, 'g, T>,
+        on_consume: Box<FnMut(&LinkedList<T>) + 's>,
+    ) -> Self {
         StreamConsumer {
             stream,
             on_consume,

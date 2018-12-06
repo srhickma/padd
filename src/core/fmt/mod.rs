@@ -90,7 +90,12 @@ impl<'a> FormatJob<'a> {
         }
     }
 
-    fn fill_pattern(&self, pattern: &Pattern, children: &Vec<Tree>, scope: &HashMap<String, String>) -> String {
+    fn fill_pattern(
+        &self,
+        pattern: &Pattern,
+        children: &Vec<Tree>,
+        scope: &HashMap<String, String>,
+    ) -> String {
         let mut res: String = String::new();
         for seg in &pattern.segments {
             match seg {
@@ -98,19 +103,29 @@ impl<'a> FormatJob<'a> {
                 &Segment::Substitution(ref s) => if let Some(value) = scope.get(s) {
                     res = format!("{}{}", res, value);
                 },
-                &Segment::Capture(ref c) => res = format!("{}{}", res, self.evaluate_capture(c, children, scope)),
+                &Segment::Capture(ref c) => res = format!(
+                    "{}{}", res, self.evaluate_capture(c, children, scope)
+                ),
             };
         }
         res
     }
 
-    fn evaluate_capture(&self, capture: &Capture, children: &Vec<Tree>, outer_scope: &HashMap<String, String>) -> String {
+    fn evaluate_capture(
+        &self,
+        capture: &Capture,
+        children: &Vec<Tree>,
+        outer_scope: &HashMap<String, String>,
+    ) -> String {
         if capture.declarations.len() > 0 {
             let mut inner_scope = outer_scope.clone();
             for decl in &capture.declarations {
                 match &decl.value {
                     &Some(ref pattern) => {
-                        inner_scope.insert(decl.key.clone(), self.fill_pattern(pattern, children, outer_scope));
+                        inner_scope.insert(
+                            decl.key.clone(),
+                            self.fill_pattern(pattern, children, outer_scope),
+                        );
                     }
                     &None => {
                         inner_scope.remove(&decl.key);

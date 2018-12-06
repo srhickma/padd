@@ -15,7 +15,11 @@ use {
 pub struct EarleyParser;
 
 impl Parser for EarleyParser {
-    fn parse(&self, scan: Vec<Token<String>>, grammar: &Grammar) -> Result<Tree, parse::Error> {
+    fn parse(
+        &self,
+        scan: Vec<Token<String>>,
+        grammar: &Grammar,
+    ) -> Result<Tree, parse::Error> {
         let mut chart: RChart = RChart::new();
         let mut parse_chart: PChart = PChart::new();
 
@@ -222,7 +226,11 @@ impl Parser for EarleyParser {
                 Ok(parse_tree(grammar, &scan, parse_chart))
             } else {
                 Err(parse::Error {
-                    message: format!("Largest parse did not consume all tokens: {} of {}", cursor - 1, scan.len()),
+                    message: format!(
+                        "Largest parse did not consume all tokens: {} of {}",
+                        cursor - 1,
+                        scan.len()
+                    ),
                 })
             }
         } else {
@@ -236,7 +244,11 @@ impl Parser for EarleyParser {
                 })
             } else {
                 Err(parse::Error {
-                    message: format!("Recognition failed at token {}: {}", cursor, scan[cursor - 1].to_string()),
+                    message: format!(
+                        "Recognition failed at token {}: {}",
+                        cursor,
+                        scan[cursor - 1].to_string()
+                    ),
                 })
             }
         };
@@ -266,7 +278,13 @@ impl Parser for EarleyParser {
                         children: {
                             let mut children: Vec<Tree> =
                                 top_list(start, edge, grammar, scan, chart).iter().rev()
-                                    .map(|&(node, ref edge)| recur(node, &edge, grammar, scan, chart))
+                                    .map(|&(node, ref edge)| recur(
+                                        node,
+                                        &edge,
+                                        grammar,
+                                        scan,
+                                        chart,
+                                    ))
                                     .collect();
                             if children.is_empty() { //Empty rhs
                                 children.push(Tree::null());

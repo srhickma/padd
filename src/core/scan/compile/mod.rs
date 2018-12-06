@@ -3,7 +3,7 @@ use core::scan::{Error, Kind, Token};
 mod maximal_munch;
 
 pub trait Scanner<State: PartialEq + Clone>: 'static + Send + Sync {
-    fn scan<'a, 'b>(&self, input: &'a str, dfa: &'b DFA<State>) -> Result<Vec<Token<String>>, Error>;
+    fn scan(&self, input: &str, dfa: &DFA<State>) -> Result<Vec<Token<String>>, Error>;
 }
 
 pub fn def_scanner<State: PartialEq + Clone>() -> Box<Scanner<State>> {
@@ -47,7 +47,7 @@ pub struct CompileTransitionDelta<State> {
 }
 
 impl<State: PartialEq + Clone> TransitionDelta<State> for CompileTransitionDelta<State> {
-    fn transition<'a>(&'a self, state: &State, c: char) -> State {
+    fn transition(&self, state: &State, c: char) -> State {
         (self.delta)(state.clone(), c)
     }
 
@@ -66,7 +66,11 @@ impl<State: PartialEq + Clone> TransitionDelta<State> for CompileTransitionDelta
 }
 
 impl<State: PartialEq + Clone> CompileTransitionDelta<State> {
-    pub fn build<'a>(delta: fn(State, char) -> State, tokenizer: fn(State) -> String, fail_state: State) -> CompileTransitionDelta<State> {
+    pub fn build<'a>(
+        delta: fn(State, char) -> State,
+        tokenizer: fn(State) -> String,
+        fail_state: State,
+    ) -> CompileTransitionDelta<State> {
         CompileTransitionDelta {
             delta,
             tokenizer,
