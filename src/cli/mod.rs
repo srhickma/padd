@@ -220,17 +220,14 @@ fn load_spec(spec_path: &str) -> Result<(FormatJobRunner, String), padd::BuildEr
     let spec_file = File::open(spec_path);
     match spec_file {
         Ok(_) => {
-            match spec_file.unwrap().read_to_string(&mut spec) {
-                Ok(_) => {}
-                Err(e) => {
-                    logger::fatal(format!(
-                        "Could not read specification file \"{}\": {}", &spec_path, e
-                    ));
-                }
+            if let Err(err) = spec_file.unwrap().read_to_string(&mut spec) {
+                logger::fatal(format!(
+                    "Could not read specification file \"{}\": {}", &spec_path, err
+                ));
             }
         }
-        Err(e) => logger::fatal(format!(
-            "Could not find specification file \"{}\": {}", &spec_path, e
+        Err(err) => logger::fatal(format!(
+            "Could not find specification file \"{}\": {}", &spec_path, err
         )),
     }
 
@@ -257,8 +254,8 @@ fn format_target(
             .for_each(|res| {
                 match res {
                     Ok(dir_item) => format_target(&dir_item.path(), criteria),
-                    Err(e) => logger::err(format!(
-                        "An error occurred while searching directory {}: {}", path_string, e
+                    Err(err) => logger::err(format!(
+                        "An error occurred while searching directory {}: {}", path_string, err
                     )),
                 }
             });
@@ -283,11 +280,10 @@ fn track_file(file_path: &Path, spec_sha: &String) {
 
     let tracker_dir_path = tracker_path.parent().unwrap();
     if !tracker_dir_path.exists() {
-        match fs::create_dir(tracker_dir_path) {
-            Err(err) => logger::err(format!(
+        if let Err(err) = fs::create_dir(tracker_dir_path) {
+            logger::err(format!(
                 "Failed to create tracker directory for {}: {}", tracker_path_string, err
-            )),
-            Ok(_) => {}
+            ))
         }
     }
 
@@ -301,28 +297,23 @@ fn track_file(file_path: &Path, spec_sha: &String) {
                 since_epoch.subsec_nanos() as u64 / 1_000_000;
             let line = format!("{}\n{}\n", spec_sha, elapsed_millis);
 
-            match tracker_file.write_all(line.as_bytes()) {
-                Err(err) => logger::err(format!(
+            if let Err(err) = tracker_file.write_all(line.as_bytes()) {
+                logger::err(format!(
                     "Failed to write to tracker file {}: {}", tracker_path_string, err
-                )),
-                Ok(()) => {}
+                ))
             }
         }
     }
 }
 
 fn needs_formatting(file_path: &Path, spec_sha: &String) -> bool {
-    match formatted_at(file_path, spec_sha) {
-        None => {}
-        Some(formatted_at) => match modified_at(file_path) {
-            None => {}
-            Some(modified_at) => {
-                let formatted_dur = formatted_at.duration_since(UNIX_EPOCH).unwrap();
-                let modified_dur = modified_at.duration_since(UNIX_EPOCH).unwrap();
+    if let Some(formatted_at) = formatted_at(file_path, spec_sha) {
+        if let Some(modified_at) = modified_at(file_path) {
+            let formatted_dur = formatted_at.duration_since(UNIX_EPOCH).unwrap();
+            let modified_dur = modified_at.duration_since(UNIX_EPOCH).unwrap();
 
-                if modified_dur.cmp(&formatted_dur) != cmp::Ordering::Greater {
-                    return false;
-                }
+            if modified_dur.cmp(&formatted_dur) != cmp::Ordering::Greater {
+                return false;
             }
         }
     }
@@ -445,24 +436,18 @@ fn format_file_internal(target_path: &Path, fjr: &FormatJobRunner) -> bool {
                 let mut cursor: usize = 0;
 
                 let mut getter = &mut || {
-                    match buffer.get(cursor) {
-                        None => {}
-                        Some(c) => {
-                            cursor += 1;
-                            return Some(*c);
-                        }
-                    };
+                    if let Some(c) = buffer.get(cursor) {
+                        cursor += 1;
+                        return Some(*c);
+                    }
 
                     let mut in_buf = String::new();
-                    match reader.read_line(&mut in_buf) {
-                        Ok(_) => {}
-                        Err(e) => {
-                            logger::fmt_err(format!(
-                                "Could not read target file \"{}\": {}", target_path_string, e
-                            ));
-                            return None;
-                        }
-                    };
+                    if let Err(err) = reader.read_line(&mut in_buf) {
+                        logger::fmt_err(format!(
+                            "Could not read target file \"{}\": {}", target_path_string, err
+                        ));
+                        return None;
+                    }
 
                     buffer = in_buf.chars().collect();
                     cursor = 1;
@@ -476,45 +461,39 @@ fn format_file_internal(target_path: &Path, fjr: &FormatJobRunner) -> bool {
 
             match result {
                 Ok(res) => {
-                    match target.seek(SeekFrom::Start(0)) {
-                        Ok(_) => {}
-                        Err(e) => {
-                            logger::fmt_err(format!(
-                                "Could not seek to start of target file \"{}\": {}",
-                                target_path_string,
-                                e
-                            ));
-                            return false;
-                        }
+                    if let Err(err) = target.seek(SeekFrom::Start(0)) {
+                        logger::fmt_err(format!(
+                            "Could not seek to start of target file \"{}\": {}",
+                            target_path_string,
+                            err
+                        ));
+                        return false;
                     }
-                    match target.set_len(0) {
-                        Ok(_) => {}
-                        Err(e) => {
-                            logger::fmt_err(format!(
-                                "Could not clear target file \"{}\": {}", target_path_string, e
-                            ));
-                            return false;
-                        }
+                    if let Err(err) = target.set_len(0) {
+                        logger::fmt_err(format!(
+                            "Could not clear target file \"{}\": {}", target_path_string, err
+                        ));
+                        return false;
                     }
                     match target.write_all(res.as_bytes()) {
                         Ok(_) => logger::fmt_ok(target_path_string),
-                        Err(e) => {
+                        Err(err) => {
                             logger::fmt_err(format!(
-                                "Could not write to target file \"{}\": {}", target_path_string, e
+                                "Could not write to target file \"{}\": {}", target_path_string, err
                             ));
                             return false;
                         }
                     }
                 }
-                Err(e) => {
-                    logger::fmt_err(format!("Error formatting {}: {}", target_path_string, e));
+                Err(err) => {
+                    logger::fmt_err(format!("Error formatting {}: {}", target_path_string, err));
                     return false;
                 }
             }
         }
-        Err(e) => {
+        Err(err) => {
             logger::fmt_err(format!(
-                "Could not find target file \"{}\": {}", target_path_string, e
+                "Could not find target file \"{}\": {}", target_path_string, err
             ));
             return false;
         }
@@ -591,11 +570,10 @@ fn clear_tracking(target_path: &Path) {
     let path_string = target_path.to_string_lossy().to_string();
     if target_path.is_dir() {
         if target_path.ends_with(TRACKER_DIR) {
-            match fs::remove_dir_all(target_path) {
-                Err(err) => logger::err(format!(
+            if let Err(err) = fs::remove_dir_all(target_path) {
+                logger::err(format!(
                     "Could not delete tracking directory {}: {}", path_string, err
-                )),
-                Ok(()) => {}
+                ))
             }
             TOTAL.fetch_add(1, Ordering::SeqCst);
             return;
@@ -605,8 +583,8 @@ fn clear_tracking(target_path: &Path) {
             .for_each(|res| {
                 match res {
                     Ok(dir_item) => clear_tracking(&dir_item.path()),
-                    Err(e) => logger::err(format!(
-                        "An error occurred while searching directory {}: {}", path_string, e
+                    Err(err) => logger::err(format!(
+                        "An error occurred while searching directory {}: {}", path_string, err
                     )),
                 }
             });
