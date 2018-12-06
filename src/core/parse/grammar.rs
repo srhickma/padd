@@ -146,17 +146,12 @@ impl GrammarBuilder {
         loop {
             match work_stack.pop() {
                 None => break,
-                Some(work_symbol) => {
-                    match prods_by_rhs.get(work_symbol) {
-                        None => {}
-                        Some(prods) => {
-                            for prod in prods {
-                                if !nss.contains(&prod.lhs)
-                                    && prod.rhs.iter().all(|sym| nss.contains(sym)) {
-                                    nss.insert(prod.lhs.clone());
-                                    work_stack.push(&prod.lhs);
-                                }
-                            }
+                Some(work_symbol) => if let Some(prods) = prods_by_rhs.get(work_symbol) {
+                    for prod in prods {
+                        if !nss.contains(&prod.lhs)
+                            && prod.rhs.iter().all(|sym| nss.contains(sym)) {
+                            nss.insert(prod.lhs.clone());
+                            work_stack.push(&prod.lhs);
                         }
                     }
                 }

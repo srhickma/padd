@@ -53,20 +53,22 @@ impl Tree {
 
     fn to_string_internal(&self, prefix: String, is_tail: bool) -> String {
         if self.children.len() == 0 {
-            format!("{}{}{}", prefix, if is_tail { "└── " } else { "├── " }, self.lhs.to_string())
+            format!(
+                "{}{}{}", prefix, if is_tail { "└── " } else { "├── " }, self.lhs.to_string()
+            )
         } else {
-            let mut s = format!("{}{}{}", prefix, if is_tail { "└── " } else { "├── " }, self.lhs.kind);
+            let mut builder = format!(
+                "{}{}{}", prefix, if is_tail { "└── " } else { "├── " }, self.lhs.kind
+            );
             let mut i = 0;
             let len = self.children.len();
             for child in &self.children {
-                if i == len - 1 {
-                    s = format!("{}\n{}", s, child.to_string_internal(format!("{}{}", prefix, if is_tail { "    " } else { "│   " }), true));
-                } else {
-                    s = format!("{}\n{}", s, child.to_string_internal(format!("{}{}", prefix, if is_tail { "    " } else { "│   " }), false));
-                }
+                let margin = format!("{}{}", prefix, if is_tail { "    " } else { "│   " });
+                let child_string = child.to_string_internal(margin, i == len - 1);
+                builder = format!("{}\n{}", builder, child_string);
                 i += 1;
             }
-            s
+            builder
         }
     }
 

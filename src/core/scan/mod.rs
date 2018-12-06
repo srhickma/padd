@@ -16,7 +16,11 @@ pub struct Token<Kind: fmt::Debug> {
 
 impl<Kind: Data> Data for Token<Kind> {
     fn to_string(&self) -> String {
-        format!("{} <- '{}'", self.kind.to_string(), self.lexeme.replace('\n', "\\n").replace('\t', "\\t"))
+        format!(
+            "{} <- '{}'",
+            self.kind.to_string(),
+            self.lexeme.replace('\n', "\\n").replace('\t', "\\t")
+        )
     }
 }
 
@@ -29,7 +33,13 @@ pub struct Error {
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "No accepting scans after ({},{}): {}...", self.line, self.character, self.sequence)
+        write!(
+            f,
+            "No accepting scans after ({},{}): {}...",
+            self.line,
+            self.character,
+            self.sequence
+        )
     }
 }
 

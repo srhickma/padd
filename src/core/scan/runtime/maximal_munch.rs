@@ -124,17 +124,14 @@ impl<State: Data, Kind: Data> Scanner<State, Kind> for MaximalMunchScanner {
                         break;
                     }
                 }
-                Some(state) => match cdfa.tokenize(&state) {
-                    None => {}
-                    Some(kind) => {
-                        let token = Token {
-                            kind,
-                            lexeme: result.scanned,
-                        };
+                Some(state) => if let Some(kind) = cdfa.tokenize(&state) {
+                    let token = Token {
+                        kind,
+                        lexeme: result.scanned,
+                    };
 
-                        //TODO write tokens to another ReadDrivenStream
-                        tokens.push(token);
-                    }
+                    //TODO write tokens to another ReadDrivenStream
+                    tokens.push(token);
                 }
             }
         }

@@ -28,13 +28,10 @@ impl<'g, T: 'g + Clone> StreamSource<'g, T> {
     }
 
     pub fn detach_tail(&mut self) {
-        match self.buffers.pop_back() {
-            None => {}
-            Some(head) => {
-                self.buffers = LinkedList::new();
-                self.buffers.push_back(head);
-            }
-        };
+        if let Some(head) = self.buffers.pop_back() {
+            self.buffers = LinkedList::new();
+            self.buffers.push_back(head);
+        }
     }
 
     pub fn detach_head<'a>(&'a mut self) -> Stream<'a, 'g, T> {
@@ -58,9 +55,8 @@ impl<'g, T: 'g + Clone> StreamSource<'g, T> {
     }
 
     fn pull(&mut self) {
-        match (self.getter)() {
-            None => {}
-            Some(val) => for buffer in &mut self.buffers {
+        if let Some(val) = (self.getter)() {
+            for buffer in &mut self.buffers {
                 buffer.push(&val)
             }
         }
@@ -97,10 +93,9 @@ impl<T: Clone> StreamBuffer<T> {
     }
 
     fn advance(&mut self) {
-        match self.incoming_buffer.pop_back() {
-            None => {}
-            Some(val) => self.outgoing_buffer.push_back(val.clone())
-        };
+        if let Some(val) = self.incoming_buffer.pop_back() {
+            self.outgoing_buffer.push_back(val.clone())
+        }
     }
 
     fn replay(&mut self) {
@@ -143,7 +138,10 @@ impl<'a, 'g: 'a, T: 'g + 'a + Clone> Stream<'a, 'g, T> {
         }
     }
 
-    pub fn consumer<'s>(&'s mut self, on_consume: Box<FnMut(&LinkedList<T>) + 's>) -> StreamConsumer<'s, 'a, 'g, T> {
+    pub fn consumer<'s>(
+        &'s mut self,
+        on_consume: Box<FnMut(&LinkedList<T>) + 's>,
+    ) -> StreamConsumer<'s, 'a, 'g, T> {
         StreamConsumer::new(self, on_consume)
     }
 
@@ -198,7 +196,10 @@ pub struct StreamConsumer<'s, 'a: 's, 'g: 'a + 's, T: 'g + 'a + 's + Clone> {
 
 #[allow(dead_code)]
 impl<'s, 'a: 's, 'g: 'a + 's, T: 'g + 'a + 's + Clone> StreamConsumer<'s, 'a, 'g, T> {
-    fn new(stream: &'s mut Stream<'a, 'g, T>, on_consume: Box<FnMut(&LinkedList<T>) + 's>) -> Self {
+    fn new(
+        stream: &'s mut Stream<'a, 'g, T>,
+        on_consume: Box<FnMut(&LinkedList<T>) + 's>,
+    ) -> Self {
         StreamConsumer {
             stream,
             on_consume,

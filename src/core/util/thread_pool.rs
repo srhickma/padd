@@ -405,7 +405,10 @@ mod tests {
 
         //verify
         let err = result.err().unwrap();
-        assert_eq!(format!("{}", err), "Error enqueuing worker job: sending on a closed channel");
+        assert_eq!(
+            format!("{}", err),
+            "Error enqueuing worker job: sending on a closed channel"
+        );
 
         assert!(err.cause().is_none());
     }
@@ -422,7 +425,10 @@ mod tests {
 
         //verify
         let err = result.err().unwrap();
-        assert_eq!(format!("{}", err), "Error enqueuing worker termination signal: sending on a closed channel");
+        assert_eq!(
+            format!("{}", err),
+            "Error enqueuing worker termination signal: sending on a closed channel"
+        );
 
         assert!(err.cause().is_none());
     }

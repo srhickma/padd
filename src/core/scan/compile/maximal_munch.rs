@@ -28,7 +28,7 @@ impl<State: PartialEq + Clone> Scanner<State> for MaximalMunchScanner {
             let mut line: usize = line;
             let mut character: usize = character;
 
-            let mut last_accepting: (usize, State, usize, usize) = (scanned, state.clone(), line, character);
+            let mut last_accepting = (scanned, state.clone(), line, character);
 
             while !input.is_empty() && dfa.has_transition(input[0], &state) {
                 let head: char = input[0];
@@ -62,7 +62,13 @@ impl<State: PartialEq + Clone> Scanner<State> for MaximalMunchScanner {
         let mut character: usize = 1;
 
         while !input.is_empty() {
-            let (scanned, end_state, end_line, end_character) = scan_one(input, line, character, dfa);
+            //TODO replace this tuple with a return object
+            let (scanned, end_state, end_line, end_character) = scan_one(
+                input,
+                line,
+                character,
+                dfa,
+            );
 
             line = end_line;
             character = end_character;

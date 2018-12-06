@@ -998,8 +998,7 @@ id ^ID
 
 s -> ;";
 
-        let input = "fdkgdfjgdjglkdjglkdjgljbnhbduhoifjeoigjeoghknhkjdfjgoirjt for if endif \
-        elseif somethign eldsfnj hi bob joe here final for fob else if id idhere fobre f ".to_string();
+        let input = "fdkgdfjgdjglkdjglkdjgljbnhbduhoifjeoigjeoghknhkjdfjgoirjt for if endif elseif somethign eldsfnj hi bob joe here final for fob else if id idhere fobre f ".to_string();
         let mut iter = input.chars();
         let mut getter = || {
             iter.next()
