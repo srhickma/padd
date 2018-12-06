@@ -95,9 +95,8 @@ impl<'a> FormatJob<'a> {
         for seg in &pattern.segments {
             match seg {
                 &Segment::Filler(ref s) => res = format!("{}{}", res, s),
-                &Segment::Substitution(ref s) => match scope.get(s) {
-                    Some(value) => res = format!("{}{}", res, value),
-                    None => {}
+                &Segment::Substitution(ref s) => if let Some(value) = scope.get(s) {
+                    res = format!("{}{}", res, value);
                 },
                 &Segment::Capture(ref c) => res = format!("{}{}", res, self.evaluate_capture(c, children, scope)),
             };

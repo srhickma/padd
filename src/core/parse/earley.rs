@@ -76,13 +76,9 @@ impl Parser for EarleyParser {
             let mut i = 0;
             while i < chart.row(cursor).incomplete().len() {
                 let item = chart.row(cursor).incomplete().item(i).clone();
-                let next = (&item).next_symbol();
-                match next {
-                    None => {}
-                    Some(symbol) => {
-                        if !grammar.is_terminal(symbol) {
-                            predict_op(&item, cursor, symbol, grammar, chart);
-                        }
+                if let Some(symbol) = (&item).next_symbol() {
+                    if !grammar.is_terminal(symbol) {
+                        predict_op(&item, cursor, symbol, grammar, chart);
                     }
                 }
                 i += 1;
@@ -175,28 +171,25 @@ impl Parser for EarleyParser {
             let mut dest: Vec<Item> = Vec::new();
 
             for item in src {
-                match item.next_symbol() {
-                    None => {}
-                    Some(sym) => {
-                        if sym == symbol {
-                            let mut last_item = item.clone();
+                if let Some(sym) = item.next_symbol() {
+                    if sym == symbol {
+                        let mut last_item = item.clone();
 
-                            loop {
-                                last_item = Item {
-                                    rule: last_item.rule,
-                                    start: last_item.start,
-                                    next: last_item.next + 1,
-                                };
+                        loop {
+                            last_item = Item {
+                                rule: last_item.rule,
+                                start: last_item.start,
+                                next: last_item.next + 1,
+                            };
 
-                                dest.push(last_item.clone());
+                            dest.push(last_item.clone());
 
-                                match last_item.next_symbol() {
-                                    None => break,
-                                    Some(sym) => {
-                                        let sym_string = sym.to_string();
-                                        if !grammar.is_nullable_nt(&sym_string) {
-                                            break;
-                                        }
+                            match last_item.next_symbol() {
+                                None => break,
+                                Some(sym) => {
+                                    let sym_string = sym.to_string();
+                                    if !grammar.is_nullable_nt(&sym_string) {
+                                        break;
                                     }
                                 }
                             }
@@ -334,12 +327,9 @@ impl Parser for EarleyParser {
                     Some(Vec::new())
                 } else {
                     for edge in edges(depth, root) {
-                        match df_search(edges, leaf, depth + 1, edge.finish) {
-                            None => {}
-                            Some(mut path) => {
-                                path.push((root, edge));
-                                return Some(path);
-                            }
+                        if let Some(mut path) = df_search(edges, leaf, depth + 1, edge.finish) {
+                            path.push((root, edge));
+                            return Some(path);
                         }
                     }
                     None
