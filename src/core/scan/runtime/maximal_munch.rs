@@ -87,7 +87,7 @@ impl<State: Data, Kind: Data> Scanner<State, Kind> for MaximalMunchScanner {
             }
 
             if stream.has_tail() {
-                stream.detach_head();
+                stream = stream.detach_head();
             }
             stream.replay();
 
