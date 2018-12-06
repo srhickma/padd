@@ -1,9 +1,8 @@
 extern crate colored;
 
-use {
-    cli::colored::{ColoredString, Colorize},
-    std::process,
-};
+use std::process;
+
+use self::colored::{ColoredString, Colorize};
 
 lazy_static! {
     static ref PREFIX_ERR: ColoredString = "error".bright_red();
