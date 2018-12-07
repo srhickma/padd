@@ -93,13 +93,24 @@ final class InheritingState implements State {
     }
 
     @Override
-    public TypeConverterBinding getConverter(String stringValue, TypeLiteral<?> type, Errors errors, Object source) {
+    public TypeConverterBinding getConverter(
+        String stringValue,
+        TypeLiteral<?> type,
+        Errors errors,
+        Object source
+    ) {
         TypeConverterBinding matchingConverter = null;
         for (State s = this; s != State.NONE; s = s.parent()) {
             for (TypeConverterBinding converter : s.getConvertersThisLevel()) {
                 if (converter.getTypeMatcher().matches(type)) {
                     if (matchingConverter != null) {
-                        errors.ambiguousTypeConversion(stringValue, source, type, matchingConverter, converter);
+                        errors.ambiguousTypeConversion(
+                            stringValue,
+                            source,
+                            type,
+                            matchingConverter,
+                            converter
+                        );
                     }
 
                     matchingConverter = converter;
@@ -163,9 +174,21 @@ final class InheritingState implements State {
     }
 
     @Override
-    public void blacklist(Key<?> key, State state, Object source) {
-        parent.blacklist(key, state, source);
-        blacklistedKeys.add(key, state, source);
+    public void blacklist(
+        Key<?> key,
+        State state,
+        Object source
+    ) {
+        parent.blacklist(
+            key,
+            state,
+            source
+        );
+        blacklistedKeys.add(
+            key,
+            state,
+            source
+        );
     }
 
     @Override
