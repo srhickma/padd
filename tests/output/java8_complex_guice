@@ -104,7 +104,13 @@ final class InheritingState implements State {
             for (TypeConverterBinding converter : s.getConvertersThisLevel()) {
                 if (converter.getTypeMatcher().matches(type)) {
                     if (matchingConverter != null) {
-                        errors.ambiguousTypeConversion(stringValue, source, type, matchingConverter, converter);
+                        errors.ambiguousTypeConversion(
+                            stringValue,
+                            source,
+                            type,
+                            matchingConverter,
+                            converter
+                        );
                     }
 
                     matchingConverter = converter;
@@ -173,8 +179,16 @@ final class InheritingState implements State {
         State state,
         Object source
     ) {
-        parent.blacklist(key, state, source);
-        blacklistedKeys.add(key, state, source);
+        parent.blacklist(
+            key,
+            state,
+            source
+        );
+        blacklistedKeys.add(
+            key,
+            state,
+            source
+        );
     }
 
     @Override

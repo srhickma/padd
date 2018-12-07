@@ -76,7 +76,11 @@ public final class CollectionFactory {
     }
 
     public static <E> Collection<E> createCollection(Class<?> collectionType, int capacity) {
-        return createCollection(collectionType, null, capacity);
+        return createCollection(
+            collectionType,
+            null,
+            capacity
+        );
     }
 
     @SuppressWarnings({"unchecked", "cast"})
@@ -131,7 +135,11 @@ public final class CollectionFactory {
     }
 
     public static <K, V> Map<K, V> createMap(Class<?> mapType, int capacity) {
-        return createMap(mapType, null, capacity);
+        return createMap(
+            mapType,
+            null,
+            capacity
+        );
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
