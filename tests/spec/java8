@@ -360,13 +360,20 @@ method_throws
 
 formal_parameter_list
     -> receiver_parameter
-    -> formal_parameters COMMA last_formal_parameter `{}{} {}`
-    -> last_formal_parameter;
+    -> last_formal_parameter
+    -> short_formal_parameter_list
+    -> long_formal_parameter_list `{;prefix=[prefix][indent]}\n[prefix]`;
+short_formal_parameter_list
+    -> formal_parameter COMMA last_formal_parameter `{}{} {}`
+    -> receiver_parameter COMMA last_formal_parameter `{}{} {}`;
+long_formal_parameter_list
+    -> formal_parameters COMMA formal_parameter COMMA last_formal_parameter `{}{}\n[prefix]{}{}\n[prefix]{}`
+    -> formal_parameters COMMA receiver_parameter COMMA last_formal_parameter `{}{}\n[prefix]{}{}\n[prefix]{}`;
 formal_parameters
-    -> formal_parameter COMMA formal_parameters `{}{} {}`
-    -> receiver_parameter COMMA formal_parameters `{}{} {}`
-    -> formal_parameter
-    -> receiver_parameter;
+    -> formal_parameter COMMA formal_parameters `\n[prefix]{}{}{}`
+    -> receiver_parameter COMMA formal_parameters `\n[prefix]{}{}{}`
+    -> formal_parameter `\n[prefix]{}`
+    -> receiver_parameter `\n[prefix]{}`;
 formal_parameter
     -> modifiers_opt type variable_declarator_id `{}{} {}`;
 receiver_parameter
