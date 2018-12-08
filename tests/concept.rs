@@ -222,3 +222,33 @@ b -> LBRACKET s RBRACKET `[prefix]{}{;prefix=[prefix]\t}[prefix]{}`;
     //verify
     assert_eq!(res, "[@LAYER s=[@LAYER s= b={[@LAYER s= b=\t{\t}]}] b={[@LAYER s= b=\t{\t}]}]");
 }
+
+#[test]
+fn test_def_non_terminal_pattern() {
+    //setup
+    let spec = "
+'ab'
+
+start
+    'a' -> ^A
+    'b' -> ^B;
+
+s `{} {}`
+    -> s A
+    -> s B
+    -> `SEPARATED:`;
+    ".to_string();
+
+    let input = "abbaba".to_string();
+    let mut iter = input.chars();
+    let mut getter = || iter.next();
+    let mut stream = Stream::from(&mut getter);
+
+    let fjr = FormatJobRunner::build(&spec).unwrap();
+
+    //exercise
+    let res = fjr.format(&mut stream).unwrap();
+
+    //verify
+    assert_eq!(res, "SEPARATED: a b b a b a");
+}

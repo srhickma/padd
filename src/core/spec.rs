@@ -186,7 +186,7 @@ lazy_static! {
             "prods prods prod",
             "prods prod",
 
-            "prod ID rhss SEMI",
+            "prod ID pattopt rhss SEMI",
 
             "rhss rhss rhs",
             "rhss rhs",
@@ -402,12 +402,21 @@ fn generate_grammar_prods(
 
     let id = &prod_node.get_child(0).lhs.lexeme;
 
-    generate_grammar_rhss(prod_node.get_child(1), id, grammar_builder, formatter_builder)
+    let def_pattern_node = &prod_node.get_child(1);
+
+    generate_grammar_rhss(
+        prod_node.get_child(2),
+        id,
+        def_pattern_node,
+        grammar_builder,
+        formatter_builder,
+    )
 }
 
 fn generate_grammar_rhss(
     rhss_node: &Tree,
     lhs: &String,
+    def_pattern_node: &Tree,
     grammar_builder: &mut GrammarBuilder,
     formatter_builder: &mut FormatterBuilder,
 ) -> Result<(), GenError> {
@@ -424,7 +433,11 @@ fn generate_grammar_rhss(
     grammar_builder.try_mark_start(lhs);
     grammar_builder.add_production(production.clone());
 
-    let pattopt_node = rhs_node.get_child(2);
+    let mut pattopt_node = rhs_node.get_child(2);
+    if pattopt_node.is_empty() {
+        pattopt_node = def_pattern_node
+    }
+
     if !pattopt_node.is_empty() {
         let pattc = &pattopt_node.get_child(0).lhs.lexeme;
         let pattern_string = &pattc[..].trim_matches('`');
@@ -437,7 +450,13 @@ fn generate_grammar_rhss(
     }
 
     if rhss_node.children.len() == 2 {
-        generate_grammar_rhss(rhss_node.get_child(0), lhs, grammar_builder, formatter_builder)?;
+        generate_grammar_rhss(
+            rhss_node.get_child(0),
+            lhs,
+            def_pattern_node,
+            grammar_builder,
+            formatter_builder,
+        )?;
     }
 
     Ok(())
@@ -544,6 +563,8 @@ mod tests {
         └── prods
             └── prod
                 ├── ID <- 's'
+                ├── pattopt
+                │   └──  <- 'NULL'
                 ├── rhss
                 │   └── rhs
                 │       ├── ARROW <- '->'
@@ -592,10 +613,10 @@ w -> WHITESPACE `[prefix]{0}\n\n{1;prefix=[prefix]\t}[prefix]{2}\n\n`
         ";
 
         //exercise
-        let tree = parse_spec(input);
+        let tree = parse_spec(input).unwrap();
 
         //verify
-        assert_eq!(tree.unwrap().to_string(),
+        assert_eq!(tree.to_string(),
                    "└── spec
     ├── dfa
     │   ├── CILC <- '' \\t\\n{}''
@@ -697,6 +718,8 @@ w -> WHITESPACE `[prefix]{0}\n\n{1;prefix=[prefix]\t}[prefix]{2}\n\n`
             │   ├── prods
             │   │   └── prod
             │   │       ├── ID <- 's'
+            │   │       ├── pattopt
+            │   │       │   └──  <- 'NULL'
             │   │       ├── rhss
             │   │       │   ├── rhss
             │   │       │   │   └── rhs
@@ -718,6 +741,8 @@ w -> WHITESPACE `[prefix]{0}\n\n{1;prefix=[prefix]\t}[prefix]{2}\n\n`
             │   │       └── SEMI <- ';'
             │   └── prod
             │       ├── ID <- 'b'
+            │       ├── pattopt
+            │       │   └──  <- 'NULL'
             │       ├── rhss
             │       │   ├── rhss
             │       │   │   └── rhs
@@ -743,6 +768,8 @@ w -> WHITESPACE `[prefix]{0}\n\n{1;prefix=[prefix]\t}[prefix]{2}\n\n`
             │       └── SEMI <- ';'
             └── prod
                 ├── ID <- 'w'
+                ├── pattopt
+                │   └──  <- 'NULL'
                 ├── rhss
                 │   └── rhs
                 │       ├── ARROW <- '->'
@@ -1132,6 +1159,8 @@ kind=ID lexeme=f")
         └── prods
             └── prod
                 ├── ID <- 's'
+                ├── pattopt
+                │   └──  <- 'NULL'
                 ├── rhss
                 │   ├── rhss
                 │   │   └── rhs
@@ -1217,6 +1246,8 @@ s -> A [B] s
         └── prods
             └── prod
                 ├── ID <- 's'
+                ├── pattopt
+                │   └──  <- 'NULL'
                 ├── rhss
                 │   ├── rhss
                 │   │   └── rhs
@@ -1300,6 +1331,94 @@ s -> A [B] s
                         │   └──  <- 'NULL'
                         └── s
                             └──  <- 'NULL'"
+        );
+    }
+
+    #[test]
+    fn def_pattern() {
+        //setup
+        let spec = "
+'ab'
+
+start
+    'a' -> ^A
+    'b' -> ^B;
+
+s `{} {}`
+    -> s A
+    -> s B
+    -> `SEPARATED:`;
+        ";
+
+        //exercise
+        let tree = parse_spec(spec).unwrap();
+
+        println!("{}", tree.clone().to_string());
+
+        //verify
+        assert_eq!(tree.to_string(),
+                   "└── spec
+    ├── dfa
+    │   ├── CILC <- ''ab''
+    │   └── states
+    │       └── state
+    │           ├── sdec
+    │           │   └── targets
+    │           │       └── ID <- 'start'
+    │           ├── transopt
+    │           │   └── trans
+    │           │       ├── trans
+    │           │       │   └── tran
+    │           │       │       ├── mtcs
+    │           │       │       │   └── CILC <- ''a''
+    │           │       │       ├── ARROW <- '->'
+    │           │       │       └── trand
+    │           │       │           ├── HAT <- '^'
+    │           │       │           └── ID <- 'A'
+    │           │       └── tran
+    │           │           ├── mtcs
+    │           │           │   └── CILC <- ''b''
+    │           │           ├── ARROW <- '->'
+    │           │           └── trand
+    │           │               ├── HAT <- '^'
+    │           │               └── ID <- 'B'
+    │           └── SEMI <- ';'
+    └── gram
+        └── prods
+            └── prod
+                ├── ID <- 's'
+                ├── pattopt
+                │   └── PATTC <- '`{} {}`'
+                ├── rhss
+                │   ├── rhss
+                │   │   ├── rhss
+                │   │   │   └── rhs
+                │   │   │       ├── ARROW <- '->'
+                │   │   │       ├── ids
+                │   │   │       │   ├── ids
+                │   │   │       │   │   ├── ids
+                │   │   │       │   │   │   └──  <- 'NULL'
+                │   │   │       │   │   └── ID <- 's'
+                │   │   │       │   └── ID <- 'A'
+                │   │   │       └── pattopt
+                │   │   │           └──  <- 'NULL'
+                │   │   └── rhs
+                │   │       ├── ARROW <- '->'
+                │   │       ├── ids
+                │   │       │   ├── ids
+                │   │       │   │   ├── ids
+                │   │       │   │   │   └──  <- 'NULL'
+                │   │       │   │   └── ID <- 's'
+                │   │       │   └── ID <- 'B'
+                │   │       └── pattopt
+                │   │           └──  <- 'NULL'
+                │   └── rhs
+                │       ├── ARROW <- '->'
+                │       ├── ids
+                │       │   └──  <- 'NULL'
+                │       └── pattopt
+                │           └── PATTC <- '`SEPARATED:`'
+                └── SEMI <- ';'"
         );
     }
 }
