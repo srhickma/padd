@@ -45,6 +45,8 @@ enum S {
     OPTID,
     COPTID,
     ARROW,
+    DOT,
+    RANGE,
     FAIL,
 }
 
@@ -61,6 +63,7 @@ thread_local! {
             (S::START, '_') => S::DEF,
             (S::START, '|') => S::OR,
             (S::START, '[') => S::OPTID,
+            (S::START, '.') => S::DOT,
             (S::START, ' ') | (S::START, '\t') | (S::START, '\n') => S::WS,
             (S::START, '0') | (S::START, '1') | (S::START, '2') | (S::START, '3') | (S::START, '4') |
             (S::START, '5') | (S::START, '6') | (S::START, '7') | (S::START, '8') | (S::START, '9') |
@@ -119,6 +122,8 @@ thread_local! {
 
             (S::CILBS, _) => S::CIL,
 
+            (S::DOT, '.') => S::RANGE,
+
             (S::COMMENT, '\n') => S::FAIL,
             (S::COMMENT, _) => S::COMMENT,
 
@@ -136,6 +141,7 @@ thread_local! {
             S::DEF => "DEF",
             S::SEMI => "SEMI",
             S::OR => "OR",
+            S::RANGE => "RANGE",
             _ => "",
         }.to_string();
 
@@ -178,8 +184,11 @@ lazy_static! {
             "trand HAT ID",
             "trand HAT DEF",
 
-            "mtcs mtcs OR CILC",
-            "mtcs CILC",
+            "mtcs mtcs OR mtc",
+            "mtcs mtc",
+
+            "mtc CILC",
+            "mtc CILC RANGE CILC",
 
             "gram prods",
 
@@ -217,14 +226,16 @@ pub fn generate_spec(parse: &Tree) -> Result<(EncodedCDFA, Grammar, Formatter), 
 
 #[derive(Debug)]
 pub enum GenError {
-    CDFAError(runtime::CDFAError),
+    MatcherErr(String),
+    CDFAErr(runtime::CDFAError),
     PatternErr(fmt::BuildError),
 }
 
 impl std::fmt::Display for GenError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
-            GenError::CDFAError(ref err) => write!(f, "ECDFA generation error: {}", err),
+            GenError::MatcherErr(ref err) => write!(f, "Matcher definition error: {}", err),
+            GenError::CDFAErr(ref err) => write!(f, "ECDFA generation error: {}", err),
             GenError::PatternErr(ref err) => write!(f, "Pattern build error: {}", err),
         }
     }
@@ -233,15 +244,22 @@ impl std::fmt::Display for GenError {
 impl error::Error for GenError {
     fn cause(&self) -> Option<&error::Error> {
         match *self {
-            GenError::CDFAError(ref err) => Some(err),
+            GenError::MatcherErr(_) => None,
+            GenError::CDFAErr(ref err) => Some(err),
             GenError::PatternErr(ref err) => Some(err),
         }
     }
 }
 
+impl From<String> for GenError {
+    fn from(err: String) -> GenError {
+        GenError::MatcherErr(err)
+    }
+}
+
 impl From<runtime::CDFAError> for GenError {
     fn from(err: runtime::CDFAError) -> GenError {
-        GenError::CDFAError(err)
+        GenError::CDFAErr(err)
     }
 }
 
@@ -251,14 +269,14 @@ impl From<fmt::BuildError> for GenError {
     }
 }
 
-fn generate_ecdfa(tree: &Tree) -> Result<EncodedCDFA, runtime::CDFAError> {
+fn generate_ecdfa(tree: &Tree) -> Result<EncodedCDFA, GenError> {
     let mut builder = EncodedCDFABuilder::new();
 
     generate_ecdfa_alphabet(tree, &mut builder);
 
     generate_ecdfa_states(tree.get_child(1), &mut builder)?;
 
-    builder.build()
+    Ok(builder.build()?)
 }
 
 fn generate_ecdfa_alphabet(tree: &Tree, builder: &mut EncodedCDFABuilder) {
@@ -271,7 +289,7 @@ fn generate_ecdfa_alphabet(tree: &Tree, builder: &mut EncodedCDFABuilder) {
 fn generate_ecdfa_states(
     states_node: &Tree,
     builder: &mut EncodedCDFABuilder,
-) -> Result<(), runtime::CDFAError> {
+) -> Result<(), GenError> {
     let state_node = states_node.get_child(states_node.children.len() - 1);
 
     let sdec_node = state_node.get_child(0);
@@ -316,7 +334,7 @@ fn generate_ecdfa_trans(
     trans_node: &Tree,
     sources: &Vec<&State>,
     builder: &mut EncodedCDFABuilder,
-) -> Result<(), runtime::CDFAError> {
+) -> Result<(), GenError> {
     let tran_node = trans_node.get_child(trans_node.children.len() - 1);
 
     let trand_node = tran_node.get_child(2);
@@ -349,21 +367,57 @@ fn generate_ecdfa_mtcs(
     sources: &Vec<&State>,
     dest: &State,
     builder: &mut EncodedCDFABuilder,
-) -> Result<(), runtime::CDFAError> {
-    let matcher = mtcs_node.children.last().unwrap();
-    let matcher_string: String = matcher.lhs.lexeme.chars()
-        .skip(1)
-        .take(matcher.lhs.lexeme.len() - 2)
-        .collect();
-    let matcher_cleaned = string_utils::replace_escapes(&matcher_string);
-    if matcher_cleaned.len() == 1 {
-        for source in sources {
-            builder.mark_trans(source, dest, matcher_cleaned.chars().next().unwrap())?;
+) -> Result<(), GenError> {
+    let mtc_node = mtcs_node.children.last().unwrap();
+
+    if mtc_node.children.len() == 1 {
+        let matcher = mtc_node.get_child(0);
+        let matcher_string: String = matcher.lhs.lexeme.chars()
+            .skip(1)
+            .take(matcher.lhs.lexeme.len() - 2)
+            .collect();
+        let matcher_cleaned = string_utils::replace_escapes(&matcher_string);
+        if matcher_cleaned.len() == 1 {
+            for source in sources {
+                builder.mark_trans(source, dest, matcher_cleaned.chars().next().unwrap())?;
+            }
+        } else {
+            for source in sources {
+                builder.mark_chain(source, dest, matcher_cleaned.chars())?;
+            }
         }
     } else {
-        for source in sources {
-            builder.mark_chain(source, dest, matcher_cleaned.chars())?;
+        let range_start_node = mtc_node.get_child(0);
+        let range_end_node = mtc_node.get_child(2);
+
+        let escaped_range_start_string: String = range_start_node.lhs.lexeme.chars()
+            .skip(1)
+            .take(range_start_node.lhs.lexeme.len() - 2)
+            .collect();
+
+        let range_start_string = string_utils::replace_escapes(&escaped_range_start_string);
+        if range_start_string.len() > 1 {
+            return Err(GenError::MatcherErr(format!(
+                "Range start must be one character, but was '{}'", range_start_string
+            )));
         }
+
+        let escaped_range_end_string: String = range_end_node.lhs.lexeme.chars()
+            .skip(1)
+            .take(range_end_node.lhs.lexeme.len() - 2)
+            .collect();
+
+        let range_end_string: String = string_utils::replace_escapes(&escaped_range_end_string);
+        if range_end_string.len() > 1 {
+            return Err(GenError::MatcherErr(format!(
+                "Range end must be one character, but was '{}'", range_end_string
+            )));
+        }
+
+        let range_start = range_start_string.chars().next().unwrap();
+        let range_end = range_end_string.chars().next().unwrap();
+
+        builder.mark_range(sources.iter(), dest, range_start, range_end)?;
     }
 
     if mtcs_node.children.len() == 3 {
@@ -636,31 +690,36 @@ w -> WHITESPACE `[prefix]{0}\n\n{1;prefix=[prefix]\t}[prefix]{2}\n\n`
     │       │   │   │       │       │   │   │   ├── trans
     │       │   │   │       │       │   │   │   │   └── tran
     │       │   │   │       │       │   │   │   │       ├── mtcs
-    │       │   │   │       │       │   │   │   │       │   └── CILC <- '' ''
+    │       │   │   │       │       │   │   │   │       │   └── mtc
+    │       │   │   │       │       │   │   │   │       │       └── CILC <- '' ''
     │       │   │   │       │       │   │   │   │       ├── ARROW <- '->'
     │       │   │   │       │       │   │   │   │       └── trand
     │       │   │   │       │       │   │   │   │           └── ID <- 'ws'
     │       │   │   │       │       │   │   │   └── tran
     │       │   │   │       │       │   │   │       ├── mtcs
-    │       │   │   │       │       │   │   │       │   └── CILC <- ''\\t''
+    │       │   │   │       │       │   │   │       │   └── mtc
+    │       │   │   │       │       │   │   │       │       └── CILC <- ''\\t''
     │       │   │   │       │       │   │   │       ├── ARROW <- '->'
     │       │   │   │       │       │   │   │       └── trand
     │       │   │   │       │       │   │   │           └── ID <- 'ws'
     │       │   │   │       │       │   │   └── tran
     │       │   │   │       │       │   │       ├── mtcs
-    │       │   │   │       │       │   │       │   └── CILC <- ''\\n''
+    │       │   │   │       │       │   │       │   └── mtc
+    │       │   │   │       │       │   │       │       └── CILC <- ''\\n''
     │       │   │   │       │       │   │       ├── ARROW <- '->'
     │       │   │   │       │       │   │       └── trand
     │       │   │   │       │       │   │           └── ID <- 'ws'
     │       │   │   │       │       │   └── tran
     │       │   │   │       │       │       ├── mtcs
-    │       │   │   │       │       │       │   └── CILC <- ''{''
+    │       │   │   │       │       │       │   └── mtc
+    │       │   │   │       │       │       │       └── CILC <- ''{''
     │       │   │   │       │       │       ├── ARROW <- '->'
     │       │   │   │       │       │       └── trand
     │       │   │   │       │       │           └── ID <- 'lbr'
     │       │   │   │       │       └── tran
     │       │   │   │       │           ├── mtcs
-    │       │   │   │       │           │   └── CILC <- ''}''
+    │       │   │   │       │           │   └── mtc
+    │       │   │   │       │           │       └── CILC <- ''}''
     │       │   │   │       │           ├── ARROW <- '->'
     │       │   │   │       │           └── trand
     │       │   │   │       │               └── ID <- 'rbr'
@@ -677,19 +736,22 @@ w -> WHITESPACE `[prefix]{0}\n\n{1;prefix=[prefix]\t}[prefix]{2}\n\n`
     │       │   │       │       │   ├── trans
     │       │   │       │       │   │   └── tran
     │       │   │       │       │   │       ├── mtcs
-    │       │   │       │       │   │       │   └── CILC <- '' ''
+    │       │   │       │       │   │       │   └── mtc
+    │       │   │       │       │   │       │       └── CILC <- '' ''
     │       │   │       │       │   │       ├── ARROW <- '->'
     │       │   │       │       │   │       └── trand
     │       │   │       │       │   │           └── ID <- 'ws'
     │       │   │       │       │   └── tran
     │       │   │       │       │       ├── mtcs
-    │       │   │       │       │       │   └── CILC <- ''\\t''
+    │       │   │       │       │       │   └── mtc
+    │       │   │       │       │       │       └── CILC <- ''\\t''
     │       │   │       │       │       ├── ARROW <- '->'
     │       │   │       │       │       └── trand
     │       │   │       │       │           └── ID <- 'ws'
     │       │   │       │       └── tran
     │       │   │       │           ├── mtcs
-    │       │   │       │           │   └── CILC <- ''\\n''
+    │       │   │       │           │   └── mtc
+    │       │   │       │           │       └── CILC <- ''\\n''
     │       │   │       │           ├── ARROW <- '->'
     │       │   │       │           └── trand
     │       │   │       │               └── ID <- 'ws'
@@ -1089,10 +1151,10 @@ kind=ID lexeme=f")
             -> ID;";
 
         //exercise
-        let tree = parse_spec(input);
+        let tree = parse_spec(input).unwrap();
 
         //verify
-        assert_eq!(tree.unwrap().to_string(),
+        assert_eq!(tree.to_string(),
                    "└── spec
     ├── dfa
     │   ├── CILC <- ''inj ''
@@ -1108,7 +1170,8 @@ kind=ID lexeme=f")
     │       │   │       │       ├── trans
     │       │   │       │       │   └── tran
     │       │   │       │       │       ├── mtcs
-    │       │   │       │       │       │   └── CILC <- ''i''
+    │       │   │       │       │       │   └── mtc
+    │       │   │       │       │       │       └── CILC <- ''i''
     │       │   │       │       │       ├── ARROW <- '->'
     │       │   │       │       │       └── trand
     │       │   │       │       │           └── ID <- 'ki'
@@ -1127,7 +1190,8 @@ kind=ID lexeme=f")
     │       │       │   └── trans
     │       │       │       └── tran
     │       │       │           ├── mtcs
-    │       │       │           │   └── CILC <- ''n''
+    │       │       │           │   └── mtc
+    │       │       │           │       └── CILC <- ''n''
     │       │       │           ├── ARROW <- '->'
     │       │       │           └── trand
     │       │       │               ├── HAT <- '^'
@@ -1145,7 +1209,8 @@ kind=ID lexeme=f")
     │           │       ├── trans
     │           │       │   └── tran
     │           │       │       ├── mtcs
-    │           │       │       │   └── CILC <- '' ''
+    │           │       │       │   └── mtc
+    │           │       │       │       └── CILC <- '' ''
     │           │       │       ├── ARROW <- '->'
     │           │       │       └── trand
     │           │       │           └── ID <- 'fail'
@@ -1186,18 +1251,6 @@ kind=ID lexeme=f")
     }
 
     #[test]
-    fn replace_escapes() {
-        //setup
-        let input = "ffffnt\'ff\\n\\t\\\\\\\\ffff\\ff\'\\f\\\'fff";
-
-        //exercise
-        let res = string_utils::replace_escapes(input);
-
-        //verify
-        assert_eq!(res, "ffffnt\'ff\n\t\\\\ffffff\'f\'fff");
-    }
-
-    #[test]
     fn parse_spec_optional_shorthand() {
         //setup
         let spec = "
@@ -1229,14 +1282,16 @@ s -> A [B] s
     │           │       ├── trans
     │           │       │   └── tran
     │           │       │       ├── mtcs
-    │           │       │       │   └── CILC <- ''a''
+    │           │       │       │   └── mtc
+    │           │       │       │       └── CILC <- ''a''
     │           │       │       ├── ARROW <- '->'
     │           │       │       └── trand
     │           │       │           ├── HAT <- '^'
     │           │       │           └── ID <- 'A'
     │           │       └── tran
     │           │           ├── mtcs
-    │           │           │   └── CILC <- ''b''
+    │           │           │   └── mtc
+    │           │           │       └── CILC <- ''b''
     │           │           ├── ARROW <- '->'
     │           │           └── trand
     │           │               ├── HAT <- '^'
@@ -1353,8 +1408,6 @@ s `{} {}`
         //exercise
         let tree = parse_spec(spec).unwrap();
 
-        println!("{}", tree.clone().to_string());
-
         //verify
         assert_eq!(tree.to_string(),
                    "└── spec
@@ -1370,14 +1423,16 @@ s `{} {}`
     │           │       ├── trans
     │           │       │   └── tran
     │           │       │       ├── mtcs
-    │           │       │       │   └── CILC <- ''a''
+    │           │       │       │   └── mtc
+    │           │       │       │       └── CILC <- ''a''
     │           │       │       ├── ARROW <- '->'
     │           │       │       └── trand
     │           │       │           ├── HAT <- '^'
     │           │       │           └── ID <- 'A'
     │           │       └── tran
     │           │           ├── mtcs
-    │           │           │   └── CILC <- ''b''
+    │           │           │   └── mtc
+    │           │           │       └── CILC <- ''b''
     │           │           ├── ARROW <- '->'
     │           │           └── trand
     │           │               ├── HAT <- '^'
@@ -1420,5 +1475,61 @@ s `{} {}`
                 │           └── PATTC <- '`SEPARATED:`'
                 └── SEMI <- ';'"
         );
+    }
+
+    #[test]
+    fn range_based_matchers() {
+        //setup
+        let spec = "
+'abcdefghijklmnopqrstuvwxyz'
+
+start
+  'a'..'d' -> ^A
+  'e'..'k' | 'l' -> ^B
+  'm'..'m' -> ^C
+  'n'..'o' -> ^D
+  _ -> ^E;
+
+E
+    'p'..'z' -> E;
+
+s -> ;";
+
+        let input = "abcdefghijklmnopqrstuvwxyz".to_string();
+        let mut iter = input.chars();
+        let mut getter = || iter.next();
+        let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
+
+        let scanner = runtime::def_scanner();
+        let tree = parse_spec(spec);
+        let parse = tree.unwrap();
+        let (cdfa, _, _) = generate_spec(&parse).unwrap();
+
+        //exercise
+        let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
+
+        //verify
+        let mut res_string = String::new();
+        for token in tokens {
+            res_string = format!("{}\nkind={} lexeme={}", res_string, token.kind, token.lexeme);
+        }
+
+        assert_eq!(res_string, "
+kind=A lexeme=a
+kind=A lexeme=b
+kind=A lexeme=c
+kind=A lexeme=d
+kind=B lexeme=e
+kind=B lexeme=f
+kind=B lexeme=g
+kind=B lexeme=h
+kind=B lexeme=i
+kind=B lexeme=j
+kind=B lexeme=k
+kind=B lexeme=l
+kind=C lexeme=m
+kind=D lexeme=n
+kind=D lexeme=o
+kind=E lexeme=pqrstuvwxyz")
     }
 }

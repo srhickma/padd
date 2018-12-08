@@ -252,3 +252,39 @@ s `{} {}`
     //verify
     assert_eq!(res, "SEPARATED: a b b a b a");
 }
+
+#[test]
+fn test_range_based_matcher() {
+    //setup
+    let spec = "
+'abcdefghijklmnopqrstuvwxyz'
+
+start
+    'a' .. 'k' -> ^FIRST
+    'l' .. 'z' -> ^LAST;
+
+s
+    -> first last `{1} {0}`;
+
+first
+    -> first FIRST
+    -> FIRST;
+
+last
+    -> last LAST
+    -> LAST;
+    ".to_string();
+
+    let input = "abcdefghijklmnopqrstuvwxyz".to_string();
+    let mut iter = input.chars();
+    let mut getter = || iter.next();
+    let mut stream = Stream::from(&mut getter);
+
+    let fjr = FormatJobRunner::build(&spec).unwrap();
+
+    //exercise
+    let res = fjr.format(&mut stream).unwrap();
+
+    //verify
+    assert_eq!(res, "lmnopqrstuvwxyz abcdefghijk");
+}

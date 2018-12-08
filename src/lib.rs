@@ -412,4 +412,123 @@ s ->;
 
         assert!(err.cause().is_none());
     }
+
+//    #[test]
+//    fn failed_range_based_matchers_overlap() {
+//        //setup
+//        let spec = "
+//''
+//
+//start
+//    'a' -> ^A
+//    'ab' -> ^B;
+//
+//s ->;
+//    ".to_string();
+//
+//        //exercise
+//        let res = FormatJobRunner::build(&spec);
+//
+//        //verify
+//        assert!(res.is_err());
+//
+//        let mut err: &Error = &res.err().unwrap();
+//        assert_eq!(
+//            format!("{}", err),
+//            "Failed to generate specification: ECDFA generation error: Failed to build CDFA: Transition trie is not prefix free on character 'a'"
+//        );
+//
+//        err = err.cause().unwrap();
+//        assert_eq!(
+//            format!("{}", err),
+//            "ECDFA generation error: Failed to build CDFA: Transition trie is not prefix free on character 'a'"
+//        );
+//
+//        err = err.cause().unwrap();
+//        assert_eq!(
+//            format!("{}", err),
+//            "Failed to build CDFA: Transition trie is not prefix free on character 'a'"
+//        );
+//
+//        assert!(err.cause().is_none());
+//    }
+//
+//    #[test]
+//    fn failed_range_based_matchers_invalid_start() {
+//        //setup
+//        let spec = "
+//''
+//
+//start
+//    'a' -> ^A
+//    'ab' -> ^B;
+//
+//s ->;
+//    ".to_string();
+//
+//        //exercise
+//        let res = FormatJobRunner::build(&spec);
+//
+//        //verify
+//        assert!(res.is_err());
+//
+//        let mut err: &Error = &res.err().unwrap();
+//        assert_eq!(
+//            format!("{}", err),
+//            "Failed to generate specification: ECDFA generation error: Failed to build CDFA: Transition trie is not prefix free on character 'a'"
+//        );
+//
+//        err = err.cause().unwrap();
+//        assert_eq!(
+//            format!("{}", err),
+//            "ECDFA generation error: Failed to build CDFA: Transition trie is not prefix free on character 'a'"
+//        );
+//
+//        err = err.cause().unwrap();
+//        assert_eq!(
+//            format!("{}", err),
+//            "Failed to build CDFA: Transition trie is not prefix free on character 'a'"
+//        );
+//
+//        assert!(err.cause().is_none());
+//    }
+//
+//    #[test]
+//    fn failed_range_based_matchers_invalid_end() {
+//        //setup
+//        let spec = "
+//''
+//
+//start
+//    'a'..'cd' -> ^A;
+//
+//s ->;
+//    ".to_string();
+//
+//        //exercise
+//        let res = FormatJobRunner::build(&spec);
+//
+//        //verify
+//        assert!(res.is_err());
+//
+//        let mut err: &Error = &res.err().unwrap();
+//        assert_eq!(
+//            format!("{}", err),
+//            "Failed to generate specification: ECDFA generation error: Failed to build CDFA: Transition trie is not prefix free on character 'a'"
+//        );
+//
+//        err = err.cause().unwrap();
+//        assert_eq!(
+//            format!("{}", err),
+//            "ECDFA generation error: Failed to build CDFA: Transition trie is not prefix free on character 'a'"
+//        );
+//
+//        err = err.cause().unwrap();
+//        assert_eq!(
+//            format!("{}", err),
+//            "Failed to build CDFA: Transition trie is not prefix free on character 'a'"
+//        );
+//
+//        assert!(err.cause().is_none());
+//    }
 }

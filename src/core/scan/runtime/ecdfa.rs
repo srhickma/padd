@@ -20,6 +20,7 @@ use {
 pub struct EncodedCDFABuilder {
     encoder: HashMap<String, usize>,
     decoder: Vec<String>,
+    alphabet_str: String,
 
     alphabet: HashedAlphabet,
     accepting: HashSet<usize>,
@@ -53,6 +54,7 @@ impl CDFABuilder<String, String, EncodedCDFA> for EncodedCDFABuilder {
         EncodedCDFABuilder {
             encoder: HashMap::new(),
             decoder: Vec::new(),
+            alphabet_str: String::new(),
 
             alphabet: HashedAlphabet::new(),
             accepting: HashSet::new(),
@@ -79,7 +81,10 @@ impl CDFABuilder<String, String, EncodedCDFA> for EncodedCDFABuilder {
     }
 
     fn set_alphabet(&mut self, chars: impl Iterator<Item=char>) -> &mut Self {
-        chars.for_each(|c| self.alphabet.insert(c));
+        chars.for_each(|c| {
+            self.alphabet_str.push(c);
+            self.alphabet.insert(c);
+        });
         self
     }
 
@@ -126,6 +131,37 @@ impl CDFABuilder<String, String, EncodedCDFA> for EncodedCDFABuilder {
             let mut chars: Vec<char> = Vec::new();
             on.for_each(|c| chars.push(c));
             t_trie.insert_chain(&chars, to_encoded)?;
+        }
+
+        Ok(self)
+    }
+
+    fn mark_range<'state_o: 'state_i, 'state_i>(
+        &mut self,
+        sources: impl Iterator<Item=&'state_i &'state_o String>,
+        to: &'state_o String,
+        start: char,
+        end: char,
+    ) -> Result<&mut Self, CDFAError> {
+        let mut in_range = false;
+
+        let to_mark: Vec<char> = self.alphabet_str.chars()
+            .filter(|c| {
+                if *c == start {
+                    in_range = true;
+                }
+                if *c == end {
+                    in_range = false;
+                    return true;
+                }
+                in_range
+            })
+            .collect();
+
+        for source in sources {
+            for c in &to_mark {
+                self.mark_trans(&source, to, *c)?;
+            }
         }
 
         Ok(self)
