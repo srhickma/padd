@@ -47,6 +47,13 @@ pub trait CDFABuilder<State, Kind, CDFAType> {
         to: &State,
         on: impl Iterator<Item=char>,
     ) -> Result<&mut Self, CDFAError>;
+    fn mark_range<'state_o: 'state_i, 'state_i>(
+        &mut self,
+        sources: impl Iterator<Item=&'state_i &'state_o State>,
+        to: &'state_o State,
+        start: char,
+        end: char,
+    ) -> Result<&mut Self, CDFAError>;
     fn mark_def(&mut self, from: &State, to: &State) -> Result<&mut Self, CDFAError>;
     fn mark_token(&mut self, state: &State, token: &Kind) -> &mut Self;
 }
