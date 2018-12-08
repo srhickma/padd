@@ -278,11 +278,11 @@ package_decl
 import_decls
     -> import_decl import_decls `{}\n{}`
     -> import_decl `{}\n\n`;
-import_decl
+import_decl `{} {} {}{}{}{}`
     -> IMPORT typename SEMI `{} {}{}`
     -> IMPORT typename DOT STAR SEMI `{} {}{}{}{}`
-    -> IMPORT STATIC typename DOT ID SEMI `{} {} {}{}{}{}`
-    -> IMPORT STATIC typename DOT STAR SEMI `{} {} {}{}{}{}`;
+    -> IMPORT STATIC typename DOT ID SEMI
+    -> IMPORT STATIC typename DOT STAR SEMI;
 
 type_decls
     -> type_decl type_decls `{}\n{}`
@@ -333,8 +333,7 @@ class_member_dec
 constructor_dec
     -> modifiers_opt constructor_declarator [throws] constructor_body `{}{} {}{}`;
 constructor_body
-    -> LBRACE constructor_statements RBRACE
-        `{}\n{;prefix=[prefix][indent]}[prefix]{}\n`;
+    -> LBRACE constructor_statements RBRACE `{}\n{;prefix=[prefix][indent]}[prefix]{}\n`;
 constructor_declarator
     -> [type_parameters] ID LPAREN [formal_parameter_list] RPAREN;
 
@@ -371,15 +370,15 @@ formal_parameter_list
     -> last_formal_parameter
     -> short_formal_parameter_list
     -> long_formal_parameter_list `{;prefix=[prefix][indent]}\n[prefix]`;
-short_formal_parameter_list
-    -> formal_parameter COMMA last_formal_parameter `{}{} {}`
-    -> receiver_parameter COMMA last_formal_parameter `{}{} {}`;
-long_formal_parameter_list
-    -> formal_parameters COMMA formal_parameter COMMA last_formal_parameter `{}{}\n[prefix]{}{}\n[prefix]{}`
-    -> formal_parameters COMMA receiver_parameter COMMA last_formal_parameter `{}{}\n[prefix]{}{}\n[prefix]{}`;
-formal_parameters
-    -> formal_parameter COMMA formal_parameters `\n[prefix]{}{}{}`
-    -> receiver_parameter COMMA formal_parameters `\n[prefix]{}{}{}`
+short_formal_parameter_list `{}{} {}`
+    -> formal_parameter COMMA last_formal_parameter
+    -> receiver_parameter COMMA last_formal_parameter;
+long_formal_parameter_list `{}{}\n[prefix]{}{}\n[prefix]{}`
+    -> formal_parameters COMMA formal_parameter COMMA last_formal_parameter
+    -> formal_parameters COMMA receiver_parameter COMMA last_formal_parameter;
+formal_parameters `\n[prefix]{}{}{}`
+    -> formal_parameter COMMA formal_parameters
+    -> receiver_parameter COMMA formal_parameters
     -> formal_parameter `\n[prefix]{}`
     -> receiver_parameter `\n[prefix]{}`;
 formal_parameter
@@ -542,9 +541,9 @@ array_dim
 
 wildcard
     -> [annotations] QST [wildcard_bounds];
-wildcard_bounds
-    -> EXTENDS type ` {} {}`
-    -> SUPER type ` {} {}`;
+wildcard_bounds ` {} {}`
+    -> EXTENDS type
+    -> SUPER type;
 
 #
 # MISC
@@ -615,18 +614,18 @@ block
 
 prefixed_block_statements
     -> block_statements `[prefix]{}`;
-block_statements
+block_statements `{}\n`
     -> isolated_block_statement block_statements `{}\n[prefix]{}`
     -> grouped_statements isolated_block_statement block_statements `{}\n\n[prefix]{}\n[prefix]{}`
     -> grouped_statements inline_isolated_block_statement `{}\n\n[prefix]{}\n`
-    -> inline_isolated_block_statement `{}\n`
-    -> grouped_statements `{}\n`;
+    -> inline_isolated_block_statement
+    -> grouped_statements;
 
-isolated_block_statement
-    -> class_dec `{}\n`
-    -> block `{}\n`
-    -> lvar_dec_statement
-    -> isolated_statement `{}\n`;
+isolated_block_statement `{}\n`
+    -> class_dec
+    -> block
+    -> lvar_dec_statement `{}`
+    -> isolated_statement;
 
 inline_isolated_block_statement
     -> class_dec
@@ -714,9 +713,9 @@ switch_bsg
 switch_labels
     -> switch_label switch_labels
     -> switch_label;
-switch_label
-    -> CASE expr COLON `[prefix]{} {}{}`
-    -> CASE ID COLON `[prefix]{} {}{}`
+switch_label `[prefix]{} {}{}`
+    -> CASE expr COLON
+    -> CASE ID COLON
     -> DEFAULT COLON `[prefix]{}{}`;
 
 break_statement
@@ -782,9 +781,7 @@ if_then_statement
     -> IF LPAREN expr RPAREN forced_statement `{} {}{}{} {}`;
 
 if_then_else_statement
-    -> IF LPAREN expr RPAREN inline_statement ELSE else_statement
-        `{} {}{}{} \\{\n[prefix][indent]{;prefix=[prefix][indent]}\n[prefix]\\} {} {}`
-    -> IF LPAREN expr RPAREN block ELSE else_statement `{} {}{}{} {} {} {}`;
+    -> IF LPAREN expr RPAREN forced_statement ELSE else_statement`{} {}{}{} {} {} {}`;
 
 else_statement
     -> block
@@ -792,15 +789,14 @@ else_statement
     -> if_statement;
 
 while_statement
-    -> WHILE LPAREN expr RPAREN inline_statement `{} {}{}{} \\{\n[prefix][indent]{;prefix=[prefix][indent]}\n[prefix]\\}`
-    -> WHILE LPAREN expr RPAREN block `{} {}{}{} {}`;
+    -> WHILE LPAREN expr RPAREN forced_statement `{} {}{}{} {}`;
 
 do_statement
     -> DO forced_statement WHILE LPAREN expr RPAREN SEMI `{} {} {} {}{}{}{}`;
 
-for_statement
-    -> basic_for_statement forced_statement `{} {}`
-    -> enhanced_for_statement forced_statement `{} {}`;
+for_statement `{} {}`
+    -> basic_for_statement forced_statement
+    -> enhanced_for_statement forced_statement;
 
 basic_for_statement
     -> FOR LPAREN [for_init] SEMI [for_expr] SEMI [for_update] RPAREN `{} {}{}{}{}{}{}{}`;
@@ -983,9 +979,9 @@ array_creation_expr
     -> array_creation_type dim_exprs [array_dims]
     -> array_creation_type array_dims array_initializer;
 
-array_creation_type
-    -> NEW PRIM `{} {}`
-    -> NEW class_type `{} {}`;
+array_creation_type `{} {}`
+    -> NEW PRIM
+    -> NEW class_type;
 
 dim_exprs
     -> dim_expr dim_exprs
