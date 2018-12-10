@@ -12,6 +12,7 @@ use {
             compile::{self, CompileTransitionDelta, DFA},
             runtime::{
                 self,
+                CDFA,
                 CDFABuilder,
                 ecdfa::{EncodedCDFA, EncodedCDFABuilder},
             },
@@ -272,24 +273,33 @@ impl From<fmt::BuildError> for GenError {
 fn generate_ecdfa(tree: &Tree) -> Result<EncodedCDFA, GenError> {
     let mut builder = EncodedCDFABuilder::new();
 
-    generate_ecdfa_alphabet(tree, &mut builder);
+    generate_cdfa_alphabet(tree, &mut builder);
 
-    generate_ecdfa_states(tree.get_child(1), &mut builder)?;
+    generate_cdfa_states(tree.get_child(1), &mut builder)?;
 
     Ok(builder.build()?)
 }
 
-fn generate_ecdfa_alphabet(tree: &Tree, builder: &mut EncodedCDFABuilder) {
+fn generate_cdfa_alphabet<CDFABuilderType, CDFAType>(
+    tree: &Tree,
+    builder: &mut CDFABuilderType,
+) where
+    CDFAType: CDFA<usize, String>,
+    CDFABuilderType: CDFABuilder<String, String, CDFAType>
+{
     let alphabet_string = tree.get_child(0).lhs.lexeme.trim_matches('\'');
     let alphabet = string_utils::replace_escapes(&alphabet_string);
 
     builder.set_alphabet(alphabet.chars());
 }
 
-fn generate_ecdfa_states(
+fn generate_cdfa_states<CDFABuilderType, CDFAType>(
     states_node: &Tree,
-    builder: &mut EncodedCDFABuilder,
-) -> Result<(), GenError> {
+    builder: &mut CDFABuilderType,
+) -> Result<(), GenError> where
+    CDFAType: CDFA<usize, String>,
+    CDFABuilderType: CDFABuilder<String, String, CDFAType>
+{
     let state_node = states_node.get_child(states_node.children.len() - 1);
 
     let sdec_node = state_node.get_child(0);
@@ -299,42 +309,48 @@ fn generate_ecdfa_states(
 
     let mut states: Vec<&State> = vec![head_state];
     if targets_node.children.len() == 3 {
-        generate_ecdfa_targets(targets_node.get_child(0), &mut states);
+        generate_cdfa_targets(targets_node.get_child(0), &mut states);
     }
 
     if sdec_node.children.len() == 3 {
         let end = &sdec_node.get_child(2).lhs.lexeme;
 
         for state in &states {
-            add_ecdfa_tokenizer(*state, end, builder);
+            add_cdfa_tokenizer(*state, end, builder);
         }
     }
 
     let transopt_node = state_node.get_child(1);
     if !transopt_node.is_empty() {
-        generate_ecdfa_trans(transopt_node.get_child(0), &states, builder)?;
+        generate_cdfa_trans(transopt_node.get_child(0), &states, builder)?;
     }
 
     if states_node.children.len() == 2 {
-        generate_ecdfa_states(states_node.get_child(0), builder)
+        generate_cdfa_states(states_node.get_child(0), builder)
     } else {
         builder.mark_start(head_state);
         Ok(())
     }
 }
 
-fn generate_ecdfa_targets<'a>(targets_node: &'a Tree, accumulator: &mut Vec<&'a State>) {
+fn generate_cdfa_targets<'tree>(
+    targets_node: &'tree Tree,
+    accumulator: &mut Vec<&'tree State>,
+) {
     accumulator.push(&targets_node.get_child(targets_node.children.len() - 1).lhs.lexeme);
     if targets_node.children.len() == 3 {
-        generate_ecdfa_targets(targets_node.get_child(0), accumulator);
+        generate_cdfa_targets(targets_node.get_child(0), accumulator);
     }
 }
 
-fn generate_ecdfa_trans(
+fn generate_cdfa_trans<CDFABuilderType, CDFAType>(
     trans_node: &Tree,
     sources: &Vec<&State>,
-    builder: &mut EncodedCDFABuilder,
-) -> Result<(), GenError> {
+    builder: &mut CDFABuilderType,
+) -> Result<(), GenError> where
+    CDFAType: CDFA<usize, String>,
+    CDFABuilderType: CDFABuilder<String, String, CDFAType>
+{
     let tran_node = trans_node.get_child(trans_node.children.len() - 1);
 
     let trand_node = tran_node.get_child(2);
@@ -343,7 +359,7 @@ fn generate_ecdfa_trans(
     let matcher = tran_node.get_child(0);
     match &matcher.lhs.kind[..] {
         "mtcs" => {
-            generate_ecdfa_mtcs(matcher, sources, dest, builder)?;
+            generate_cdfa_mtcs(matcher, sources, dest, builder)?;
         }
         "DEF" => for source in sources {
             builder.mark_def(source, dest)?;
@@ -352,22 +368,25 @@ fn generate_ecdfa_trans(
     }
 
     if trand_node.children.len() == 2 { //Immediate state pass-through
-        add_ecdfa_tokenizer(dest, dest, builder);
+        add_cdfa_tokenizer(dest, dest, builder);
     }
 
     if trans_node.children.len() == 2 {
-        generate_ecdfa_trans(trans_node.get_child(0), sources, builder)
+        generate_cdfa_trans(trans_node.get_child(0), sources, builder)
     } else {
         Ok(())
     }
 }
 
-fn generate_ecdfa_mtcs(
+fn generate_cdfa_mtcs<CDFABuilderType, CDFAType>(
     mtcs_node: &Tree,
     sources: &Vec<&State>,
     dest: &State,
-    builder: &mut EncodedCDFABuilder,
-) -> Result<(), GenError> {
+    builder: &mut CDFABuilderType,
+) -> Result<(), GenError> where
+    CDFAType: CDFA<usize, String>,
+    CDFABuilderType: CDFABuilder<String, String, CDFAType>
+{
     let mtc_node = mtcs_node.children.last().unwrap();
 
     if mtc_node.children.len() == 1 {
@@ -421,13 +440,20 @@ fn generate_ecdfa_mtcs(
     }
 
     if mtcs_node.children.len() == 3 {
-        generate_ecdfa_mtcs(mtcs_node.get_child(0), sources, dest, builder)
+        generate_cdfa_mtcs(mtcs_node.get_child(0), sources, dest, builder)
     } else {
         Ok(())
     }
 }
 
-fn add_ecdfa_tokenizer(state: &State, kind: &String, builder: &mut EncodedCDFABuilder) {
+fn add_cdfa_tokenizer<CDFABuilderType, CDFAType>(
+    state: &State,
+    kind: &String,
+    builder: &mut CDFABuilderType,
+) where
+    CDFAType: CDFA<usize, String>,
+    CDFABuilderType: CDFABuilder<String, String, CDFAType>
+{
     builder.mark_accepting(state);
     if kind != DEF_MATCHER {
         builder.mark_token(state, kind);
