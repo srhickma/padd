@@ -872,6 +872,7 @@ equality_expr
 
 relational_expr
     -> shift_expr
+    -> relational_expr INSTANCEOF type `{} {} {}`
     -> relational_expr relational_op shift_expr `{} {} {}`;
 
 shift_expr
@@ -1018,8 +1019,7 @@ shift_op
 relational_op
     -> CMP_REL
     -> LT
-    -> GT
-    -> INSTANCEOF;
+    -> GT;
 
 additive_op
     -> PLUS
