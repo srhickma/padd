@@ -192,9 +192,11 @@ s -> ACC;
     fn failed_parse_input() {
         //setup
         let spec = "
-'a'
+'ab'
 
-start 'a' -> ^ACC;
+start
+    'a' -> ^ACC
+    'b' -> ^B;
 
 s -> B;
     ".to_string();
@@ -520,6 +522,42 @@ s ->;
         assert_eq!(
             format!("{}", err),
             "Matcher definition error: Range end must be one character, but was 'cd'"
+        );
+
+        assert!(err.cause().is_none());
+    }
+
+    #[test]
+    fn failed_orphaned_terminal() {
+        //setup
+        let spec = "
+'ab'
+
+start
+    'a' -> ^A
+    'b' -> ^B;
+
+s -> ORPHANED;
+    ".to_string();
+
+        //exercise
+        let res = FormatJobRunner::build(&spec);
+
+        //verify
+        assert!(res.is_err());
+
+        let mut err: &Error = &res.err().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "Failed to generate specification: ECDFA to grammar mapping error: \
+            Orphaned terminal 'ORPHANED' is not tokenized by the ECDFA"
+        );
+
+        err = err.cause().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "ECDFA to grammar mapping error: \
+            Orphaned terminal 'ORPHANED' is not tokenized by the ECDFA"
         );
 
         assert!(err.cause().is_none());

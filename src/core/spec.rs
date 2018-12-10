@@ -19,7 +19,11 @@ use {
         },
         util::string_utils,
     },
-    std::{self, error},
+    std::{
+        self,
+        collections::HashSet,
+        error,
+    },
 };
 
 static SPEC_ALPHABET: &'static str = "`-=~!@#$%^&*()_+{}|[]\\;':\"<>?,./QWERTYUIOPASDFGHJKLZXCVBNM1234567890abcdefghijklmnopqrstuvwxyz \n\t";
@@ -221,12 +225,16 @@ lazy_static! {
 pub fn generate_spec(parse: &Tree) -> Result<(EncodedCDFA, Grammar, Formatter), GenError> {
     let ecdfa = generate_ecdfa(parse.get_child(0))?;
     let (grammar, formatter) = traverse_grammar(parse.get_child(1))?;
+
+    orphan_check(&ecdfa, &grammar)?;
+
     Ok((ecdfa, grammar, formatter))
 }
 
 #[derive(Debug)]
 pub enum GenError {
     MatcherErr(String),
+    MappingErr(String),
     CDFAErr(runtime::CDFAError),
     PatternErr(fmt::BuildError),
 }
@@ -235,6 +243,7 @@ impl std::fmt::Display for GenError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
             GenError::MatcherErr(ref err) => write!(f, "Matcher definition error: {}", err),
+            GenError::MappingErr(ref err) => write!(f, "ECDFA to grammar mapping error: {}", err),
             GenError::CDFAErr(ref err) => write!(f, "ECDFA generation error: {}", err),
             GenError::PatternErr(ref err) => write!(f, "Pattern build error: {}", err),
         }
@@ -245,15 +254,10 @@ impl error::Error for GenError {
     fn cause(&self) -> Option<&error::Error> {
         match *self {
             GenError::MatcherErr(_) => None,
+            GenError::MappingErr(_) => None,
             GenError::CDFAErr(ref err) => Some(err),
             GenError::PatternErr(ref err) => Some(err),
         }
-    }
-}
-
-impl From<String> for GenError {
-    fn from(err: String) -> GenError {
-        GenError::MatcherErr(err)
     }
 }
 
@@ -537,6 +541,23 @@ fn generate_grammar_ids(
 
         ids_accumulator.push(id);
     }
+}
+
+fn orphan_check(ecdfa: &EncodedCDFA, grammar: &Grammar) -> Result<(), GenError> {
+    let mut ecdfa_products: HashSet<&String> = HashSet::new();
+    for product in ecdfa.produces() {
+        ecdfa_products.insert(product);
+    }
+
+    for symbol in grammar.terminals() {
+        if !ecdfa_products.contains(symbol) {
+            return Err(GenError::MappingErr(format!(
+                "Orphaned terminal '{}' is not tokenized by the ECDFA", symbol
+            )));
+        }
+    }
+
+    Ok(())
 }
 
 pub fn parse_spec(input: &str) -> Result<Tree, ParseError> {

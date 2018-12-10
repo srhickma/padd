@@ -1,7 +1,7 @@
 use {
     core::{
         data::{
-            map::CEHashMap,
+            map::{CEHashMap, CEHashMapIterator},
             stream::StreamConsumer,
         },
         scan::runtime::{
@@ -198,6 +198,12 @@ pub struct EncodedCDFA {
     start: usize,
 }
 
+impl EncodedCDFA {
+    pub fn produces(&self) -> CEHashMapIterator<String> {
+        self.tokenizer.iter()
+    }
+}
+
 impl CDFA<usize, String> for EncodedCDFA {
     fn transition(&self, state: &usize, stream: &mut StreamConsumer<char>) -> Option<usize> {
         match self.t_delta.get(*state) {
@@ -228,7 +234,6 @@ impl CDFA<usize, String> for EncodedCDFA {
         self.start
     }
 }
-
 
 struct TransitionTrie {
     root: TransitionNode,

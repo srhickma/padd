@@ -38,6 +38,32 @@ impl<V: Default> CEHashMap<V> {
     pub fn size(&self) -> usize {
         self.vector.len()
     }
+
+    pub fn iter(&self) -> CEHashMapIterator<V> {
+        CEHashMapIterator {
+            map: &self,
+            index: 0,
+        }
+    }
+}
+
+pub struct CEHashMapIterator<'scope, V: Default + 'scope> {
+    map: &'scope CEHashMap<V>,
+    index: usize,
+}
+
+impl<'scope, V: Default + 'scope> Iterator for CEHashMapIterator<'scope, V> {
+    type Item = &'scope V;
+    fn next(&mut self) -> Option<&'scope V> {
+        while self.index < self.map.size() {
+            let entry = self.map.get(self.index);
+            self.index += 1;
+            if entry.is_some() {
+                return entry;
+            }
+        }
+        None
+    }
 }
 
 #[cfg(test)]
@@ -132,5 +158,27 @@ mod tests {
         assert_eq!(map.size(), 3);
         map.insert(50, 0);
         assert_eq!(map.size(), 51);
+    }
+
+    #[test]
+    fn iterator() {
+        //setup
+        let mut map: CEHashMap<usize> = CEHashMap::new();
+
+        //exercise/verify
+        {
+            let mut iter = map.iter();
+            assert_eq!(iter.next(), None);
+        }
+
+        map.insert(2, 7);
+        map.insert(1, 8);
+        map.insert(50, 9);
+
+        let mut iter = map.iter();
+        assert_eq!(iter.next(), Some(&8));
+        assert_eq!(iter.next(), Some(&7));
+        assert_eq!(iter.next(), Some(&9));
+        assert_eq!(iter.next(), None);
     }
 }
