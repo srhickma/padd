@@ -248,6 +248,9 @@ public class JavaConcepts<T extends List<int[]>, X> extends Base implements Seri
                     if (t instanceof Base) {
                         System.out.println(1);
                     }
+                    if (t instanceof Base[]) {
+                        System.out.println(2);
+                    }
                     i++;
                     ++i;
             }
