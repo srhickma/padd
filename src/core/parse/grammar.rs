@@ -25,6 +25,8 @@ impl Grammar {
         self.terminals.contains(symbol)
     }
 
+    pub fn terminals(&self) -> &HashSet<String> { &self.terminals }
+
     pub fn start(&self) -> &String {
         &self.start
     }
