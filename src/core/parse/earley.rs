@@ -325,7 +325,7 @@ impl Parser for EarleyParser {
                                 finish: node + 1,
                             }];
                         }
-                    } else { //TODO return iterators instead to avoid collection and cloning
+                    } else {
                         return chart.row(node).edges()
                             .filter(|edge| edge.rule.unwrap().lhs == *symbol)
                             .cloned()
