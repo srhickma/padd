@@ -4,7 +4,7 @@ use {
             map::{CEHashMap, CEHashMapIterator},
             stream::StreamConsumer,
         },
-        scan::runtime::{
+        scan::{
             alphabet::HashedAlphabet,
             CDFA,
             CDFABuilder,
@@ -47,6 +47,23 @@ impl<State: Eq + Hash + Clone, Kind: Default + Clone> EncodedCDFABuilder<State, 
             self.t_delta.insert(from, TransitionTrie::new());
         }
         self.t_delta.get_mut(from).unwrap()
+    }
+
+    fn get_alphabet_range(&self, start: char, end: char) -> Vec<char> {
+        let mut in_range = false;
+
+        self.alphabet_str.chars()
+            .filter(|c| {
+                if *c == start {
+                    in_range = true;
+                }
+                if *c == end {
+                    in_range = false;
+                    return true;
+                }
+                in_range
+            })
+            .collect()
     }
 }
 
@@ -138,27 +155,30 @@ for EncodedCDFABuilder<State, Kind> {
         Ok(self)
     }
 
-    fn mark_range<'state_o: 'state_i, 'state_i>(
+    fn mark_range(
+        &mut self,
+        from: &State,
+        to: &State,
+        start: char,
+        end: char,
+    ) -> Result<&mut Self, CDFAError> {
+        let to_mark = self.get_alphabet_range(start, end);
+
+        for c in &to_mark {
+            self.mark_trans(from, to, *c)?;
+        }
+
+        Ok(self)
+    }
+
+    fn mark_range_for_all<'state_o: 'state_i, 'state_i>(
         &mut self,
         sources: impl Iterator<Item=&'state_i &'state_o State>,
         to: &'state_o State,
         start: char,
         end: char,
     ) -> Result<&mut Self, CDFAError> {
-        let mut in_range = false;
-
-        let to_mark: Vec<char> = self.alphabet_str.chars()
-            .filter(|c| {
-                if *c == start {
-                    in_range = true;
-                }
-                if *c == end {
-                    in_range = false;
-                    return true;
-                }
-                in_range
-            })
-            .collect();
+        let to_mark = self.get_alphabet_range(start, end);
 
         for source in sources {
             for c in &to_mark {
@@ -184,6 +204,7 @@ for EncodedCDFABuilder<State, Kind> {
     }
 
     fn mark_token(&mut self, state: &State, token: &Kind) -> &mut Self {
+        self.mark_accepting(state);
         let state_encoded = self.encode(state);
         self.tokenizer.insert(state_encoded, token.clone());
         self
@@ -382,7 +403,7 @@ mod tests {
             Data,
             stream::StreamSource,
         },
-        scan::{runtime, Token},
+        scan::{self, Token},
     };
 
     use super::*;
@@ -416,7 +437,7 @@ mod tests {
 
         let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
 
-        let scanner = runtime::def_scanner();
+        let scanner = scan::def_scanner();
 
         //exercise
         let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
@@ -466,7 +487,7 @@ NZ <- '11010101'
 
         let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
 
-        let scanner = runtime::def_scanner();
+        let scanner = scan::def_scanner();
 
         //exercise
         let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
@@ -526,7 +547,7 @@ RBR <- '}'
 
         let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
 
-        let scanner = runtime::def_scanner();
+        let scanner = scan::def_scanner();
 
         //exercise
         let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
@@ -582,7 +603,7 @@ RBR <- '}'
 
         let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
 
-        let scanner = runtime::def_scanner();
+        let scanner = scan::def_scanner();
 
         //exercise
         let result = scanner.scan(&mut stream, &cdfa);
@@ -629,7 +650,7 @@ RBR <- '}'
 
         let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
 
-        let scanner = runtime::def_scanner();
+        let scanner = scan::def_scanner();
 
         //exercise
         let result = scanner.scan(&mut stream, &cdfa);
@@ -669,7 +690,7 @@ RBR <- '}'
 
         let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
 
-        let scanner = runtime::def_scanner();
+        let scanner = scan::def_scanner();
 
         //exercise
         let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
@@ -716,7 +737,7 @@ FIVE <- 'five'
 
         let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
 
-        let scanner = runtime::def_scanner();
+        let scanner = scan::def_scanner();
 
         //exercise
         let tokens = scanner.scan(&mut stream, &cdfa).unwrap();

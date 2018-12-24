@@ -13,12 +13,9 @@ use {
         },
         scan::{
             self,
+            ecdfa::EncodedCDFA,
             Kind,
-            runtime::{
-                self,
-                ecdfa::EncodedCDFA,
-                Scanner,
-            },
+            Scanner,
         },
         spec,
     },
@@ -55,7 +52,7 @@ impl FormatJobRunner {
             cdfa,
             grammar,
             formatter,
-            scanner: runtime::def_scanner(),
+            scanner: scan::def_scanner(),
             parser: parse::def_parser(),
         })
     }

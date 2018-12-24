@@ -7,7 +7,8 @@ use {
         scan::{
             self,
             FAIL_SEQUENCE_LENGTH,
-            runtime::{CDFA, Scanner},
+            CDFA,
+            Scanner,
             Token,
         },
     },
@@ -49,6 +50,7 @@ impl<State: Data, Kind: Data> Scanner<State, Kind> for MaximalMunchScanner {
             let mut consumed: LinkedList<char> = LinkedList::new();
 
             let mut stream: Stream<char> = stream_source.head();
+            stream = stream.split();
 
             loop {
                 let res: Option<State> = {

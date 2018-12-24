@@ -1,5 +1,6 @@
 use {
     core::{
+        data::stream::StreamSource,
         fmt::{self, Formatter, FormatterBuilder, PatternPair},
         parse::{
             self,
@@ -9,14 +10,10 @@ use {
         },
         scan::{
             self,
-            compile::{self, CompileTransitionDelta, DFA},
+            CDFA,
+            CDFABuilder,
+            ecdfa::{EncodedCDFA, EncodedCDFABuilder},
             Kind,
-            runtime::{
-                self,
-                CDFA,
-                CDFABuilder,
-                ecdfa::{EncodedCDFA, EncodedCDFABuilder},
-            },
             State,
         },
         util::string_utils,
@@ -28,10 +25,10 @@ use {
     },
 };
 
-static SPEC_ALPHABET: &'static str = "`-=~!@#$%^&*()_+{}|[]\\;':\"<>?,./QWERTYUIOPASDFGHJKLZXCVBNM1234567890abcdefghijklmnopqrstuvwxyz \n\t";
+static SPEC_ALPHABET: &'static str = "`-=~!@#$%^&*()+{}|[]\\;':\"<>?,./_0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ \n\t";
 pub static DEF_MATCHER: &'static str = "_";
 
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Eq, Hash, Clone)]
 enum S {
     START,
     HAT,
@@ -57,171 +54,127 @@ enum S {
 }
 
 thread_local! {
-    static SPEC_DFA: DFA<S> = {
-        let delta: fn(S, char) -> S = |state, c| match (state, c) {
-            (S::START, '^') => S::HAT,
-            (S::START, '-') => S::MINUS,
-            (S::START, '\\') => S::BSLASH,
-            (S::START, '`') => S::PATT,
-            (S::START, '\'') => S::CIL,
-            (S::START, '#') => S::COMMENT,
-            (S::START, ';') => S::SEMI,
-            (S::START, '_') => S::DEF,
-            (S::START, '|') => S::OR,
-            (S::START, '[') => S::OPTID,
-            (S::START, '.') => S::DOT,
-            (S::START, ' ') | (S::START, '\t') | (S::START, '\n') => S::WS,
-            (S::START, '0') | (S::START, '1') | (S::START, '2') | (S::START, '3') | (S::START, '4') |
-            (S::START, '5') | (S::START, '6') | (S::START, '7') | (S::START, '8') | (S::START, '9') |
-            (S::START, 'a') | (S::START, 'g') | (S::START, 'l') | (S::START, 'q') | (S::START, 'v') |
-            (S::START, 'b') | (S::START, 'h') | (S::START, 'm') | (S::START, 'r') | (S::START, 'w') |
-            (S::START, 'c') | (S::START, 'i') | (S::START, 'n') | (S::START, 's') | (S::START, 'x') |
-            (S::START, 'd') | (S::START, 'j') | (S::START, 'o') | (S::START, 't') | (S::START, 'y') |
-            (S::START, 'e') | (S::START, 'k') | (S::START, 'p') | (S::START, 'u') | (S::START, 'z') |
-            (S::START, 'f') | (S::START, 'A') | (S::START, 'G') | (S::START, 'L') | (S::START, 'Q') |
-            (S::START, 'V') | (S::START, 'B') | (S::START, 'H') | (S::START, 'M') | (S::START, 'R') |
-            (S::START, 'W') | (S::START, 'C') | (S::START, 'I') | (S::START, 'N') | (S::START, 'S') |
-            (S::START, 'X') | (S::START, 'D') | (S::START, 'J') | (S::START, 'O') | (S::START, 'T') |
-            (S::START, 'Y') | (S::START, 'E') | (S::START, 'K') | (S::START, 'P') | (S::START, 'U') |
-            (S::START, 'Z') | (S::START, 'F') => S::ID,
-
-            (S::MINUS, '>') => S::ARROW,
-
-            (S::OPTID, '0') | (S::OPTID, '1') | (S::OPTID, '2') | (S::OPTID, '3') | (S::OPTID, '4') |
-            (S::OPTID, '5') | (S::OPTID, '6') | (S::OPTID, '7') | (S::OPTID, '8') | (S::OPTID, '9') |
-            (S::OPTID, 'a') | (S::OPTID, 'g') | (S::OPTID, 'l') | (S::OPTID, 'q') | (S::OPTID, 'v') |
-            (S::OPTID, 'b') | (S::OPTID, 'h') | (S::OPTID, 'm') | (S::OPTID, 'r') | (S::OPTID, 'w') |
-            (S::OPTID, 'c') | (S::OPTID, 'i') | (S::OPTID, 'n') | (S::OPTID, 's') | (S::OPTID, 'x') |
-            (S::OPTID, 'd') | (S::OPTID, 'j') | (S::OPTID, 'o') | (S::OPTID, 't') | (S::OPTID, 'y') |
-            (S::OPTID, 'e') | (S::OPTID, 'k') | (S::OPTID, 'p') | (S::OPTID, 'u') | (S::OPTID, 'z') |
-            (S::OPTID, 'f') | (S::OPTID, 'A') | (S::OPTID, 'G') | (S::OPTID, 'L') | (S::OPTID, 'Q') |
-            (S::OPTID, 'V') | (S::OPTID, 'B') | (S::OPTID, 'H') | (S::OPTID, 'M') | (S::OPTID, 'R') |
-            (S::OPTID, 'W') | (S::OPTID, 'C') | (S::OPTID, 'I') | (S::OPTID, 'N') | (S::OPTID, 'S') |
-            (S::OPTID, 'X') | (S::OPTID, 'D') | (S::OPTID, 'J') | (S::OPTID, 'O') | (S::OPTID, 'T') |
-            (S::OPTID, 'Y') | (S::OPTID, 'E') | (S::OPTID, 'K') | (S::OPTID, 'P') | (S::OPTID, 'U') |
-            (S::OPTID, 'Z') | (S::OPTID, 'F') | (S::OPTID, '_') => S::OPTID,
-
-            (S::OPTID, ']') => S::COPTID,
-
-            (S::ID, '0') | (S::ID, '1') | (S::ID, '2') | (S::ID, '3') | (S::ID, '4') |
-            (S::ID, '5') | (S::ID, '6') | (S::ID, '7') | (S::ID, '8') | (S::ID, '9') |
-            (S::ID, 'a') | (S::ID, 'g') | (S::ID, 'l') | (S::ID, 'q') | (S::ID, 'v') |
-            (S::ID, 'b') | (S::ID, 'h') | (S::ID, 'm') | (S::ID, 'r') | (S::ID, 'w') |
-            (S::ID, 'c') | (S::ID, 'i') | (S::ID, 'n') | (S::ID, 's') | (S::ID, 'x') |
-            (S::ID, 'd') | (S::ID, 'j') | (S::ID, 'o') | (S::ID, 't') | (S::ID, 'y') |
-            (S::ID, 'e') | (S::ID, 'k') | (S::ID, 'p') | (S::ID, 'u') | (S::ID, 'z') |
-            (S::ID, 'f') | (S::ID, 'A') | (S::ID, 'G') | (S::ID, 'L') | (S::ID, 'Q') |
-            (S::ID, 'V') | (S::ID, 'B') | (S::ID, 'H') | (S::ID, 'M') | (S::ID, 'R') |
-            (S::ID, 'W') | (S::ID, 'C') | (S::ID, 'I') | (S::ID, 'N') | (S::ID, 'S') |
-            (S::ID, 'X') | (S::ID, 'D') | (S::ID, 'J') | (S::ID, 'O') | (S::ID, 'T') |
-            (S::ID, 'Y') | (S::ID, 'E') | (S::ID, 'K') | (S::ID, 'P') | (S::ID, 'U') |
-            (S::ID, 'Z') | (S::ID, 'F') | (S::ID, '_') => S::ID,
-
-            (S::WS, ' ') | (S::WS, '\t') | (S::WS, '\n') => S::WS,
-
-            (S::PATT, '`') => S::PATTC,
-            (S::PATT, _) => S::PATT,
-
-            (S::CIL, '\'') => S::CILC,
-            (S::CIL, '\\') => S::CILBS,
-            (S::CIL, _) => S::CIL,
-
-            (S::CILBS, _) => S::CIL,
-
-            (S::DOT, '.') => S::RANGE,
-
-            (S::COMMENT, '\n') => S::FAIL,
-            (S::COMMENT, _) => S::COMMENT,
-
-            (_, _) => S::FAIL,
-        };
-        let tokenizer: fn(S) -> String = |state| match state {
-            S::HAT => "HAT",
-            S::ARROW => "ARROW",
-            S::PATTC => "PATTC",
-            S::CILC => "CILC",
-            S::COMMENT => "_",
-            S::WS => "_",
-            S::ID => "ID",
-            S::COPTID => "COPTID",
-            S::DEF => "DEF",
-            S::SEMI => "SEMI",
-            S::OR => "OR",
-            S::RANGE => "RANGE",
-            _ => "",
-        }.to_string();
-
-        DFA{
-            alphabet: SPEC_ALPHABET.to_string(),
-            start: S::START,
-            td: Box::new(CompileTransitionDelta::build(delta, tokenizer, S::FAIL)),
-        }
-    };
+    static SPEC_ECDFA: EncodedCDFA<String> = build_spec_ecdfa().unwrap();
 }
 
 lazy_static! {
-    static ref SPEC_PRODUCTIONS: Vec<Production> = parse::build_prods(&[
-            "spec dfa gram",
+    static ref SPEC_GRAMMAR: Grammar = build_spec_grammar();
+}
 
-            "dfa CILC states",
+fn build_spec_ecdfa() -> Result<EncodedCDFA<String>, scan::CDFAError> {
+    let mut builder: EncodedCDFABuilder<S, String> = EncodedCDFABuilder::new();
 
-            "states states state",
-            "states state",
+    builder.set_alphabet(SPEC_ALPHABET.chars());
+    builder.mark_start(&S::START);
 
-            "state sdec transopt SEMI",
+    builder
+        .mark_trans(&S::START, &S::HAT, '^')?
+        .mark_trans(&S::START, &S::MINUS, '-')?
+        .mark_trans(&S::START, &S::BSLASH, '\\')?
+        .mark_trans(&S::START, &S::PATT, '`')?
+        .mark_trans(&S::START, &S::CIL, '\'')?
+        .mark_trans(&S::START, &S::COMMENT, '#')?
+        .mark_trans(&S::START, &S::SEMI, ';')?
+        .mark_trans(&S::START, &S::DEF, '_')?
+        .mark_trans(&S::START, &S::OR, '|')?
+        .mark_trans(&S::START, &S::OPTID, '[')?
+        .mark_trans(&S::START, &S::DOT, '.')?
+        .mark_trans(&S::START, &S::WS, ' ')?
+        .mark_trans(&S::START, &S::WS, '\t')?
+        .mark_trans(&S::START, &S::WS, '\n')?
+        .mark_range(&S::START, &S::ID, '0', 'Z')?;
 
-            "sdec targets",
-            "sdec targets HAT ID",
-            "sdec targets HAT DEF",
+    builder.mark_trans(&S::MINUS, &S::ARROW, '>')?;
 
-            "targets ID",
-            "targets targets OR ID",
+    builder
+        .mark_trans(&S::OPTID, &S::COPTID, ']')?
+        .mark_range(&S::OPTID, &S::OPTID, '_', 'Z')?;
 
-            "transopt trans",
-            "transopt ",
+    builder.mark_range(&S::ID, &S::ID, '_', 'Z')?;
 
-            "trans trans tran",
-            "trans tran",
+    builder
+        .mark_trans(&S::WS, &S::WS, ' ')?
+        .mark_trans(&S::WS, &S::WS, '\t')?
+        .mark_trans(&S::WS, &S::WS, '\n')?;
 
-            "tran mtcs ARROW trand",
-            "tran DEF ARROW trand",
+    builder
+        .mark_trans(&S::PATT, &S::PATTC, '`')?
+        .mark_def(&S::PATT, &S::PATT)?;
 
-            "trand ID",
-            "trand HAT ID",
-            "trand HAT DEF",
+    builder
+        .mark_trans(&S::CIL, &S::CILC, '\'')?
+        .mark_trans(&S::CIL, &S::CILBS, '\\')?
+        .mark_def(&S::CIL, &S::CIL)?;
 
-            "mtcs mtcs OR mtc",
-            "mtcs mtc",
+    builder.mark_def(&S::CILBS, &S::CIL)?;
 
-            "mtc CILC",
-            "mtc CILC RANGE CILC",
+    builder.mark_trans(&S::DOT, &S::RANGE, '.')?;
 
-            "gram prods",
+    builder
+        .mark_trans(&S::COMMENT, &S::FAIL, '\n')?
+        .mark_def(&S::COMMENT, &S::COMMENT)?;
 
-            "prods prods prod",
-            "prods prod",
+    builder
+        .mark_token(&S::HAT, &"HAT".to_string())
+        .mark_token(&S::ARROW, &"ARROW".to_string())
+        .mark_token(&S::PATTC, &"PATTC".to_string())
+        .mark_token(&S::CILC, &"CILC".to_string())
+        .mark_token(&S::CILC, &"CILC".to_string())
+        .mark_token(&S::ID, &"ID".to_string())
+        .mark_token(&S::COPTID, &"COPTID".to_string())
+        .mark_token(&S::DEF, &"DEF".to_string())
+        .mark_token(&S::SEMI, &"SEMI".to_string())
+        .mark_token(&S::OR, &"OR".to_string())
+        .mark_token(&S::RANGE, &"RANGE".to_string())
+        .mark_accepting(&S::COMMENT)
+        .mark_accepting(&S::WS);
 
-            "prod ID pattopt rhss SEMI",
+    builder.build()
+}
 
-            "rhss rhss rhs",
-            "rhss rhs",
+fn build_spec_grammar() -> Grammar {
+    let productions = parse::build_prods(&[
+        "spec dfa gram",
+        "dfa CILC states",
+        "states states state",
+        "states state",
+        "state sdec transopt SEMI",
+        "sdec targets",
+        "sdec targets HAT ID",
+        "sdec targets HAT DEF",
+        "targets ID",
+        "targets targets OR ID",
+        "transopt trans",
+        "transopt ",
+        "trans trans tran",
+        "trans tran",
+        "tran mtcs ARROW trand",
+        "tran DEF ARROW trand",
+        "trand ID",
+        "trand HAT ID",
+        "trand HAT DEF",
+        "mtcs mtcs OR mtc",
+        "mtcs mtc",
+        "mtc CILC",
+        "mtc CILC RANGE CILC",
+        "gram prods",
+        "prods prods prod",
+        "prods prod",
+        "prod ID pattopt rhss SEMI",
+        "rhss rhss rhs",
+        "rhss rhs",
+        "rhs ARROW ids pattopt",
+        "pattopt PATTC",
+        "pattopt ",
+        "ids ids ID",
+        "ids ids COPTID",
+        "ids ",
+    ]);
 
-            "rhs ARROW ids pattopt",
-
-            "pattopt PATTC",
-            "pattopt ",
-
-            "ids ids ID",
-            "ids ids COPTID",
-            "ids ",
-        ]);
-
-    static ref SPEC_GRAMMAR: Grammar = {
-        let mut builder = GrammarBuilder::new();
-        builder.try_mark_start(&SPEC_PRODUCTIONS.first().unwrap().lhs);
-        builder.add_productions(SPEC_PRODUCTIONS.clone());
-        builder.build()
-    };
+    let mut builder = GrammarBuilder::new();
+    builder.try_mark_start(&productions.first().unwrap().lhs);
+    builder.add_productions(productions.clone());
+    builder.build()
 }
 
 pub fn generate_spec(parse: &Tree) -> Result<(EncodedCDFA<Kind>, Grammar, Formatter), GenError> {
@@ -237,7 +190,7 @@ pub fn generate_spec(parse: &Tree) -> Result<(EncodedCDFA<Kind>, Grammar, Format
 pub enum GenError {
     MatcherErr(String),
     MappingErr(String),
-    CDFAErr(runtime::CDFAError),
+    CDFAErr(scan::CDFAError),
     PatternErr(fmt::BuildError),
 }
 
@@ -263,8 +216,8 @@ impl error::Error for GenError {
     }
 }
 
-impl From<runtime::CDFAError> for GenError {
-    fn from(err: runtime::CDFAError) -> GenError {
+impl From<scan::CDFAError> for GenError {
+    fn from(err: scan::CDFAError) -> GenError {
         GenError::CDFAErr(err)
     }
 }
@@ -441,7 +394,7 @@ fn generate_cdfa_mtcs<CDFABuilderType, CDFAType>(
         let range_start = range_start_string.chars().next().unwrap();
         let range_end = range_end_string.chars().next().unwrap();
 
-        builder.mark_range(sources.iter(), dest, range_start, range_end)?;
+        builder.mark_range_for_all(sources.iter(), dest, range_start, range_end)?;
     }
 
     if mtcs_node.children.len() == 3 {
@@ -588,8 +541,12 @@ fn orphan_check(ecdfa: &EncodedCDFA<Kind>, grammar: &Grammar) -> Result<(), GenE
 }
 
 pub fn parse_spec(input: &str) -> Result<Tree, ParseError> {
-    SPEC_DFA.with(|f| -> Result<Tree, ParseError> {
-        let tokens = compile::def_scanner().scan(input, f)?;
+    SPEC_ECDFA.with(|cdfa| -> Result<Tree, ParseError> {
+        let mut iter = input.chars();
+        let mut getter = || iter.next();
+        let mut source = StreamSource::observe(&mut getter);
+
+        let tokens = scan::def_scanner().scan(&mut source, cdfa)?;
         let parse = parse::def_parser().parse(tokens, &SPEC_GRAMMAR)?;
         Ok(parse)
     })
@@ -923,7 +880,7 @@ w -> WHITESPACE ``;
         };
         let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
 
-        let scanner = runtime::def_scanner();
+        let scanner = scan::def_scanner();
         let parser = parse::def_parser();
 
         //specification
@@ -999,7 +956,7 @@ w -> WHITESPACE ``;
         };
         let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
 
-        let scanner = runtime::def_scanner();
+        let scanner = scan::def_scanner();
 
         let tree = parse_spec(spec);
         let parse = tree.unwrap();
@@ -1048,7 +1005,7 @@ s ->;
         };
         let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
 
-        let scanner = runtime::def_scanner();
+        let scanner = scan::def_scanner();
 
         let tree = parse_spec(spec);
         let parse = tree.unwrap();
@@ -1096,7 +1053,7 @@ ids
         };
         let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
 
-        let scanner = runtime::def_scanner();
+        let scanner = scan::def_scanner();
 
         let tree = parse_spec(spec);
         let parse = tree.unwrap();
@@ -1142,7 +1099,7 @@ s -> ;";
         };
         let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
 
-        let scanner = runtime::def_scanner();
+        let scanner = scan::def_scanner();
         let tree = parse_spec(spec);
         let parse = tree.unwrap();
         let (cdfa, _, _) = generate_spec(&parse).unwrap();
@@ -1396,7 +1353,7 @@ s -> A [B] s
         };
         let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
 
-        let scanner = runtime::def_scanner();
+        let scanner = scan::def_scanner();
         let tree = parse_spec(spec);
         let parse = tree.unwrap();
         let (cdfa, grammar, _) = generate_spec(&parse).unwrap();
@@ -1548,7 +1505,7 @@ s -> ;";
         let mut getter = || iter.next();
         let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
 
-        let scanner = runtime::def_scanner();
+        let scanner = scan::def_scanner();
         let tree = parse_spec(spec);
         let parse = tree.unwrap();
         let (cdfa, _, _) = generate_spec(&parse).unwrap();
