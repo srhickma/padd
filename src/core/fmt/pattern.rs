@@ -1,6 +1,9 @@
 use {
     core::{
-        data::Data,
+        data::{
+            Data,
+            stream::StreamSource,
+        },
         parse::{
             self,
             grammar::{Grammar, GrammarBuilder},
@@ -10,6 +13,12 @@ use {
         scan::{
             self,
             compile::{self, CompileTransitionDelta, DFA},
+            runtime::{
+                self,
+                CDFA,
+                CDFABuilder,
+                ecdfa::{EncodedCDFA, EncodedCDFABuilder},
+            },
         },
         util::string_utils,
     },
@@ -17,9 +26,9 @@ use {
 };
 
 static PATTERN_ALPHABET: &'static str =
-    "{}[];=1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ \n\t`~!@#$%^&*()_-+:'\"<>,.?/\\|";
+    "{}[];=0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ \n\t`~!@#$%^&*()_-+:'\"<>,.?/\\|";
 
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Eq, Hash, Clone)]
 enum S {
     START,
     LBRACE,
@@ -37,121 +46,90 @@ enum S {
 }
 
 thread_local! {
-    static PATTERN_DFA: DFA<S> = {
-        let delta: fn(S, char) -> S = |state, c| match (state, c) {
-            (S::START, '{') => S::LBRACE,
-            (S::START, '}') => S::RBRACE,
-            (S::START, '[') => S::LBRACKET,
-            (S::START, ']') => S::RBRACKET,
-            (S::START, ';') => S::SEMI,
-            (S::START, '=') => S::EQ,
-            (S::START, '\\') => S::ESC,
-            (S::START, '0') => S::ZERO,
-            (S::START, '1') | (S::START, '2') | (S::START, '3') | (S::START, '4') | (S::START, '5') |
-            (S::START, '6') | (S::START, '7') | (S::START, '8') | (S::START, '9') => S::NUM,
-            (S::START, 'a') | (S::START, 'g') | (S::START, 'l') | (S::START, 'q') | (S::START, 'v') |
-            (S::START, 'b') | (S::START, 'h') | (S::START, 'm') | (S::START, 'r') | (S::START, 'w') |
-            (S::START, 'c') | (S::START, 'i') | (S::START, 'n') | (S::START, 's') | (S::START, 'x') |
-            (S::START, 'd') | (S::START, 'j') | (S::START, 'o') | (S::START, 't') | (S::START, 'y') |
-            (S::START, 'e') | (S::START, 'k') | (S::START, 'p') | (S::START, 'u') | (S::START, 'z') |
-            (S::START, 'f') | (S::START, 'A') | (S::START, 'B') | (S::START, 'C') | (S::START, 'D') |
-            (S::START, 'E') | (S::START, 'F') | (S::START, 'G') | (S::START, 'H') | (S::START, 'I') |
-            (S::START, 'J') | (S::START, 'K') | (S::START, 'L') | (S::START, 'M') | (S::START, 'N') |
-            (S::START, 'O') | (S::START, 'P') | (S::START, 'Q') | (S::START, 'R') | (S::START, 'S') |
-            (S::START, 'T') | (S::START, 'U') | (S::START, 'V') | (S::START, 'W') | (S::START, 'X') |
-            (S::START, 'Y') | (S::START, 'Z') => S::ALPHA,
-            (S::START, _) => S::FILLER,
-
-            (S::FILLER, '\\') => S::ESC,
-            (S::FILLER, '{') | (S::FILLER, '}') | (S::FILLER, '[') | (S::FILLER, ';') |
-            (S::FILLER, '=')  => S::FAIL,
-            (S::FILLER, _) => S::FILLER,
-
-            (S::ESC, _) => S::FILLER,
-
-            (S::NUM, '0') | (S::NUM, '1') | (S::NUM, '2') | (S::NUM, '3') | (S::NUM, '4') |
-            (S::NUM, '5') | (S::NUM, '6') | (S::NUM, '7') | (S::NUM, '8') | (S::NUM, '9') => S::NUM,
-
-            (S::ALPHA, 'a') | (S::ALPHA, 'g') | (S::ALPHA, 'l') | (S::ALPHA, 'q') | (S::ALPHA, 'v') |
-            (S::ALPHA, 'b') | (S::ALPHA, 'h') | (S::ALPHA, 'm') | (S::ALPHA, 'r') | (S::ALPHA, 'w') |
-            (S::ALPHA, 'c') | (S::ALPHA, 'i') | (S::ALPHA, 'n') | (S::ALPHA, 's') | (S::ALPHA, 'x') |
-            (S::ALPHA, 'd') | (S::ALPHA, 'j') | (S::ALPHA, 'o') | (S::ALPHA, 't') | (S::ALPHA, 'y') |
-            (S::ALPHA, 'e') | (S::ALPHA, 'k') | (S::ALPHA, 'p') | (S::ALPHA, 'u') | (S::ALPHA, 'z') |
-            (S::ALPHA, 'f') | (S::ALPHA, 'A') | (S::ALPHA, 'B') | (S::ALPHA, 'C') | (S::ALPHA, 'D') |
-            (S::ALPHA, 'E') | (S::ALPHA, 'F') | (S::ALPHA, 'G') | (S::ALPHA, 'H') | (S::ALPHA, 'I') |
-            (S::ALPHA, 'J') | (S::ALPHA, 'K') | (S::ALPHA, 'L') | (S::ALPHA, 'M') | (S::ALPHA, 'N') |
-            (S::ALPHA, 'O') | (S::ALPHA, 'P') | (S::ALPHA, 'Q') | (S::ALPHA, 'R') | (S::ALPHA, 'S') |
-            (S::ALPHA, 'T') | (S::ALPHA, 'U') | (S::ALPHA, 'V') | (S::ALPHA, 'W') | (S::ALPHA, 'X') |
-            (S::ALPHA, 'Y') | (S::ALPHA, 'Z') => S::ALPHA,
-
-            (_, _) => S::FAIL,
-        };
-        let tokenizer: fn(S) -> String = |state| match state {
-            S::SEMI => "SEMI",
-            S::EQ => "EQ",
-            S::LBRACE => "LBRACE",
-            S::RBRACE => "RBRACE",
-            S::LBRACKET => "LBRACKET",
-            S::RBRACKET => "RBRACKET",
-            S::ZERO => "NUM",
-            S::NUM => "NUM",
-            S::ALPHA => "ALPHA",
-            S::FILLER => "FILLER",
-            _ => "",
-        }.to_string();
-
-        let dfa = DFA{
-            alphabet: PATTERN_ALPHABET.to_string(),
-            start: S::START,
-            td: Box::new(CompileTransitionDelta::build(delta, tokenizer, S::FAIL)),
-        };
-        dfa
-    };
+    static PATTERN_ECDFA: EncodedCDFA<String> = build_pattern_ecdfa().unwrap();
 }
 
 lazy_static! {
-    static ref PATTERN_PRODUCTIONS: Vec<Production> = {
-        parse::build_prods(&[
-            "pattern segs",
+    static ref PATTERN_GRAMMAR: Grammar = build_pattern_grammar();
+}
 
-            "segs seg segs",
-            "segs ",
+fn build_pattern_ecdfa() -> Result<EncodedCDFA<String>, runtime::CDFAError> {
+    let mut builder: EncodedCDFABuilder<S, String> = EncodedCDFABuilder::new();
 
-            "seg filler",
-            "seg sub",
-            "seg cap",
+    builder.set_alphabet(PATTERN_ALPHABET.chars());
+    builder.mark_start(&S::START);
 
-            "filler FILLER",
-            "filler ALPHA",
-            "filler NUM",
+    builder
+        .mark_trans(&S::START, &S::LBRACE, '{')?
+        .mark_trans(&S::START, &S::RBRACE, '}')?
+        .mark_trans(&S::START, &S::LBRACKET, '[')?
+        .mark_trans(&S::START, &S::RBRACKET, ']')?
+        .mark_trans(&S::START, &S::SEMI, ';')?
+        .mark_trans(&S::START, &S::EQ, '=')?
+        .mark_trans(&S::START, &S::ESC, '\\')?
+        .mark_trans(&S::START, &S::ZERO, '0')?
+        .mark_range(&S::START, &S::NUM, '1', '9')?
+        .mark_range(&S::START, &S::ALPHA, 'a', 'Z')?
+        .mark_def(&S::START, &S::FILLER)?;
 
-            "sub LBRACKET ALPHA RBRACKET",
+    builder
+        .mark_trans(&S::FILLER, &S::ESC, '\\')?
+        .mark_trans(&S::FILLER, &S::FAIL, '{')?
+        .mark_trans(&S::FILLER, &S::FAIL, '}')?
+        .mark_trans(&S::FILLER, &S::FAIL, '[')?
+        .mark_trans(&S::FILLER, &S::FAIL, ';')?
+        .mark_trans(&S::FILLER, &S::FAIL, '=')?
+        .mark_def(&S::FILLER, &S::FILLER)?;
 
-            "cap LBRACE capdesc RBRACE",
+    builder.mark_def(&S::ESC, &S::FILLER);
 
-            "capdesc capindex",
-            "capdesc capindex SEMI decls",
+    builder.mark_range(&S::NUM, &S::NUM, '0', '9');
 
-            "capindex NUM",
-            "capindex ",
+    builder.mark_range(&S::ALPHA, &S::ALPHA, 'a', 'Z');
 
-            "decls decls SEMI decl",
-            "decls decl",
+    builder
+        .mark_token(&S::SEMI, &"SEMI".to_string())
+        .mark_token(&S::EQ, &"EQ".to_string())
+        .mark_token(&S::LBRACE, &"LBRACE".to_string())
+        .mark_token(&S::RBRACE, &"RBRACE".to_string())
+        .mark_token(&S::LBRACKET, &"LBRACKET".to_string())
+        .mark_token(&S::RBRACKET, &"RBRACKET".to_string())
+        .mark_token(&S::ZERO, &"NUM".to_string())
+        .mark_token(&S::NUM, &"NUM".to_string())
+        .mark_token(&S::ALPHA, &"ALPHA".to_string())
+        .mark_token(&S::FILLER, &"FILLER".to_string());
 
-            "decl ALPHA EQ val",
+    builder.build()
+}
 
-            "val pattern",
-            "val ",
+fn build_pattern_grammar() -> Grammar {
+    let productions = parse::build_prods(&[
+        "pattern segs",
+        "segs seg segs",
+        "segs ",
+        "seg filler",
+        "seg sub",
+        "seg cap",
+        "filler FILLER",
+        "filler ALPHA",
+        "filler NUM",
+        "sub LBRACKET ALPHA RBRACKET",
+        "cap LBRACE capdesc RBRACE",
+        "capdesc capindex",
+        "capdesc capindex SEMI decls",
+        "capindex NUM",
+        "capindex ",
+        "decls decls SEMI decl",
+        "decls decl",
+        "decl ALPHA EQ val",
+        "val pattern",
+        "val ",
+    ]);
 
-        ])
-    };
-
-    static ref PATTERN_GRAMMAR: Grammar = {
-        let mut builder = GrammarBuilder::new();
-        builder.try_mark_start(&PATTERN_PRODUCTIONS.first().unwrap().lhs);
-        builder.add_productions(PATTERN_PRODUCTIONS.clone());
-        builder.build()
-    };
+    let mut builder = GrammarBuilder::new();
+    builder.try_mark_start(&productions.first().unwrap().lhs);
+    builder.add_productions(productions.clone());
+    builder.build()
 }
 
 #[derive(Clone)]
@@ -264,8 +242,13 @@ fn parse_decl(decl: &Tree, prod: &Production) -> Result<Declaration, BuildError>
 }
 
 fn parse_pattern(input: &str) -> Result<Tree, BuildError> {
-    PATTERN_DFA.with(|f| -> Result<Tree, BuildError> {
-        let tokens = compile::def_scanner().scan(input, f)?;
+    PATTERN_ECDFA.with(|cdfa| -> Result<Tree, BuildError> {
+        let mut index = 0;
+        let mut iter = input.chars();
+        let mut getter = || iter.next();
+        let mut source = StreamSource::observe(&mut getter);
+
+        let tokens = runtime::def_scanner().scan(&mut source, cdfa)?;
         let parse = parse::def_parser().parse(tokens, &PATTERN_GRAMMAR)?;
         Ok(parse)
     })

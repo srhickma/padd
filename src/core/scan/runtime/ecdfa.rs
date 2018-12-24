@@ -204,6 +204,7 @@ for EncodedCDFABuilder<State, Kind> {
     }
 
     fn mark_token(&mut self, state: &State, token: &Kind) -> &mut Self {
+        self.mark_accepting(state);
         let state_encoded = self.encode(state);
         self.tokenizer.insert(state_encoded, token.clone());
         self
