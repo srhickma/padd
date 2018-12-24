@@ -65,6 +65,16 @@ impl<State: Eq + Hash + Clone, Kind: Default + Clone> EncodedCDFABuilder<State, 
             })
             .collect()
     }
+
+    pub fn state<'scope, 'state: 'scope>(
+        &'scope mut self,
+        state: &'state State,
+    ) -> EncodedCDFAStateBuilder<'scope, 'state, State, Kind> {
+        EncodedCDFAStateBuilder {
+            ecdfa_builder: self,
+            state,
+        }
+    }
 }
 
 impl<State: Eq + Hash + Clone, Kind: Default + Clone> CDFABuilder<State, Kind, EncodedCDFA<Kind>>
@@ -207,6 +217,62 @@ for EncodedCDFABuilder<State, Kind> {
         self.mark_accepting(state);
         let state_encoded = self.encode(state);
         self.tokenizer.insert(state_encoded, token.clone());
+        self
+    }
+}
+
+pub struct EncodedCDFAStateBuilder<
+    'scope,
+    'state: 'scope,
+    State: 'state + Eq + Hash + Clone,
+    Kind: 'scope + Default + Clone
+> {
+    ecdfa_builder: &'scope mut EncodedCDFABuilder<State, Kind>,
+    state: &'state State,
+}
+
+impl<'scope, 'state: 'scope, State: 'state + Eq + Hash + Clone, Kind: 'scope + Default + Clone>
+EncodedCDFAStateBuilder<'scope, 'state, State, Kind> {
+    pub fn mark_accepting(&mut self) -> &mut Self {
+        self.ecdfa_builder.mark_accepting(self.state);
+        self
+    }
+
+    pub fn mark_trans(
+        &mut self,
+        to: &State,
+        on: char,
+    ) -> Result<&mut Self, CDFAError> {
+        self.ecdfa_builder.mark_trans(self.state, to, on)?;
+        Ok(self)
+    }
+
+    pub fn mark_chain(
+        &mut self,
+        to: &State,
+        on: impl Iterator<Item=char>,
+    ) -> Result<&mut Self, CDFAError> {
+        self.ecdfa_builder.mark_chain(self.state, to, on)?;
+        Ok(self)
+    }
+
+    pub fn mark_range(
+        &mut self,
+        to: &State,
+        start: char,
+        end: char,
+    ) -> Result<&mut Self, CDFAError> {
+        self.ecdfa_builder.mark_range(self.state, to, start, end)?;
+        Ok(self)
+    }
+
+    pub fn mark_def(&mut self, to: &State) -> Result<&mut Self, CDFAError> {
+        self.ecdfa_builder.mark_def(self.state, to)?;
+        Ok(self)
+    }
+
+    pub fn mark_token(&mut self, token: &Kind) -> &mut Self {
+        self.ecdfa_builder.mark_token(self.state, token);
         self
     }
 }
@@ -413,20 +479,16 @@ mod tests {
         //setup
         let mut builder: EncodedCDFABuilder<String, String> = EncodedCDFABuilder::new();
         builder
-            .set_alphabet("01".chars());
-        builder
-            .mark_trans(&"start".to_string(), &"zero".to_string(), '0').unwrap()
-            .mark_trans(&"start".to_string(), &"notzero".to_string(), '1').unwrap();
-        builder
-            .mark_def(&"notzero".to_string(), &"notzero".to_string()).unwrap();
-        builder
-            .mark_token(&"zero".to_string(), &"ZERO".to_string())
-            .mark_token(&"notzero".to_string(), &"NZ".to_string());
-        builder
+            .set_alphabet("01".chars())
             .mark_start(&"start".to_string());
+        builder.state(&"start".to_string())
+            .mark_trans(&"zero".to_string(), '0').unwrap()
+            .mark_trans(&"notzero".to_string(), '1').unwrap();
+        builder.state(&"notzero".to_string())
+            .mark_def(&"notzero".to_string()).unwrap()
+            .mark_token(&"NZ".to_string());
         builder
-            .mark_accepting(&"zero".to_string())
-            .mark_accepting(&"notzero".to_string());
+            .mark_token(&"zero".to_string(), &"ZERO".to_string());
 
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
 
@@ -457,26 +519,22 @@ NZ <- '11010101'
         //setup
         let mut builder: EncodedCDFABuilder<String, String> = EncodedCDFABuilder::new();
         builder
-            .set_alphabet("{} \t\n".chars());
-        builder
-            .mark_trans(&"start".to_string(), &"ws".to_string(), ' ').unwrap()
-            .mark_trans(&"start".to_string(), &"ws".to_string(), '\t').unwrap()
-            .mark_trans(&"start".to_string(), &"ws".to_string(), '\n').unwrap()
-            .mark_trans(&"start".to_string(), &"lbr".to_string(), '{').unwrap()
-            .mark_trans(&"start".to_string(), &"rbr".to_string(), '}').unwrap()
-            .mark_trans(&"ws".to_string(), &"ws".to_string(), ' ').unwrap()
-            .mark_trans(&"ws".to_string(), &"ws".to_string(), '\t').unwrap()
-            .mark_trans(&"ws".to_string(), &"ws".to_string(), '\n').unwrap();
+            .set_alphabet("{} \t\n".chars())
+            .mark_start(&"start".to_string());
+        builder.state(&"start".to_string())
+            .mark_trans(&"ws".to_string(), ' ').unwrap()
+            .mark_trans(&"ws".to_string(), '\t').unwrap()
+            .mark_trans(&"ws".to_string(), '\n').unwrap()
+            .mark_trans(&"lbr".to_string(), '{').unwrap()
+            .mark_trans(&"rbr".to_string(), '}').unwrap();
+        builder.state(&"ws".to_string())
+            .mark_trans(&"ws".to_string(), ' ').unwrap()
+            .mark_trans(&"ws".to_string(), '\t').unwrap()
+            .mark_trans(&"ws".to_string(), '\n').unwrap()
+            .mark_token(&"WS".to_string());
         builder
             .mark_token(&"lbr".to_string(), &"LBR".to_string())
-            .mark_token(&"rbr".to_string(), &"RBR".to_string())
-            .mark_token(&"ws".to_string(), &"WS".to_string());
-        builder
-            .mark_start(&"start".to_string());
-        builder
-            .mark_accepting(&"lbr".to_string())
-            .mark_accepting(&"rbr".to_string())
-            .mark_accepting(&"ws".to_string());
+            .mark_token(&"rbr".to_string(), &"RBR".to_string());
 
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
 
@@ -518,25 +576,22 @@ RBR <- '}'
         //setup
         let mut builder: EncodedCDFABuilder<String, String> = EncodedCDFABuilder::new();
         builder
-            .set_alphabet("{} \t\n".chars());
-        builder
-            .mark_trans(&"start".to_string(), &"ws".to_string(), ' ').unwrap()
-            .mark_trans(&"start".to_string(), &"ws".to_string(), '\t').unwrap()
-            .mark_trans(&"start".to_string(), &"ws".to_string(), '\n').unwrap()
-            .mark_trans(&"start".to_string(), &"lbr".to_string(), '{').unwrap()
-            .mark_trans(&"start".to_string(), &"rbr".to_string(), '}').unwrap()
-            .mark_trans(&"ws".to_string(), &"ws".to_string(), ' ').unwrap()
-            .mark_trans(&"ws".to_string(), &"ws".to_string(), '\t').unwrap()
-            .mark_trans(&"ws".to_string(), &"ws".to_string(), '\n').unwrap();
+            .set_alphabet("{} \t\n".chars())
+            .mark_start(&"start".to_string());
+        builder.state(&"start".to_string())
+            .mark_trans(&"ws".to_string(), ' ').unwrap()
+            .mark_trans(&"ws".to_string(), '\t').unwrap()
+            .mark_trans(&"ws".to_string(), '\n').unwrap()
+            .mark_trans(&"lbr".to_string(), '{').unwrap()
+            .mark_trans(&"rbr".to_string(), '}').unwrap();
+        builder.state(&"ws".to_string())
+            .mark_trans(&"ws".to_string(), ' ').unwrap()
+            .mark_trans(&"ws".to_string(), '\t').unwrap()
+            .mark_trans(&"ws".to_string(), '\n').unwrap()
+            .mark_accepting();
         builder
             .mark_token(&"lbr".to_string(), &"LBR".to_string())
             .mark_token(&"rbr".to_string(), &"RBR".to_string());
-        builder
-            .mark_start(&"start".to_string());
-        builder
-            .mark_accepting(&"lbr".to_string())
-            .mark_accepting(&"rbr".to_string())
-            .mark_accepting(&"ws".to_string());
 
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
 
@@ -574,25 +629,22 @@ RBR <- '}'
         //setup
         let mut builder: EncodedCDFABuilder<String, String> = EncodedCDFABuilder::new();
         builder
-            .set_alphabet("{} \t\n".chars());
-        builder
-            .mark_trans(&"start".to_string(), &"ws".to_string(), ' ').unwrap()
-            .mark_trans(&"start".to_string(), &"ws".to_string(), '\t').unwrap()
-            .mark_trans(&"start".to_string(), &"ws".to_string(), '\n').unwrap()
-            .mark_trans(&"start".to_string(), &"lbr".to_string(), '{').unwrap()
-            .mark_trans(&"start".to_string(), &"rbr".to_string(), '}').unwrap()
-            .mark_trans(&"ws".to_string(), &"ws".to_string(), ' ').unwrap()
-            .mark_trans(&"ws".to_string(), &"ws".to_string(), '\t').unwrap()
-            .mark_trans(&"ws".to_string(), &"ws".to_string(), '\n').unwrap();
+            .set_alphabet("{} \t\n".chars())
+            .mark_start(&"start".to_string());
+        builder.state(&"start".to_string())
+            .mark_trans(&"ws".to_string(), ' ').unwrap()
+            .mark_trans(&"ws".to_string(), '\t').unwrap()
+            .mark_trans(&"ws".to_string(), '\n').unwrap()
+            .mark_trans(&"lbr".to_string(), '{').unwrap()
+            .mark_trans(&"rbr".to_string(), '}').unwrap();
+        builder.state(&"ws".to_string())
+            .mark_trans(&"ws".to_string(), ' ').unwrap()
+            .mark_trans(&"ws".to_string(), '\t').unwrap()
+            .mark_trans(&"ws".to_string(), '\n').unwrap()
+            .mark_accepting();
         builder
             .mark_token(&"lbr".to_string(), &"LBR".to_string())
             .mark_token(&"rbr".to_string(), &"RBR".to_string());
-        builder
-            .mark_start(&"start".to_string());
-        builder
-            .mark_accepting(&"lbr".to_string())
-            .mark_accepting(&"rbr".to_string())
-            .mark_accepting(&"ws".to_string());
 
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
 
@@ -621,25 +673,22 @@ RBR <- '}'
         //setup
         let mut builder: EncodedCDFABuilder<String, String> = EncodedCDFABuilder::new();
         builder
-            .set_alphabet("{} \t\n".chars());
-        builder
-            .mark_trans(&"start".to_string(), &"ws".to_string(), ' ').unwrap()
-            .mark_trans(&"start".to_string(), &"ws".to_string(), '\t').unwrap()
-            .mark_trans(&"start".to_string(), &"ws".to_string(), '\n').unwrap()
-            .mark_trans(&"start".to_string(), &"lbr".to_string(), '{').unwrap()
-            .mark_trans(&"start".to_string(), &"rbr".to_string(), '}').unwrap()
-            .mark_trans(&"ws".to_string(), &"ws".to_string(), ' ').unwrap()
-            .mark_trans(&"ws".to_string(), &"ws".to_string(), '\t').unwrap()
-            .mark_trans(&"ws".to_string(), &"ws".to_string(), '\n').unwrap();
+            .set_alphabet("{} \t\n".chars())
+            .mark_start(&"start".to_string());
+        builder.state(&"start".to_string())
+            .mark_trans(&"ws".to_string(), ' ').unwrap()
+            .mark_trans(&"ws".to_string(), '\t').unwrap()
+            .mark_trans(&"ws".to_string(), '\n').unwrap()
+            .mark_trans(&"lbr".to_string(), '{').unwrap()
+            .mark_trans(&"rbr".to_string(), '}').unwrap();
+        builder.state(&"ws".to_string())
+            .mark_trans(&"ws".to_string(), ' ').unwrap()
+            .mark_trans(&"ws".to_string(), '\t').unwrap()
+            .mark_trans(&"ws".to_string(), '\n').unwrap()
+            .mark_accepting();
         builder
             .mark_token(&"lbr".to_string(), &"LBR".to_string())
             .mark_token(&"rbr".to_string(), &"RBR".to_string());
-        builder
-            .mark_start(&"start".to_string());
-        builder
-            .mark_accepting(&"lbr".to_string())
-            .mark_accepting(&"rbr".to_string())
-            .mark_accepting(&"ws".to_string());
 
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
 
@@ -668,18 +717,14 @@ RBR <- '}'
         //setup
         let mut builder: EncodedCDFABuilder<String, String> = EncodedCDFABuilder::new();
         builder
-            .set_alphabet("fourive".chars());
-        builder
-            .mark_chain(&"start".to_string(), &"four".to_string(), "four".chars()).unwrap()
-            .mark_chain(&"start".to_string(), &"five".to_string(), "five".chars()).unwrap();
+            .set_alphabet("fourive".chars())
+            .mark_start(&"start".to_string());
+        builder.state(&"start".to_string())
+            .mark_chain(&"four".to_string(), "four".chars()).unwrap()
+            .mark_chain(&"five".to_string(), "five".chars()).unwrap();
         builder
             .mark_token(&"four".to_string(), &"FOUR".to_string())
             .mark_token(&"five".to_string(), &"FIVE".to_string());
-        builder
-            .mark_start(&"start".to_string());
-        builder
-            .mark_accepting(&"four".to_string())
-            .mark_accepting(&"five".to_string());
 
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
 
@@ -713,20 +758,16 @@ FIVE <- 'five'
         //setup
         let mut builder: EncodedCDFABuilder<String, String> = EncodedCDFABuilder::new();
         builder
-            .set_alphabet("fordk".chars());
-        builder
-            .mark_chain(&"start".to_string(), &"FOR".to_string(), "for".chars()).unwrap();
+            .set_alphabet("fordk".chars())
+            .mark_start(&"start".to_string());
+        builder.state(&"start".to_string())
+            .mark_chain(&"FOR".to_string(), "for".chars()).unwrap()
+            .mark_def(&"id".to_string()).unwrap();
         builder
             .mark_token(&"FOR".to_string(), &"FOR".to_string())
             .mark_token(&"id".to_string(), &"ID".to_string());
         builder
-            .mark_start(&"start".to_string());
-        builder
-            .mark_def(&"start".to_string(), &"id".to_string()).unwrap()
             .mark_def(&"id".to_string(), &"id".to_string()).unwrap();
-        builder
-            .mark_accepting(&"FOR".to_string())
-            .mark_accepting(&"id".to_string());
 
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
 
