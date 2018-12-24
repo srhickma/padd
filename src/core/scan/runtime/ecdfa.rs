@@ -13,24 +13,25 @@ use {
     },
     std::{
         collections::{HashMap, HashSet},
+        hash::Hash,
         usize,
     },
 };
 
-pub struct EncodedCDFABuilder {
-    encoder: HashMap<String, usize>,
-    decoder: Vec<String>,
+pub struct EncodedCDFABuilder<State: Eq + Hash + Clone, Kind: Default + Clone> {
+    encoder: HashMap<State, usize>,
+    decoder: Vec<State>,
     alphabet_str: String,
 
     alphabet: HashedAlphabet,
     accepting: HashSet<usize>,
     t_delta: CEHashMap<TransitionTrie>,
-    tokenizer: CEHashMap<String>,
+    tokenizer: CEHashMap<Kind>,
     start: usize,
 }
 
-impl EncodedCDFABuilder {
-    fn encode(&mut self, val: &String) -> usize {
+impl<State: Eq + Hash + Clone, Kind: Default + Clone> EncodedCDFABuilder<State, Kind> {
+    fn encode(&mut self, val: &State) -> usize {
         if self.encoder.contains_key(val) {
             *self.encoder.get(val).unwrap()
         } else {
@@ -49,7 +50,8 @@ impl EncodedCDFABuilder {
     }
 }
 
-impl CDFABuilder<String, String, EncodedCDFA> for EncodedCDFABuilder {
+impl<State: Eq + Hash + Clone, Kind: Default + Clone> CDFABuilder<State, Kind, EncodedCDFA<Kind>>
+for EncodedCDFABuilder<State, Kind> {
     fn new() -> Self {
         EncodedCDFABuilder {
             encoder: HashMap::new(),
@@ -64,7 +66,7 @@ impl CDFABuilder<String, String, EncodedCDFA> for EncodedCDFABuilder {
         }
     }
 
-    fn build(self) -> Result<EncodedCDFA, CDFAError> {
+    fn build(self) -> Result<EncodedCDFA<Kind>, CDFAError> {
         if self.start == usize::max_value() {
             Err(CDFAError::BuildErr("No start state was set".to_string()))
         } else if self.start > self.t_delta.size() {
@@ -88,21 +90,21 @@ impl CDFABuilder<String, String, EncodedCDFA> for EncodedCDFABuilder {
         self
     }
 
-    fn mark_accepting(&mut self, state: &String) -> &mut Self {
+    fn mark_accepting(&mut self, state: &State) -> &mut Self {
         let state_encoded = self.encode(state);
         self.accepting.insert(state_encoded);
         self
     }
 
-    fn mark_start(&mut self, state: &String) -> &mut Self {
+    fn mark_start(&mut self, state: &State) -> &mut Self {
         self.start = self.encode(state);
         self
     }
 
     fn mark_trans(
         &mut self,
-        from: &String,
-        to: &String,
+        from: &State,
+        to: &State,
         on: char,
     ) -> Result<&mut Self, CDFAError> {
         let from_encoded = self.encode(from);
@@ -118,8 +120,8 @@ impl CDFABuilder<String, String, EncodedCDFA> for EncodedCDFABuilder {
 
     fn mark_chain(
         &mut self,
-        from: &String,
-        to: &String,
+        from: &State,
+        to: &State,
         on: impl Iterator<Item=char>,
     ) -> Result<&mut Self, CDFAError> {
         let from_encoded = self.encode(from);
@@ -138,8 +140,8 @@ impl CDFABuilder<String, String, EncodedCDFA> for EncodedCDFABuilder {
 
     fn mark_range<'state_o: 'state_i, 'state_i>(
         &mut self,
-        sources: impl Iterator<Item=&'state_i &'state_o String>,
-        to: &'state_o String,
+        sources: impl Iterator<Item=&'state_i &'state_o State>,
+        to: &'state_o State,
         start: char,
         end: char,
     ) -> Result<&mut Self, CDFAError> {
@@ -167,7 +169,7 @@ impl CDFABuilder<String, String, EncodedCDFA> for EncodedCDFABuilder {
         Ok(self)
     }
 
-    fn mark_def(&mut self, from: &String, to: &String) -> Result<&mut Self, CDFAError> {
+    fn mark_def(&mut self, from: &State, to: &State) -> Result<&mut Self, CDFAError> {
         let from_encoded = self.encode(from);
         let to_encoded = self.encode(to);
 
@@ -181,30 +183,30 @@ impl CDFABuilder<String, String, EncodedCDFA> for EncodedCDFABuilder {
         }
     }
 
-    fn mark_token(&mut self, state: &String, token: &String) -> &mut Self {
+    fn mark_token(&mut self, state: &State, token: &Kind) -> &mut Self {
         let state_encoded = self.encode(state);
         self.tokenizer.insert(state_encoded, token.clone());
         self
     }
 }
 
-pub struct EncodedCDFA {
+pub struct EncodedCDFA<Kind: Default + Clone> {
     //TODO add separate error message if character not in alphabet
     #[allow(dead_code)]
     alphabet: HashedAlphabet,
     accepting: HashSet<usize>,
     t_delta: CEHashMap<TransitionTrie>,
-    tokenizer: CEHashMap<String>,
+    tokenizer: CEHashMap<Kind>,
     start: usize,
 }
 
-impl EncodedCDFA {
-    pub fn produces(&self) -> CEHashMapIterator<String> {
+impl<Kind: Default + Clone> EncodedCDFA<Kind> {
+    pub fn produces(&self) -> CEHashMapIterator<Kind> {
         self.tokenizer.iter()
     }
 }
 
-impl CDFA<usize, String> for EncodedCDFA {
+impl<Kind: Default + Clone> CDFA<usize, Kind> for EncodedCDFA<Kind> {
     fn transition(&self, state: &usize, stream: &mut StreamConsumer<char>) -> Option<usize> {
         match self.t_delta.get(*state) {
             None => None,
@@ -223,7 +225,7 @@ impl CDFA<usize, String> for EncodedCDFA {
         self.accepting.contains(state)
     }
 
-    fn tokenize(&self, state: &usize) -> Option<String> {
+    fn tokenize(&self, state: &usize) -> Option<Kind> {
         match self.tokenizer.get(*state) {
             None => None,
             Some(dest) => Some(dest.clone())
@@ -388,7 +390,7 @@ mod tests {
     #[test]
     fn scan_binary() {
         //setup
-        let mut builder: EncodedCDFABuilder = EncodedCDFABuilder::new();
+        let mut builder: EncodedCDFABuilder<String, String> = EncodedCDFABuilder::new();
         builder
             .set_alphabet("01".chars());
         builder
@@ -405,7 +407,7 @@ mod tests {
             .mark_accepting(&"zero".to_string())
             .mark_accepting(&"notzero".to_string());
 
-        let cdfa: EncodedCDFA = builder.build().unwrap();
+        let cdfa: EncodedCDFA<String> = builder.build().unwrap();
 
         let input = "000011010101".to_string();
         let mut iter = input.chars();
@@ -432,7 +434,7 @@ NZ <- '11010101'
     #[test]
     fn scan_brackets() {
         //setup
-        let mut builder: EncodedCDFABuilder = EncodedCDFABuilder::new();
+        let mut builder: EncodedCDFABuilder<String, String> = EncodedCDFABuilder::new();
         builder
             .set_alphabet("{} \t\n".chars());
         builder
@@ -455,7 +457,7 @@ NZ <- '11010101'
             .mark_accepting(&"rbr".to_string())
             .mark_accepting(&"ws".to_string());
 
-        let cdfa: EncodedCDFA = builder.build().unwrap();
+        let cdfa: EncodedCDFA<String> = builder.build().unwrap();
 
         let input = "  {{\n}{}{} \t{} \t{}}".to_string();
         let mut iter = input.chars();
@@ -493,7 +495,7 @@ RBR <- '}'
     #[test]
     fn scan_ignore() {
         //setup
-        let mut builder: EncodedCDFABuilder = EncodedCDFABuilder::new();
+        let mut builder: EncodedCDFABuilder<String, String> = EncodedCDFABuilder::new();
         builder
             .set_alphabet("{} \t\n".chars());
         builder
@@ -515,7 +517,7 @@ RBR <- '}'
             .mark_accepting(&"rbr".to_string())
             .mark_accepting(&"ws".to_string());
 
-        let cdfa: EncodedCDFA = builder.build().unwrap();
+        let cdfa: EncodedCDFA<String> = builder.build().unwrap();
 
         let input = "  {{\n}{}{} \t{} \t{}}".to_string();
         let mut iter = input.chars();
@@ -549,7 +551,7 @@ RBR <- '}'
     #[test]
     fn scan_fail_simple() {
         //setup
-        let mut builder: EncodedCDFABuilder = EncodedCDFABuilder::new();
+        let mut builder: EncodedCDFABuilder<String, String> = EncodedCDFABuilder::new();
         builder
             .set_alphabet("{} \t\n".chars());
         builder
@@ -571,7 +573,7 @@ RBR <- '}'
             .mark_accepting(&"rbr".to_string())
             .mark_accepting(&"ws".to_string());
 
-        let cdfa: EncodedCDFA = builder.build().unwrap();
+        let cdfa: EncodedCDFA<String> = builder.build().unwrap();
 
         let input = "  {{\n}{}{} \tx{} \t{}}".to_string();
         let mut iter = input.chars();
@@ -596,7 +598,7 @@ RBR <- '}'
     #[test]
     fn scan_fail_complex() {
         //setup
-        let mut builder: EncodedCDFABuilder = EncodedCDFABuilder::new();
+        let mut builder: EncodedCDFABuilder<String, String> = EncodedCDFABuilder::new();
         builder
             .set_alphabet("{} \t\n".chars());
         builder
@@ -618,7 +620,7 @@ RBR <- '}'
             .mark_accepting(&"rbr".to_string())
             .mark_accepting(&"ws".to_string());
 
-        let cdfa: EncodedCDFA = builder.build().unwrap();
+        let cdfa: EncodedCDFA<String> = builder.build().unwrap();
 
         let input = "   {  {  {{{\t}}}\n {} }  }   { {}\n }   {  {  {{{\t}}}\n {} }  } xyz  { {}\n }   {  {  {{{\t}}}\n {} }  }   { {}\n } ".to_string();
         let mut iter = input.chars();
@@ -643,7 +645,7 @@ RBR <- '}'
     #[test]
     fn scan_chain_simple() {
         //setup
-        let mut builder: EncodedCDFABuilder = EncodedCDFABuilder::new();
+        let mut builder: EncodedCDFABuilder<String, String> = EncodedCDFABuilder::new();
         builder
             .set_alphabet("fourive".chars());
         builder
@@ -658,7 +660,7 @@ RBR <- '}'
             .mark_accepting(&"four".to_string())
             .mark_accepting(&"five".to_string());
 
-        let cdfa: EncodedCDFA = builder.build().unwrap();
+        let cdfa: EncodedCDFA<String> = builder.build().unwrap();
 
         let input = "fivefourfourfourfivefivefourfive".to_string();
         let mut iter = input.chars();
@@ -688,7 +690,7 @@ FIVE <- 'five'
     #[test]
     fn scan_chain_def() {
         //setup
-        let mut builder: EncodedCDFABuilder = EncodedCDFABuilder::new();
+        let mut builder: EncodedCDFABuilder<String, String> = EncodedCDFABuilder::new();
         builder
             .set_alphabet("fordk".chars());
         builder
@@ -705,7 +707,7 @@ FIVE <- 'five'
             .mark_accepting(&"FOR".to_string())
             .mark_accepting(&"id".to_string());
 
-        let cdfa: EncodedCDFA = builder.build().unwrap();
+        let cdfa: EncodedCDFA<String> = builder.build().unwrap();
 
         let input = "fdk".to_string();
         let mut iter = input.chars();

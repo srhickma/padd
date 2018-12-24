@@ -13,6 +13,7 @@ use {
         },
         scan::{
             self,
+            Kind,
             runtime::{
                 self,
                 ecdfa::EncodedCDFA,
@@ -39,7 +40,7 @@ impl FormatJob {
 }
 
 pub struct FormatJobRunner {
-    cdfa: EncodedCDFA,
+    cdfa: EncodedCDFA<Kind>,
     grammar: Grammar,
     formatter: Formatter,
     scanner: Box<Scanner<usize, String>>,
