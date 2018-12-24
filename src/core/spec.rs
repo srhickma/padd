@@ -10,6 +10,7 @@ use {
         scan::{
             self,
             compile::{self, CompileTransitionDelta, DFA},
+            Kind,
             runtime::{
                 self,
                 CDFA,
@@ -223,7 +224,7 @@ lazy_static! {
     };
 }
 
-pub fn generate_spec(parse: &Tree) -> Result<(EncodedCDFA, Grammar, Formatter), GenError> {
+pub fn generate_spec(parse: &Tree) -> Result<(EncodedCDFA<Kind>, Grammar, Formatter), GenError> {
     let ecdfa = generate_ecdfa(parse.get_child(0))?;
     let (grammar, formatter) = traverse_grammar(parse.get_child(1))?;
 
@@ -274,7 +275,7 @@ impl From<fmt::BuildError> for GenError {
     }
 }
 
-fn generate_ecdfa(tree: &Tree) -> Result<EncodedCDFA, GenError> {
+fn generate_ecdfa(tree: &Tree) -> Result<EncodedCDFA<Kind>, GenError> {
     let mut builder = EncodedCDFABuilder::new();
 
     generate_cdfa_alphabet(tree, &mut builder);
@@ -569,7 +570,7 @@ fn generate_grammar_ids(
     }
 }
 
-fn orphan_check(ecdfa: &EncodedCDFA, grammar: &Grammar) -> Result<(), GenError> {
+fn orphan_check(ecdfa: &EncodedCDFA<Kind>, grammar: &Grammar) -> Result<(), GenError> {
     let mut ecdfa_products: HashSet<&String> = HashSet::new();
     for product in ecdfa.produces() {
         ecdfa_products.insert(product);
