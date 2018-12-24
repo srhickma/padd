@@ -64,8 +64,8 @@ lazy_static! {
 fn build_spec_ecdfa() -> Result<EncodedCDFA<String>, scan::CDFAError> {
     let mut builder: EncodedCDFABuilder<S, String> = EncodedCDFABuilder::new();
 
-    builder.set_alphabet(SPEC_ALPHABET.chars());
-    builder.mark_start(&S::START);
+    builder.set_alphabet(SPEC_ALPHABET.chars())
+        .mark_start(&S::START);
 
     builder.state(&S::START)
         .mark_trans(&S::HAT, '^')?
