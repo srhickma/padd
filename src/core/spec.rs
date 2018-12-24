@@ -441,7 +441,7 @@ fn generate_cdfa_mtcs<CDFABuilderType, CDFAType>(
         let range_start = range_start_string.chars().next().unwrap();
         let range_end = range_end_string.chars().next().unwrap();
 
-        builder.mark_range(sources.iter(), dest, range_start, range_end)?;
+        builder.mark_range_for_all(sources.iter(), dest, range_start, range_end)?;
     }
 
     if mtcs_node.children.len() == 3 {
