@@ -30,7 +30,7 @@ after_success: |
     sudo make install && cd ../.. &&
     for file in target/debug/padd-*[^\.d] target/debug/concept-*[^\.d] target/debug/scope-*[^\.d]; do
       mkdir -p "target/cov/$(basename $file)";
-      kcov --exclude-region='#[cfg(test)]:#[cfg(testkcovstopmarker)]' --include-path=src --exclude-path=src/cli "target/cov/$(basename $file)" "$file";
+      kcov --exclude-region='#[cfg(test)]:#[cfg(testkcovstopmarker)]' --include-path=src --exclude-path=src/cli/mod.rs --exclude-path=src/cli/logger.rs "target/cov/$(basename $file)" "$file";
     done &&
     bash <(curl -s https://codecov.io/bash)
   fi

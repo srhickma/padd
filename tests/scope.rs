@@ -1,7 +1,7 @@
 extern crate padd;
 
 use {
-    padd::{FormatJobRunner, Stream},
+    padd::{FormatJobRunner, FormatJob},
     std::{
         fs::File,
         io::{Read, Write},
@@ -73,12 +73,9 @@ fn test_fjr(case_name: &str, spec_name: &str) {
     let fjr = FormatJobRunner::build(&load_spec(spec_name)).unwrap();
 
     let input = load_input(case_name);
-    let mut iter = input.chars();
-    let mut getter = || iter.next();
-    let mut stream = Stream::from(&mut getter);
 
     //exercise
-    let res = fjr.format(&mut stream).unwrap();
+    let res = fjr.format(FormatJob::from_text(input)).unwrap();
 
     //verify
     assert_matches_file(res, case_name)

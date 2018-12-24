@@ -26,6 +26,18 @@ use {
 
 mod core;
 
+pub struct FormatJob {
+    text: String
+}
+
+impl FormatJob {
+    pub fn from_text(text: String) -> Self {
+        FormatJob {
+            text
+        }
+    }
+}
+
 pub struct FormatJobRunner {
     cdfa: EncodedCDFA,
     grammar: Grammar,
@@ -47,8 +59,10 @@ impl FormatJobRunner {
         })
     }
 
-    pub fn format(&self, stream: &mut Stream<char>) -> Result<String, FormatError> {
-        let mut source = StreamSource::observe(stream.getter);
+    pub fn format(&self, job: FormatJob) -> Result<String, FormatError> {
+        let mut iter = job.text.chars();
+        let mut getter = || iter.next();
+        let mut source = StreamSource::observe(&mut getter);
         let tokens = self.scanner.scan(&mut source, &self.cdfa)?;
         let parse = self.parser.parse(tokens, &self.grammar)?;
         Ok(self.formatter.format(&parse))
@@ -131,18 +145,6 @@ impl From<parse::Error> for FormatError {
     }
 }
 
-pub struct Stream<'g, T: 'g + Clone> {
-    getter: &'g mut FnMut() -> Option<T>,
-}
-
-impl<'g, T: 'g + Clone> Stream<'g, T> {
-    pub fn from(getter: &'g mut FnMut() -> Option<T>) -> Stream<'g, T> {
-        Stream { getter }
-    }
-}
-
-pub type ThreadPool<Payload> = core::util::thread_pool::ThreadPool<Payload>;
-
 #[cfg(test)]
 mod tests {
     use std::error::Error;
@@ -160,15 +162,10 @@ start 'a' -> ^ACC;
 s -> ACC;
     ".to_string();
 
-        let input = "b".to_string();
-        let mut iter = input.chars();
-        let mut getter = || iter.next();
-        let mut stream = Stream::from(&mut getter);
-
         let fjr = FormatJobRunner::build(&spec).unwrap();
 
         //exercise
-        let res = fjr.format(&mut stream);
+        let res = fjr.format(FormatJob::from_text("b".to_string()));
 
         //verify
         assert!(res.is_err());
@@ -201,15 +198,10 @@ start
 s -> B;
     ".to_string();
 
-        let input = "a".to_string();
-        let mut iter = input.chars();
-        let mut getter = || iter.next();
-        let mut stream = Stream::from(&mut getter);
-
         let fjr = FormatJobRunner::build(&spec).unwrap();
 
         //exercise
-        let res = fjr.format(&mut stream);
+        let res = fjr.format(FormatJob::from_text("a".to_string()));
 
         //verify
         assert!(res.is_err());

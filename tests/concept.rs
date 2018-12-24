@@ -1,6 +1,6 @@
 extern crate padd;
 
-use padd::{FormatJobRunner, Stream};
+use padd::{FormatJobRunner, FormatJob};
 
 #[test]
 fn test_def_input_matcher() {
@@ -21,14 +21,11 @@ acc -> ACC;
     ".to_string();
 
     let input = "abasdfergrthergerghera".to_string();
-    let mut iter = input.chars();
-    let mut getter = || iter.next();
-    let mut stream = Stream::from(&mut getter);
 
     let fjr = FormatJobRunner::build(&spec).unwrap();
 
     //exercise
-    let res = fjr.format(&mut stream).unwrap();
+    let res = fjr.format(FormatJob::from_text(input)).unwrap();
 
     //verify
     assert_eq!(res,
@@ -58,14 +55,11 @@ acc -> ACC;
     ".to_string();
 
     let input = "aaaa \t \n  a aa  aa ".to_string();
-    let mut iter = input.chars();
-    let mut getter = || iter.next();
-    let mut stream = Stream::from(&mut getter);
 
     let fjr = FormatJobRunner::build(&spec).unwrap();
 
     //exercise
-    let res = fjr.format(&mut stream).unwrap();
+    let res = fjr.format(FormatJob::from_text(input)).unwrap();
 
     //verify
     assert_eq!(res, "aaaa a aa aa");
@@ -91,14 +85,11 @@ fn test_advanced_operators() {
             -> IN ``;".to_string();
 
     let input = "i ij ijjjijijiji inj in iii".to_string();
-    let mut iter = input.chars();
-    let mut getter = || iter.next();
-    let mut stream = Stream::from(&mut getter);
 
     let fjr = FormatJobRunner::build(&spec).unwrap();
 
     //exercise
-    let res = fjr.format(&mut stream).unwrap();
+    let res = fjr.format(FormatJob::from_text(input)).unwrap();
 
     //verify
     assert_eq!(res, "iijijjjijijijiinjiii");
@@ -121,14 +112,11 @@ b -> B `\n{}\n`;
     ".to_string();
 
     let input = "ababaaaaababaaba".to_string();
-    let mut iter = input.chars();
-    let mut getter = || iter.next();
-    let mut stream = Stream::from(&mut getter);
 
     let fjr = FormatJobRunner::build(&spec).unwrap();
 
     //exercise
-    let res = fjr.format(&mut stream).unwrap();
+    let res = fjr.format(FormatJob::from_text(input)).unwrap();
 
     //verify
     assert_eq!(res, "a\nb\na\nb\naaaaa\nb\na\nb\naa\nb\na");
@@ -151,14 +139,11 @@ b -> B [b] `\n{} {}`;
     ".to_string();
 
     let input = "abbbabaaaabbbbababaaba".to_string();
-    let mut iter = input.chars();
-    let mut getter = || iter.next();
-    let mut stream = Stream::from(&mut getter);
 
     let fjr = FormatJobRunner::build(&spec).unwrap();
 
     //exercise
-    let res = fjr.format(&mut stream).unwrap();
+    let res = fjr.format(FormatJob::from_text(input)).unwrap();
 
     //verify
     assert_eq!(res, "a\nb \nb \nb a\nb aaaa\nb \nb \nb \nb a\nb a\nb aa\nb a");
@@ -178,14 +163,11 @@ s -> [A] [B];
     ".to_string();
 
     let input = "ab".to_string();
-    let mut iter = input.chars();
-    let mut getter = || iter.next();
-    let mut stream = Stream::from(&mut getter);
 
     let fjr = FormatJobRunner::build(&spec).unwrap();
 
     //exercise
-    let res = fjr.format(&mut stream).unwrap();
+    let res = fjr.format(FormatJob::from_text(input)).unwrap();
 
     //verify
     assert_eq!(res, "ab");
@@ -210,14 +192,11 @@ b -> LBRACKET s RBRACKET `[prefix]{}{;prefix=[prefix]\t}[prefix]{}`;
     ".to_string();
 
     let input = " {{} }  { {}}".to_string();
-    let mut iter = input.chars();
-    let mut getter = || iter.next();
-    let mut stream = Stream::from(&mut getter);
 
     let fjr = FormatJobRunner::build(&spec).unwrap();
 
     //exercise
-    let res = fjr.format(&mut stream).unwrap();
+    let res = fjr.format(FormatJob::from_text(input)).unwrap();
 
     //verify
     assert_eq!(res, "[@LAYER s=[@LAYER s= b={[@LAYER s= b=\t{\t}]}] b={[@LAYER s= b=\t{\t}]}]");
@@ -240,14 +219,11 @@ s `{} {}`
     ".to_string();
 
     let input = "abbaba".to_string();
-    let mut iter = input.chars();
-    let mut getter = || iter.next();
-    let mut stream = Stream::from(&mut getter);
 
     let fjr = FormatJobRunner::build(&spec).unwrap();
 
     //exercise
-    let res = fjr.format(&mut stream).unwrap();
+    let res = fjr.format(FormatJob::from_text(input)).unwrap();
 
     //verify
     assert_eq!(res, "SEPARATED: a b b a b a");
@@ -276,14 +252,11 @@ last
     ".to_string();
 
     let input = "abcdefghijklmnopqrstuvwxyz".to_string();
-    let mut iter = input.chars();
-    let mut getter = || iter.next();
-    let mut stream = Stream::from(&mut getter);
 
     let fjr = FormatJobRunner::build(&spec).unwrap();
 
     //exercise
-    let res = fjr.format(&mut stream).unwrap();
+    let res = fjr.format(FormatJob::from_text(input)).unwrap();
 
     //verify
     assert_eq!(res, "lmnopqrstuvwxyz abcdefghijk");

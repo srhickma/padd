@@ -5,7 +5,8 @@ extern crate regex;
 extern crate stopwatch;
 
 use {
-    padd::{self, FormatJobRunner, Stream, ThreadPool},
+    cli::thread_pool::ThreadPool,
+    padd::{self, FormatJob, FormatJobRunner},
     std::{
         cmp,
         fs::{self, File, OpenOptions},
@@ -32,6 +33,7 @@ use self::{
 };
 
 mod logger;
+mod thread_pool;
 
 const TRACKER_DIR: &str = ".padd";
 const TRACKER_EXTENSION: &str = ".trk";
@@ -430,33 +432,15 @@ fn format_file_internal(target_path: &Path, fjr: &FormatJobRunner) -> bool {
             let mut target = target_file.unwrap();
 
             let result = {
-                let mut reader = BufReader::new(&target);
+                let mut text = String::new();
 
-                let mut buffer: Vec<char> = Vec::new();
-                let mut cursor: usize = 0;
+                if let Err(err) = target.read_to_string(&mut text) {
+                    logger::fatal(format!(
+                        "Could not read target file \"{}\": {}", target_path_string, err
+                    ));
+                }
 
-                let mut getter = &mut || {
-                    if let Some(c) = buffer.get(cursor) {
-                        cursor += 1;
-                        return Some(*c);
-                    }
-
-                    let mut in_buf = String::new();
-                    if let Err(err) = reader.read_line(&mut in_buf) {
-                        logger::fmt_err(format!(
-                            "Could not read target file \"{}\": {}", target_path_string, err
-                        ));
-                        return None;
-                    }
-
-                    buffer = in_buf.chars().collect();
-                    cursor = 1;
-                    in_buf.chars().next()
-                };
-
-                let mut stream = Stream::from(&mut getter);
-
-                fjr.format(&mut stream)
+                fjr.format(FormatJob::from_text(text))
             };
 
             match result {
