@@ -145,8 +145,6 @@ impl From<parse::Error> for FormatError {
     }
 }
 
-pub type ThreadPool<Payload> = core::util::thread_pool::ThreadPool<Payload>;
-
 #[cfg(test)]
 mod tests {
     use std::error::Error;

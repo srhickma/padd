@@ -5,7 +5,8 @@ extern crate regex;
 extern crate stopwatch;
 
 use {
-    padd::{self, FormatJob, FormatJobRunner, ThreadPool},
+    cli::thread_pool::ThreadPool,
+    padd::{self, FormatJob, FormatJobRunner},
     std::{
         cmp,
         fs::{self, File, OpenOptions},
@@ -32,6 +33,7 @@ use self::{
 };
 
 mod logger;
+mod thread_pool;
 
 const TRACKER_DIR: &str = ".padd";
 const TRACKER_EXTENSION: &str = ".trk";
