@@ -56,6 +56,56 @@ enum S {
     FAIL,
 }
 
+lazy_static! {
+    static ref SPEC_GRAMMAR: Grammar = build_spec_grammar();
+}
+
+fn build_spec_grammar() -> Grammar {
+    let productions = parse::build_prods(&[
+        "spec dfa gram",
+        "dfa CILC states",
+        "states states state",
+        "states state",
+        "state sdec transopt SEMI",
+        "sdec targets",
+        "sdec targets HAT ID",
+        "sdec targets HAT DEF",
+        "targets ID",
+        "targets targets OR ID",
+        "transopt trans",
+        "transopt ",
+        "trans trans tran",
+        "trans tran",
+        "tran mtcs ARROW trand",
+        "tran DEF ARROW trand",
+        "trand ID",
+        "trand HAT ID",
+        "trand HAT DEF",
+        "mtcs mtcs OR mtc",
+        "mtcs mtc",
+        "mtc CILC",
+        "mtc CILC RANGE CILC",
+        "gram prods",
+        "prods prods prod",
+        "prods prod",
+        "prod ID pattopt rhss SEMI",
+        "rhss rhss rhs",
+        "rhss rhs",
+        "rhs ARROW ids pattopt",
+        "pattopt PATTC",
+        "pattopt ",
+        "ids ids ID",
+        "ids ids COPTID",
+        "ids ",
+    ]);
+
+    let mut builder = GrammarBuilder::new();
+    builder.try_mark_start(&productions.first().unwrap().lhs);
+    builder.add_productions(productions.clone());
+    builder.build()
+}
+
+
 thread_local! {
     static SPEC_DFA: DFA<S> = {
         let delta: fn(S, char) -> S = |state, c| match (state, c) {
@@ -156,71 +206,6 @@ thread_local! {
             start: S::START,
             td: Box::new(CompileTransitionDelta::build(delta, tokenizer, S::FAIL)),
         }
-    };
-}
-
-lazy_static! {
-    static ref SPEC_PRODUCTIONS: Vec<Production> = parse::build_prods(&[
-            "spec dfa gram",
-
-            "dfa CILC states",
-
-            "states states state",
-            "states state",
-
-            "state sdec transopt SEMI",
-
-            "sdec targets",
-            "sdec targets HAT ID",
-            "sdec targets HAT DEF",
-
-            "targets ID",
-            "targets targets OR ID",
-
-            "transopt trans",
-            "transopt ",
-
-            "trans trans tran",
-            "trans tran",
-
-            "tran mtcs ARROW trand",
-            "tran DEF ARROW trand",
-
-            "trand ID",
-            "trand HAT ID",
-            "trand HAT DEF",
-
-            "mtcs mtcs OR mtc",
-            "mtcs mtc",
-
-            "mtc CILC",
-            "mtc CILC RANGE CILC",
-
-            "gram prods",
-
-            "prods prods prod",
-            "prods prod",
-
-            "prod ID pattopt rhss SEMI",
-
-            "rhss rhss rhs",
-            "rhss rhs",
-
-            "rhs ARROW ids pattopt",
-
-            "pattopt PATTC",
-            "pattopt ",
-
-            "ids ids ID",
-            "ids ids COPTID",
-            "ids ",
-        ]);
-
-    static ref SPEC_GRAMMAR: Grammar = {
-        let mut builder = GrammarBuilder::new();
-        builder.try_mark_start(&SPEC_PRODUCTIONS.first().unwrap().lhs);
-        builder.add_productions(SPEC_PRODUCTIONS.clone());
-        builder.build()
     };
 }
 
