@@ -65,6 +65,16 @@ impl<State: Eq + Hash + Clone, Kind: Default + Clone> EncodedCDFABuilder<State, 
             })
             .collect()
     }
+
+    pub fn state<'scope, 'state: 'scope>(
+        &'scope mut self,
+        state: &'state State,
+    ) -> EncodedCDFAStateBuilder<'scope, 'state, State, Kind> {
+        EncodedCDFAStateBuilder {
+            ecdfa_builder: self,
+            state,
+        }
+    }
 }
 
 impl<State: Eq + Hash + Clone, Kind: Default + Clone> CDFABuilder<State, Kind, EncodedCDFA<Kind>>
@@ -207,6 +217,62 @@ for EncodedCDFABuilder<State, Kind> {
         self.mark_accepting(state);
         let state_encoded = self.encode(state);
         self.tokenizer.insert(state_encoded, token.clone());
+        self
+    }
+}
+
+pub struct EncodedCDFAStateBuilder<
+    'scope,
+    'state: 'scope,
+    State: 'state + Eq + Hash + Clone,
+    Kind: 'scope + Default + Clone
+> {
+    ecdfa_builder: &'scope mut EncodedCDFABuilder<State, Kind>,
+    state: &'state State,
+}
+
+impl<'scope, 'state: 'scope, State: 'state + Eq + Hash + Clone, Kind: 'scope + Default + Clone>
+EncodedCDFAStateBuilder<'scope, 'state, State, Kind> {
+    pub fn mark_accepting(&mut self) -> &mut Self {
+        self.ecdfa_builder.mark_accepting(self.state);
+        self
+    }
+
+    pub fn mark_trans(
+        &mut self,
+        to: &State,
+        on: char,
+    ) -> Result<&mut Self, CDFAError> {
+        self.ecdfa_builder.mark_trans(self.state, to, on)?;
+        Ok(self)
+    }
+
+    pub fn mark_chain(
+        &mut self,
+        to: &State,
+        on: impl Iterator<Item=char>,
+    ) -> Result<&mut Self, CDFAError> {
+        self.ecdfa_builder.mark_chain(self.state, to, on)?;
+        Ok(self)
+    }
+
+    pub fn mark_range(
+        &mut self,
+        to: &State,
+        start: char,
+        end: char,
+    ) -> Result<&mut Self, CDFAError> {
+        self.ecdfa_builder.mark_range(self.state, to, start, end)?;
+        Ok(self)
+    }
+
+    pub fn mark_def(&mut self, to: &State) -> Result<&mut Self, CDFAError> {
+        self.ecdfa_builder.mark_def(self.state, to)?;
+        Ok(self)
+    }
+
+    pub fn mark_token(&mut self, token: &Kind) -> &mut Self {
+        self.ecdfa_builder.mark_token(self.state, token);
         self
     }
 }

@@ -67,52 +67,56 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<String>, scan::CDFAError> {
     builder.set_alphabet(SPEC_ALPHABET.chars());
     builder.mark_start(&S::START);
 
-    builder
-        .mark_trans(&S::START, &S::HAT, '^')?
-        .mark_trans(&S::START, &S::MINUS, '-')?
-        .mark_trans(&S::START, &S::BSLASH, '\\')?
-        .mark_trans(&S::START, &S::PATT, '`')?
-        .mark_trans(&S::START, &S::CIL, '\'')?
-        .mark_trans(&S::START, &S::COMMENT, '#')?
-        .mark_trans(&S::START, &S::SEMI, ';')?
-        .mark_trans(&S::START, &S::DEF, '_')?
-        .mark_trans(&S::START, &S::OR, '|')?
-        .mark_trans(&S::START, &S::OPTID, '[')?
-        .mark_trans(&S::START, &S::DOT, '.')?
-        .mark_trans(&S::START, &S::WS, ' ')?
-        .mark_trans(&S::START, &S::WS, '\t')?
-        .mark_trans(&S::START, &S::WS, '\n')?
-        .mark_range(&S::START, &S::ID, '0', 'Z')?;
+    builder.state(&S::START)
+        .mark_trans(&S::HAT, '^')?
+        .mark_trans(&S::MINUS, '-')?
+        .mark_trans(&S::BSLASH, '\\')?
+        .mark_trans(&S::PATT, '`')?
+        .mark_trans(&S::CIL, '\'')?
+        .mark_trans(&S::COMMENT, '#')?
+        .mark_trans(&S::SEMI, ';')?
+        .mark_trans(&S::DEF, '_')?
+        .mark_trans(&S::OR, '|')?
+        .mark_trans(&S::OPTID, '[')?
+        .mark_trans(&S::DOT, '.')?
+        .mark_trans(&S::WS, ' ')?
+        .mark_trans(&S::WS, '\t')?
+        .mark_trans(&S::WS, '\n')?
+        .mark_range(&S::ID, '0', 'Z')?;
 
     builder.mark_trans(&S::MINUS, &S::ARROW, '>')?;
 
-    builder
-        .mark_trans(&S::OPTID, &S::COPTID, ']')?
-        .mark_range(&S::OPTID, &S::OPTID, '_', 'Z')?;
+    builder.state(&S::OPTID)
+        .mark_trans(&S::COPTID, ']')?
+        .mark_range(&S::OPTID, '_', 'Z')?;
 
-    builder.mark_range(&S::ID, &S::ID, '_', 'Z')?;
+    builder.state(&S::ID)
+        .mark_range(&S::ID, '_', 'Z')?
+        .mark_token(&"ID".to_string());
 
-    builder
-        .mark_trans(&S::WS, &S::WS, ' ')?
-        .mark_trans(&S::WS, &S::WS, '\t')?
-        .mark_trans(&S::WS, &S::WS, '\n')?;
+    builder.state(&S::WS)
+        .mark_trans(&S::WS, ' ')?
+        .mark_trans(&S::WS, '\t')?
+        .mark_trans(&S::WS, '\n')?
+        .mark_accepting();
 
-    builder
-        .mark_trans(&S::PATT, &S::PATTC, '`')?
-        .mark_def(&S::PATT, &S::PATT)?;
+    builder.state(&S::PATT)
+        .mark_trans(&S::PATTC, '`')?
+        .mark_def(&S::PATT)?;
 
-    builder
-        .mark_trans(&S::CIL, &S::CILC, '\'')?
-        .mark_trans(&S::CIL, &S::CILBS, '\\')?
-        .mark_def(&S::CIL, &S::CIL)?;
+    builder.state(&S::CIL)
+        .mark_trans(&S::CILC, '\'')?
+        .mark_trans(&S::CILBS, '\\')?
+        .mark_def(&S::CIL)?;
 
     builder.mark_def(&S::CILBS, &S::CIL)?;
 
     builder.mark_trans(&S::DOT, &S::RANGE, '.')?;
 
-    builder
-        .mark_trans(&S::COMMENT, &S::FAIL, '\n')?
-        .mark_def(&S::COMMENT, &S::COMMENT)?;
+    builder.state(&S::COMMENT)
+        .mark_trans(&S::FAIL, '\n')?
+        .mark_def(&S::COMMENT)?
+        .mark_accepting();
 
     builder
         .mark_token(&S::HAT, &"HAT".to_string())
@@ -120,14 +124,11 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<String>, scan::CDFAError> {
         .mark_token(&S::PATTC, &"PATTC".to_string())
         .mark_token(&S::CILC, &"CILC".to_string())
         .mark_token(&S::CILC, &"CILC".to_string())
-        .mark_token(&S::ID, &"ID".to_string())
         .mark_token(&S::COPTID, &"COPTID".to_string())
         .mark_token(&S::DEF, &"DEF".to_string())
         .mark_token(&S::SEMI, &"SEMI".to_string())
         .mark_token(&S::OR, &"OR".to_string())
-        .mark_token(&S::RANGE, &"RANGE".to_string())
-        .mark_accepting(&S::COMMENT)
-        .mark_accepting(&S::WS);
+        .mark_token(&S::RANGE, &"RANGE".to_string());
 
     builder.build()
 }
