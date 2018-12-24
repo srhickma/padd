@@ -3,7 +3,6 @@ use {
     std::{error, fmt},
 };
 
-pub mod compile;
 pub mod runtime;
 
 static FAIL_SEQUENCE_LENGTH: usize = 10;

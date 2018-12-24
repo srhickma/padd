@@ -12,10 +12,8 @@ use {
         },
         scan::{
             self,
-            compile::{self, CompileTransitionDelta, DFA},
             runtime::{
                 self,
-                CDFA,
                 CDFABuilder,
                 ecdfa::{EncodedCDFA, EncodedCDFABuilder},
             },
@@ -81,11 +79,11 @@ fn build_pattern_ecdfa() -> Result<EncodedCDFA<String>, runtime::CDFAError> {
         .mark_trans(&S::FILLER, &S::FAIL, '=')?
         .mark_def(&S::FILLER, &S::FILLER)?;
 
-    builder.mark_def(&S::ESC, &S::FILLER);
+    builder.mark_def(&S::ESC, &S::FILLER)?;
 
-    builder.mark_range(&S::NUM, &S::NUM, '0', '9');
+    builder.mark_range(&S::NUM, &S::NUM, '0', '9')?;
 
-    builder.mark_range(&S::ALPHA, &S::ALPHA, 'a', 'Z');
+    builder.mark_range(&S::ALPHA, &S::ALPHA, 'a', 'Z')?;
 
     builder
         .mark_token(&S::SEMI, &"SEMI".to_string())
@@ -243,7 +241,6 @@ fn parse_decl(decl: &Tree, prod: &Production) -> Result<Declaration, BuildError>
 
 fn parse_pattern(input: &str) -> Result<Tree, BuildError> {
     PATTERN_ECDFA.with(|cdfa| -> Result<Tree, BuildError> {
-        let mut index = 0;
         let mut iter = input.chars();
         let mut getter = || iter.next();
         let mut source = StreamSource::observe(&mut getter);
