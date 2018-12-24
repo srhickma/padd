@@ -7,7 +7,8 @@ use {
         scan::{
             self,
             FAIL_SEQUENCE_LENGTH,
-            runtime::{CDFA, Scanner},
+            CDFA,
+            Scanner,
             Token,
         },
     },

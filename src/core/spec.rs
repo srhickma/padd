@@ -10,13 +10,10 @@ use {
         },
         scan::{
             self,
+            CDFA,
+            CDFABuilder,
+            ecdfa::{EncodedCDFA, EncodedCDFABuilder},
             Kind,
-            runtime::{
-                self,
-                CDFA,
-                CDFABuilder,
-                ecdfa::{EncodedCDFA, EncodedCDFABuilder},
-            },
             State,
         },
         util::string_utils,
@@ -64,7 +61,7 @@ lazy_static! {
     static ref SPEC_GRAMMAR: Grammar = build_spec_grammar();
 }
 
-fn build_spec_ecdfa() -> Result<EncodedCDFA<String>, runtime::CDFAError> {
+fn build_spec_ecdfa() -> Result<EncodedCDFA<String>, scan::CDFAError> {
     let mut builder: EncodedCDFABuilder<S, String> = EncodedCDFABuilder::new();
 
     builder.set_alphabet(SPEC_ALPHABET.chars());
@@ -193,7 +190,7 @@ pub fn generate_spec(parse: &Tree) -> Result<(EncodedCDFA<Kind>, Grammar, Format
 pub enum GenError {
     MatcherErr(String),
     MappingErr(String),
-    CDFAErr(runtime::CDFAError),
+    CDFAErr(scan::CDFAError),
     PatternErr(fmt::BuildError),
 }
 
@@ -219,8 +216,8 @@ impl error::Error for GenError {
     }
 }
 
-impl From<runtime::CDFAError> for GenError {
-    fn from(err: runtime::CDFAError) -> GenError {
+impl From<scan::CDFAError> for GenError {
+    fn from(err: scan::CDFAError) -> GenError {
         GenError::CDFAErr(err)
     }
 }
@@ -549,7 +546,7 @@ pub fn parse_spec(input: &str) -> Result<Tree, ParseError> {
         let mut getter = || iter.next();
         let mut source = StreamSource::observe(&mut getter);
 
-        let tokens = runtime::def_scanner().scan(&mut source, cdfa)?;
+        let tokens = scan::def_scanner().scan(&mut source, cdfa)?;
         let parse = parse::def_parser().parse(tokens, &SPEC_GRAMMAR)?;
         Ok(parse)
     })
@@ -883,7 +880,7 @@ w -> WHITESPACE ``;
         };
         let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
 
-        let scanner = runtime::def_scanner();
+        let scanner = scan::def_scanner();
         let parser = parse::def_parser();
 
         //specification
@@ -959,7 +956,7 @@ w -> WHITESPACE ``;
         };
         let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
 
-        let scanner = runtime::def_scanner();
+        let scanner = scan::def_scanner();
 
         let tree = parse_spec(spec);
         let parse = tree.unwrap();
@@ -1008,7 +1005,7 @@ s ->;
         };
         let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
 
-        let scanner = runtime::def_scanner();
+        let scanner = scan::def_scanner();
 
         let tree = parse_spec(spec);
         let parse = tree.unwrap();
@@ -1056,7 +1053,7 @@ ids
         };
         let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
 
-        let scanner = runtime::def_scanner();
+        let scanner = scan::def_scanner();
 
         let tree = parse_spec(spec);
         let parse = tree.unwrap();
@@ -1102,7 +1099,7 @@ s -> ;";
         };
         let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
 
-        let scanner = runtime::def_scanner();
+        let scanner = scan::def_scanner();
         let tree = parse_spec(spec);
         let parse = tree.unwrap();
         let (cdfa, _, _) = generate_spec(&parse).unwrap();
@@ -1356,7 +1353,7 @@ s -> A [B] s
         };
         let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
 
-        let scanner = runtime::def_scanner();
+        let scanner = scan::def_scanner();
         let tree = parse_spec(spec);
         let parse = tree.unwrap();
         let (cdfa, grammar, _) = generate_spec(&parse).unwrap();
@@ -1508,7 +1505,7 @@ s -> ;";
         let mut getter = || iter.next();
         let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
 
-        let scanner = runtime::def_scanner();
+        let scanner = scan::def_scanner();
         let tree = parse_spec(spec);
         let parse = tree.unwrap();
         let (cdfa, _, _) = generate_spec(&parse).unwrap();

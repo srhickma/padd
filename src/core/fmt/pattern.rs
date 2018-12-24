@@ -12,11 +12,8 @@ use {
         },
         scan::{
             self,
-            runtime::{
-                self,
-                CDFABuilder,
-                ecdfa::{EncodedCDFA, EncodedCDFABuilder},
-            },
+            CDFABuilder,
+            ecdfa::{EncodedCDFA, EncodedCDFABuilder},
         },
         util::string_utils,
     },
@@ -51,7 +48,7 @@ lazy_static! {
     static ref PATTERN_GRAMMAR: Grammar = build_pattern_grammar();
 }
 
-fn build_pattern_ecdfa() -> Result<EncodedCDFA<String>, runtime::CDFAError> {
+fn build_pattern_ecdfa() -> Result<EncodedCDFA<String>, scan::CDFAError> {
     let mut builder: EncodedCDFABuilder<S, String> = EncodedCDFABuilder::new();
 
     builder.set_alphabet(PATTERN_ALPHABET.chars());
@@ -245,7 +242,7 @@ fn parse_pattern(input: &str) -> Result<Tree, BuildError> {
         let mut getter = || iter.next();
         let mut source = StreamSource::observe(&mut getter);
 
-        let tokens = runtime::def_scanner().scan(&mut source, cdfa)?;
+        let tokens = scan::def_scanner().scan(&mut source, cdfa)?;
         let parse = parse::def_parser().parse(tokens, &PATTERN_GRAMMAR)?;
         Ok(parse)
     })

@@ -4,7 +4,7 @@ use {
             map::{CEHashMap, CEHashMapIterator},
             stream::StreamConsumer,
         },
-        scan::runtime::{
+        scan::{
             alphabet::HashedAlphabet,
             CDFA,
             CDFABuilder,
@@ -403,7 +403,7 @@ mod tests {
             Data,
             stream::StreamSource,
         },
-        scan::{runtime, Token},
+        scan::{self, Token},
     };
 
     use super::*;
@@ -437,7 +437,7 @@ mod tests {
 
         let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
 
-        let scanner = runtime::def_scanner();
+        let scanner = scan::def_scanner();
 
         //exercise
         let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
@@ -487,7 +487,7 @@ NZ <- '11010101'
 
         let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
 
-        let scanner = runtime::def_scanner();
+        let scanner = scan::def_scanner();
 
         //exercise
         let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
@@ -547,7 +547,7 @@ RBR <- '}'
 
         let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
 
-        let scanner = runtime::def_scanner();
+        let scanner = scan::def_scanner();
 
         //exercise
         let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
@@ -603,7 +603,7 @@ RBR <- '}'
 
         let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
 
-        let scanner = runtime::def_scanner();
+        let scanner = scan::def_scanner();
 
         //exercise
         let result = scanner.scan(&mut stream, &cdfa);
@@ -650,7 +650,7 @@ RBR <- '}'
 
         let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
 
-        let scanner = runtime::def_scanner();
+        let scanner = scan::def_scanner();
 
         //exercise
         let result = scanner.scan(&mut stream, &cdfa);
@@ -690,7 +690,7 @@ RBR <- '}'
 
         let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
 
-        let scanner = runtime::def_scanner();
+        let scanner = scan::def_scanner();
 
         //exercise
         let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
@@ -737,7 +737,7 @@ FIVE <- 'five'
 
         let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
 
-        let scanner = runtime::def_scanner();
+        let scanner = scan::def_scanner();
 
         //exercise
         let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
