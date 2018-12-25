@@ -6,8 +6,8 @@ use {
         },
         scan::{
             self,
-            FAIL_SEQUENCE_LENGTH,
             CDFA,
+            FAIL_SEQUENCE_LENGTH,
             Scanner,
             Token,
         },
@@ -26,23 +26,26 @@ impl<State: Data, Kind: Data> Scanner<State, Kind> for MaximalMunchScanner {
         struct ScanOneResult<State> {
             scanned: String,
             end_state: Option<State>,
+            next_start: Option<State>,
             line: usize,
             character: usize,
         }
 
         fn scan_one<State: Data, Kind: Data>(
             stream_source: &mut StreamSource<char>,
+            start: State,
             line: usize,
             character: usize,
             cdfa: &CDFA<State, Kind>,
         ) -> ScanOneResult<State> {
-            let mut state: State = cdfa.start();
+            let mut state: State = start;
             let mut line: usize = line;
             let mut character: usize = character;
 
             let mut last_accepting = ScanOneResult {
                 scanned: String::new(),
                 end_state: None,
+                next_start: None,
                 line,
                 character,
             };
@@ -77,6 +80,7 @@ impl<State: Data, Kind: Data> Scanner<State, Kind> for MaximalMunchScanner {
                             last_accepting = ScanOneResult {
                                 scanned: consumed.iter().collect(),
                                 end_state: Some(next.clone()),
+                                next_start: cdfa.accepts_to(&next),
                                 line,
                                 character,
                             };
@@ -97,12 +101,23 @@ impl<State: Data, Kind: Data> Scanner<State, Kind> for MaximalMunchScanner {
         }
 
         let mut tokens: Vec<Token<Kind>> = vec![];
+        let mut next_start = cdfa.start();
         let mut line: usize = 1;
         let mut character: usize = 1;
 
         loop {
-            let result: ScanOneResult<State> = scan_one(stream_source, line, character, cdfa);
+            let result: ScanOneResult<State> = scan_one(
+                stream_source,
+                next_start,
+                line,
+                character,
+                cdfa
+            );
 
+            next_start = match result.next_start {
+                None => cdfa.start(),
+                Some(state) => state
+            };
             line = result.line;
             character = result.character;
 

@@ -92,43 +92,43 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<String>, scan::CDFAError> {
 
     builder.state(&S::ID)
         .mark_range(&S::ID, '_', 'Z')?
-        .mark_token(&"ID".to_string());
+        .tokenize(&"ID".to_string());
 
     builder.state(&S::WS)
         .mark_trans(&S::WS, ' ')?
         .mark_trans(&S::WS, '\t')?
         .mark_trans(&S::WS, '\n')?
-        .mark_accepting();
+        .accept();
 
     builder.state(&S::PATT)
         .mark_trans(&S::PATTC, '`')?
-        .mark_def(&S::PATT)?;
+        .default_to(&S::PATT)?;
 
     builder.state(&S::CIL)
         .mark_trans(&S::CILC, '\'')?
         .mark_trans(&S::CILBS, '\\')?
-        .mark_def(&S::CIL)?;
+        .default_to(&S::CIL)?;
 
-    builder.mark_def(&S::CILBS, &S::CIL)?;
+    builder.default_to(&S::CILBS, &S::CIL)?;
 
     builder.mark_trans(&S::DOT, &S::RANGE, '.')?;
 
     builder.state(&S::COMMENT)
         .mark_trans(&S::FAIL, '\n')?
-        .mark_def(&S::COMMENT)?
-        .mark_accepting();
+        .default_to(&S::COMMENT)?
+        .accept();
 
     builder
-        .mark_token(&S::HAT, &"HAT".to_string())
-        .mark_token(&S::ARROW, &"ARROW".to_string())
-        .mark_token(&S::PATTC, &"PATTC".to_string())
-        .mark_token(&S::CILC, &"CILC".to_string())
-        .mark_token(&S::CILC, &"CILC".to_string())
-        .mark_token(&S::COPTID, &"COPTID".to_string())
-        .mark_token(&S::DEF, &"DEF".to_string())
-        .mark_token(&S::SEMI, &"SEMI".to_string())
-        .mark_token(&S::OR, &"OR".to_string())
-        .mark_token(&S::RANGE, &"RANGE".to_string());
+        .tokenize(&S::HAT, &"HAT".to_string())
+        .tokenize(&S::ARROW, &"ARROW".to_string())
+        .tokenize(&S::PATTC, &"PATTC".to_string())
+        .tokenize(&S::CILC, &"CILC".to_string())
+        .tokenize(&S::CILC, &"CILC".to_string())
+        .tokenize(&S::COPTID, &"COPTID".to_string())
+        .tokenize(&S::DEF, &"DEF".to_string())
+        .tokenize(&S::SEMI, &"SEMI".to_string())
+        .tokenize(&S::OR, &"OR".to_string())
+        .tokenize(&S::RANGE, &"RANGE".to_string());
 
     builder.build()
 }
@@ -321,7 +321,7 @@ fn generate_cdfa_trans<CDFABuilderType, CDFAType>(
             generate_cdfa_mtcs(matcher, sources, dest, builder)?;
         }
         "DEF" => for source in sources {
-            builder.mark_def(source, dest)?;
+            builder.default_to(source, dest)?;
         },
         &_ => panic!("Transition map input is neither CILC or DEF"),
     }
@@ -413,9 +413,9 @@ fn add_cdfa_tokenizer<CDFABuilderType, CDFAType>(
     CDFAType: CDFA<usize, String>,
     CDFABuilderType: CDFABuilder<String, String, CDFAType>
 {
-    builder.mark_accepting(state);
+    builder.accept(state);
     if kind != DEF_MATCHER {
-        builder.mark_token(state, kind);
+        builder.tokenize(state, kind);
     }
 }
 

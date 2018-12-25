@@ -30,6 +30,7 @@ pub trait CDFA<State, Kind> {
     fn transition(&self, state: &State, stream: &mut StreamConsumer<char>) -> Option<State>;
     fn has_transition(&self, state: &State, stream: &mut StreamConsumer<char>) -> bool;
     fn accepts(&self, state: &State) -> bool;
+    fn accepts_to(&self, state: &State) -> Option<State>;
     fn tokenize(&self, state: &State) -> Option<Kind>;
     fn start(&self) -> State;
 }
@@ -39,7 +40,8 @@ pub trait CDFABuilder<State, Kind, CDFAType> {
     fn build(self) -> Result<CDFAType, CDFAError>;
 
     fn set_alphabet(&mut self, chars: impl Iterator<Item=char>) -> &mut Self;
-    fn mark_accepting(&mut self, state: &State) -> &mut Self;
+    fn accept(&mut self, state: &State) -> &mut Self;
+    fn accept_to(&mut self, state: &State, to: &State) -> &mut Self;
     fn mark_start(&mut self, state: &State) -> &mut Self;
     fn mark_trans(&mut self, from: &State, to: &State, on: char) -> Result<&mut Self, CDFAError>;
     fn mark_chain(
@@ -62,8 +64,8 @@ pub trait CDFABuilder<State, Kind, CDFAType> {
         start: char,
         end: char,
     ) -> Result<&mut Self, CDFAError>;
-    fn mark_def(&mut self, from: &State, to: &State) -> Result<&mut Self, CDFAError>;
-    fn mark_token(&mut self, state: &State, token: &Kind) -> &mut Self;
+    fn default_to(&mut self, from: &State, to: &State) -> Result<&mut Self, CDFAError>;
+    fn tokenize(&mut self, state: &State, token: &Kind) -> &mut Self;
 }
 
 #[derive(Debug)]

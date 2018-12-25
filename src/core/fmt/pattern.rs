@@ -65,7 +65,7 @@ fn build_pattern_ecdfa() -> Result<EncodedCDFA<String>, scan::CDFAError> {
         .mark_trans(&S::ZERO, '0')?
         .mark_range(&S::NUM, '1', '9')?
         .mark_range(&S::ALPHA, 'a', 'Z')?
-        .mark_def(&S::FILLER)?;
+        .default_to(&S::FILLER)?;
 
     builder.state(&S::FILLER)
         .mark_trans(&S::ESC, '\\')?
@@ -74,27 +74,27 @@ fn build_pattern_ecdfa() -> Result<EncodedCDFA<String>, scan::CDFAError> {
         .mark_trans(&S::FAIL, '[')?
         .mark_trans(&S::FAIL, ';')?
         .mark_trans(&S::FAIL, '=')?
-        .mark_def(&S::FILLER)?
-        .mark_token(&"FILLER".to_string());
+        .default_to(&S::FILLER)?
+        .tokenize(&"FILLER".to_string());
 
-    builder.mark_def(&S::ESC, &S::FILLER)?;
+    builder.default_to(&S::ESC, &S::FILLER)?;
 
     builder.state(&S::NUM)
         .mark_range(&S::NUM, '0', '9')?
-        .mark_token(&"NUM".to_string());
+        .tokenize(&"NUM".to_string());
 
     builder.state(&S::ALPHA)
         .mark_range(&S::ALPHA, 'a', 'Z')?
-        .mark_token(&"ALPHA".to_string());
+        .tokenize(&"ALPHA".to_string());
 
     builder
-        .mark_token(&S::SEMI, &"SEMI".to_string())
-        .mark_token(&S::EQ, &"EQ".to_string())
-        .mark_token(&S::LBRACE, &"LBRACE".to_string())
-        .mark_token(&S::RBRACE, &"RBRACE".to_string())
-        .mark_token(&S::LBRACKET, &"LBRACKET".to_string())
-        .mark_token(&S::RBRACKET, &"RBRACKET".to_string())
-        .mark_token(&S::ZERO, &"NUM".to_string());
+        .tokenize(&S::SEMI, &"SEMI".to_string())
+        .tokenize(&S::EQ, &"EQ".to_string())
+        .tokenize(&S::LBRACE, &"LBRACE".to_string())
+        .tokenize(&S::RBRACE, &"RBRACE".to_string())
+        .tokenize(&S::LBRACKET, &"LBRACKET".to_string())
+        .tokenize(&S::RBRACKET, &"RBRACKET".to_string())
+        .tokenize(&S::ZERO, &"NUM".to_string());
 
     builder.build()
 }
