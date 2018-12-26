@@ -1054,6 +1054,44 @@ A <- 'a'
 ");
     }
 
+    #[test]
+    fn accept_from_all_twice() {
+        //setup
+        #[derive(PartialEq, Eq, Hash, Clone, Debug)]
+        enum S {
+            Start,
+            A,
+            LastA,
+        }
+
+        let mut builder: EncodedCDFABuilder<S, String> = EncodedCDFABuilder::new();
+        builder
+            .set_alphabet("a".chars())
+            .mark_start(&S::Start);
+        builder.mark_trans(&S::Start, &S::A, 'a').unwrap();
+        builder.accept_to_from_all(&S::A, &S::LastA).unwrap();
+        builder.accept_to_from_all(&S::A, &S::Start).unwrap();
+        builder.state(&S::A).tokenize(&"A".to_string());
+
+        let cdfa: EncodedCDFA<String> = builder.build().unwrap();
+
+        let input = "aa".to_string();
+        let mut iter = input.chars();
+        let mut getter = || iter.next();
+        let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
+
+        let scanner = scan::def_scanner();
+
+        //exercise
+        let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
+
+        //verify
+        assert_eq!(tokens_string(&tokens), "\
+A <- 'a'
+A <- 'a'
+");
+    }
+
     fn tokens_string<Kind: Data>(tokens: &Vec<Token<Kind>>) -> String {
         let mut result = String::new();
         for token in tokens {
