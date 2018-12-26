@@ -549,7 +549,7 @@ impl AcceptorDestinationMux {
     ) -> Result<(), CDFAError> {
         if self.all.is_some() {
             return Err(CDFAError::BuildErr(format!(
-                "State '{:?}' already has an acceptance destination from all incoming states", state
+                "State {:?} already has an acceptance destination from all incoming states", state
             )));
         }
 
@@ -562,7 +562,7 @@ impl AcceptorDestinationMux {
                 let entry = mux.get(&from_encoded);
                 if entry.is_some() && *entry.unwrap() != dest_encoded {
                     return Err(CDFAError::BuildErr(format!(
-                        "State '{:?}' is accepted multiple times with different destinations", state
+                        "State {:?} is accepted multiple times with different destinations", state
                     )));
                 }
             }
@@ -580,19 +580,11 @@ impl AcceptorDestinationMux {
     ) -> Result<(), CDFAError> {
         if self.mux.is_some() {
             return Err(CDFAError::BuildErr(format!(
-                "State '{:?}' already has an acceptance destination from a specific state", state
+                "State {:?} already has an acceptance destination from a specific state", state
             )));
         }
 
-        if self.all.is_some() {
-            if self.all.unwrap() != dest_encoded {
-                return Err(CDFAError::BuildErr(format!(
-                    "State '{:?}' is accepted multiple times with different destinations", state
-                )));
-            }
-        } else {
-            self.all = Some(dest_encoded)
-        }
+        self.all = Some(dest_encoded);
 
         Ok(())
     }

@@ -239,7 +239,8 @@ s -> ACC;
         let mut err: &Error = &res.err().unwrap();
         assert_eq!(
             format!("{}", err),
-            "Failed to parse specification: Scan error: No accepting scans after (2,5): ~\n\nstart \'..."
+            "Failed to parse specification: Scan error: No accepting scans after (2,5): \
+            ~\n\nstart \'..."
         );
 
         err = err.cause().unwrap();
@@ -275,7 +276,8 @@ s -> B;
         let mut err: &Error = &res.err().unwrap();
         assert_eq!(
             format!("{}", err),
-            "Failed to parse specification: Parse error: Recognition failed at token 1: ID <- 'start'"
+            "Failed to parse specification: Parse error: Recognition failed at token 1: \
+            ID <- 'start'"
         );
 
         err = err.cause().unwrap();
@@ -347,7 +349,8 @@ s ->;
         let mut err: &Error = &res.err().unwrap();
         assert_eq!(
             format!("{}", err),
-            "Failed to generate specification: ECDFA generation error: Failed to build CDFA: Default matcher used twice"
+            "Failed to generate specification: ECDFA generation error: Failed to build CDFA: \
+            Default matcher used twice"
         );
 
         err = err.cause().unwrap();
@@ -553,5 +556,134 @@ s -> ORPHANED;
         assert!(err.cause().is_none());
     }
 
-    //TODO test failures for re-mapping acceptances
+    #[test]
+    fn failed_cdfa_different_destinations() {
+        //setup
+        let spec = "
+'a'
+
+start
+    'a' -> ^A -> x
+    _ -> ^A -> y;
+
+s ->;
+    ".to_string();
+
+        //exercise
+        let res = FormatJobRunner::build(&spec);
+
+        //verify
+        assert!(res.is_err());
+
+        let mut err: &Error = &res.err().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "Failed to generate specification: ECDFA generation error: Failed to build CDFA: \
+            State \"A\" is accepted multiple times with different destinations"
+        );
+
+        err = err.cause().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "ECDFA generation error: Failed to build CDFA: \
+            State \"A\" is accepted multiple times with different destinations"
+        );
+
+        err = err.cause().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "Failed to build CDFA: \
+            State \"A\" is accepted multiple times with different destinations"
+        );
+
+        assert!(err.cause().is_none());
+    }
+
+    #[test]
+    fn failed_cdfa_existing_acceptor_destination() {
+        //setup
+        let spec = "
+''
+
+start
+    _ -> ^A -> x;
+
+A   ^A -> y;
+
+s ->;
+    ".to_string();
+
+        //exercise
+        let res = FormatJobRunner::build(&spec);
+
+        //verify
+        assert!(res.is_err());
+
+        let mut err: &Error = &res.err().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "Failed to generate specification: ECDFA generation error: Failed to build CDFA: \
+            State \"A\" already has an acceptance destination from all incoming states"
+        );
+
+        err = err.cause().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "ECDFA generation error: Failed to build CDFA: \
+            State \"A\" already has an acceptance destination from all incoming states"
+        );
+
+        err = err.cause().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "Failed to build CDFA: \
+            State \"A\" already has an acceptance destination from all incoming states"
+        );
+
+        assert!(err.cause().is_none());
+    }
+
+    #[test]
+    fn failed_cdfa_existing_acceptor_destination_from_all() {
+        //setup
+        let spec = "
+''
+
+A   ^A -> y;
+
+start
+    _ -> ^A -> x;
+
+s ->;
+    ".to_string();
+
+        //exercise
+        let res = FormatJobRunner::build(&spec);
+
+        //verify
+        assert!(res.is_err());
+
+        let mut err: &Error = &res.err().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "Failed to generate specification: ECDFA generation error: Failed to build CDFA: \
+            State \"A\" already has an acceptance destination from a specific state"
+        );
+
+        err = err.cause().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "ECDFA generation error: Failed to build CDFA: \
+            State \"A\" already has an acceptance destination from a specific state"
+        );
+
+        err = err.cause().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "Failed to build CDFA: \
+            State \"A\" already has an acceptance destination from a specific state"
+        );
+
+        assert!(err.cause().is_none());
+    }
 }
