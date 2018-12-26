@@ -261,3 +261,116 @@ last
     //verify
     assert_eq!(res, "lmnopqrstuvwxyz abcdefghijk");
 }
+
+#[test]
+fn test_online_context_sensitive_scanner() {
+    //setup
+    let spec = "
+'a!123456789'
+
+start
+    'a' -> a
+    '!' -> ^_ -> hidden;
+
+a       ^A
+    'a' -> a;
+
+hidden
+    '1' .. '9' -> num
+    '!' -> ^_;
+
+num     ^NUM -> hidden
+    '1' .. '9' -> num;
+
+s
+    -> [regions];
+
+regions
+    -> regions region `{} {}`
+    -> region;
+
+region
+    -> A
+    -> NUM;
+    ".to_string();
+
+    let input = "!!aaa!!a!49913!a".to_string();
+
+    let fjr = FormatJobRunner::build(&spec).unwrap();
+
+    //exercise
+    let res = fjr.format(FormatJob::from_text(input)).unwrap();
+
+    //verify
+    assert_eq!(res, "aaa a 49913 a");
+}
+
+#[test]
+fn test_region_based_scanner() {
+    //setup
+    let spec = "
+'abcdefghijklmnopqrstuvwxyz0123456789{}'
+
+start
+    'region1' -> ^R1_DEC -> r1_dec
+    'region2' -> ^R2_DEC -> r2_dec;
+
+r1_dec
+   '{' -> ^LBRACE_R1 -> r1_body;
+
+r2_dec
+   '{' -> ^LBRACE_R2 -> r2_body;
+
+r1_body
+    'a' -> ^A -> r1_body
+    'b' -> ^B -> r1_body
+    '}' -> ^RBRACE;
+
+r2_body
+    '0' .. '9' -> num
+    '}' -> ^RBRACE;
+
+num     ^NUM -> r2_body
+    '0' .. '9' -> num;
+
+s
+    -> [regions];
+
+regions
+    -> regions region `{}\\n{}`
+    -> region;
+
+region
+    -> region1
+    -> region2;
+
+region1
+    -> R1_DEC LBRACE_R1 abs RBRACE `{} {}\\n\\t{}\\n{}`;
+
+abs
+    -> abs A
+    -> abs B
+    -> ;
+
+region2
+    -> R2_DEC LBRACE_R2 [NUM] RBRACE `{} {}\\n\\t{}\\n{}`;
+    ".to_string();
+
+    let input = "region1{abaaba}region1{bb}region2{558905}".to_string();
+
+    let fjr = FormatJobRunner::build(&spec).unwrap();
+
+    //exercise
+    let res = fjr.format(FormatJob::from_text(input)).unwrap();
+
+    //verify
+    assert_eq!(res, "region1 {
+\tabaaba
+}
+region1 {
+\tbb
+}
+region2 {
+\t558905
+}");
+}
