@@ -80,7 +80,7 @@ impl<State: Data, Kind: Data> Scanner<State, Kind> for MaximalMunchScanner {
                             last_accepting = ScanOneResult {
                                 scanned: consumed.iter().collect(),
                                 end_state: Some(next.clone()),
-                                next_start: cdfa.accepts_to(&next),
+                                next_start: cdfa.acceptor_destination(&next, &state),
                                 line,
                                 character,
                             };
@@ -111,13 +111,14 @@ impl<State: Data, Kind: Data> Scanner<State, Kind> for MaximalMunchScanner {
                 next_start,
                 line,
                 character,
-                cdfa
+                cdfa,
             );
 
             next_start = match result.next_start {
                 None => cdfa.start(),
                 Some(state) => state
             };
+
             line = result.line;
             character = result.character;
 

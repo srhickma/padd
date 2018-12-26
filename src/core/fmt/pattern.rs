@@ -23,7 +23,7 @@ use {
 static PATTERN_ALPHABET: &'static str =
     "{}[];=0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ \n\t`~!@#$%^&*()_-+:'\"<>,.?/\\|";
 
-#[derive(PartialEq, Eq, Hash, Clone)]
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
 enum S {
     START,
     LBRACE,
@@ -75,17 +75,29 @@ fn build_pattern_ecdfa() -> Result<EncodedCDFA<String>, scan::CDFAError> {
         .mark_trans(&S::FAIL, ';')?
         .mark_trans(&S::FAIL, '=')?
         .default_to(&S::FILLER)?
+        .accept()
         .tokenize(&"FILLER".to_string());
 
     builder.default_to(&S::ESC, &S::FILLER)?;
 
     builder.state(&S::NUM)
         .mark_range(&S::NUM, '0', '9')?
+        .accept()
         .tokenize(&"NUM".to_string());
 
     builder.state(&S::ALPHA)
         .mark_range(&S::ALPHA, 'a', 'Z')?
+        .accept()
         .tokenize(&"ALPHA".to_string());
+
+    builder
+        .accept(&S::SEMI)
+        .accept(&S::EQ)
+        .accept(&S::LBRACE)
+        .accept(&S::RBRACE)
+        .accept(&S::LBRACKET)
+        .accept(&S::RBRACKET)
+        .accept(&S::ZERO);
 
     builder
         .tokenize(&S::SEMI, &"SEMI".to_string())

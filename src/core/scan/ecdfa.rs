@@ -13,24 +13,25 @@ use {
     },
     std::{
         collections::HashMap,
+        fmt::Debug,
         hash::Hash,
         usize,
     },
 };
 
-pub struct EncodedCDFABuilder<State: Eq + Hash + Clone, Kind: Default + Clone> {
+pub struct EncodedCDFABuilder<State: Eq + Hash + Clone + Debug, Kind: Default + Clone> {
     encoder: HashMap<State, usize>,
     decoder: Vec<State>,
     alphabet_str: String,
 
     alphabet: HashedAlphabet,
-    accepting: HashMap<usize, Option<usize>>,
+    accepting: HashMap<usize, AcceptorDestinationMux>,
     t_delta: CEHashMap<TransitionTrie>,
     tokenizer: CEHashMap<Kind>,
     start: usize,
 }
 
-impl<State: Eq + Hash + Clone, Kind: Default + Clone> EncodedCDFABuilder<State, Kind> {
+impl<State: Eq + Hash + Clone + Debug, Kind: Default + Clone> EncodedCDFABuilder<State, Kind> {
     fn encode(&mut self, val: &State) -> usize {
         if self.encoder.contains_key(val) {
             *self.encoder.get(val).unwrap()
@@ -77,8 +78,8 @@ impl<State: Eq + Hash + Clone, Kind: Default + Clone> EncodedCDFABuilder<State, 
     }
 }
 
-impl<State: Eq + Hash + Clone, Kind: Default + Clone> CDFABuilder<State, Kind, EncodedCDFA<Kind>>
-for EncodedCDFABuilder<State, Kind> {
+impl<State: Eq + Hash + Clone + Debug, Kind: Default + Clone>
+CDFABuilder<State, Kind, EncodedCDFA<Kind>> for EncodedCDFABuilder<State, Kind> {
     fn new() -> Self {
         EncodedCDFABuilder {
             encoder: HashMap::new(),
@@ -119,15 +120,53 @@ for EncodedCDFABuilder<State, Kind> {
 
     fn accept(&mut self, state: &State) -> &mut Self {
         let state_encoded = self.encode(state);
-        self.accepting.insert(state_encoded, None);
+
+        if self.accepting.contains_key(&state_encoded) {
+            return self;
+        }
+
+        self.accepting.insert(state_encoded, AcceptorDestinationMux::new());
         self
     }
 
-    fn accept_to(&mut self, state: &State, to: &State) -> &mut Self {
+    fn accept_to(
+        &mut self,
+        state: &State,
+        from: &State,
+        to: &State,
+    ) -> Result<&mut Self, CDFAError> {
+        let state_encoded = self.encode(state);
+        let from_encoded = self.encode(from);
+        let to_encoded = self.encode(to);
+
+        if !self.accepting.contains_key(&state_encoded) {
+            let mut accd_mux = AcceptorDestinationMux::new();
+            accd_mux.add_from(state, to_encoded, from_encoded)?;
+            self.accepting.insert(state_encoded, accd_mux);
+        } else if let Some(ref mut accd_mux) = self.accepting.get_mut(&state_encoded) {
+            accd_mux.add_from(state, to_encoded, from_encoded)?;
+        }
+
+        Ok(self)
+    }
+
+    fn accept_to_from_all(
+        &mut self,
+        state: &State,
+        to: &State,
+    ) -> Result<&mut Self, CDFAError> {
         let state_encoded = self.encode(state);
         let to_encoded = self.encode(to);
-        self.accepting.insert(state_encoded, Some(to_encoded));
-        self
+
+        if !self.accepting.contains_key(&state_encoded) {
+            let mut accd_mux = AcceptorDestinationMux::new();
+            accd_mux.add_from_all(state, to_encoded)?;
+            self.accepting.insert(state_encoded, accd_mux);
+        } else if let Some(ref mut accd_mux) = self.accepting.get_mut(&state_encoded) {
+            accd_mux.add_from_all(state, to_encoded)?;
+        }
+
+        Ok(self)
     }
 
     fn mark_start(&mut self, state: &State) -> &mut Self {
@@ -221,7 +260,6 @@ for EncodedCDFABuilder<State, Kind> {
     }
 
     fn tokenize(&mut self, state: &State, token: &Kind) -> &mut Self {
-        self.accept(state);
         let state_encoded = self.encode(state);
         self.tokenizer.insert(state_encoded, token.clone());
         self
@@ -231,23 +269,27 @@ for EncodedCDFABuilder<State, Kind> {
 pub struct EncodedCDFAStateBuilder<
     'scope,
     'state: 'scope,
-    State: 'state + Eq + Hash + Clone,
+    State: 'state + Eq + Hash + Clone + Debug,
     Kind: 'scope + Default + Clone
 > {
     ecdfa_builder: &'scope mut EncodedCDFABuilder<State, Kind>,
     state: &'state State,
 }
 
-impl<'scope, 'state: 'scope, State: 'state + Eq + Hash + Clone, Kind: 'scope + Default + Clone>
-EncodedCDFAStateBuilder<'scope, 'state, State, Kind> {
+impl<
+    'scope,
+    'state: 'scope,
+    State: 'state + Eq + Hash + Clone + Debug,
+    Kind: 'scope + Default + Clone
+> EncodedCDFAStateBuilder<'scope, 'state, State, Kind> {
     pub fn accept(&mut self) -> &mut Self {
         self.ecdfa_builder.accept(self.state);
         self
     }
 
-    pub fn accept_to(&mut self, to: &State) -> &mut Self {
-        self.ecdfa_builder.accept_to(self.state, to);
-        self
+    pub fn accept_to_from_all(&mut self, to: &State) -> Result<&mut Self, CDFAError> {
+        self.ecdfa_builder.accept_to_from_all(self.state, to)?;
+        Ok(self)
     }
 
     pub fn mark_trans(
@@ -293,7 +335,7 @@ pub struct EncodedCDFA<Kind: Default + Clone> {
     //TODO add separate error message if character not in alphabet
     #[allow(dead_code)]
     alphabet: HashedAlphabet,
-    accepting: HashMap<usize, Option<usize>>,
+    accepting: HashMap<usize, AcceptorDestinationMux>,
     t_delta: CEHashMap<TransitionTrie>,
     tokenizer: CEHashMap<Kind>,
     start: usize,
@@ -324,10 +366,15 @@ impl<Kind: Default + Clone> CDFA<usize, Kind> for EncodedCDFA<Kind> {
         self.accepting.contains_key(state)
     }
 
-    fn accepts_to(&self, state: &usize) -> Option<usize> {
+    fn acceptor_destination(&self, state: &usize, from: &usize) -> Option<usize> {
         match self.accepting.get(state) {
             None => None,
-            Some(state_opt) => state_opt.clone()
+            Some(accd_mux) => {
+                match accd_mux.get_destination(*from) {
+                    None => None,
+                    Some(destination) => Some(destination.clone())
+                }
+            }
         }
     }
 
@@ -481,6 +528,89 @@ impl TransitionNode {
     }
 }
 
+struct AcceptorDestinationMux {
+    mux: Option<HashMap<usize, usize>>,
+    all: Option<usize>,
+}
+
+impl AcceptorDestinationMux {
+    fn new() -> Self {
+        AcceptorDestinationMux {
+            mux: None,
+            all: None,
+        }
+    }
+
+    fn add_from<State: Debug>(
+        &mut self,
+        state: &State,
+        dest_encoded: usize,
+        from_encoded: usize,
+    ) -> Result<(), CDFAError> {
+        if self.all.is_some() {
+            return Err(CDFAError::BuildErr(format!(
+                "State '{:?}' already has an acceptance destination from all incoming states", state
+            )));
+        }
+
+        if !self.mux.is_some() {
+            let mut mux = HashMap::new();
+            mux.insert(from_encoded, dest_encoded);
+            self.mux = Some(mux);
+        } else if let Some(ref mut mux) = self.mux {
+            {
+                let entry = mux.get(&from_encoded);
+                if entry.is_some() && *entry.unwrap() != dest_encoded {
+                    return Err(CDFAError::BuildErr(format!(
+                        "State '{:?}' is accepted multiple times with different destinations", state
+                    )));
+                }
+            }
+
+            mux.insert(from_encoded, dest_encoded);
+        }
+
+        Ok(())
+    }
+
+    fn add_from_all<State: Debug>(
+        &mut self,
+        state: &State,
+        dest_encoded: usize,
+    ) -> Result<(), CDFAError> {
+        if self.mux.is_some() {
+            return Err(CDFAError::BuildErr(format!(
+                "State '{:?}' already has an acceptance destination from a specific state", state
+            )));
+        }
+
+        if self.all.is_some() {
+            if self.all.unwrap() != dest_encoded {
+                return Err(CDFAError::BuildErr(format!(
+                    "State '{:?}' is accepted multiple times with different destinations", state
+                )));
+            }
+        } else {
+            self.all = Some(dest_encoded)
+        }
+
+        Ok(())
+    }
+
+    fn get_destination(&self, from_encoded: usize) -> Option<usize> {
+        if let Some(dest) = self.all {
+            Some(dest)
+        } else if let Some(ref mux) = self.mux {
+            match mux.get(&from_encoded) {
+                None => None,
+                Some(dest) => Some(dest.clone())
+            }
+        } else {
+            None
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use core::{
@@ -505,8 +635,10 @@ mod tests {
             .mark_trans(&"notzero".to_string(), '1').unwrap();
         builder.state(&"notzero".to_string())
             .default_to(&"notzero".to_string()).unwrap()
+            .accept()
             .tokenize(&"NZ".to_string());
         builder
+            .accept(&"zero".to_string())
             .tokenize(&"zero".to_string(), &"ZERO".to_string());
 
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
@@ -550,9 +682,12 @@ NZ <- '11010101'
             .mark_trans(&"ws".to_string(), ' ').unwrap()
             .mark_trans(&"ws".to_string(), '\t').unwrap()
             .mark_trans(&"ws".to_string(), '\n').unwrap()
+            .accept()
             .tokenize(&"WS".to_string());
         builder
+            .accept(&"lbr".to_string())
             .tokenize(&"lbr".to_string(), &"LBR".to_string())
+            .accept(&"rbr".to_string())
             .tokenize(&"rbr".to_string(), &"RBR".to_string());
 
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
@@ -609,7 +744,9 @@ RBR <- '}'
             .mark_trans(&"ws".to_string(), '\n').unwrap()
             .accept();
         builder
+            .accept(&"lbr".to_string())
             .tokenize(&"lbr".to_string(), &"LBR".to_string())
+            .accept(&"rbr".to_string())
             .tokenize(&"rbr".to_string(), &"RBR".to_string());
 
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
@@ -662,7 +799,9 @@ RBR <- '}'
             .mark_trans(&"ws".to_string(), '\n').unwrap()
             .accept();
         builder
+            .accept(&"lbr".to_string())
             .tokenize(&"lbr".to_string(), &"LBR".to_string())
+            .accept(&"rbr".to_string())
             .tokenize(&"rbr".to_string(), &"RBR".to_string());
 
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
@@ -706,7 +845,9 @@ RBR <- '}'
             .mark_trans(&"ws".to_string(), '\n').unwrap()
             .accept();
         builder
+            .accept(&"lbr".to_string())
             .tokenize(&"lbr".to_string(), &"LBR".to_string())
+            .accept(&"rbr".to_string())
             .tokenize(&"rbr".to_string(), &"RBR".to_string());
 
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
@@ -742,7 +883,9 @@ RBR <- '}'
             .mark_chain(&"four".to_string(), "four".chars()).unwrap()
             .mark_chain(&"five".to_string(), "five".chars()).unwrap();
         builder
+            .accept(&"four".to_string())
             .tokenize(&"four".to_string(), &"FOUR".to_string())
+            .accept(&"five".to_string())
             .tokenize(&"five".to_string(), &"FIVE".to_string());
 
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
@@ -783,7 +926,9 @@ FIVE <- 'five'
             .mark_chain(&"FOR".to_string(), "for".chars()).unwrap()
             .default_to(&"id".to_string()).unwrap();
         builder
+            .accept(&"FOR".to_string())
             .tokenize(&"FOR".to_string(), &"FOR".to_string())
+            .accept(&"id".to_string())
             .tokenize(&"id".to_string(), &"ID".to_string());
         builder
             .default_to(&"id".to_string(), &"id".to_string()).unwrap();
@@ -811,7 +956,7 @@ ID <- 'fdk'
     #[test]
     fn scan_context_sensitive() {
         //setup
-        #[derive(PartialEq, Eq, Hash, Clone)]
+        #[derive(PartialEq, Eq, Hash, Clone, Debug)]
         enum S {
             Start,
             A,
@@ -830,19 +975,20 @@ ID <- 'fdk'
             .mark_trans(&S::BangIn, '!').unwrap();
         builder.state(&S::A)
             .mark_trans(&S::A, 'a').unwrap()
-            .tokenize(&"A".to_string());
+            .tokenize(&"A".to_string())
+            .accept();
         builder.state(&S::BangIn)
             .tokenize(&"BANG".to_string())
-            .accept_to(&S::Hidden);
+            .accept_to_from_all(&S::Hidden).unwrap();
         builder.state(&S::BangOut)
             .tokenize(&"BANG".to_string())
-            .accept_to(&S::Start);
+            .accept();
         builder.state(&S::Hidden)
             .mark_range(&S::Num, '1', '9').unwrap()
             .mark_trans(&S::BangOut, '!').unwrap();
         builder.state(&S::Num)
             .tokenize(&"NUM".to_string())
-            .accept_to(&S::Hidden);
+            .accept_to_from_all(&S::Hidden).unwrap();
 
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
 
@@ -871,6 +1017,47 @@ NUM <- '9'
 NUM <- '1'
 NUM <- '3'
 BANG <- '!'
+A <- 'a'
+");
+    }
+
+    #[test]
+    fn multiple_acceptor_destinations() {
+        //setup
+        #[derive(PartialEq, Eq, Hash, Clone, Debug)]
+        enum S {
+            Start,
+            A,
+            LastA,
+        }
+
+        let mut builder: EncodedCDFABuilder<S, String> = EncodedCDFABuilder::new();
+        builder
+            .set_alphabet("a".chars())
+            .mark_start(&S::Start);
+        builder.mark_trans(&S::Start, &S::A, 'a').unwrap();
+        builder.accept_to(&S::A, &S::Start, &S::LastA).unwrap();
+        builder.mark_trans(&S::LastA, &S::A, 'a').unwrap();
+        builder.accept_to(&S::A, &S::LastA, &S::Start).unwrap();
+        builder.state(&S::A).tokenize(&"A".to_string());
+
+        let cdfa: EncodedCDFA<String> = builder.build().unwrap();
+
+        let input = "aaaa".to_string();
+        let mut iter = input.chars();
+        let mut getter = || iter.next();
+        let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
+
+        let scanner = scan::def_scanner();
+
+        //exercise
+        let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
+
+        //verify
+        assert_eq!(tokens_string(&tokens), "\
+A <- 'a'
+A <- 'a'
+A <- 'a'
 A <- 'a'
 ");
     }

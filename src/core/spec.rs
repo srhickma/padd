@@ -28,7 +28,7 @@ use {
 static SPEC_ALPHABET: &'static str = "`-=~!@#$%^&*()+{}|[]\\;':\"<>?,./_0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ \n\t";
 pub static DEF_MATCHER: &'static str = "_";
 
-#[derive(PartialEq, Eq, Hash, Clone)]
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
 enum S {
     START,
     HAT,
@@ -92,6 +92,7 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<String>, scan::CDFAError> {
 
     builder.state(&S::ID)
         .mark_range(&S::ID, '_', 'Z')?
+        .accept()
         .tokenize(&"ID".to_string());
 
     builder.state(&S::WS)
@@ -119,6 +120,18 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<String>, scan::CDFAError> {
         .accept();
 
     builder
+        .accept(&S::HAT)
+        .accept(&S::ARROW)
+        .accept(&S::PATTC)
+        .accept(&S::CILC)
+        .accept(&S::CILC)
+        .accept(&S::COPTID)
+        .accept(&S::DEF)
+        .accept(&S::SEMI)
+        .accept(&S::OR)
+        .accept(&S::RANGE);
+
+    builder
         .tokenize(&S::HAT, &"HAT".to_string())
         .tokenize(&S::ARROW, &"ARROW".to_string())
         .tokenize(&S::PATTC, &"PATTC".to_string())
@@ -139,21 +152,22 @@ fn build_spec_grammar() -> Grammar {
         "dfa CILC states",
         "states states state",
         "states state",
-        "state sdec transopt SEMI",
+        "state sdec trans_opt SEMI",
         "sdec targets",
-        "sdec targets HAT ID",
-        "sdec targets HAT DEF",
+        "sdec targets acceptor",
+        "acceptor HAT id_or_def accd_opt",
+        "accd_opt ARROW ID",
+        "accd_opt ",
         "targets ID",
         "targets targets OR ID",
-        "transopt trans",
-        "transopt ",
+        "trans_opt trans",
+        "trans_opt ",
         "trans trans tran",
         "trans tran",
         "tran mtcs ARROW trand",
         "tran DEF ARROW trand",
         "trand ID",
-        "trand HAT ID",
-        "trand HAT DEF",
+        "trand acceptor",
         "mtcs mtcs OR mtc",
         "mtcs mtc",
         "mtc CILC",
@@ -161,15 +175,17 @@ fn build_spec_grammar() -> Grammar {
         "gram prods",
         "prods prods prod",
         "prods prod",
-        "prod ID pattopt rhss SEMI",
+        "prod ID patt_opt rhss SEMI",
         "rhss rhss rhs",
         "rhss rhs",
-        "rhs ARROW ids pattopt",
-        "pattopt PATTC",
-        "pattopt ",
+        "rhs ARROW ids patt_opt",
+        "patt_opt PATTC",
+        "patt_opt ",
         "ids ids ID",
         "ids ids COPTID",
         "ids ",
+        "id_or_def ID",
+        "id_or_def DEF"
     ]);
 
     let mut builder = GrammarBuilder::new();
@@ -271,11 +287,13 @@ fn generate_cdfa_states<CDFABuilderType, CDFAType>(
         generate_cdfa_targets(targets_node.get_child(0), &mut states);
     }
 
-    if sdec_node.children.len() == 3 {
-        let end = &sdec_node.get_child(2).lhs.lexeme;
+    if sdec_node.children.len() == 2 {
+        let acceptor_node = sdec_node.get_child(1);
+        let id_or_def_node = acceptor_node.get_child(1);
+        let token = &id_or_def_node.get_child(0).lhs.lexeme;
 
         for state in &states {
-            add_cdfa_tokenizer(*state, end, builder);
+            add_cdfa_tokenizer(acceptor_node, *state, None, token, builder)?;
         }
     }
 
@@ -313,7 +331,23 @@ fn generate_cdfa_trans<CDFABuilderType, CDFAType>(
     let tran_node = trans_node.get_child(trans_node.children.len() - 1);
 
     let trand_node = tran_node.get_child(2);
-    let dest: &State = &trand_node.get_child(trand_node.children.len() - 1).lhs.lexeme;
+
+    let dest = match &trand_node.get_child(0).lhs.kind[..] {
+        "ID" => &trand_node.get_child(0).lhs.lexeme,
+        "acceptor" => {
+            let acceptor_node = trand_node.get_child(0);
+            let id_or_def_node = acceptor_node.get_child(1);
+            let token = &id_or_def_node.get_child(0).lhs.lexeme;
+
+            // Immediate state pass-through
+            for source in sources {
+                add_cdfa_tokenizer(acceptor_node, token, Some(*source), token, builder)?;
+            }
+
+            token
+        }
+        kind => panic!("Unexpected transition destination kind: {}", kind)
+    };
 
     let matcher = tran_node.get_child(0);
     match &matcher.lhs.kind[..] {
@@ -324,10 +358,6 @@ fn generate_cdfa_trans<CDFABuilderType, CDFAType>(
             builder.default_to(source, dest)?;
         },
         &_ => panic!("Transition map input is neither CILC or DEF"),
-    }
-
-    if trand_node.children.len() == 2 { //Immediate state pass-through
-        add_cdfa_tokenizer(dest, dest, builder);
     }
 
     if trans_node.children.len() == 2 {
@@ -406,17 +436,30 @@ fn generate_cdfa_mtcs<CDFABuilderType, CDFAType>(
 }
 
 fn add_cdfa_tokenizer<CDFABuilderType, CDFAType>(
+    acceptor_node: &Tree,
     state: &State,
+    from: Option<&State>,
     kind: &String,
     builder: &mut CDFABuilderType,
-) where
+) -> Result<(), GenError> where
     CDFAType: CDFA<usize, String>,
     CDFABuilderType: CDFABuilder<String, String, CDFAType>
 {
-    builder.accept(state);
+    let accd_opt_node = acceptor_node.get_child(2);
+    if accd_opt_node.is_empty() {
+        builder.accept(state);
+    } else {
+        let acceptor_destination = &accd_opt_node.get_child(1).lhs.lexeme;
+        match from {
+            None => builder.accept_to_from_all(state, acceptor_destination)?,
+            Some(from_state) => builder.accept_to(state, from_state, acceptor_destination)?
+        };
+    }
+
     if kind != DEF_MATCHER {
         builder.tokenize(state, kind);
     }
+    Ok(())
 }
 
 fn traverse_grammar(tree: &Tree) -> Result<(Grammar, Formatter), GenError> {
@@ -591,9 +634,12 @@ impl From<parse::Error> for ParseError {
 
 #[cfg(test)]
 mod tests {
-    use core::data::{
-        Data,
-        stream::StreamSource,
+    use core::{
+        data::{
+            Data,
+            stream::StreamSource,
+        },
+        scan::Token,
     };
 
     use super::*;
@@ -604,10 +650,10 @@ mod tests {
         let input = "' 'start;s->s b;";
 
         //exercise
-        let tree = parse_spec(input);
+        let tree = parse_spec(input).unwrap();
 
         //verify
-        assert_eq!(tree.unwrap().to_string(),
+        assert_eq!(tree.to_string(),
                    "└── spec
     ├── dfa
     │   ├── CILC <- '' ''
@@ -616,14 +662,14 @@ mod tests {
     │           ├── sdec
     │           │   └── targets
     │           │       └── ID <- 'start'
-    │           ├── transopt
+    │           ├── trans_opt
     │           │   └──  <- 'NULL'
     │           └── SEMI <- ';'
     └── gram
         └── prods
             └── prod
                 ├── ID <- 's'
-                ├── pattopt
+                ├── patt_opt
                 │   └──  <- 'NULL'
                 ├── rhss
                 │   └── rhs
@@ -634,7 +680,7 @@ mod tests {
                 │       │   │   │   └──  <- 'NULL'
                 │       │   │   └── ID <- 's'
                 │       │   └── ID <- 'b'
-                │       └── pattopt
+                │       └── patt_opt
                 │           └──  <- 'NULL'
                 └── SEMI <- ';'"
         );
@@ -688,7 +734,7 @@ w -> WHITESPACE `[prefix]{0}\n\n{1;prefix=[prefix]\t}[prefix]{2}\n\n`
     │       │   │   │       ├── sdec
     │       │   │   │       │   └── targets
     │       │   │   │       │       └── ID <- 'start'
-    │       │   │   │       ├── transopt
+    │       │   │   │       ├── trans_opt
     │       │   │   │       │   └── trans
     │       │   │   │       │       ├── trans
     │       │   │   │       │       │   ├── trans
@@ -734,9 +780,13 @@ w -> WHITESPACE `[prefix]{0}\n\n{1;prefix=[prefix]\t}[prefix]{2}\n\n`
     │       │   │       ├── sdec
     │       │   │       │   ├── targets
     │       │   │       │   │   └── ID <- 'ws'
-    │       │   │       │   ├── HAT <- '^'
-    │       │   │       │   └── ID <- 'WHITESPACE'
-    │       │   │       ├── transopt
+    │       │   │       │   └── acceptor
+    │       │   │       │       ├── HAT <- '^'
+    │       │   │       │       ├── id_or_def
+    │       │   │       │       │   └── ID <- 'WHITESPACE'
+    │       │   │       │       └── accd_opt
+    │       │   │       │           └──  <- 'NULL'
+    │       │   │       ├── trans_opt
     │       │   │       │   └── trans
     │       │   │       │       ├── trans
     │       │   │       │       │   ├── trans
@@ -766,18 +816,26 @@ w -> WHITESPACE `[prefix]{0}\n\n{1;prefix=[prefix]\t}[prefix]{2}\n\n`
     │       │       ├── sdec
     │       │       │   ├── targets
     │       │       │   │   └── ID <- 'lbr'
-    │       │       │   ├── HAT <- '^'
-    │       │       │   └── ID <- 'LBRACKET'
-    │       │       ├── transopt
+    │       │       │   └── acceptor
+    │       │       │       ├── HAT <- '^'
+    │       │       │       ├── id_or_def
+    │       │       │       │   └── ID <- 'LBRACKET'
+    │       │       │       └── accd_opt
+    │       │       │           └──  <- 'NULL'
+    │       │       ├── trans_opt
     │       │       │   └──  <- 'NULL'
     │       │       └── SEMI <- ';'
     │       └── state
     │           ├── sdec
     │           │   ├── targets
     │           │   │   └── ID <- 'rbr'
-    │           │   ├── HAT <- '^'
-    │           │   └── ID <- 'RBRACKET'
-    │           ├── transopt
+    │           │   └── acceptor
+    │           │       ├── HAT <- '^'
+    │           │       ├── id_or_def
+    │           │       │   └── ID <- 'RBRACKET'
+    │           │       └── accd_opt
+    │           │           └──  <- 'NULL'
+    │           ├── trans_opt
     │           │   └──  <- 'NULL'
     │           └── SEMI <- ';'
     └── gram
@@ -786,7 +844,7 @@ w -> WHITESPACE `[prefix]{0}\n\n{1;prefix=[prefix]\t}[prefix]{2}\n\n`
             │   ├── prods
             │   │   └── prod
             │   │       ├── ID <- 's'
-            │   │       ├── pattopt
+            │   │       ├── patt_opt
             │   │       │   └──  <- 'NULL'
             │   │       ├── rhss
             │   │       │   ├── rhss
@@ -798,18 +856,18 @@ w -> WHITESPACE `[prefix]{0}\n\n{1;prefix=[prefix]\t}[prefix]{2}\n\n`
             │   │       │   │       │   │   │   └──  <- 'NULL'
             │   │       │   │       │   │   └── ID <- 's'
             │   │       │   │       │   └── ID <- 'b'
-            │   │       │   │       └── pattopt
+            │   │       │   │       └── patt_opt
             │   │       │   │           └──  <- 'NULL'
             │   │       │   └── rhs
             │   │       │       ├── ARROW <- '->'
             │   │       │       ├── ids
             │   │       │       │   └──  <- 'NULL'
-            │   │       │       └── pattopt
+            │   │       │       └── patt_opt
             │   │       │           └──  <- 'NULL'
             │   │       └── SEMI <- ';'
             │   └── prod
             │       ├── ID <- 'b'
-            │       ├── pattopt
+            │       ├── patt_opt
             │       │   └──  <- 'NULL'
             │       ├── rhss
             │       │   ├── rhss
@@ -823,7 +881,7 @@ w -> WHITESPACE `[prefix]{0}\n\n{1;prefix=[prefix]\t}[prefix]{2}\n\n`
             │       │   │       │   │   │   └── ID <- 'LBRACKET'
             │       │   │       │   │   └── ID <- 's'
             │       │   │       │   └── ID <- 'RBRACKET'
-            │       │   │       └── pattopt
+            │       │   │       └── patt_opt
             │       │   │           └── PATTC <- '``'
             │       │   └── rhs
             │       │       ├── ARROW <- '->'
@@ -831,12 +889,12 @@ w -> WHITESPACE `[prefix]{0}\n\n{1;prefix=[prefix]\t}[prefix]{2}\n\n`
             │       │       │   ├── ids
             │       │       │   │   └──  <- 'NULL'
             │       │       │   └── ID <- 'w'
-            │       │       └── pattopt
+            │       │       └── patt_opt
             │       │           └──  <- 'NULL'
             │       └── SEMI <- ';'
             └── prod
                 ├── ID <- 'w'
-                ├── pattopt
+                ├── patt_opt
                 │   └──  <- 'NULL'
                 ├── rhss
                 │   └── rhs
@@ -845,7 +903,7 @@ w -> WHITESPACE `[prefix]{0}\n\n{1;prefix=[prefix]\t}[prefix]{2}\n\n`
                 │       │   ├── ids
                 │       │   │   └──  <- 'NULL'
                 │       │   └── ID <- 'WHITESPACE'
-                │       └── pattopt
+                │       └── patt_opt
                 │           └── PATTC <- '`[prefix]{0}\\n\\n{1;prefix=[prefix]\\t}[prefix]{2}\\n\\n`'
                 └── SEMI <- ';'"
         );
@@ -1016,12 +1074,7 @@ s ->;
         let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
 
         //verify
-        let mut res_string = String::new();
-        for token in tokens {
-            res_string = format!("{}\nkind={} lexeme={}", res_string, token.kind, token.lexeme);
-        }
-
-        assert_eq!(res_string, "\nkind=ID lexeme=c\nkind=WS lexeme= \nkind=ID lexeme=c")
+        assert_eq!(tokens_string(tokens), "\nkind=ID lexeme=c\nkind=WS lexeme= \nkind=ID lexeme=c")
     }
 
     #[test]
@@ -1064,12 +1117,7 @@ ids
         let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
 
         //verify
-        let mut res_string = String::new();
-        for token in tokens {
-            res_string = format!("{}\nkind={} lexeme={}", res_string, token.kind, token.lexeme);
-        }
-
-        assert_eq!(res_string, "\nkind=ID lexeme=a\nkind=ID lexeme=ababab\nkind=ID lexeme=_abab\nkind=ID lexeme=ab_abba_")
+        assert_eq!(tokens_string(tokens), "\nkind=ID lexeme=a\nkind=ID lexeme=ababab\nkind=ID lexeme=_abab\nkind=ID lexeme=ab_abba_")
     }
 
     #[test]
@@ -1109,12 +1157,7 @@ s -> ;";
         let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
 
         //verify
-        let mut res_string = String::new();
-        for token in tokens {
-            res_string = format!("{}\nkind={} lexeme={}", res_string, token.kind, token.lexeme);
-        }
-
-        assert_eq!(res_string, "
+        assert_eq!(tokens_string(tokens), "
 kind=ID lexeme=fdkgdfjgdjglkdjglkdjgljbnhbduhoifjeoigjeoghknhkjdfjgoirjt
 kind=FOR lexeme=for
 kind=IF lexeme=if
@@ -1171,7 +1214,7 @@ kind=ID lexeme=f")
     │       │   │       ├── sdec
     │       │   │       │   └── targets
     │       │   │       │       └── ID <- 'start'
-    │       │   │       ├── transopt
+    │       │   │       ├── trans_opt
     │       │   │       │   └── trans
     │       │   │       │       ├── trans
     │       │   │       │       │   └── tran
@@ -1185,14 +1228,18 @@ kind=ID lexeme=f")
     │       │   │       │           ├── DEF <- '_'
     │       │   │       │           ├── ARROW <- '->'
     │       │   │       │           └── trand
-    │       │   │       │               ├── HAT <- '^'
-    │       │   │       │               └── ID <- 'ID'
+    │       │   │       │               └── acceptor
+    │       │   │       │                   ├── HAT <- '^'
+    │       │   │       │                   ├── id_or_def
+    │       │   │       │                   │   └── ID <- 'ID'
+    │       │   │       │                   └── accd_opt
+    │       │   │       │                       └──  <- 'NULL'
     │       │   │       └── SEMI <- ';'
     │       │   └── state
     │       │       ├── sdec
     │       │       │   └── targets
     │       │       │       └── ID <- 'ki'
-    │       │       ├── transopt
+    │       │       ├── trans_opt
     │       │       │   └── trans
     │       │       │       └── tran
     │       │       │           ├── mtcs
@@ -1200,8 +1247,12 @@ kind=ID lexeme=f")
     │       │       │           │       └── CILC <- ''n''
     │       │       │           ├── ARROW <- '->'
     │       │       │           └── trand
-    │       │       │               ├── HAT <- '^'
-    │       │       │               └── ID <- 'IN'
+    │       │       │               └── acceptor
+    │       │       │                   ├── HAT <- '^'
+    │       │       │                   ├── id_or_def
+    │       │       │                   │   └── ID <- 'IN'
+    │       │       │                   └── accd_opt
+    │       │       │                       └──  <- 'NULL'
     │       │       └── SEMI <- ';'
     │       └── state
     │           ├── sdec
@@ -1210,7 +1261,7 @@ kind=ID lexeme=f")
     │           │       │   └── ID <- 'ID'
     │           │       ├── OR <- '|'
     │           │       └── ID <- 'ki'
-    │           ├── transopt
+    │           ├── trans_opt
     │           │   └── trans
     │           │       ├── trans
     │           │       │   └── tran
@@ -1230,7 +1281,7 @@ kind=ID lexeme=f")
         └── prods
             └── prod
                 ├── ID <- 's'
-                ├── pattopt
+                ├── patt_opt
                 │   └──  <- 'NULL'
                 ├── rhss
                 │   ├── rhss
@@ -1242,7 +1293,7 @@ kind=ID lexeme=f")
                 │   │       │   │   │   └──  <- 'NULL'
                 │   │       │   │   └── ID <- 'ID'
                 │   │       │   └── ID <- 's'
-                │   │       └── pattopt
+                │   │       └── patt_opt
                 │   │           └──  <- 'NULL'
                 │   └── rhs
                 │       ├── ARROW <- '->'
@@ -1250,7 +1301,7 @@ kind=ID lexeme=f")
                 │       │   ├── ids
                 │       │   │   └──  <- 'NULL'
                 │       │   └── ID <- 'ID'
-                │       └── pattopt
+                │       └── patt_opt
                 │           └──  <- 'NULL'
                 └── SEMI <- ';'"
         );
@@ -1283,7 +1334,7 @@ s -> A [B] s
     │           ├── sdec
     │           │   └── targets
     │           │       └── ID <- 'start'
-    │           ├── transopt
+    │           ├── trans_opt
     │           │   └── trans
     │           │       ├── trans
     │           │       │   └── tran
@@ -1292,22 +1343,30 @@ s -> A [B] s
     │           │       │       │       └── CILC <- ''a''
     │           │       │       ├── ARROW <- '->'
     │           │       │       └── trand
-    │           │       │           ├── HAT <- '^'
-    │           │       │           └── ID <- 'A'
+    │           │       │           └── acceptor
+    │           │       │               ├── HAT <- '^'
+    │           │       │               ├── id_or_def
+    │           │       │               │   └── ID <- 'A'
+    │           │       │               └── accd_opt
+    │           │       │                   └──  <- 'NULL'
     │           │       └── tran
     │           │           ├── mtcs
     │           │           │   └── mtc
     │           │           │       └── CILC <- ''b''
     │           │           ├── ARROW <- '->'
     │           │           └── trand
-    │           │               ├── HAT <- '^'
-    │           │               └── ID <- 'B'
+    │           │               └── acceptor
+    │           │                   ├── HAT <- '^'
+    │           │                   ├── id_or_def
+    │           │                   │   └── ID <- 'B'
+    │           │                   └── accd_opt
+    │           │                       └──  <- 'NULL'
     │           └── SEMI <- ';'
     └── gram
         └── prods
             └── prod
                 ├── ID <- 's'
-                ├── pattopt
+                ├── patt_opt
                 │   └──  <- 'NULL'
                 ├── rhss
                 │   ├── rhss
@@ -1321,13 +1380,13 @@ s -> A [B] s
                 │   │       │   │   │   └── ID <- 'A'
                 │   │       │   │   └── COPTID <- '[B]'
                 │   │       │   └── ID <- 's'
-                │   │       └── pattopt
+                │   │       └── patt_opt
                 │   │           └──  <- 'NULL'
                 │   └── rhs
                 │       ├── ARROW <- '->'
                 │       ├── ids
                 │       │   └──  <- 'NULL'
-                │       └── pattopt
+                │       └── patt_opt
                 │           └──  <- 'NULL'
                 └── SEMI <- ';'"
         );
@@ -1424,7 +1483,7 @@ s `{} {}`
     │           ├── sdec
     │           │   └── targets
     │           │       └── ID <- 'start'
-    │           ├── transopt
+    │           ├── trans_opt
     │           │   └── trans
     │           │       ├── trans
     │           │       │   └── tran
@@ -1433,22 +1492,30 @@ s `{} {}`
     │           │       │       │       └── CILC <- ''a''
     │           │       │       ├── ARROW <- '->'
     │           │       │       └── trand
-    │           │       │           ├── HAT <- '^'
-    │           │       │           └── ID <- 'A'
+    │           │       │           └── acceptor
+    │           │       │               ├── HAT <- '^'
+    │           │       │               ├── id_or_def
+    │           │       │               │   └── ID <- 'A'
+    │           │       │               └── accd_opt
+    │           │       │                   └──  <- 'NULL'
     │           │       └── tran
     │           │           ├── mtcs
     │           │           │   └── mtc
     │           │           │       └── CILC <- ''b''
     │           │           ├── ARROW <- '->'
     │           │           └── trand
-    │           │               ├── HAT <- '^'
-    │           │               └── ID <- 'B'
+    │           │               └── acceptor
+    │           │                   ├── HAT <- '^'
+    │           │                   ├── id_or_def
+    │           │                   │   └── ID <- 'B'
+    │           │                   └── accd_opt
+    │           │                       └──  <- 'NULL'
     │           └── SEMI <- ';'
     └── gram
         └── prods
             └── prod
                 ├── ID <- 's'
-                ├── pattopt
+                ├── patt_opt
                 │   └── PATTC <- '`{} {}`'
                 ├── rhss
                 │   ├── rhss
@@ -1461,7 +1528,7 @@ s `{} {}`
                 │   │   │       │   │   │   └──  <- 'NULL'
                 │   │   │       │   │   └── ID <- 's'
                 │   │   │       │   └── ID <- 'A'
-                │   │   │       └── pattopt
+                │   │   │       └── patt_opt
                 │   │   │           └──  <- 'NULL'
                 │   │   └── rhs
                 │   │       ├── ARROW <- '->'
@@ -1471,13 +1538,13 @@ s `{} {}`
                 │   │       │   │   │   └──  <- 'NULL'
                 │   │       │   │   └── ID <- 's'
                 │   │       │   └── ID <- 'B'
-                │   │       └── pattopt
+                │   │       └── patt_opt
                 │   │           └──  <- 'NULL'
                 │   └── rhs
                 │       ├── ARROW <- '->'
                 │       ├── ids
                 │       │   └──  <- 'NULL'
-                │       └── pattopt
+                │       └── patt_opt
                 │           └── PATTC <- '`SEPARATED:`'
                 └── SEMI <- ';'"
         );
@@ -1537,5 +1604,67 @@ kind=C lexeme=m
 kind=D lexeme=n
 kind=D lexeme=o
 kind=E lexeme=pqrstuvwxyz")
+    }
+
+    #[test]
+    fn context_sensitive_scanner() {
+        //setup
+        let spec = "
+'a!123456789'
+
+start
+    'a' -> a
+    '!' -> bang_in;
+
+bang_in ^BANG -> hidden;
+
+a       ^A
+    'a' -> a;
+
+hidden
+    '1' .. '9' -> num
+    '!' -> ^BANG;
+
+num     ^NUM -> hidden;
+
+s -> ;";
+
+        let input = "!!aaa!!a!49913!a".to_string();
+        let mut iter = input.chars();
+        let mut getter = || iter.next();
+        let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
+
+        let scanner = scan::def_scanner();
+        let tree = parse_spec(spec);
+        let parse = tree.unwrap();
+        let (cdfa, _, _) = generate_spec(&parse).unwrap();
+
+        //exercise
+        let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
+
+        //verify
+        assert_eq!(tokens_string(tokens), "
+kind=BANG lexeme=!
+kind=BANG lexeme=!
+kind=A lexeme=aaa
+kind=BANG lexeme=!
+kind=BANG lexeme=!
+kind=A lexeme=a
+kind=BANG lexeme=!
+kind=NUM lexeme=4
+kind=NUM lexeme=9
+kind=NUM lexeme=9
+kind=NUM lexeme=1
+kind=NUM lexeme=3
+kind=BANG lexeme=!
+kind=A lexeme=a")
+    }
+
+    fn tokens_string(tokens: Vec<Token<String>>) -> String {
+        let mut res_string = String::new();
+        for token in tokens {
+            res_string = format!("{}\nkind={} lexeme={}", res_string, token.kind, token.lexeme);
+        }
+        res_string
     }
 }
