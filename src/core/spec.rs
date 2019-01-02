@@ -1965,6 +1965,8 @@ kind=BANG lexeme=!
 kind=A lexeme=a")
     }
 
+    //TODO add test(s) for duplicated regions
+
     fn tokens_string(tokens: Vec<Token<String>>) -> String {
         let mut res_string = String::new();
         for token in tokens {

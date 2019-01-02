@@ -39,19 +39,20 @@ use padd::{FormatJobRunner, FormatJob};
 fn main() {
     // Specification String
     let spec = "
-# Alphabet
-'ab'
+alphabet 'ab'
 
-# CDFA
-start
-    'a' -> ^A
-    'b' -> ^B;
+cdfa {
+    start
+        'a' -> ^A
+        'b' -> ^B;
+}
 
-# Grammar
-s `{} {}`
-    -> s A
-    -> s B
-    -> `SEPARATED:`;
+grammar {
+    s `{} {}`
+        | s A
+        | s B
+        | `SEPARATED:`;
+}
     ".to_string();
 
     let input = "abbaba".to_string();
@@ -70,19 +71,23 @@ s `{} {}`
 ## Simple Example: Balanced Brackets
 The specification file:
 ```
-# Alphabet
-' \t\n{}'
+alphabet ' \t\n{}'
 
-# CDFA
-start
- ' ' | '\t' | '\n' -> ^_
- '{' -> ^LBRACKET
- '}' -> ^RBRACKET;
+cdfa {
+    start
+        ' ' | '\t' | '\n' -> ^_
+        '{' -> ^LBRACKET
+        '}' -> ^RBRACKET;
+}
 
-# Grammar
-s -> s b
-  ->;
-b -> LBRACKET s RBRACKET `[prefix]{}\n\n{;prefix=[prefix]\t}[prefix]{}\n\n`;
+grammar {
+    s
+        | s b
+        |;
+
+    b
+        | LBRACKET s RBRACKET `[prefix]{}\n\n{;prefix=[prefix]\t}[prefix]{}\n\n`;
+}
 ```
 The input:
 ```

@@ -1,129 +1,129 @@
-'<>=+-*/%(){},;:! \t\nABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+alphabet '<>=+-*/%(){},;:! \t\nABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
 
-# lacs dfa
+cdfa {
+    start
+        '(' -> ^LPAREN
+        ')' -> ^RPAREN
+        '{' -> ^LBRACE
+        '}' -> ^RBRACE
+        '+' -> ^PLUS
+        '-' -> ^MINUS
+        '*' -> ^STAR
+        '%' -> ^PCT
+        ',' -> ^COMMA
+        ';' -> ^SEMI
+        ':' -> ^COLON
+        ' ' | '\t' | '\n' -> ws
+        '=' -> eq
+        '!=' -> ^NE
+        '<' -> lt
+        '>' -> gt
+        '/' -> slash
+        '0' -> num
+        '1' .. '9' -> num
+        'def' -> ^DEF
+        'var' -> ^VAR
+        'Int' -> ^INT
+        'if' -> ^IF
+        'else' -> ^ELSE
+        _ -> ^ID;
 
-start
-    '(' -> ^LPAREN
-    ')' -> ^RPAREN
-    '{' -> ^LBRACE
-    '}' -> ^RBRACE
-    '+' -> ^PLUS
-    '-' -> ^MINUS
-    '*' -> ^STAR
-    '%' -> ^PCT
-    ',' -> ^COMMA
-    ';' -> ^SEMI
-    ':' -> ^COLON
-    ' ' | '\t' | '\n' -> ws
-    '=' -> eq
-    '!=' -> ^NE
-    '<' -> lt
-    '>' -> gt
-    '/' -> slash
-    '0' -> num
-    '1' .. '9' -> num
-    'def' -> ^DEF
-    'var' -> ^VAR
-    'Int' -> ^INT
-    'if' -> ^IF
-    'else' -> ^ELSE
-    _ -> ^ID;
+    ID
+        '<' .. '\n' -> fail
+        _ -> ID;
 
-ID
-    '<' .. '\n' -> fail
-    _ -> ID;
+    num     ^NUM
+        '0' .. '9' -> num;
 
-num     ^NUM
-    '0' .. '9' -> num;
+    slash   ^SLASH
+        '/' -> comment;
 
-slash   ^SLASH
-    '/' -> comment;
+    comment ^COMMENT
+        '\n' -> fail
+        _ -> comment;
 
-comment ^COMMENT
-    '\n' -> fail
-    _ -> comment;
+    eq      ^BECOMES
+        '=' -> ^EQ
+        '>' -> ^ARROW;
 
-eq      ^BECOMES
-    '=' -> ^EQ
-    '>' -> ^ARROW;
+    lt      ^LT
+        '=' -> ^LE;
 
-lt      ^LT
-    '=' -> ^LE;
+    gt      ^GT
+        '=' -> ^GE;
 
-gt      ^GT
-    '=' -> ^GE;
+    ws      ^WHITESPACE
+        ' ' | '\t' | '\n' -> ws;
+}
 
-ws      ^WHITESPACE
-    ' ' | '\t' | '\n' -> ws;
+grammar {
+    S
+        | defdefs;
+    inner_defdefs
+        | defdefs `{0}\n\n`;
+    defdefs
+        | defdef defdefs `{0}\n\n{1}`
+        | defdef;
+    defdef
+        | w DEF w ID w LPAREN [parms] w RPAREN w COLON type w BECOMES w LBRACE [vardefs] [inner_defdefs] expras w RBRACE
+            `[prefix]{1} {3}{5}{6}{8}{10} {11} {13} {15}\n{16;prefix=[prefix]\t}{17;prefix=[prefix]\t}{18;prefix=[prefix]\t}[prefix]{20}`;
 
-# lacs grammar
+    parms
+        | vardef w COMMA parms `{0}{2} {3}`
+        | vardef;
 
-S
-    -> defdefs;
-inner_defdefs
-    -> defdefs `{0}\n\n`;
-defdefs
-    -> defdef defdefs `{0}\n\n{1}`
-    -> defdef;
-defdef
-    -> w DEF w ID w LPAREN [parms] w RPAREN w COLON type w BECOMES w LBRACE [vardefs] [inner_defdefs] expras w RBRACE
-        `[prefix]{1} {3}{5}{6}{8}{10} {11} {13} {15}\n{16;prefix=[prefix]\t}{17;prefix=[prefix]\t}{18;prefix=[prefix]\t}[prefix]{20}`;
+    type
+        | w INT
+        | w LPAREN [types] w RPAREN w ARROW type `{1}{2}{4} {6} {7}`;
+    types
+        | type w COMMA types `{0}{2} {3}`
+        | type;
 
-parms
-    -> vardef w COMMA parms `{0}{2} {3}`
-    -> vardef;
+    vardefs
+        | w VAR vardef w SEMI vardefs `[prefix]{1} {2}{4}\n{5}\n`
+        | w VAR vardef w SEMI `[prefix]{1} {2}{4}\n\n`;
+    vardef
+        | w ID w COLON type `{1}{3} {4}`;
 
-type
-    -> w INT
-    -> w LPAREN [types] w RPAREN w ARROW type `{1}{2}{4} {6} {7}`;
-types
-    -> type w COMMA types `{0}{2} {3}`
-    -> type;
+    expras
+        | expra w SEMI expras `[prefix]{0}{2}\n{3}`
+        | expra `[prefix]{0}\n`;
+    expra
+        | w ID w BECOMES expr `{1} {3} {4}`
+        | expr;
+    expr
+        | w IF w LPAREN test w RPAREN w LBRACE expras w RBRACE w ELSE w LBRACE expras w RBRACE
+            `{1} {3}{4}{6} {8}\n{9;prefix=[prefix]\t}[prefix]{11} {13} {15}\n{16;prefix=[prefix]\t}[prefix]{18}`
+        | term
+        | expr w PLUS term `{0} {2} {3}`
+        | expr w MINUS term `{0} {2} {3}`;
 
-vardefs
-    -> w VAR vardef w SEMI vardefs `[prefix]{1} {2}{4}\n{5}\n`
-    -> w VAR vardef w SEMI `[prefix]{1} {2}{4}\n\n`;
-vardef
-    -> w ID w COLON type `{1}{3} {4}`;
+    term
+        | factor
+        | term w STAR factor `{0} {2} {3}`
+        | term w SLASH factor `{0} {2} {3}`
+        | term w PCT factor `{0} {2} {3}`;
 
-expras
-    -> expra w SEMI expras `[prefix]{0}{2}\n{3}`
-    -> expra `[prefix]{0}\n`;
-expra
-    -> w ID w BECOMES expr `{1} {3} {4}`
-    -> expr;
-expr
-    -> w IF w LPAREN test w RPAREN w LBRACE expras w RBRACE w ELSE w LBRACE expras w RBRACE
-        `{1} {3}{4}{6} {8}\n{9;prefix=[prefix]\t}[prefix]{11} {13} {15}\n{16;prefix=[prefix]\t}[prefix]{18}`
-    -> term
-    -> expr w PLUS term `{0} {2} {3}`
-    -> expr w MINUS term `{0} {2} {3}`;
+    factor
+        | w ID
+        | w NUM
+        | w LPAREN expr w RPAREN
+        | factor w LPAREN [args] w RPAREN;
 
-term
-    -> factor
-    -> term w STAR factor `{0} {2} {3}`
-    -> term w SLASH factor `{0} {2} {3}`
-    -> term w PCT factor `{0} {2} {3}`;
+    test
+        | expr w NE expr `{0} {2} {3}`
+        | expr w LT expr `{0} {2} {3}`
+        | expr w LE expr `{0} {2} {3}`
+        | expr w GE expr `{0} {2} {3}`
+        | expr w GT expr `{0} {2} {3}`
+        | expr w EQ expr `{0} {2} {3}`;
 
-factor
-    -> w ID
-    -> w NUM
-    -> w LPAREN expr w RPAREN
-    -> factor w LPAREN [args] w RPAREN;
+    args
+        | expr w COMMA args `{0}{2} {3}`
+        | expr;
 
-test
-    -> expr w NE expr `{0} {2} {3}`
-    -> expr w LT expr `{0} {2} {3}`
-    -> expr w LE expr `{0} {2} {3}`
-    -> expr w GE expr `{0} {2} {3}`
-    -> expr w GT expr `{0} {2} {3}`
-    -> expr w EQ expr `{0} {2} {3}`;
-
-args
-    -> expr w COMMA args `{0}{2} {3}`
-    -> expr;
-
-w
-    -> WHITESPACE w `{1}`
-    -> COMMENT w `{0}\n{1}`
-    -> ;
+    w
+        | WHITESPACE w `{1}`
+        | COMMENT w `{0}\n{1}`
+        | ;
+}
