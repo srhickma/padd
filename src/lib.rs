@@ -153,12 +153,16 @@ mod tests {
     fn failed_scan_input() {
         //setup
         let spec = "
-'ab'
+alphabet 'ab'
 
-start 'a' -> ^ACC;
+cdfa {
+    start 'a' -> ^ACC;
+}
 
-s -> ACC;
-    ".to_string();
+grammar {
+    s | ACC;
+}
+        ".to_string();
 
         let fjr = FormatJobRunner::build(&spec).unwrap();
 
@@ -187,14 +191,18 @@ s -> ACC;
     fn failed_parse_input() {
         //setup
         let spec = "
-'ab'
+alphabet 'ab'
 
-start
-    'a' -> ^ACC
-    'b' -> ^B;
+cdfa {
+    start
+        'a' -> ^ACC
+        'b' -> ^B;
+}
 
-s -> B;
-    ".to_string();
+grammar {
+    s | B;
+}
+        ".to_string();
 
         let fjr = FormatJobRunner::build(&spec).unwrap();
 
@@ -223,12 +231,16 @@ s -> B;
     fn failed_scan_spec() {
         //setup
         let spec = "
-'ab'~
+alphabet 'ab'~
 
-start 'a' -> ^ACC;
+cdfa {
+    start 'a' -> ^ACC;
+}
 
-s -> ACC;
-    ".to_string();
+grammar {
+    s | ACC;
+}
+        ".to_string();
 
         //exercise
         let res = FormatJobRunner::build(&spec);
@@ -239,20 +251,20 @@ s -> ACC;
         let mut err: &Error = &res.err().unwrap();
         assert_eq!(
             format!("{}", err),
-            "Failed to parse specification: Scan error: No accepting scans after (2,5): \
-            ~\n\nstart \'..."
+            "Failed to parse specification: Scan error: No accepting scans after (2,14): \
+            ~\n\ncdfa {\n..."
         );
 
         err = err.cause().unwrap();
         assert_eq!(
             format!("{}", err),
-            "Scan error: No accepting scans after (2,5): ~\n\nstart \'..."
+            "Scan error: No accepting scans after (2,14): ~\n\ncdfa {\n..."
         );
 
         err = err.cause().unwrap();
         assert_eq!(
             format!("{}", err),
-            "No accepting scans after (2,5): ~\n\nstart \'..."
+            "No accepting scans after (2,14): ~\n\ncdfa {\n..."
         );
 
         assert!(err.cause().is_none());
@@ -262,10 +274,16 @@ s -> ACC;
     fn failed_parse_spec() {
         //setup
         let spec = "
-start 'a' -> ^ACC;
+alphabet 'a'
 
-s -> B;
-    ".to_string();
+cdfa {
+    start 'a' -> ^ACC SOMETHING;
+}
+
+grammar {
+    s | B;
+}
+        ".to_string();
 
         //exercise
         let res = FormatJobRunner::build(&spec);
@@ -276,20 +294,20 @@ s -> B;
         let mut err: &Error = &res.err().unwrap();
         assert_eq!(
             format!("{}", err),
-            "Failed to parse specification: Parse error: Recognition failed at token 1: \
-            ID <- 'start'"
+            "Failed to parse specification: Parse error: Recognition failed at token 10: \
+            ID <- 'SOMETHING'"
         );
 
         err = err.cause().unwrap();
         assert_eq!(
             format!("{}", err),
-            "Parse error: Recognition failed at token 1: ID <- 'start'"
+            "Parse error: Recognition failed at token 10: ID <- 'SOMETHING'"
         );
 
         err = err.cause().unwrap();
         assert_eq!(
             format!("{}", err),
-            "Recognition failed at token 1: ID <- 'start'"
+            "Recognition failed at token 10: ID <- 'SOMETHING'"
         );
 
         assert!(err.cause().is_none());
@@ -331,14 +349,18 @@ s -> B;
     fn failed_cdfa_multiple_def_matchers() {
         //setup
         let spec = "
-''
+alphabet ''
 
-start
-    _ -> ^A
-    _ -> ^B;
+cdfa {
+    start
+        _ -> ^A
+        _ -> ^B;
+}
 
-s ->;
-    ".to_string();
+grammar {
+    s |;
+}
+        ".to_string();
 
         //exercise
         let res = FormatJobRunner::build(&spec);
@@ -372,14 +394,18 @@ s ->;
     fn failed_cdfa_non_prefix_free() {
         //setup
         let spec = "
-''
+alphabet ''
 
-start
-    'a' -> ^A
-    'ab' -> ^B;
+cdfa {
+    start
+        'a' -> ^A
+        'ab' -> ^B;
+}
 
-s ->;
-    ".to_string();
+grammar {
+    s |;
+}
+        ".to_string();
 
         //exercise
         let res = FormatJobRunner::build(&spec);
@@ -414,14 +440,18 @@ s ->;
     fn failed_range_based_matchers_overlap() {
         //setup
         let spec = "
-'abcdefghijklmnopqrstuvwxyz'
+alphabet 'abcdefghijklmnopqrstuvwxyz'
 
-start
-    'a' .. 'l' -> ^FIRST
-    'l' .. 'z' -> ^LAST;
+cdfa {
+    start
+        'a' .. 'l' -> ^FIRST
+        'l' .. 'z' -> ^LAST;
+}
 
-s -> ;
-    ".to_string();
+grammar {
+    s |;
+}
+        ".to_string();
 
         //exercise
         let res = FormatJobRunner::build(&spec);
@@ -456,13 +486,17 @@ s -> ;
     fn failed_range_based_matchers_invalid_start() {
         //setup
         let spec = "
-''
+alphabet ''
 
-start
-    'aa'..'b' -> ^A;
+cdfa {
+    start
+        'aa'..'b' -> ^A;
+}
 
-s ->;
-    ".to_string();
+grammar {
+    s |;
+}
+        ".to_string();
 
         //exercise
         let res = FormatJobRunner::build(&spec);
@@ -490,13 +524,17 @@ s ->;
     fn failed_range_based_matchers_invalid_end() {
         //setup
         let spec = "
-''
+alphabet ''
 
-start
-    'a'..'cd' -> ^A;
+cdfa {
+    start
+        'a'..'cd' -> ^A;
+}
 
-s ->;
-    ".to_string();
+grammar {
+    s |;
+}
+        ".to_string();
 
         //exercise
         let res = FormatJobRunner::build(&spec);
@@ -524,14 +562,18 @@ s ->;
     fn failed_orphaned_terminal() {
         //setup
         let spec = "
-'ab'
+alphabet 'ab'
 
-start
-    'a' -> ^A
-    'b' -> ^B;
+cdfa {
+    start
+        'a' -> ^A
+        'b' -> ^B;
+}
 
-s -> ORPHANED;
-    ".to_string();
+grammar {
+    s | ORPHANED;
+}
+        ".to_string();
 
         //exercise
         let res = FormatJobRunner::build(&spec);
@@ -560,14 +602,18 @@ s -> ORPHANED;
     fn failed_cdfa_different_destinations() {
         //setup
         let spec = "
-'a'
+alphabet 'a'
 
-start
-    'a' -> ^A -> x
-    _ -> ^A -> y;
+cdfa {
+    start
+        'a' -> ^A -> x
+        _ -> ^A -> y;
+}
 
-s ->;
-    ".to_string();
+grammar {
+    s |;
+}
+        ".to_string();
 
         //exercise
         let res = FormatJobRunner::build(&spec);
@@ -603,15 +649,19 @@ s ->;
     fn failed_cdfa_existing_acceptor_destination() {
         //setup
         let spec = "
-''
+alphabet ''
 
-start
-    _ -> ^A -> x;
+cdfa {
+    start
+        _ -> ^A -> x;
 
-A   ^A -> y;
+    A   ^A -> y;
+}
 
-s ->;
-    ".to_string();
+grammar {
+    s |;
+}
+        ".to_string();
 
         //exercise
         let res = FormatJobRunner::build(&spec);
@@ -647,15 +697,19 @@ s ->;
     fn failed_cdfa_existing_acceptor_destination_from_all() {
         //setup
         let spec = "
-''
+alphabet ''
 
-A   ^A -> y;
+cdfa {
+    A   ^A -> y;
 
-start
-    _ -> ^A -> x;
+    start
+        _ -> ^A -> x;
+}
 
-s ->;
-    ".to_string();
+grammar {
+    s |;
+}
+        ".to_string();
 
         //exercise
         let res = FormatJobRunner::build(&spec);
@@ -686,8 +740,6 @@ s ->;
 
         assert!(err.cause().is_none());
     }
-
-    //TODO add test for invalid region type
 
     //TODO add test(s) for missing spec regions
 }
