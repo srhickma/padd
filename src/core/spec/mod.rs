@@ -1,324 +1,34 @@
 use {
     core::{
-        data::stream::StreamSource,
-        fmt::{self, Formatter, FormatterBuilder, PatternPair},
+        fmt::{self, Formatter},
         parse::{
             self,
-            grammar::{Grammar, GrammarBuilder},
-            Production,
+            grammar::Grammar,
             Tree,
         },
         scan::{
             self,
-            CDFA,
-            CDFABuilder,
-            ecdfa::{EncodedCDFA, EncodedCDFABuilder},
+            ecdfa::EncodedCDFA,
             Kind,
-            State,
         },
-        util::string_utils,
     },
     std::{
         self,
-        collections::HashSet,
         error,
     },
 };
 
-static SPEC_ALPHABET: &'static str = "`-=~!@#$%^&*()+{}|[]\\;':\"<>?,./_0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ \n\t";
+mod gen;
+mod lang;
+
 pub static DEF_MATCHER: &'static str = "_";
 
-#[derive(PartialEq, Eq, Hash, Clone, Debug)]
-enum S {
-    Start,
-    Alphabet,
-    AlphabetTag,
-    AlphabetString,
-    AlphabetStringPartial,
-    AlphabetStringEscaped,
-    CDFA,
-    CDFATag,
-    CDFAEntryBrace,
-    CDFABody,
-    Grammar,
-    GrammarTag,
-    GrammarEntryBrace,
-    GrammarBody,
-    RegionExitBrace,
-    Or,
-    Hat,
-    Arrow,
-    Range,
-    Pattern,
-    PatternPartial,
-    Cil,
-    CilPartial,
-    CilEscaped,
-    Comment,
-    Semi,
-    Def,
-    Whitespace,
-    Id,
-    OptIdPartial,
-    OptId,
-    Fail,
-}
-
-thread_local! {
-    static SPEC_ECDFA: EncodedCDFA<String> = build_spec_ecdfa().unwrap();
-}
-
-lazy_static! {
-    static ref SPEC_GRAMMAR: Grammar = build_spec_grammar();
-}
-
-fn build_spec_ecdfa() -> Result<EncodedCDFA<String>, scan::CDFAError> {
-    let mut builder: EncodedCDFABuilder<S, String> = EncodedCDFABuilder::new();
-
-    builder.set_alphabet(SPEC_ALPHABET.chars())
-        .mark_start(&S::Start);
-
-    builder.state(&S::Start)
-        .mark_chain(&S::AlphabetTag, "alphabet".chars())?
-        .mark_chain(&S::CDFATag, "cdfa".chars())?
-        .mark_chain(&S::GrammarTag, "grammar".chars())?
-        .mark_trans(&S::Comment, '#')?
-        .mark_trans(&S::Whitespace, ' ')?
-        .mark_trans(&S::Whitespace, '\t')?
-        .mark_trans(&S::Whitespace, '\n')?;
-
-    // Alphabet
-
-    builder.state(&S::AlphabetTag)
-        .accept_to_from_all(&S::Alphabet)?
-        .tokenize(&"ALPHABET".to_string());
-
-    builder.state(&S::Alphabet)
-        .mark_trans(&S::AlphabetStringPartial, '\'')?
-        .mark_trans(&S::Comment, '#')?
-        .mark_trans(&S::Whitespace, ' ')?
-        .mark_trans(&S::Whitespace, '\t')?
-        .mark_trans(&S::Whitespace, '\n')?;
-
-    builder.state(&S::AlphabetStringPartial)
-        .mark_trans(&S::AlphabetString, '\'')?
-        .mark_trans(&S::AlphabetStringEscaped, '\\')?
-        .default_to(&S::AlphabetStringPartial)?;
-
-    builder.state(&S::AlphabetString)
-        .accept_to_from_all(&S::Start)?
-        .tokenize(&"CILC".to_string());
-
-    builder.state(&S::AlphabetStringEscaped)
-        .default_to(&S::AlphabetStringPartial)?;
-
-    // CDFA
-
-    builder.state(&S::CDFATag)
-        .accept_to_from_all(&S::CDFA)?
-        .tokenize(&"CDFA".to_string());
-
-    builder.state(&S::CDFA)
-        .mark_trans(&S::CDFAEntryBrace, '{')?
-        .mark_trans(&S::Comment, '#')?
-        .mark_trans(&S::Whitespace, ' ')?
-        .mark_trans(&S::Whitespace, '\t')?
-        .mark_trans(&S::Whitespace, '\n')?;
-
-    builder.state(&S::CDFAEntryBrace)
-        .accept_to_from_all(&S::CDFABody)?
-        .tokenize(&"LBRACE".to_string());
-
-    builder.state(&S::CDFABody)
-        .mark_trans(&S::Or, '|')?
-        .mark_trans(&S::Semi, ';')?
-        .mark_trans(&S::CilPartial, '\'')?
-        .mark_range(&S::Id, '0', 'Z')?
-        .mark_trans(&S::Hat, '^')?
-        .mark_chain(&S::Arrow, "->".chars())?
-        .mark_chain(&S::Range, "..".chars())?
-        .mark_trans(&S::Def, '_')?
-        .mark_trans(&S::RegionExitBrace, '}')?
-        .mark_trans(&S::Comment, '#')?
-        .mark_trans(&S::Whitespace, ' ')?
-        .mark_trans(&S::Whitespace, '\t')?
-        .mark_trans(&S::Whitespace, '\n')?;
-
-    builder.state(&S::Hat)
-        .accept()
-        .tokenize(&"HAT".to_string());
-
-    builder.state(&S::Arrow)
-        .accept()
-        .tokenize(&"ARROW".to_string());
-
-    builder.state(&S::Range)
-        .accept()
-        .tokenize(&"RANGE".to_string());
-
-    builder.state(&S::Def)
-        .accept()
-        .tokenize(&"DEF".to_string());
-
-    // Grammar
-
-    builder.state(&S::GrammarTag)
-        .accept_to_from_all(&S::Grammar)?
-        .tokenize(&"GRAMMAR".to_string());
-
-    builder.state(&S::Grammar)
-        .mark_trans(&S::GrammarEntryBrace, '{')?
-        .mark_trans(&S::Comment, '#')?
-        .mark_trans(&S::Whitespace, ' ')?
-        .mark_trans(&S::Whitespace, '\t')?
-        .mark_trans(&S::Whitespace, '\n')?;
-
-    builder.state(&S::GrammarEntryBrace)
-        .accept_to_from_all(&S::GrammarBody)?
-        .tokenize(&"LBRACE".to_string());
-
-    builder.state(&S::GrammarBody)
-        .mark_trans(&S::Or, '|')?
-        .mark_trans(&S::Semi, ';')?
-        .mark_range(&S::Id, '0', 'Z')?
-        .mark_trans(&S::OptIdPartial, '[')?
-        .mark_trans(&S::PatternPartial, '`')?
-        .mark_trans(&S::RegionExitBrace, '}')?
-        .mark_trans(&S::Comment, '#')?
-        .mark_trans(&S::Whitespace, ' ')?
-        .mark_trans(&S::Whitespace, '\t')?
-        .mark_trans(&S::Whitespace, '\n')?;
-
-    builder.state(&S::OptIdPartial)
-        .mark_trans(&S::OptId, ']')?
-        .mark_range(&S::OptIdPartial, '_', 'Z')?;
-
-    builder.state(&S::OptId)
-        .accept()
-        .tokenize(&"COPTID".to_string());
-
-    builder.state(&S::PatternPartial)
-        .mark_trans(&S::Pattern, '`')?
-        .default_to(&S::PatternPartial)?;
-
-    builder.state(&S::Pattern)
-        .accept()
-        .tokenize(&"PATTC".to_string());
-
-    // Shared
-
-    builder.state(&S::Whitespace)
-        .accept();
-
-    builder.state(&S::RegionExitBrace)
-        .accept_to_from_all(&S::Start)?
-        .tokenize(&"RBRACE".to_string());
-
-    builder.state(&S::Or)
-        .accept()
-        .tokenize(&"OR".to_string());
-
-    builder.state(&S::Semi)
-        .accept()
-        .tokenize(&"SEMI".to_string());
-
-    builder.state(&S::CilPartial)
-        .mark_trans(&S::Cil, '\'')?
-        .mark_trans(&S::CilEscaped, '\\')?
-        .default_to(&S::CilPartial)?;
-
-    builder.state(&S::Cil)
-        .accept()
-        .tokenize(&"CILC".to_string());
-
-    builder.state(&S::CilEscaped)
-        .default_to(&S::CilPartial)?;
-
-    builder.state(&S::Id)
-        .mark_range(&S::Id, '_', 'Z')?
-        .accept()
-        .tokenize(&"ID".to_string());
-
-    builder.state(&S::Comment)
-        .mark_trans(&S::Fail, '\n')?
-        .default_to(&S::Comment)?
-        .accept();
-
-    builder.build()
-}
-
-fn build_spec_grammar() -> Grammar {
-    let productions = parse::build_prods(&[
-        "spec regions",
-        "regions regions region",
-        "regions region",
-        "region alphabet",
-        "region cdfa",
-        "region grammar",
-        "alphabet ALPHABET CILC",
-        "cdfa CDFA LBRACE states RBRACE",
-        "states states state",
-        "states state",
-        "state sdec trans_opt SEMI",
-        "sdec targets",
-        "sdec targets acceptor",
-        "acceptor HAT id_or_def accd_opt",
-        "accd_opt ARROW ID",
-        "accd_opt ",
-        "targets ID",
-        "targets targets OR ID",
-        "trans_opt trans",
-        "trans_opt ",
-        "trans trans tran",
-        "trans tran",
-        "tran mtcs ARROW trand",
-        "tran DEF ARROW trand",
-        "trand ID",
-        "trand acceptor",
-        "mtcs mtcs OR mtc",
-        "mtcs mtc",
-        "mtc CILC",
-        "mtc CILC RANGE CILC",
-        "grammar GRAMMAR LBRACE prods RBRACE",
-        "prods prods prod",
-        "prods prod",
-        "prod ID patt_opt rhss SEMI",
-        "rhss rhss rhs",
-        "rhss rhs",
-        "rhs OR ids patt_opt",
-        "patt_opt PATTC",
-        "patt_opt ",
-        "ids ids ID",
-        "ids ids COPTID",
-        "ids ",
-        "id_or_def ID",
-        "id_or_def DEF"
-    ]);
-
-    let mut builder = GrammarBuilder::new();
-    builder.try_mark_start(&productions.first().unwrap().lhs);
-    builder.add_productions(productions.clone());
-    builder.build()
+pub fn parse_spec(input: &str) -> Result<Tree, ParseError> {
+    lang::parse_spec(input)
 }
 
 pub fn generate_spec(parse: &Tree) -> Result<(EncodedCDFA<Kind>, Grammar, Formatter), GenError> {
-    let mut ecdfa_builder: EncodedCDFABuilder<String, Kind> = EncodedCDFABuilder::new();
-    let mut grammar_builder = GrammarBuilder::new();
-    let mut formatter_builder = FormatterBuilder::new();
-
-    traverse_spec_regions(
-        parse.get_child(0),
-        &mut ecdfa_builder,
-        &mut grammar_builder,
-        &mut formatter_builder,
-    )?;
-
-    let ecdfa = ecdfa_builder.build()?;
-    let grammar = grammar_builder.build();
-
-    orphan_check(&ecdfa, &grammar)?;
-
-    Ok((ecdfa, grammar, formatter_builder.build()))
+    gen::generate_spec(parse)
 }
 
 #[derive(Debug)]
@@ -364,406 +74,6 @@ impl From<fmt::BuildError> for GenError {
     fn from(err: fmt::BuildError) -> GenError {
         GenError::PatternErr(err)
     }
-}
-
-fn traverse_spec_regions<CDFABuilderType, CDFAType>(
-    regions_node: &Tree,
-    cdfa_builder: &mut CDFABuilderType,
-    grammar_builder: &mut GrammarBuilder,
-    formatter_builder: &mut FormatterBuilder,
-) -> Result<(), GenError> where
-    CDFAType: CDFA<usize, String>,
-    CDFABuilderType: CDFABuilder<String, String, CDFAType>
-{
-    if regions_node.children.len() == 2 {
-        traverse_spec_regions(
-            regions_node.get_child(0),
-            cdfa_builder,
-            grammar_builder,
-            formatter_builder,
-        )?;
-    }
-
-    traverse_spec_region(
-        regions_node.children.last().unwrap(),
-        cdfa_builder,
-        grammar_builder,
-        formatter_builder,
-    )
-}
-
-fn traverse_spec_region<CDFABuilderType, CDFAType>(
-    region_node: &Tree,
-    cdfa_builder: &mut CDFABuilderType,
-    grammar_builder: &mut GrammarBuilder,
-    formatter_builder: &mut FormatterBuilder,
-) -> Result<(), GenError> where
-    CDFAType: CDFA<usize, String>,
-    CDFABuilderType: CDFABuilder<String, String, CDFAType>
-{
-    let region_type_node = region_node.get_child(0);
-    let region_type = &region_type_node.lhs.kind;
-
-    match &region_type[..] {
-        "alphabet" => traverse_alphabet_region(region_type_node, cdfa_builder),
-        "cdfa" => traverse_cdfa_region(region_type_node, cdfa_builder)?,
-        "grammar" => traverse_grammar_region(region_type_node, grammar_builder, formatter_builder)?,
-        &_ => return Err(GenError::RegionTypeErr(region_type.clone()))
-    }
-
-    Ok(())
-}
-
-//TODO generalize region handling using enums and maps
-
-fn traverse_alphabet_region<CDFABuilderType, CDFAType>(
-    alphabet_node: &Tree,
-    cdfa_builder: &mut CDFABuilderType,
-) where
-    CDFAType: CDFA<usize, String>,
-    CDFABuilderType: CDFABuilder<String, String, CDFAType>
-{
-    let escaped_alphabet = alphabet_node.get_child(1).lhs.lexeme.trim_matches('\'');
-    let alphabet = string_utils::replace_escapes(&escaped_alphabet);
-
-    cdfa_builder.set_alphabet(alphabet.chars());
-}
-
-fn traverse_cdfa_region<CDFABuilderType, CDFAType>(
-    cdfa_node: &Tree,
-    cdfa_builder: &mut CDFABuilderType,
-) -> Result<(), GenError> where
-    CDFAType: CDFA<usize, String>,
-    CDFABuilderType: CDFABuilder<String, String, CDFAType>
-{
-    generate_cdfa_states(cdfa_node.get_child(2), cdfa_builder)
-}
-
-fn traverse_grammar_region(
-    grammar_node: &Tree,
-    grammar_builder: &mut GrammarBuilder,
-    formatter_builder: &mut FormatterBuilder,
-) -> Result<(), GenError> {
-    generate_grammar_prods(grammar_node.get_child(2), grammar_builder, formatter_builder)
-}
-
-fn generate_cdfa_states<CDFABuilderType, CDFAType>(
-    states_node: &Tree,
-    builder: &mut CDFABuilderType,
-) -> Result<(), GenError> where
-    CDFAType: CDFA<usize, String>,
-    CDFABuilderType: CDFABuilder<String, String, CDFAType>
-{
-    let state_node = states_node.get_child(states_node.children.len() - 1);
-
-    let sdec_node = state_node.get_child(0);
-
-    let targets_node = sdec_node.get_child(0);
-    let head_state = &targets_node.get_child(targets_node.children.len() - 1).lhs.lexeme;
-
-    let mut states: Vec<&State> = vec![head_state];
-    if targets_node.children.len() == 3 {
-        generate_cdfa_targets(targets_node.get_child(0), &mut states);
-    }
-
-    if sdec_node.children.len() == 2 {
-        let acceptor_node = sdec_node.get_child(1);
-        let id_or_def_node = acceptor_node.get_child(1);
-        let token = &id_or_def_node.get_child(0).lhs.lexeme;
-
-        for state in &states {
-            add_cdfa_tokenizer(acceptor_node, *state, None, token, builder)?;
-        }
-    }
-
-    let transopt_node = state_node.get_child(1);
-    if !transopt_node.is_empty() {
-        generate_cdfa_trans(transopt_node.get_child(0), &states, builder)?;
-    }
-
-    if states_node.children.len() == 2 {
-        generate_cdfa_states(states_node.get_child(0), builder)
-    } else {
-        builder.mark_start(head_state);
-        Ok(())
-    }
-}
-
-fn generate_cdfa_targets<'tree>(
-    targets_node: &'tree Tree,
-    accumulator: &mut Vec<&'tree State>,
-) {
-    accumulator.push(&targets_node.get_child(targets_node.children.len() - 1).lhs.lexeme);
-    if targets_node.children.len() == 3 {
-        generate_cdfa_targets(targets_node.get_child(0), accumulator);
-    }
-}
-
-fn generate_cdfa_trans<CDFABuilderType, CDFAType>(
-    trans_node: &Tree,
-    sources: &Vec<&State>,
-    builder: &mut CDFABuilderType,
-) -> Result<(), GenError> where
-    CDFAType: CDFA<usize, String>,
-    CDFABuilderType: CDFABuilder<String, String, CDFAType>
-{
-    let tran_node = trans_node.get_child(trans_node.children.len() - 1);
-
-    let trand_node = tran_node.get_child(2);
-
-    let dest = match &trand_node.get_child(0).lhs.kind[..] {
-        "ID" => &trand_node.get_child(0).lhs.lexeme,
-        "acceptor" => {
-            let acceptor_node = trand_node.get_child(0);
-            let id_or_def_node = acceptor_node.get_child(1);
-            let token = &id_or_def_node.get_child(0).lhs.lexeme;
-
-            // Immediate state pass-through
-            for source in sources {
-                add_cdfa_tokenizer(acceptor_node, token, Some(*source), token, builder)?;
-            }
-
-            token
-        }
-        kind => panic!("Unexpected transition destination kind: {}", kind)
-    };
-
-    let matcher = tran_node.get_child(0);
-    match &matcher.lhs.kind[..] {
-        "mtcs" => {
-            generate_cdfa_mtcs(matcher, sources, dest, builder)?;
-        }
-        "DEF" => for source in sources {
-            builder.default_to(source, dest)?;
-        },
-        &_ => panic!("Transition map input is neither CILC or DEF"),
-    }
-
-    if trans_node.children.len() == 2 {
-        generate_cdfa_trans(trans_node.get_child(0), sources, builder)
-    } else {
-        Ok(())
-    }
-}
-
-fn generate_cdfa_mtcs<CDFABuilderType, CDFAType>(
-    mtcs_node: &Tree,
-    sources: &Vec<&State>,
-    dest: &State,
-    builder: &mut CDFABuilderType,
-) -> Result<(), GenError> where
-    CDFAType: CDFA<usize, String>,
-    CDFABuilderType: CDFABuilder<String, String, CDFAType>
-{
-    let mtc_node = mtcs_node.children.last().unwrap();
-
-    if mtc_node.children.len() == 1 {
-        let matcher = mtc_node.get_child(0);
-        let matcher_string: String = matcher.lhs.lexeme.chars()
-            .skip(1)
-            .take(matcher.lhs.lexeme.len() - 2)
-            .collect();
-        let matcher_cleaned = string_utils::replace_escapes(&matcher_string);
-        if matcher_cleaned.len() == 1 {
-            for source in sources {
-                builder.mark_trans(source, dest, matcher_cleaned.chars().next().unwrap())?;
-            }
-        } else {
-            for source in sources {
-                builder.mark_chain(source, dest, matcher_cleaned.chars())?;
-            }
-        }
-    } else {
-        let range_start_node = mtc_node.get_child(0);
-        let range_end_node = mtc_node.get_child(2);
-
-        let escaped_range_start_string: String = range_start_node.lhs.lexeme.chars()
-            .skip(1)
-            .take(range_start_node.lhs.lexeme.len() - 2)
-            .collect();
-
-        let range_start_string = string_utils::replace_escapes(&escaped_range_start_string);
-        if range_start_string.len() > 1 {
-            return Err(GenError::MatcherErr(format!(
-                "Range start must be one character, but was '{}'", range_start_string
-            )));
-        }
-
-        let escaped_range_end_string: String = range_end_node.lhs.lexeme.chars()
-            .skip(1)
-            .take(range_end_node.lhs.lexeme.len() - 2)
-            .collect();
-
-        let range_end_string: String = string_utils::replace_escapes(&escaped_range_end_string);
-        if range_end_string.len() > 1 {
-            return Err(GenError::MatcherErr(format!(
-                "Range end must be one character, but was '{}'", range_end_string
-            )));
-        }
-
-        let range_start = range_start_string.chars().next().unwrap();
-        let range_end = range_end_string.chars().next().unwrap();
-
-        builder.mark_range_for_all(sources.iter(), dest, range_start, range_end)?;
-    }
-
-    if mtcs_node.children.len() == 3 {
-        generate_cdfa_mtcs(mtcs_node.get_child(0), sources, dest, builder)
-    } else {
-        Ok(())
-    }
-}
-
-fn add_cdfa_tokenizer<CDFABuilderType, CDFAType>(
-    acceptor_node: &Tree,
-    state: &State,
-    from: Option<&State>,
-    kind: &String,
-    builder: &mut CDFABuilderType,
-) -> Result<(), GenError> where
-    CDFAType: CDFA<usize, String>,
-    CDFABuilderType: CDFABuilder<String, String, CDFAType>
-{
-    let accd_opt_node = acceptor_node.get_child(2);
-    if accd_opt_node.is_empty() {
-        builder.accept(state);
-    } else {
-        let acceptor_destination = &accd_opt_node.get_child(1).lhs.lexeme;
-        match from {
-            None => builder.accept_to_from_all(state, acceptor_destination)?,
-            Some(from_state) => builder.accept_to(state, from_state, acceptor_destination)?
-        };
-    }
-
-    if kind != DEF_MATCHER {
-        builder.tokenize(state, kind);
-    }
-    Ok(())
-}
-
-fn generate_grammar_prods(
-    prods_node: &Tree,
-    grammar_builder: &mut GrammarBuilder,
-    formatter_builder: &mut FormatterBuilder,
-) -> Result<(), GenError> {
-    if prods_node.children.len() == 2 {
-        generate_grammar_prods(prods_node.get_child(0), grammar_builder, formatter_builder)?;
-    }
-
-    let prod_node = prods_node.get_child(prods_node.children.len() - 1);
-
-    let id = &prod_node.get_child(0).lhs.lexeme;
-
-    let def_pattern_node = &prod_node.get_child(1);
-
-    generate_grammar_rhss(
-        prod_node.get_child(2),
-        id,
-        def_pattern_node,
-        grammar_builder,
-        formatter_builder,
-    )
-}
-
-fn generate_grammar_rhss(
-    rhss_node: &Tree,
-    lhs: &String,
-    def_pattern_node: &Tree,
-    grammar_builder: &mut GrammarBuilder,
-    formatter_builder: &mut FormatterBuilder,
-) -> Result<(), GenError> {
-    let rhs_node = rhss_node.get_child(rhss_node.children.len() - 1);
-
-    let mut ids: Vec<String> = Vec::new();
-    generate_grammar_ids(rhs_node.get_child(1), &mut ids, grammar_builder);
-
-    let production = Production {
-        lhs: lhs.clone(),
-        rhs: ids,
-    };
-
-    grammar_builder.try_mark_start(lhs);
-    grammar_builder.add_production(production.clone());
-
-    let mut pattopt_node = rhs_node.get_child(2);
-    if pattopt_node.is_empty() {
-        pattopt_node = def_pattern_node
-    }
-
-    if !pattopt_node.is_empty() {
-        let pattc = &pattopt_node.get_child(0).lhs.lexeme;
-        let pattern_string = &pattc[..].trim_matches('`');
-        let pattern = string_utils::replace_escapes(pattern_string);
-
-        formatter_builder.add_pattern(PatternPair {
-            production,
-            pattern,
-        })?;
-    }
-
-    if rhss_node.children.len() == 2 {
-        generate_grammar_rhss(
-            rhss_node.get_child(0),
-            lhs,
-            def_pattern_node,
-            grammar_builder,
-            formatter_builder,
-        )?;
-    }
-
-    Ok(())
-}
-
-fn generate_grammar_ids(
-    ids_node: &Tree,
-    ids_accumulator: &mut Vec<String>,
-    grammar_builder: &mut GrammarBuilder,
-) {
-    if !ids_node.is_empty() {
-        generate_grammar_ids(ids_node.get_child(0), ids_accumulator, grammar_builder);
-
-        let id_node = ids_node.get_child(1);
-        let id = match &id_node.lhs.kind[..] {
-            "ID" => id_node.lhs.lexeme.clone(),
-            "COPTID" => {
-                let lex = &id_node.lhs.lexeme[..];
-                let dest = &lex[1..lex.len() - 1];
-                grammar_builder.add_optional_state(dest)
-            }
-            &_ => panic!("Production identifier is neither an ID or a COPTID")
-        };
-
-        ids_accumulator.push(id);
-    }
-}
-
-fn orphan_check(ecdfa: &EncodedCDFA<Kind>, grammar: &Grammar) -> Result<(), GenError> {
-    let mut ecdfa_products: HashSet<&String> = HashSet::new();
-    for product in ecdfa.produces() {
-        ecdfa_products.insert(product);
-    }
-
-    for symbol in grammar.terminals() {
-        if !ecdfa_products.contains(symbol) {
-            return Err(GenError::MappingErr(format!(
-                "Orphaned terminal '{}' is not tokenized by the ECDFA", symbol
-            )));
-        }
-    }
-
-    Ok(())
-}
-
-pub fn parse_spec(input: &str) -> Result<Tree, ParseError> {
-    SPEC_ECDFA.with(|cdfa| -> Result<Tree, ParseError> {
-        let mut iter = input.chars();
-        let mut getter = || iter.next();
-        let mut source = StreamSource::observe(&mut getter);
-
-        let tokens = scan::def_scanner().scan(&mut source, cdfa)?;
-        let parse = parse::def_parser().parse(tokens, &SPEC_GRAMMAR)?;
-        Ok(parse)
-    })
 }
 
 #[derive(Debug)]
@@ -820,7 +130,7 @@ mod tests {
         let input = "alphabet' 'cdfa{start;}grammar{s|s b;}";
 
         //exercise
-        let tree = parse_spec(input).unwrap();
+        let tree = lang::parse_spec(input).unwrap();
 
         //verify
         assert_eq!(tree.to_string(),
@@ -907,7 +217,7 @@ grammar {
         ";
 
         //exercise
-        let tree = parse_spec(input).unwrap();
+        let tree = lang::parse_spec(input).unwrap();
 
         //verify
         assert_eq!(tree.to_string(),
@@ -1155,7 +465,7 @@ grammar {
         let parser = parse::def_parser();
 
         //specification
-        let tree = parse_spec(spec);
+        let tree = lang::parse_spec(spec);
         let parse = tree.unwrap();
         let (cdfa, grammar, formatter) = generate_spec(&parse).unwrap();
 
@@ -1234,7 +544,7 @@ grammar {
 
         let scanner = scan::def_scanner();
 
-        let tree = parse_spec(spec);
+        let tree = lang::parse_spec(spec);
         let parse = tree.unwrap();
         let (cdfa, _, _) = generate_spec(&parse).unwrap();
 
@@ -1287,7 +597,7 @@ grammar {
 
         let scanner = scan::def_scanner();
 
-        let tree = parse_spec(spec);
+        let tree = lang::parse_spec(spec);
         let parse = tree.unwrap();
         let (cdfa, _, _) = generate_spec(&parse).unwrap();
 
@@ -1334,7 +644,7 @@ grammar {
 
         let scanner = scan::def_scanner();
 
-        let tree = parse_spec(spec);
+        let tree = lang::parse_spec(spec);
         let parse = tree.unwrap();
         let (cdfa, _, _) = generate_spec(&parse).unwrap();
 
@@ -1379,7 +689,7 @@ grammar {
         let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
 
         let scanner = scan::def_scanner();
-        let tree = parse_spec(spec);
+        let tree = lang::parse_spec(spec);
         let parse = tree.unwrap();
         let (cdfa, _, _) = generate_spec(&parse).unwrap();
 
@@ -1439,7 +749,7 @@ grammar {
         ";
 
         //exercise
-        let tree = parse_spec(input).unwrap();
+        let tree = lang::parse_spec(input).unwrap();
 
         //verify
         assert_eq!(tree.to_string(),
@@ -1580,7 +890,7 @@ grammar {
         ";
 
         //exercise
-        let tree = parse_spec(spec).unwrap();
+        let tree = lang::parse_spec(spec).unwrap();
 
         //verify
         assert_eq!(tree.to_string(),
@@ -1691,7 +1001,7 @@ grammar {
         let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
 
         let scanner = scan::def_scanner();
-        let tree = parse_spec(spec);
+        let tree = lang::parse_spec(spec);
         let parse = tree.unwrap();
         let (cdfa, grammar, _) = generate_spec(&parse).unwrap();
         let parser = parse::def_parser();
@@ -1752,7 +1062,7 @@ grammar {
         ";
 
         //exercise
-        let tree = parse_spec(spec).unwrap();
+        let tree = lang::parse_spec(spec).unwrap();
 
         //verify
         assert_eq!(tree.to_string(),
@@ -1874,7 +1184,7 @@ grammar {
         let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
 
         let scanner = scan::def_scanner();
-        let tree = parse_spec(spec);
+        let tree = lang::parse_spec(spec);
         let parse = tree.unwrap();
         let (cdfa, _, _) = generate_spec(&parse).unwrap();
 
@@ -1940,7 +1250,7 @@ grammar {
         let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
 
         let scanner = scan::def_scanner();
-        let tree = parse_spec(spec);
+        let tree = lang::parse_spec(spec);
         let parse = tree.unwrap();
         let (cdfa, _, _) = generate_spec(&parse).unwrap();
 
