@@ -30,27 +30,35 @@ pub static DEF_MATCHER: &'static str = "_";
 
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
 enum S {
-    START,
-    HAT,
-    MINUS,
-    BSLASH,
-    PATT,
-    PATTC,
-    CIL,
-    CILC,
-    CILBS,
-    COMMENT,
-    SEMI,
-    DEF,
-    OR,
-    WS,
-    ID,
-    OPTID,
-    COPTID,
-    ARROW,
-    DOT,
-    RANGE,
-    FAIL,
+    Start,
+    Alphabet,
+    AlphabetTag,
+    CDFA,
+    CDFATag,
+    CDFAEntryBrace,
+    CDFABody,
+    Grammar,
+    GrammarTag,
+    GrammarEntryBrace,
+    GrammarBody,
+    RegionExitBrace,
+    Or,
+    Hat,
+    Arrow,
+    Range,
+    Pattern,
+    PatternPartial,
+    Cil,
+    CilPartial,
+    CilEscaped,
+    Comment,
+    Semi,
+    Def,
+    Whitespace,
+    Id,
+    OptIdPartial,
+    OptId,
+    Fail,
 }
 
 thread_local! {
@@ -65,83 +73,161 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<String>, scan::CDFAError> {
     let mut builder: EncodedCDFABuilder<S, String> = EncodedCDFABuilder::new();
 
     builder.set_alphabet(SPEC_ALPHABET.chars())
-        .mark_start(&S::START);
+        .mark_start(&S::Start);
 
-    builder.state(&S::START)
-        .mark_trans(&S::HAT, '^')?
-        .mark_trans(&S::MINUS, '-')?
-        .mark_trans(&S::BSLASH, '\\')?
-        .mark_trans(&S::PATT, '`')?
-        .mark_trans(&S::CIL, '\'')?
-        .mark_trans(&S::COMMENT, '#')?
-        .mark_trans(&S::SEMI, ';')?
-        .mark_trans(&S::DEF, '_')?
-        .mark_trans(&S::OR, '|')?
-        .mark_trans(&S::OPTID, '[')?
-        .mark_trans(&S::DOT, '.')?
-        .mark_trans(&S::WS, ' ')?
-        .mark_trans(&S::WS, '\t')?
-        .mark_trans(&S::WS, '\n')?
-        .mark_range(&S::ID, '0', 'Z')?;
+    builder.state(&S::Start)
+        .mark_chain(&S::AlphabetTag, "alphabet".chars())?
+        .mark_chain(&S::CDFATag, "cdfa")?
+        .mark_chain(&S::GrammarTag, "grammar")?
+        .mark_trans(&S::Comment, '#')?
+        .mark_trans(&S::Whitespace, ' ')?
+        .mark_trans(&S::Whitespace, '\t')?
+        .mark_trans(&S::Whitespace, '\n')?;
 
-    builder.mark_trans(&S::MINUS, &S::ARROW, '>')?;
+    // Alphabet
 
-    builder.state(&S::OPTID)
-        .mark_trans(&S::COPTID, ']')?
-        .mark_range(&S::OPTID, '_', 'Z')?;
+    builder.state(&S::AlphabetTag)
+        .accept_to_from_all(&S::Alphabet)?
+        .tokenize(&"ALP_T".to_string());
 
-    builder.state(&S::ID)
-        .mark_range(&S::ID, '_', 'Z')?
+    builder.state(&S::Alphabet)
+        .mark_trans(&S::CilPartial, '\'')?
+        .mark_trans(&S::Comment, '#')?
+        .mark_trans(&S::Whitespace, ' ')?
+        .mark_trans(&S::Whitespace, '\t')?
+        .mark_trans(&S::Whitespace, '\n')?;
+
+    // CDFA
+
+    builder.state(&S::CDFATag)
+        .accept_to_from_all(&S::CDFA)?
+        .tokenize(&"CDFA_T".to_string());
+
+    builder.state(&S::CDFA)
+        .mark_trans(&S::CDFAEntryBrace, '{')?
+        .mark_trans(&S::Comment, '#')?
+        .mark_trans(&S::Whitespace, ' ')?
+        .mark_trans(&S::Whitespace, '\t')?
+        .mark_trans(&S::Whitespace, '\n')?;
+
+    builder.state(&S::CDFAEntryBrace)
+        .accept_to_from_all(&S::CDFABody)?
+        .tokenize(&"LBRACE".to_string());
+
+    builder.state(&S::CDFABody)
+        .mark_trans(&S::Or, '|')?
+        .mark_trans(&S::Semi, ';')?
+        .mark_trans(&S::CilPartial, '\'')?
+        .mark_range(&S::Id, '0', 'Z')?
+        .mark_trans(&S::Hat, '^')?
+        .mark_chain(&S::Arrow, "->".chars())?
+        .mark_chain(&S::Range, "..".chars())?
+        .mark_trans(&S::Def, '_')?
+        .mark_trans(&S::RegionExitBrace, '}')?
+        .mark_trans(&S::Comment, '#')?
+        .mark_trans(&S::Whitespace, ' ')?
+        .mark_trans(&S::Whitespace, '\t')?
+        .mark_trans(&S::Whitespace, '\n')?;
+
+    builder.state(&S::Hat)
+        .accept()
+        .tokenize(&"HAT".to_string());
+
+    builder.state(&S::Arrow)
+        .accept()
+        .tokenize(&"ARROW".to_string());
+
+    builder.state(&S::Range)
+        .accept()
+        .tokenize(&"RANGE".to_string());
+
+    builder.state(&S::Def)
+        .accept()
+        .tokenize(&"DEF".to_string());
+
+    // Grammar
+
+    builder.state(&S::GrammarTag)
+        .accept_to_from_all(&S::Grammar)?
+        .tokenize(&"GRAM_T".to_string());
+
+    builder.state(&S::Grammar)
+        .mark_trans(&S::GrammarEntryBrace, '{')?
+        .mark_trans(&S::Comment, '#')?
+        .mark_trans(&S::Whitespace, ' ')?
+        .mark_trans(&S::Whitespace, '\t')?
+        .mark_trans(&S::Whitespace, '\n')?;
+
+    builder.state(&S::GrammarEntryBrace)
+        .accept_to_from_all(&S::GrammarBody)?
+        .tokenize(&"LBRACE".to_string());
+
+    builder.state(&S::GrammarBody)
+        .mark_trans(&S::Or, '|')?
+        .mark_trans(&S::Semi, ';')?
+        .mark_range(&S::Id, '0', 'Z')?
+        .mark_trans(&S::OptIdPartial, '[')?
+        .mark_trans(&S::PatternPartial, '`')?
+        .mark_trans(&S::RegionExitBrace, '}')?
+        .mark_trans(&S::Comment, '#')?
+        .mark_trans(&S::Whitespace, ' ')?
+        .mark_trans(&S::Whitespace, '\t')?
+        .mark_trans(&S::Whitespace, '\n')?;
+
+    builder.state(&S::OptIdPartial)
+        .mark_trans(&S::OptId, ']')?
+        .mark_range(&S::OptIdPartial, '_', 'Z')?;
+
+    builder.state(&S::OptId)
+        .accept()
+        .tokenize(&"COPTID".to_string());
+
+    builder.state(&S::PatternPartial)
+        .mark_trans(&S::Pattern, '`')?
+        .default_to(&S::PatternPartial)?;
+
+    builder.state(&S::Pattern)
+        .accept()
+        .tokenize(&"PATTC".to_string());
+
+    // Shared
+
+    builder.state(&S::Whitespace)
+        .accept();
+
+    builder.state(&S::RegionExitBrace)
+        .accept_to_from_all(&S::Start)?
+        .tokenize(&"RBRACE".to_string());
+
+    builder.state(&S::Or)
+        .accept()
+        .tokenize(&"OR".to_string());
+
+    builder.state(&S::Semi)
+        .accept()
+        .tokenize(&"SEMI".to_string());
+
+    builder.state(&S::CilPartial)
+        .mark_trans(&S::Cil, '\'')?
+        .mark_trans(&S::CilEscaped, '\\')?
+        .default_to(&S::CilPartial)?;
+
+    builder.state(&S::Cil)
+        .accept()
+        .tokenize(&"CILC".to_string());
+
+    builder.state(&S::CilEscaped)
+        .default_to(&S::CilPartial)?;
+
+    builder.state(&S::Id)
+        .mark_range(&S::Id, '_', 'Z')?
         .accept()
         .tokenize(&"ID".to_string());
 
-    builder.state(&S::WS)
-        .mark_trans(&S::WS, ' ')?
-        .mark_trans(&S::WS, '\t')?
-        .mark_trans(&S::WS, '\n')?
+    builder.state(&S::Comment)
+        .mark_trans(&S::Fail, '\n')?
+        .default_to(&S::Comment)?
         .accept();
-
-    builder.state(&S::PATT)
-        .mark_trans(&S::PATTC, '`')?
-        .default_to(&S::PATT)?;
-
-    builder.state(&S::CIL)
-        .mark_trans(&S::CILC, '\'')?
-        .mark_trans(&S::CILBS, '\\')?
-        .default_to(&S::CIL)?;
-
-    builder.default_to(&S::CILBS, &S::CIL)?;
-
-    builder.mark_trans(&S::DOT, &S::RANGE, '.')?;
-
-    builder.state(&S::COMMENT)
-        .mark_trans(&S::FAIL, '\n')?
-        .default_to(&S::COMMENT)?
-        .accept();
-
-    builder
-        .accept(&S::HAT)
-        .accept(&S::ARROW)
-        .accept(&S::PATTC)
-        .accept(&S::CILC)
-        .accept(&S::CILC)
-        .accept(&S::COPTID)
-        .accept(&S::DEF)
-        .accept(&S::SEMI)
-        .accept(&S::OR)
-        .accept(&S::RANGE);
-
-    builder
-        .tokenize(&S::HAT, &"HAT".to_string())
-        .tokenize(&S::ARROW, &"ARROW".to_string())
-        .tokenize(&S::PATTC, &"PATTC".to_string())
-        .tokenize(&S::CILC, &"CILC".to_string())
-        .tokenize(&S::CILC, &"CILC".to_string())
-        .tokenize(&S::COPTID, &"COPTID".to_string())
-        .tokenize(&S::DEF, &"DEF".to_string())
-        .tokenize(&S::SEMI, &"SEMI".to_string())
-        .tokenize(&S::OR, &"OR".to_string())
-        .tokenize(&S::RANGE, &"RANGE".to_string());
 
     builder.build()
 }
