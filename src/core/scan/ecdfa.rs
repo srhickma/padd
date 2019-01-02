@@ -974,13 +974,13 @@ ID <- 'fdk'
             .accept_to_from_all(&S::Hidden).unwrap();
         builder.state(&S::BangOut)
             .tokenize(&"BANG".to_string())
-            .accept();
+            .accept_to_from_all(&S::Start);
         builder.state(&S::Hidden)
             .mark_range(&S::Num, '1', '9').unwrap()
             .mark_trans(&S::BangOut, '!').unwrap();
         builder.state(&S::Num)
             .tokenize(&"NUM".to_string())
-            .accept_to_from_all(&S::Hidden).unwrap();
+            .accept();
 
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
 

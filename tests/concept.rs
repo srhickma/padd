@@ -277,9 +277,9 @@ a       ^A
 
 hidden
     '1' .. '9' -> num
-    '!' -> ^_;
+    '!' -> ^_ -> start;
 
-num     ^NUM -> hidden
+num     ^NUM
     '1' .. '9' -> num;
 
 s
@@ -322,15 +322,15 @@ r2_dec
    '{' -> ^LBRACE_R2 -> r2_body;
 
 r1_body
-    'a' -> ^A -> r1_body
-    'b' -> ^B -> r1_body
-    '}' -> ^RBRACE;
+    'a' -> ^A
+    'b' -> ^B
+    '}' -> ^RBRACE -> start;
 
 r2_body
     '0' .. '9' -> num
-    '}' -> ^RBRACE;
+    '}' -> ^RBRACE -> start;
 
-num     ^NUM -> r2_body
+num     ^NUM
     '0' .. '9' -> num;
 
 s
