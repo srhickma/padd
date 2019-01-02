@@ -33,6 +33,9 @@ enum S {
     Start,
     Alphabet,
     AlphabetTag,
+    AlphabetString,
+    AlphabetStringPartial,
+    AlphabetStringEscaped,
     CDFA,
     CDFATag,
     CDFAEntryBrace,
@@ -77,8 +80,8 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<String>, scan::CDFAError> {
 
     builder.state(&S::Start)
         .mark_chain(&S::AlphabetTag, "alphabet".chars())?
-        .mark_chain(&S::CDFATag, "cdfa")?
-        .mark_chain(&S::GrammarTag, "grammar")?
+        .mark_chain(&S::CDFATag, "cdfa".chars())?
+        .mark_chain(&S::GrammarTag, "grammar".chars())?
         .mark_trans(&S::Comment, '#')?
         .mark_trans(&S::Whitespace, ' ')?
         .mark_trans(&S::Whitespace, '\t')?
@@ -88,20 +91,32 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<String>, scan::CDFAError> {
 
     builder.state(&S::AlphabetTag)
         .accept_to_from_all(&S::Alphabet)?
-        .tokenize(&"ALP_T".to_string());
+        .tokenize(&"ALPHABET".to_string());
 
     builder.state(&S::Alphabet)
-        .mark_trans(&S::CilPartial, '\'')?
+        .mark_trans(&S::AlphabetStringPartial, '\'')?
         .mark_trans(&S::Comment, '#')?
         .mark_trans(&S::Whitespace, ' ')?
         .mark_trans(&S::Whitespace, '\t')?
         .mark_trans(&S::Whitespace, '\n')?;
 
+    builder.state(&S::AlphabetStringPartial)
+        .mark_trans(&S::AlphabetString, '\'')?
+        .mark_trans(&S::AlphabetStringEscaped, '\\')?
+        .default_to(&S::AlphabetStringPartial)?;
+
+    builder.state(&S::AlphabetString)
+        .accept_to_from_all(&S::Start)?
+        .tokenize(&"CILC".to_string());
+
+    builder.state(&S::AlphabetStringEscaped)
+        .default_to(&S::AlphabetStringPartial)?;
+
     // CDFA
 
     builder.state(&S::CDFATag)
         .accept_to_from_all(&S::CDFA)?
-        .tokenize(&"CDFA_T".to_string());
+        .tokenize(&"CDFA".to_string());
 
     builder.state(&S::CDFA)
         .mark_trans(&S::CDFAEntryBrace, '{')?
@@ -149,7 +164,7 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<String>, scan::CDFAError> {
 
     builder.state(&S::GrammarTag)
         .accept_to_from_all(&S::Grammar)?
-        .tokenize(&"GRAM_T".to_string());
+        .tokenize(&"GRAMMAR".to_string());
 
     builder.state(&S::Grammar)
         .mark_trans(&S::GrammarEntryBrace, '{')?
@@ -233,9 +248,11 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<String>, scan::CDFAError> {
 }
 
 fn build_spec_grammar() -> Grammar {
+    //TODO allow regions to be in any order
     let productions = parse::build_prods(&[
-        "spec dfa gram",
-        "dfa CILC states",
+        "spec alphabet cdfa grammar",
+        "alphabet ALPHABET CILC",
+        "cdfa CDFA LBRACE states RBRACE",
         "states states state",
         "states state",
         "state sdec trans_opt SEMI",
@@ -258,13 +275,13 @@ fn build_spec_grammar() -> Grammar {
         "mtcs mtc",
         "mtc CILC",
         "mtc CILC RANGE CILC",
-        "gram prods",
+        "grammar GRAMMAR LBRACE prods RBRACE",
         "prods prods prod",
         "prods prod",
         "prod ID patt_opt rhss SEMI",
         "rhss rhss rhs",
         "rhss rhs",
-        "rhs ARROW ids patt_opt",
+        "rhs OR ids patt_opt",
         "patt_opt PATTC",
         "patt_opt ",
         "ids ids ID",
@@ -281,8 +298,8 @@ fn build_spec_grammar() -> Grammar {
 }
 
 pub fn generate_spec(parse: &Tree) -> Result<(EncodedCDFA<Kind>, Grammar, Formatter), GenError> {
-    let ecdfa = generate_ecdfa(parse.get_child(0))?;
-    let (grammar, formatter) = traverse_grammar(parse.get_child(1))?;
+    let ecdfa = generate_ecdfa(parse)?;
+    let (grammar, formatter) = traverse_grammar(parse.get_child(2))?;
 
     orphan_check(&ecdfa, &grammar)?;
 
@@ -331,27 +348,19 @@ impl From<fmt::BuildError> for GenError {
     }
 }
 
-fn generate_ecdfa(tree: &Tree) -> Result<EncodedCDFA<Kind>, GenError> {
+fn generate_ecdfa(parse: &Tree) -> Result<EncodedCDFA<Kind>, GenError> {
     let mut builder = EncodedCDFABuilder::new();
 
-    generate_cdfa_alphabet(tree, &mut builder);
+    builder.set_alphabet(get_alphabet(parse.get_child(0)).chars());
 
-    generate_cdfa_states(tree.get_child(1), &mut builder)?;
+    generate_cdfa_states(parse.get_child(1).get_child(2), &mut builder)?;
 
     Ok(builder.build()?)
 }
 
-fn generate_cdfa_alphabet<CDFABuilderType, CDFAType>(
-    tree: &Tree,
-    builder: &mut CDFABuilderType,
-) where
-    CDFAType: CDFA<usize, String>,
-    CDFABuilderType: CDFABuilder<String, String, CDFAType>
-{
-    let alphabet_string = tree.get_child(0).lhs.lexeme.trim_matches('\'');
-    let alphabet = string_utils::replace_escapes(&alphabet_string);
-
-    builder.set_alphabet(alphabet.chars());
+fn get_alphabet(alphabet_node: &Tree) -> String {
+    let alphabet_string = alphabet_node.get_child(1).lhs.lexeme.trim_matches('\'');
+    string_utils::replace_escapes(&alphabet_string)
 }
 
 fn generate_cdfa_states<CDFABuilderType, CDFAType>(
@@ -552,7 +561,7 @@ fn traverse_grammar(tree: &Tree) -> Result<(Grammar, Formatter), GenError> {
     let mut grammar_builder = GrammarBuilder::new();
     let mut formatter_builder = FormatterBuilder::new();
 
-    generate_grammar_prods(tree.get_child(0), &mut grammar_builder, &mut formatter_builder)?;
+    generate_grammar_prods(tree.get_child(2), &mut grammar_builder, &mut formatter_builder)?;
 
     Ok((grammar_builder.build(), formatter_builder.build()))
 }
@@ -999,23 +1008,33 @@ w -> WHITESPACE `[prefix]{0}\n\n{1;prefix=[prefix]\t}[prefix]{2}\n\n`
     fn generate_spec_simple() {
         //setup
         let spec = "
-' \\t\\n{}'
+alphabet ' \\t\\n{}'
 
-# dfa
-start ' ' | '\\t' | '\\n' -> ws
- '{' -> lbr
- '}' -> rbr;
-ws^WHITESPACE
- ' ' | '\\t' | '\\n' -> ws;
-lbr^LBRACKET;
-rbr^RBRACKET;
+cdfa {
+    start
+        ' ' | '\\t' | '\\n' -> ws
+        '{' -> lbr
+        '}' -> rbr;
 
-# grammar
-s -> s b
-  -> ;
-b -> LBRACKET s RBRACKET `[prefix]{0}\\n\\n{1;prefix=[prefix]\\t}[prefix]{2}\\n\\n`
-  -> w ;
-w -> WHITESPACE ``;
+    ws  ^WHITESPACE
+        ' ' | '\\t' | '\\n' -> ws;
+
+    lbr ^LBRACKET;
+
+    rbr ^RBRACKET;
+}
+
+grammar {
+    s
+        | s b
+        | ;
+
+    b
+        | LBRACKET s RBRACKET `[prefix]{0}\\n\\n{1;prefix=[prefix]\\t}[prefix]{2}\\n\\n`
+        | w ;
+
+    w   | WHITESPACE ``;
+}
         ";
 
         let input = "  {  {  {{{\t}}}\n {} }  }   { {}\n } ".to_string();
@@ -1081,18 +1100,23 @@ w -> WHITESPACE ``;
     fn generate_spec_advanced_operators() {
         //setup
         let spec = "
-        'inj '
+alphabet 'inj '
 
-        start
-            'in' -> ^IN
-            ' ' -> ^_
-            _ -> ^ID;
+cdfa {
+    start
+        'in' -> ^IN
+        ' ' -> ^_
+        _ -> ^ID;
 
-        ID | IN
-            ' ' -> fail
-            _ -> ID;
+    ID | IN
+        ' ' -> fail
+        _ -> ID;
+}
 
-        s ->;";
+grammar {
+    s |;
+}
+        ";
 
         let input = "i ij ijjjijijiji inj in iii".to_string();
         let mut iter = input.chars();
@@ -1131,16 +1155,20 @@ ID <- 'iii'
     fn default_matcher_conflict() {
         //setup
         let spec = "
-' c'
+alphabet ' c'
 
-start
-    ' ' -> ^WS
-    'c' -> id;
+cdfa {
+    start
+        ' ' -> ^WS
+        'c' -> id;
 
-id      ^ID
-    'c' | '_' -> id;
+    id      ^ID
+        'c' | '_' -> id;
+}
 
-s ->;
+grammar {
+    s |;
+}
         ";
 
         let input = "c c".to_string();
@@ -1167,23 +1195,27 @@ s ->;
     fn complex_id() {
         //setup
         let spec = "
-' ab_'
+alphabet ' ab_'
 
-start
-    ' ' -> ws
-    _ -> id;
+cdfa {
+    start
+        ' ' -> ws
+        _ -> id;
 
-ws      ^_;
+    ws      ^_;
 
-id      ^ID
-    'a' | 'b' | '_' -> id;
+    id      ^ID
+        'a' | 'b' | '_' -> id;
+}
 
-s
-    -> ids
-    ->;
-ids
-    -> ids ID
-    -> ID;
+grammar {
+    s
+        | ids
+        |;
+    ids
+        | ids ID
+        | ID;
+}
         ";
 
         let input = "a ababab _abab ab_abba_".to_string();
@@ -1210,22 +1242,27 @@ ids
     fn multi_character_lexing() {
         //setup
         let spec = "
-'abcdefghijklmnopqrstuvwxyz '
+alphabet 'abcdefghijklmnopqrstuvwxyz '
 
-start
-  'if' -> ^IF
-  'else' -> ^ELSE
-  'for' -> ^FOR
-  'fob' -> ^FOB
-  'final' -> ^FINAL
-  ' ' -> ^_
-  _ -> id;
+cdfa {
+    start
+        'if' -> ^IF
+        'else' -> ^ELSE
+        'for' -> ^FOR
+        'fob' -> ^FOB
+        'final' -> ^FINAL
+        ' ' -> ^_
+        _ -> id;
 
-id ^ID
- ' ' -> fail
- _ -> id;
+    id  ^ID
+        ' ' -> fail
+        _ -> id;
+}
 
-s -> ;";
+grammar {
+    s |;
+}
+        ";
 
         let input = "fdkgdfjgdjglkdjglkdjgljbnhbduhoifjeoigjeoghknhkjdfjgoirjt for if endif elseif somethign eldsfnj hi bob joe here final for fob else if id idhere fobre f ".to_string();
         let mut iter = input.chars();
@@ -1640,19 +1677,24 @@ s `{} {}`
     fn range_based_matchers() {
         //setup
         let spec = "
-'abcdefghijklmnopqrstuvwxyz'
+alphabet 'abcdefghijklmnopqrstuvwxyz'
 
-start
-  'a'..'d' -> ^A
-  'e'..'k' | 'l' -> ^B
-  'm'..'m' -> ^C
-  'n'..'o' -> ^D
-  _ -> ^E;
+cdfa {
+    start
+        'a'..'d' -> ^A
+        'e'..'k' | 'l' -> ^B
+        'm'..'m' -> ^C
+        'n'..'o' -> ^D
+        _ -> ^E;
 
-E
-    'p'..'z' -> E;
+    E
+        'p'..'z' -> E;
+}
 
-s -> ;";
+grammar {
+    s |;
+}
+        ";
 
         let input = "abcdefghijklmnopqrstuvwxyz".to_string();
         let mut iter = input.chars();
@@ -1696,24 +1738,29 @@ kind=E lexeme=pqrstuvwxyz")
     fn context_sensitive_scanner() {
         //setup
         let spec = "
-'a!123456789'
+alphabet 'a!123456789'
 
-start
-    'a' -> a
-    '!' -> bang_in;
+cdfa {
+    start
+        'a' -> a
+        '!' -> bang_in;
 
-bang_in ^BANG -> hidden;
+    bang_in ^BANG -> hidden;
 
-a       ^A
-    'a' -> a;
+    a       ^A
+        'a' -> a;
 
-hidden
-    '1' .. '9' -> num
-    '!' -> ^BANG -> start;
+    hidden
+        '1' .. '9' -> num
+        '!' -> ^BANG -> start;
 
-num     ^NUM;
+    num     ^NUM;
+}
 
-s -> ;";
+grammar {
+    s |;
+}
+        ";
 
         let input = "!!aaa!!a!49913!a".to_string();
         let mut iter = input.chars();

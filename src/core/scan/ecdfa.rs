@@ -974,7 +974,7 @@ ID <- 'fdk'
             .accept_to_from_all(&S::Hidden).unwrap();
         builder.state(&S::BangOut)
             .tokenize(&"BANG".to_string())
-            .accept_to_from_all(&S::Start);
+            .accept_to_from_all(&S::Start).unwrap();
         builder.state(&S::Hidden)
             .mark_range(&S::Num, '1', '9').unwrap()
             .mark_trans(&S::BangOut, '!').unwrap();

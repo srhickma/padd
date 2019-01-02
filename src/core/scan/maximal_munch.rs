@@ -148,6 +148,8 @@ impl<State: Data, Kind: Data> Scanner<State, Kind> for MaximalMunchScanner {
                         lexeme: result.scanned,
                     };
 
+
+                    println!("SCANNED kind={} lexeme={}", token.kind.to_string(), token.lexeme);
                     //TODO write tokens to another ReadDrivenStream
                     tokens.push(token);
                 }
