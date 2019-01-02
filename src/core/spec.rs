@@ -1623,9 +1623,9 @@ a       ^A
 
 hidden
     '1' .. '9' -> num
-    '!' -> ^BANG;
+    '!' -> ^BANG -> start;
 
-num     ^NUM -> hidden;
+num     ^NUM;
 
 s -> ;";
 

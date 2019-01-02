@@ -108,14 +108,14 @@ impl<State: Data, Kind: Data> Scanner<State, Kind> for MaximalMunchScanner {
         loop {
             let result: ScanOneResult<State> = scan_one(
                 stream_source,
-                next_start,
+                next_start.clone(),
                 line,
                 character,
                 cdfa,
             );
 
             next_start = match result.next_start {
-                None => cdfa.start(),
+                None => next_start,
                 Some(state) => state
             };
 
