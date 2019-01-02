@@ -686,4 +686,8 @@ s ->;
 
         assert!(err.cause().is_none());
     }
+
+    //TODO add test for invalid region type
+
+    //TODO add test(s) for missing spec regions
 }

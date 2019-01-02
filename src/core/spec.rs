@@ -248,9 +248,13 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<String>, scan::CDFAError> {
 }
 
 fn build_spec_grammar() -> Grammar {
-    //TODO allow regions to be in any order
     let productions = parse::build_prods(&[
-        "spec alphabet cdfa grammar",
+        "spec regions",
+        "regions regions region",
+        "regions region",
+        "region alphabet",
+        "region cdfa",
+        "region grammar",
         "alphabet ALPHABET CILC",
         "cdfa CDFA LBRACE states RBRACE",
         "states states state",
@@ -298,16 +302,28 @@ fn build_spec_grammar() -> Grammar {
 }
 
 pub fn generate_spec(parse: &Tree) -> Result<(EncodedCDFA<Kind>, Grammar, Formatter), GenError> {
-    let ecdfa = generate_ecdfa(parse)?;
-    let (grammar, formatter) = traverse_grammar(parse.get_child(2))?;
+    let mut ecdfa_builder: EncodedCDFABuilder<String, Kind> = EncodedCDFABuilder::new();
+    let mut grammar_builder = GrammarBuilder::new();
+    let mut formatter_builder = FormatterBuilder::new();
+
+    traverse_spec_regions(
+        parse.get_child(0),
+        &mut ecdfa_builder,
+        &mut grammar_builder,
+        &mut formatter_builder,
+    )?;
+
+    let ecdfa = ecdfa_builder.build()?;
+    let grammar = grammar_builder.build();
 
     orphan_check(&ecdfa, &grammar)?;
 
-    Ok((ecdfa, grammar, formatter))
+    Ok((ecdfa, grammar, formatter_builder.build()))
 }
 
 #[derive(Debug)]
 pub enum GenError {
+    RegionTypeErr(String),
     MatcherErr(String),
     MappingErr(String),
     CDFAErr(scan::CDFAError),
@@ -317,6 +333,7 @@ pub enum GenError {
 impl std::fmt::Display for GenError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
+            GenError::RegionTypeErr(ref region) => write!(f, "Invalid region type: '{}'", region),
             GenError::MatcherErr(ref err) => write!(f, "Matcher definition error: {}", err),
             GenError::MappingErr(ref err) => write!(f, "ECDFA to grammar mapping error: {}", err),
             GenError::CDFAErr(ref err) => write!(f, "ECDFA generation error: {}", err),
@@ -328,6 +345,7 @@ impl std::fmt::Display for GenError {
 impl error::Error for GenError {
     fn cause(&self) -> Option<&error::Error> {
         match *self {
+            GenError::RegionTypeErr(_) => None,
             GenError::MatcherErr(_) => None,
             GenError::MappingErr(_) => None,
             GenError::CDFAErr(ref err) => Some(err),
@@ -348,19 +366,85 @@ impl From<fmt::BuildError> for GenError {
     }
 }
 
-fn generate_ecdfa(parse: &Tree) -> Result<EncodedCDFA<Kind>, GenError> {
-    let mut builder = EncodedCDFABuilder::new();
+fn traverse_spec_regions<CDFABuilderType, CDFAType>(
+    regions_node: &Tree,
+    cdfa_builder: &mut CDFABuilderType,
+    grammar_builder: &mut GrammarBuilder,
+    formatter_builder: &mut FormatterBuilder,
+) -> Result<(), GenError> where
+    CDFAType: CDFA<usize, String>,
+    CDFABuilderType: CDFABuilder<String, String, CDFAType>
+{
+    if regions_node.children.len() == 2 {
+        traverse_spec_regions(
+            regions_node.get_child(0),
+            cdfa_builder,
+            grammar_builder,
+            formatter_builder,
+        )?;
+    }
 
-    builder.set_alphabet(get_alphabet(parse.get_child(0)).chars());
-
-    generate_cdfa_states(parse.get_child(1).get_child(2), &mut builder)?;
-
-    Ok(builder.build()?)
+    traverse_spec_region(
+        regions_node.children.last().unwrap(),
+        cdfa_builder,
+        grammar_builder,
+        formatter_builder,
+    )
 }
 
-fn get_alphabet(alphabet_node: &Tree) -> String {
-    let alphabet_string = alphabet_node.get_child(1).lhs.lexeme.trim_matches('\'');
-    string_utils::replace_escapes(&alphabet_string)
+fn traverse_spec_region<CDFABuilderType, CDFAType>(
+    region_node: &Tree,
+    cdfa_builder: &mut CDFABuilderType,
+    grammar_builder: &mut GrammarBuilder,
+    formatter_builder: &mut FormatterBuilder,
+) -> Result<(), GenError> where
+    CDFAType: CDFA<usize, String>,
+    CDFABuilderType: CDFABuilder<String, String, CDFAType>
+{
+    let region_type_node = region_node.get_child(0);
+    let region_type = &region_type_node.lhs.kind;
+
+    match &region_type[..] {
+        "alphabet" => traverse_alphabet_region(region_type_node, cdfa_builder),
+        "cdfa" => traverse_cdfa_region(region_type_node, cdfa_builder)?,
+        "grammar" => traverse_grammar_region(region_type_node, grammar_builder, formatter_builder)?,
+        &_ => return Err(GenError::RegionTypeErr(region_type.clone()))
+    }
+
+    Ok(())
+}
+
+//TODO generalize region handling using enums and maps
+
+fn traverse_alphabet_region<CDFABuilderType, CDFAType>(
+    alphabet_node: &Tree,
+    cdfa_builder: &mut CDFABuilderType,
+) where
+    CDFAType: CDFA<usize, String>,
+    CDFABuilderType: CDFABuilder<String, String, CDFAType>
+{
+    let escaped_alphabet = alphabet_node.get_child(1).lhs.lexeme.trim_matches('\'');
+    let alphabet = string_utils::replace_escapes(&escaped_alphabet);
+
+    cdfa_builder.set_alphabet(alphabet.chars());
+}
+
+fn traverse_cdfa_region<CDFABuilderType, CDFAType>(
+    cdfa_node: &Tree,
+    cdfa_builder: &mut CDFABuilderType,
+) -> Result<(), GenError> where
+    CDFAType: CDFA<usize, String>,
+    CDFABuilderType: CDFABuilder<String, String, CDFAType>
+{
+    generate_cdfa_states(cdfa_node.get_child(2), cdfa_builder)
+}
+
+fn traverse_grammar_region(
+    grammar_node: &Tree,
+    grammar_builder: &mut GrammarBuilder,
+    formatter_builder: &mut FormatterBuilder,
+) -> Result<(), GenError> {
+    generate_grammar_prods(grammar_node.get_child(2), grammar_builder, formatter_builder)
 }
 
 fn generate_cdfa_states<CDFABuilderType, CDFAType>(
@@ -557,15 +641,6 @@ fn add_cdfa_tokenizer<CDFABuilderType, CDFAType>(
     Ok(())
 }
 
-fn traverse_grammar(tree: &Tree) -> Result<(Grammar, Formatter), GenError> {
-    let mut grammar_builder = GrammarBuilder::new();
-    let mut formatter_builder = FormatterBuilder::new();
-
-    generate_grammar_prods(tree.get_child(2), &mut grammar_builder, &mut formatter_builder)?;
-
-    Ok((grammar_builder.build(), formatter_builder.build()))
-}
-
 fn generate_grammar_prods(
     prods_node: &Tree,
     grammar_builder: &mut GrammarBuilder,
@@ -742,7 +817,7 @@ mod tests {
     #[test]
     fn parse_spec_spaces() {
         //setup
-        let input = "' 'start;s->s b;";
+        let input = "alphabet' 'cdfa{start;}grammar{s|s b;}";
 
         //exercise
         let tree = parse_spec(input).unwrap();
@@ -750,34 +825,48 @@ mod tests {
         //verify
         assert_eq!(tree.to_string(),
                    "└── spec
-    ├── dfa
-    │   ├── CILC <- '' ''
-    │   └── states
-    │       └── state
-    │           ├── sdec
-    │           │   └── targets
-    │           │       └── ID <- 'start'
-    │           ├── trans_opt
-    │           │   └──  <- 'NULL'
-    │           └── SEMI <- ';'
-    └── gram
-        └── prods
-            └── prod
-                ├── ID <- 's'
-                ├── patt_opt
-                │   └──  <- 'NULL'
-                ├── rhss
-                │   └── rhs
-                │       ├── ARROW <- '->'
-                │       ├── ids
-                │       │   ├── ids
-                │       │   │   ├── ids
-                │       │   │   │   └──  <- 'NULL'
-                │       │   │   └── ID <- 's'
-                │       │   └── ID <- 'b'
-                │       └── patt_opt
-                │           └──  <- 'NULL'
-                └── SEMI <- ';'"
+    └── regions
+        ├── regions
+        │   ├── regions
+        │   │   └── region
+        │   │       └── alphabet
+        │   │           ├── ALPHABET <- 'alphabet'
+        │   │           └── CILC <- '' ''
+        │   └── region
+        │       └── cdfa
+        │           ├── CDFA <- 'cdfa'
+        │           ├── LBRACE <- '{'
+        │           ├── states
+        │           │   └── state
+        │           │       ├── sdec
+        │           │       │   └── targets
+        │           │       │       └── ID <- 'start'
+        │           │       ├── trans_opt
+        │           │       │   └──  <- 'NULL'
+        │           │       └── SEMI <- ';'
+        │           └── RBRACE <- '}'
+        └── region
+            └── grammar
+                ├── GRAMMAR <- 'grammar'
+                ├── LBRACE <- '{'
+                ├── prods
+                │   └── prod
+                │       ├── ID <- 's'
+                │       ├── patt_opt
+                │       │   └──  <- 'NULL'
+                │       ├── rhss
+                │       │   └── rhs
+                │       │       ├── OR <- '|'
+                │       │       ├── ids
+                │       │       │   ├── ids
+                │       │       │   │   ├── ids
+                │       │       │   │   │   └──  <- 'NULL'
+                │       │       │   │   └── ID <- 's'
+                │       │       │   └── ID <- 'b'
+                │       │       └── patt_opt
+                │       │           └──  <- 'NULL'
+                │       └── SEMI <- ';'
+                └── RBRACE <- '}'"
         );
     }
 
@@ -785,32 +874,36 @@ mod tests {
     fn parse_spec_simple() {
         //setup
         let input = "
-' \t\n{}'
-# dfa
-start ' ' -> ws
- '\t' -> ws
- '\n' -> ws
- '{' -> lbr
- '}' -> rbr
-;
-ws^WHITESPACE
- ' ' -> ws
- '\t' -> ws
- '\n' -> ws
-;
-lbr^LBRACKET
-;
-rbr^RBRACKET
-;
-# grammar
-s -> s b
-  ->
-;
-b -> LBRACKET s RBRACKET ``
-  -> w
-;
-w -> WHITESPACE `[prefix]{0}\n\n{1;prefix=[prefix]\t}[prefix]{2}\n\n`
-;
+alphabet ' \t\n{}'
+
+cdfa {
+    start
+        ' ' -> ws
+        '\t' -> ws
+        '\n' -> ws
+        '{' -> lbr
+        '}' -> rbr;
+
+    ws  ^WHITESPACE
+        ' ' -> ws
+        '\t' -> ws
+        '\n' -> ws;
+
+    lbr ^LBRACKET;
+
+    rbr ^RBRACKET;
+}
+
+grammar {
+    s
+        | s b
+        |;
+    b
+        | LBRACKET s RBRACKET ``
+        | w;
+
+    w | WHITESPACE `[prefix]{0}\n\n{1;prefix=[prefix]\t}[prefix]{2}\n\n`;
+}
         ";
 
         //exercise
@@ -819,188 +912,202 @@ w -> WHITESPACE `[prefix]{0}\n\n{1;prefix=[prefix]\t}[prefix]{2}\n\n`
         //verify
         assert_eq!(tree.to_string(),
                    "└── spec
-    ├── dfa
-    │   ├── CILC <- '' \\t\\n{}''
-    │   └── states
-    │       ├── states
-    │       │   ├── states
-    │       │   │   ├── states
-    │       │   │   │   └── state
-    │       │   │   │       ├── sdec
-    │       │   │   │       │   └── targets
-    │       │   │   │       │       └── ID <- 'start'
-    │       │   │   │       ├── trans_opt
-    │       │   │   │       │   └── trans
-    │       │   │   │       │       ├── trans
-    │       │   │   │       │       │   ├── trans
-    │       │   │   │       │       │   │   ├── trans
-    │       │   │   │       │       │   │   │   ├── trans
-    │       │   │   │       │       │   │   │   │   └── tran
-    │       │   │   │       │       │   │   │   │       ├── mtcs
-    │       │   │   │       │       │   │   │   │       │   └── mtc
-    │       │   │   │       │       │   │   │   │       │       └── CILC <- '' ''
-    │       │   │   │       │       │   │   │   │       ├── ARROW <- '->'
-    │       │   │   │       │       │   │   │   │       └── trand
-    │       │   │   │       │       │   │   │   │           └── ID <- 'ws'
-    │       │   │   │       │       │   │   │   └── tran
-    │       │   │   │       │       │   │   │       ├── mtcs
-    │       │   │   │       │       │   │   │       │   └── mtc
-    │       │   │   │       │       │   │   │       │       └── CILC <- ''\\t''
-    │       │   │   │       │       │   │   │       ├── ARROW <- '->'
-    │       │   │   │       │       │   │   │       └── trand
-    │       │   │   │       │       │   │   │           └── ID <- 'ws'
-    │       │   │   │       │       │   │   └── tran
-    │       │   │   │       │       │   │       ├── mtcs
-    │       │   │   │       │       │   │       │   └── mtc
-    │       │   │   │       │       │   │       │       └── CILC <- ''\\n''
-    │       │   │   │       │       │   │       ├── ARROW <- '->'
-    │       │   │   │       │       │   │       └── trand
-    │       │   │   │       │       │   │           └── ID <- 'ws'
-    │       │   │   │       │       │   └── tran
-    │       │   │   │       │       │       ├── mtcs
-    │       │   │   │       │       │       │   └── mtc
-    │       │   │   │       │       │       │       └── CILC <- ''{''
-    │       │   │   │       │       │       ├── ARROW <- '->'
-    │       │   │   │       │       │       └── trand
-    │       │   │   │       │       │           └── ID <- 'lbr'
-    │       │   │   │       │       └── tran
-    │       │   │   │       │           ├── mtcs
-    │       │   │   │       │           │   └── mtc
-    │       │   │   │       │           │       └── CILC <- ''}''
-    │       │   │   │       │           ├── ARROW <- '->'
-    │       │   │   │       │           └── trand
-    │       │   │   │       │               └── ID <- 'rbr'
-    │       │   │   │       └── SEMI <- ';'
-    │       │   │   └── state
-    │       │   │       ├── sdec
-    │       │   │       │   ├── targets
-    │       │   │       │   │   └── ID <- 'ws'
-    │       │   │       │   └── acceptor
-    │       │   │       │       ├── HAT <- '^'
-    │       │   │       │       ├── id_or_def
-    │       │   │       │       │   └── ID <- 'WHITESPACE'
-    │       │   │       │       └── accd_opt
-    │       │   │       │           └──  <- 'NULL'
-    │       │   │       ├── trans_opt
-    │       │   │       │   └── trans
-    │       │   │       │       ├── trans
-    │       │   │       │       │   ├── trans
-    │       │   │       │       │   │   └── tran
-    │       │   │       │       │   │       ├── mtcs
-    │       │   │       │       │   │       │   └── mtc
-    │       │   │       │       │   │       │       └── CILC <- '' ''
-    │       │   │       │       │   │       ├── ARROW <- '->'
-    │       │   │       │       │   │       └── trand
-    │       │   │       │       │   │           └── ID <- 'ws'
-    │       │   │       │       │   └── tran
-    │       │   │       │       │       ├── mtcs
-    │       │   │       │       │       │   └── mtc
-    │       │   │       │       │       │       └── CILC <- ''\\t''
-    │       │   │       │       │       ├── ARROW <- '->'
-    │       │   │       │       │       └── trand
-    │       │   │       │       │           └── ID <- 'ws'
-    │       │   │       │       └── tran
-    │       │   │       │           ├── mtcs
-    │       │   │       │           │   └── mtc
-    │       │   │       │           │       └── CILC <- ''\\n''
-    │       │   │       │           ├── ARROW <- '->'
-    │       │   │       │           └── trand
-    │       │   │       │               └── ID <- 'ws'
-    │       │   │       └── SEMI <- ';'
-    │       │   └── state
-    │       │       ├── sdec
-    │       │       │   ├── targets
-    │       │       │   │   └── ID <- 'lbr'
-    │       │       │   └── acceptor
-    │       │       │       ├── HAT <- '^'
-    │       │       │       ├── id_or_def
-    │       │       │       │   └── ID <- 'LBRACKET'
-    │       │       │       └── accd_opt
-    │       │       │           └──  <- 'NULL'
-    │       │       ├── trans_opt
-    │       │       │   └──  <- 'NULL'
-    │       │       └── SEMI <- ';'
-    │       └── state
-    │           ├── sdec
-    │           │   ├── targets
-    │           │   │   └── ID <- 'rbr'
-    │           │   └── acceptor
-    │           │       ├── HAT <- '^'
-    │           │       ├── id_or_def
-    │           │       │   └── ID <- 'RBRACKET'
-    │           │       └── accd_opt
-    │           │           └──  <- 'NULL'
-    │           ├── trans_opt
-    │           │   └──  <- 'NULL'
-    │           └── SEMI <- ';'
-    └── gram
-        └── prods
-            ├── prods
-            │   ├── prods
-            │   │   └── prod
-            │   │       ├── ID <- 's'
-            │   │       ├── patt_opt
-            │   │       │   └──  <- 'NULL'
-            │   │       ├── rhss
-            │   │       │   ├── rhss
-            │   │       │   │   └── rhs
-            │   │       │   │       ├── ARROW <- '->'
-            │   │       │   │       ├── ids
-            │   │       │   │       │   ├── ids
-            │   │       │   │       │   │   ├── ids
-            │   │       │   │       │   │   │   └──  <- 'NULL'
-            │   │       │   │       │   │   └── ID <- 's'
-            │   │       │   │       │   └── ID <- 'b'
-            │   │       │   │       └── patt_opt
-            │   │       │   │           └──  <- 'NULL'
-            │   │       │   └── rhs
-            │   │       │       ├── ARROW <- '->'
-            │   │       │       ├── ids
-            │   │       │       │   └──  <- 'NULL'
-            │   │       │       └── patt_opt
-            │   │       │           └──  <- 'NULL'
-            │   │       └── SEMI <- ';'
-            │   └── prod
-            │       ├── ID <- 'b'
-            │       ├── patt_opt
-            │       │   └──  <- 'NULL'
-            │       ├── rhss
-            │       │   ├── rhss
-            │       │   │   └── rhs
-            │       │   │       ├── ARROW <- '->'
-            │       │   │       ├── ids
-            │       │   │       │   ├── ids
-            │       │   │       │   │   ├── ids
-            │       │   │       │   │   │   ├── ids
-            │       │   │       │   │   │   │   └──  <- 'NULL'
-            │       │   │       │   │   │   └── ID <- 'LBRACKET'
-            │       │   │       │   │   └── ID <- 's'
-            │       │   │       │   └── ID <- 'RBRACKET'
-            │       │   │       └── patt_opt
-            │       │   │           └── PATTC <- '``'
-            │       │   └── rhs
-            │       │       ├── ARROW <- '->'
-            │       │       ├── ids
-            │       │       │   ├── ids
-            │       │       │   │   └──  <- 'NULL'
-            │       │       │   └── ID <- 'w'
-            │       │       └── patt_opt
-            │       │           └──  <- 'NULL'
-            │       └── SEMI <- ';'
-            └── prod
-                ├── ID <- 'w'
-                ├── patt_opt
-                │   └──  <- 'NULL'
-                ├── rhss
-                │   └── rhs
-                │       ├── ARROW <- '->'
-                │       ├── ids
-                │       │   ├── ids
-                │       │   │   └──  <- 'NULL'
-                │       │   └── ID <- 'WHITESPACE'
-                │       └── patt_opt
-                │           └── PATTC <- '`[prefix]{0}\\n\\n{1;prefix=[prefix]\\t}[prefix]{2}\\n\\n`'
-                └── SEMI <- ';'"
+    └── regions
+        ├── regions
+        │   ├── regions
+        │   │   └── region
+        │   │       └── alphabet
+        │   │           ├── ALPHABET <- 'alphabet'
+        │   │           └── CILC <- '' \\t\\n{}''
+        │   └── region
+        │       └── cdfa
+        │           ├── CDFA <- 'cdfa'
+        │           ├── LBRACE <- '{'
+        │           ├── states
+        │           │   ├── states
+        │           │   │   ├── states
+        │           │   │   │   ├── states
+        │           │   │   │   │   └── state
+        │           │   │   │   │       ├── sdec
+        │           │   │   │   │       │   └── targets
+        │           │   │   │   │       │       └── ID <- 'start'
+        │           │   │   │   │       ├── trans_opt
+        │           │   │   │   │       │   └── trans
+        │           │   │   │   │       │       ├── trans
+        │           │   │   │   │       │       │   ├── trans
+        │           │   │   │   │       │       │   │   ├── trans
+        │           │   │   │   │       │       │   │   │   ├── trans
+        │           │   │   │   │       │       │   │   │   │   └── tran
+        │           │   │   │   │       │       │   │   │   │       ├── mtcs
+        │           │   │   │   │       │       │   │   │   │       │   └── mtc
+        │           │   │   │   │       │       │   │   │   │       │       └── CILC <- '' ''
+        │           │   │   │   │       │       │   │   │   │       ├── ARROW <- '->'
+        │           │   │   │   │       │       │   │   │   │       └── trand
+        │           │   │   │   │       │       │   │   │   │           └── ID <- 'ws'
+        │           │   │   │   │       │       │   │   │   └── tran
+        │           │   │   │   │       │       │   │   │       ├── mtcs
+        │           │   │   │   │       │       │   │   │       │   └── mtc
+        │           │   │   │   │       │       │   │   │       │       └── CILC <- ''\\t''
+        │           │   │   │   │       │       │   │   │       ├── ARROW <- '->'
+        │           │   │   │   │       │       │   │   │       └── trand
+        │           │   │   │   │       │       │   │   │           └── ID <- 'ws'
+        │           │   │   │   │       │       │   │   └── tran
+        │           │   │   │   │       │       │   │       ├── mtcs
+        │           │   │   │   │       │       │   │       │   └── mtc
+        │           │   │   │   │       │       │   │       │       └── CILC <- ''\\n''
+        │           │   │   │   │       │       │   │       ├── ARROW <- '->'
+        │           │   │   │   │       │       │   │       └── trand
+        │           │   │   │   │       │       │   │           └── ID <- 'ws'
+        │           │   │   │   │       │       │   └── tran
+        │           │   │   │   │       │       │       ├── mtcs
+        │           │   │   │   │       │       │       │   └── mtc
+        │           │   │   │   │       │       │       │       └── CILC <- ''{''
+        │           │   │   │   │       │       │       ├── ARROW <- '->'
+        │           │   │   │   │       │       │       └── trand
+        │           │   │   │   │       │       │           └── ID <- 'lbr'
+        │           │   │   │   │       │       └── tran
+        │           │   │   │   │       │           ├── mtcs
+        │           │   │   │   │       │           │   └── mtc
+        │           │   │   │   │       │           │       └── CILC <- ''}''
+        │           │   │   │   │       │           ├── ARROW <- '->'
+        │           │   │   │   │       │           └── trand
+        │           │   │   │   │       │               └── ID <- 'rbr'
+        │           │   │   │   │       └── SEMI <- ';'
+        │           │   │   │   └── state
+        │           │   │   │       ├── sdec
+        │           │   │   │       │   ├── targets
+        │           │   │   │       │   │   └── ID <- 'ws'
+        │           │   │   │       │   └── acceptor
+        │           │   │   │       │       ├── HAT <- '^'
+        │           │   │   │       │       ├── id_or_def
+        │           │   │   │       │       │   └── ID <- 'WHITESPACE'
+        │           │   │   │       │       └── accd_opt
+        │           │   │   │       │           └──  <- 'NULL'
+        │           │   │   │       ├── trans_opt
+        │           │   │   │       │   └── trans
+        │           │   │   │       │       ├── trans
+        │           │   │   │       │       │   ├── trans
+        │           │   │   │       │       │   │   └── tran
+        │           │   │   │       │       │   │       ├── mtcs
+        │           │   │   │       │       │   │       │   └── mtc
+        │           │   │   │       │       │   │       │       └── CILC <- '' ''
+        │           │   │   │       │       │   │       ├── ARROW <- '->'
+        │           │   │   │       │       │   │       └── trand
+        │           │   │   │       │       │   │           └── ID <- 'ws'
+        │           │   │   │       │       │   └── tran
+        │           │   │   │       │       │       ├── mtcs
+        │           │   │   │       │       │       │   └── mtc
+        │           │   │   │       │       │       │       └── CILC <- ''\\t''
+        │           │   │   │       │       │       ├── ARROW <- '->'
+        │           │   │   │       │       │       └── trand
+        │           │   │   │       │       │           └── ID <- 'ws'
+        │           │   │   │       │       └── tran
+        │           │   │   │       │           ├── mtcs
+        │           │   │   │       │           │   └── mtc
+        │           │   │   │       │           │       └── CILC <- ''\\n''
+        │           │   │   │       │           ├── ARROW <- '->'
+        │           │   │   │       │           └── trand
+        │           │   │   │       │               └── ID <- 'ws'
+        │           │   │   │       └── SEMI <- ';'
+        │           │   │   └── state
+        │           │   │       ├── sdec
+        │           │   │       │   ├── targets
+        │           │   │       │   │   └── ID <- 'lbr'
+        │           │   │       │   └── acceptor
+        │           │   │       │       ├── HAT <- '^'
+        │           │   │       │       ├── id_or_def
+        │           │   │       │       │   └── ID <- 'LBRACKET'
+        │           │   │       │       └── accd_opt
+        │           │   │       │           └──  <- 'NULL'
+        │           │   │       ├── trans_opt
+        │           │   │       │   └──  <- 'NULL'
+        │           │   │       └── SEMI <- ';'
+        │           │   └── state
+        │           │       ├── sdec
+        │           │       │   ├── targets
+        │           │       │   │   └── ID <- 'rbr'
+        │           │       │   └── acceptor
+        │           │       │       ├── HAT <- '^'
+        │           │       │       ├── id_or_def
+        │           │       │       │   └── ID <- 'RBRACKET'
+        │           │       │       └── accd_opt
+        │           │       │           └──  <- 'NULL'
+        │           │       ├── trans_opt
+        │           │       │   └──  <- 'NULL'
+        │           │       └── SEMI <- ';'
+        │           └── RBRACE <- '}'
+        └── region
+            └── grammar
+                ├── GRAMMAR <- 'grammar'
+                ├── LBRACE <- '{'
+                ├── prods
+                │   ├── prods
+                │   │   ├── prods
+                │   │   │   └── prod
+                │   │   │       ├── ID <- 's'
+                │   │   │       ├── patt_opt
+                │   │   │       │   └──  <- 'NULL'
+                │   │   │       ├── rhss
+                │   │   │       │   ├── rhss
+                │   │   │       │   │   └── rhs
+                │   │   │       │   │       ├── OR <- '|'
+                │   │   │       │   │       ├── ids
+                │   │   │       │   │       │   ├── ids
+                │   │   │       │   │       │   │   ├── ids
+                │   │   │       │   │       │   │   │   └──  <- 'NULL'
+                │   │   │       │   │       │   │   └── ID <- 's'
+                │   │   │       │   │       │   └── ID <- 'b'
+                │   │   │       │   │       └── patt_opt
+                │   │   │       │   │           └──  <- 'NULL'
+                │   │   │       │   └── rhs
+                │   │   │       │       ├── OR <- '|'
+                │   │   │       │       ├── ids
+                │   │   │       │       │   └──  <- 'NULL'
+                │   │   │       │       └── patt_opt
+                │   │   │       │           └──  <- 'NULL'
+                │   │   │       └── SEMI <- ';'
+                │   │   └── prod
+                │   │       ├── ID <- 'b'
+                │   │       ├── patt_opt
+                │   │       │   └──  <- 'NULL'
+                │   │       ├── rhss
+                │   │       │   ├── rhss
+                │   │       │   │   └── rhs
+                │   │       │   │       ├── OR <- '|'
+                │   │       │   │       ├── ids
+                │   │       │   │       │   ├── ids
+                │   │       │   │       │   │   ├── ids
+                │   │       │   │       │   │   │   ├── ids
+                │   │       │   │       │   │   │   │   └──  <- 'NULL'
+                │   │       │   │       │   │   │   └── ID <- 'LBRACKET'
+                │   │       │   │       │   │   └── ID <- 's'
+                │   │       │   │       │   └── ID <- 'RBRACKET'
+                │   │       │   │       └── patt_opt
+                │   │       │   │           └── PATTC <- '``'
+                │   │       │   └── rhs
+                │   │       │       ├── OR <- '|'
+                │   │       │       ├── ids
+                │   │       │       │   ├── ids
+                │   │       │       │   │   └──  <- 'NULL'
+                │   │       │       │   └── ID <- 'w'
+                │   │       │       └── patt_opt
+                │   │       │           └──  <- 'NULL'
+                │   │       └── SEMI <- ';'
+                │   └── prod
+                │       ├── ID <- 'w'
+                │       ├── patt_opt
+                │       │   └──  <- 'NULL'
+                │       ├── rhss
+                │       │   └── rhs
+                │       │       ├── OR <- '|'
+                │       │       ├── ids
+                │       │       │   ├── ids
+                │       │       │   │   └──  <- 'NULL'
+                │       │       │   └── ID <- 'WHITESPACE'
+                │       │       └── patt_opt
+                │       │           └── PATTC <- '`[prefix]{0}\\n\\n{1;prefix=[prefix]\\t}[prefix]{2}\\n\\n`'
+                │       └── SEMI <- ';'
+                └── RBRACE <- '}'"
         );
     }
 
@@ -1309,18 +1416,27 @@ kind=ID lexeme=f")
     fn parse_spec_olap_trans() {
         //setup
         let input = "
-        'inj '
-        start
-            'i' -> ki
-            _ -> ^ID;
-        ki
-            'n' -> ^IN;
-        ID | ki
-            ' ' -> fail
-            _ -> ID;
-        s
-            -> ID s
-            -> ID;";
+alphabet 'inj '
+
+cdfa {
+    start
+        'i' -> ki
+        _ -> ^ID;
+
+    ki
+        'n' -> ^IN;
+
+    ID | ki
+        ' ' -> fail
+        _ -> ID;
+}
+
+grammar {
+    s
+        | ID s
+        | ID;
+}
+        ";
 
         //exercise
         let tree = parse_spec(input).unwrap();
@@ -1328,105 +1444,119 @@ kind=ID lexeme=f")
         //verify
         assert_eq!(tree.to_string(),
                    "└── spec
-    ├── dfa
-    │   ├── CILC <- ''inj ''
-    │   └── states
-    │       ├── states
-    │       │   ├── states
-    │       │   │   └── state
-    │       │   │       ├── sdec
-    │       │   │       │   └── targets
-    │       │   │       │       └── ID <- 'start'
-    │       │   │       ├── trans_opt
-    │       │   │       │   └── trans
-    │       │   │       │       ├── trans
-    │       │   │       │       │   └── tran
-    │       │   │       │       │       ├── mtcs
-    │       │   │       │       │       │   └── mtc
-    │       │   │       │       │       │       └── CILC <- ''i''
-    │       │   │       │       │       ├── ARROW <- '->'
-    │       │   │       │       │       └── trand
-    │       │   │       │       │           └── ID <- 'ki'
-    │       │   │       │       └── tran
-    │       │   │       │           ├── DEF <- '_'
-    │       │   │       │           ├── ARROW <- '->'
-    │       │   │       │           └── trand
-    │       │   │       │               └── acceptor
-    │       │   │       │                   ├── HAT <- '^'
-    │       │   │       │                   ├── id_or_def
-    │       │   │       │                   │   └── ID <- 'ID'
-    │       │   │       │                   └── accd_opt
-    │       │   │       │                       └──  <- 'NULL'
-    │       │   │       └── SEMI <- ';'
-    │       │   └── state
-    │       │       ├── sdec
-    │       │       │   └── targets
-    │       │       │       └── ID <- 'ki'
-    │       │       ├── trans_opt
-    │       │       │   └── trans
-    │       │       │       └── tran
-    │       │       │           ├── mtcs
-    │       │       │           │   └── mtc
-    │       │       │           │       └── CILC <- ''n''
-    │       │       │           ├── ARROW <- '->'
-    │       │       │           └── trand
-    │       │       │               └── acceptor
-    │       │       │                   ├── HAT <- '^'
-    │       │       │                   ├── id_or_def
-    │       │       │                   │   └── ID <- 'IN'
-    │       │       │                   └── accd_opt
-    │       │       │                       └──  <- 'NULL'
-    │       │       └── SEMI <- ';'
-    │       └── state
-    │           ├── sdec
-    │           │   └── targets
-    │           │       ├── targets
-    │           │       │   └── ID <- 'ID'
-    │           │       ├── OR <- '|'
-    │           │       └── ID <- 'ki'
-    │           ├── trans_opt
-    │           │   └── trans
-    │           │       ├── trans
-    │           │       │   └── tran
-    │           │       │       ├── mtcs
-    │           │       │       │   └── mtc
-    │           │       │       │       └── CILC <- '' ''
-    │           │       │       ├── ARROW <- '->'
-    │           │       │       └── trand
-    │           │       │           └── ID <- 'fail'
-    │           │       └── tran
-    │           │           ├── DEF <- '_'
-    │           │           ├── ARROW <- '->'
-    │           │           └── trand
-    │           │               └── ID <- 'ID'
-    │           └── SEMI <- ';'
-    └── gram
-        └── prods
-            └── prod
-                ├── ID <- 's'
-                ├── patt_opt
-                │   └──  <- 'NULL'
-                ├── rhss
-                │   ├── rhss
-                │   │   └── rhs
-                │   │       ├── ARROW <- '->'
-                │   │       ├── ids
-                │   │       │   ├── ids
-                │   │       │   │   ├── ids
-                │   │       │   │   │   └──  <- 'NULL'
-                │   │       │   │   └── ID <- 'ID'
-                │   │       │   └── ID <- 's'
-                │   │       └── patt_opt
-                │   │           └──  <- 'NULL'
-                │   └── rhs
-                │       ├── ARROW <- '->'
-                │       ├── ids
-                │       │   ├── ids
-                │       │   │   └──  <- 'NULL'
-                │       │   └── ID <- 'ID'
-                │       └── patt_opt
-                │           └──  <- 'NULL'
-                └── SEMI <- ';'"
+    └── regions
+        ├── regions
+        │   ├── regions
+        │   │   └── region
+        │   │       └── alphabet
+        │   │           ├── ALPHABET <- 'alphabet'
+        │   │           └── CILC <- ''inj ''
+        │   └── region
+        │       └── cdfa
+        │           ├── CDFA <- 'cdfa'
+        │           ├── LBRACE <- '{'
+        │           ├── states
+        │           │   ├── states
+        │           │   │   ├── states
+        │           │   │   │   └── state
+        │           │   │   │       ├── sdec
+        │           │   │   │       │   └── targets
+        │           │   │   │       │       └── ID <- 'start'
+        │           │   │   │       ├── trans_opt
+        │           │   │   │       │   └── trans
+        │           │   │   │       │       ├── trans
+        │           │   │   │       │       │   └── tran
+        │           │   │   │       │       │       ├── mtcs
+        │           │   │   │       │       │       │   └── mtc
+        │           │   │   │       │       │       │       └── CILC <- ''i''
+        │           │   │   │       │       │       ├── ARROW <- '->'
+        │           │   │   │       │       │       └── trand
+        │           │   │   │       │       │           └── ID <- 'ki'
+        │           │   │   │       │       └── tran
+        │           │   │   │       │           ├── DEF <- '_'
+        │           │   │   │       │           ├── ARROW <- '->'
+        │           │   │   │       │           └── trand
+        │           │   │   │       │               └── acceptor
+        │           │   │   │       │                   ├── HAT <- '^'
+        │           │   │   │       │                   ├── id_or_def
+        │           │   │   │       │                   │   └── ID <- 'ID'
+        │           │   │   │       │                   └── accd_opt
+        │           │   │   │       │                       └──  <- 'NULL'
+        │           │   │   │       └── SEMI <- ';'
+        │           │   │   └── state
+        │           │   │       ├── sdec
+        │           │   │       │   └── targets
+        │           │   │       │       └── ID <- 'ki'
+        │           │   │       ├── trans_opt
+        │           │   │       │   └── trans
+        │           │   │       │       └── tran
+        │           │   │       │           ├── mtcs
+        │           │   │       │           │   └── mtc
+        │           │   │       │           │       └── CILC <- ''n''
+        │           │   │       │           ├── ARROW <- '->'
+        │           │   │       │           └── trand
+        │           │   │       │               └── acceptor
+        │           │   │       │                   ├── HAT <- '^'
+        │           │   │       │                   ├── id_or_def
+        │           │   │       │                   │   └── ID <- 'IN'
+        │           │   │       │                   └── accd_opt
+        │           │   │       │                       └──  <- 'NULL'
+        │           │   │       └── SEMI <- ';'
+        │           │   └── state
+        │           │       ├── sdec
+        │           │       │   └── targets
+        │           │       │       ├── targets
+        │           │       │       │   └── ID <- 'ID'
+        │           │       │       ├── OR <- '|'
+        │           │       │       └── ID <- 'ki'
+        │           │       ├── trans_opt
+        │           │       │   └── trans
+        │           │       │       ├── trans
+        │           │       │       │   └── tran
+        │           │       │       │       ├── mtcs
+        │           │       │       │       │   └── mtc
+        │           │       │       │       │       └── CILC <- '' ''
+        │           │       │       │       ├── ARROW <- '->'
+        │           │       │       │       └── trand
+        │           │       │       │           └── ID <- 'fail'
+        │           │       │       └── tran
+        │           │       │           ├── DEF <- '_'
+        │           │       │           ├── ARROW <- '->'
+        │           │       │           └── trand
+        │           │       │               └── ID <- 'ID'
+        │           │       └── SEMI <- ';'
+        │           └── RBRACE <- '}'
+        └── region
+            └── grammar
+                ├── GRAMMAR <- 'grammar'
+                ├── LBRACE <- '{'
+                ├── prods
+                │   └── prod
+                │       ├── ID <- 's'
+                │       ├── patt_opt
+                │       │   └──  <- 'NULL'
+                │       ├── rhss
+                │       │   ├── rhss
+                │       │   │   └── rhs
+                │       │   │       ├── OR <- '|'
+                │       │   │       ├── ids
+                │       │   │       │   ├── ids
+                │       │   │       │   │   ├── ids
+                │       │   │       │   │   │   └──  <- 'NULL'
+                │       │   │       │   │   └── ID <- 'ID'
+                │       │   │       │   └── ID <- 's'
+                │       │   │       └── patt_opt
+                │       │   │           └──  <- 'NULL'
+                │       │   └── rhs
+                │       │       ├── OR <- '|'
+                │       │       ├── ids
+                │       │       │   ├── ids
+                │       │       │   │   └──  <- 'NULL'
+                │       │       │   └── ID <- 'ID'
+                │       │       └── patt_opt
+                │       │           └──  <- 'NULL'
+                │       └── SEMI <- ';'
+                └── RBRACE <- '}'"
         );
     }
 
@@ -1434,15 +1564,20 @@ kind=ID lexeme=f")
     fn parse_spec_optional_shorthand() {
         //setup
         let spec = "
-'ab'
+alphabet 'ab'
 
-start
-  'a' -> ^A
-  'b' -> ^B;
+cdfa {
+    start
+        'a' -> ^A
+        'b' -> ^B;
+}
 
-s -> A [B] s
-  ->;
-  ";
+grammar {
+    s
+        | A [B] s
+        |;
+}
+        ";
 
         //exercise
         let tree = parse_spec(spec).unwrap();
@@ -1450,68 +1585,82 @@ s -> A [B] s
         //verify
         assert_eq!(tree.to_string(),
                    "└── spec
-    ├── dfa
-    │   ├── CILC <- ''ab''
-    │   └── states
-    │       └── state
-    │           ├── sdec
-    │           │   └── targets
-    │           │       └── ID <- 'start'
-    │           ├── trans_opt
-    │           │   └── trans
-    │           │       ├── trans
-    │           │       │   └── tran
-    │           │       │       ├── mtcs
-    │           │       │       │   └── mtc
-    │           │       │       │       └── CILC <- ''a''
-    │           │       │       ├── ARROW <- '->'
-    │           │       │       └── trand
-    │           │       │           └── acceptor
-    │           │       │               ├── HAT <- '^'
-    │           │       │               ├── id_or_def
-    │           │       │               │   └── ID <- 'A'
-    │           │       │               └── accd_opt
-    │           │       │                   └──  <- 'NULL'
-    │           │       └── tran
-    │           │           ├── mtcs
-    │           │           │   └── mtc
-    │           │           │       └── CILC <- ''b''
-    │           │           ├── ARROW <- '->'
-    │           │           └── trand
-    │           │               └── acceptor
-    │           │                   ├── HAT <- '^'
-    │           │                   ├── id_or_def
-    │           │                   │   └── ID <- 'B'
-    │           │                   └── accd_opt
-    │           │                       └──  <- 'NULL'
-    │           └── SEMI <- ';'
-    └── gram
-        └── prods
-            └── prod
-                ├── ID <- 's'
-                ├── patt_opt
-                │   └──  <- 'NULL'
-                ├── rhss
-                │   ├── rhss
-                │   │   └── rhs
-                │   │       ├── ARROW <- '->'
-                │   │       ├── ids
-                │   │       │   ├── ids
-                │   │       │   │   ├── ids
-                │   │       │   │   │   ├── ids
-                │   │       │   │   │   │   └──  <- 'NULL'
-                │   │       │   │   │   └── ID <- 'A'
-                │   │       │   │   └── COPTID <- '[B]'
-                │   │       │   └── ID <- 's'
-                │   │       └── patt_opt
-                │   │           └──  <- 'NULL'
-                │   └── rhs
-                │       ├── ARROW <- '->'
-                │       ├── ids
+    └── regions
+        ├── regions
+        │   ├── regions
+        │   │   └── region
+        │   │       └── alphabet
+        │   │           ├── ALPHABET <- 'alphabet'
+        │   │           └── CILC <- ''ab''
+        │   └── region
+        │       └── cdfa
+        │           ├── CDFA <- 'cdfa'
+        │           ├── LBRACE <- '{'
+        │           ├── states
+        │           │   └── state
+        │           │       ├── sdec
+        │           │       │   └── targets
+        │           │       │       └── ID <- 'start'
+        │           │       ├── trans_opt
+        │           │       │   └── trans
+        │           │       │       ├── trans
+        │           │       │       │   └── tran
+        │           │       │       │       ├── mtcs
+        │           │       │       │       │   └── mtc
+        │           │       │       │       │       └── CILC <- ''a''
+        │           │       │       │       ├── ARROW <- '->'
+        │           │       │       │       └── trand
+        │           │       │       │           └── acceptor
+        │           │       │       │               ├── HAT <- '^'
+        │           │       │       │               ├── id_or_def
+        │           │       │       │               │   └── ID <- 'A'
+        │           │       │       │               └── accd_opt
+        │           │       │       │                   └──  <- 'NULL'
+        │           │       │       └── tran
+        │           │       │           ├── mtcs
+        │           │       │           │   └── mtc
+        │           │       │           │       └── CILC <- ''b''
+        │           │       │           ├── ARROW <- '->'
+        │           │       │           └── trand
+        │           │       │               └── acceptor
+        │           │       │                   ├── HAT <- '^'
+        │           │       │                   ├── id_or_def
+        │           │       │                   │   └── ID <- 'B'
+        │           │       │                   └── accd_opt
+        │           │       │                       └──  <- 'NULL'
+        │           │       └── SEMI <- ';'
+        │           └── RBRACE <- '}'
+        └── region
+            └── grammar
+                ├── GRAMMAR <- 'grammar'
+                ├── LBRACE <- '{'
+                ├── prods
+                │   └── prod
+                │       ├── ID <- 's'
+                │       ├── patt_opt
                 │       │   └──  <- 'NULL'
-                │       └── patt_opt
-                │           └──  <- 'NULL'
-                └── SEMI <- ';'"
+                │       ├── rhss
+                │       │   ├── rhss
+                │       │   │   └── rhs
+                │       │   │       ├── OR <- '|'
+                │       │   │       ├── ids
+                │       │   │       │   ├── ids
+                │       │   │       │   │   ├── ids
+                │       │   │       │   │   │   ├── ids
+                │       │   │       │   │   │   │   └──  <- 'NULL'
+                │       │   │       │   │   │   └── ID <- 'A'
+                │       │   │       │   │   └── COPTID <- '[B]'
+                │       │   │       │   └── ID <- 's'
+                │       │   │       └── patt_opt
+                │       │   │           └──  <- 'NULL'
+                │       │   └── rhs
+                │       │       ├── OR <- '|'
+                │       │       ├── ids
+                │       │       │   └──  <- 'NULL'
+                │       │       └── patt_opt
+                │       │           └──  <- 'NULL'
+                │       └── SEMI <- ';'
+                └── RBRACE <- '}'"
         );
     }
 
@@ -1519,15 +1668,20 @@ s -> A [B] s
     fn single_reference_optional_shorthand() {
         //setup
         let spec = "
-'ab'
+alphabet 'ab'
 
-start
-  'a' -> ^A
-  'b' -> ^B;
+cdfa {
+    start
+        'a' -> ^A
+        'b' -> ^B;
+}
 
-s -> A [B] s
-  ->;
-  ";
+grammar {
+    s
+        | A [B] s
+        |;
+}
+        ";
 
         let input = "ababaaaba".to_string();
         let mut iter = input.chars();
@@ -1581,16 +1735,20 @@ s -> A [B] s
     fn def_pattern() {
         //setup
         let spec = "
-'ab'
+alphabet 'ab'
 
-start
-    'a' -> ^A
-    'b' -> ^B;
+cdfa {
+    start
+        'a' -> ^A
+        'b' -> ^B;
+}
 
-s `{} {}`
-    -> s A
-    -> s B
-    -> `SEPARATED:`;
+grammar {
+    s `{} {}`
+        | s A
+        | s B
+        | `SEPARATED:`;
+}
         ";
 
         //exercise
@@ -1599,77 +1757,91 @@ s `{} {}`
         //verify
         assert_eq!(tree.to_string(),
                    "└── spec
-    ├── dfa
-    │   ├── CILC <- ''ab''
-    │   └── states
-    │       └── state
-    │           ├── sdec
-    │           │   └── targets
-    │           │       └── ID <- 'start'
-    │           ├── trans_opt
-    │           │   └── trans
-    │           │       ├── trans
-    │           │       │   └── tran
-    │           │       │       ├── mtcs
-    │           │       │       │   └── mtc
-    │           │       │       │       └── CILC <- ''a''
-    │           │       │       ├── ARROW <- '->'
-    │           │       │       └── trand
-    │           │       │           └── acceptor
-    │           │       │               ├── HAT <- '^'
-    │           │       │               ├── id_or_def
-    │           │       │               │   └── ID <- 'A'
-    │           │       │               └── accd_opt
-    │           │       │                   └──  <- 'NULL'
-    │           │       └── tran
-    │           │           ├── mtcs
-    │           │           │   └── mtc
-    │           │           │       └── CILC <- ''b''
-    │           │           ├── ARROW <- '->'
-    │           │           └── trand
-    │           │               └── acceptor
-    │           │                   ├── HAT <- '^'
-    │           │                   ├── id_or_def
-    │           │                   │   └── ID <- 'B'
-    │           │                   └── accd_opt
-    │           │                       └──  <- 'NULL'
-    │           └── SEMI <- ';'
-    └── gram
-        └── prods
-            └── prod
-                ├── ID <- 's'
-                ├── patt_opt
-                │   └── PATTC <- '`{} {}`'
-                ├── rhss
-                │   ├── rhss
-                │   │   ├── rhss
-                │   │   │   └── rhs
-                │   │   │       ├── ARROW <- '->'
-                │   │   │       ├── ids
-                │   │   │       │   ├── ids
-                │   │   │       │   │   ├── ids
-                │   │   │       │   │   │   └──  <- 'NULL'
-                │   │   │       │   │   └── ID <- 's'
-                │   │   │       │   └── ID <- 'A'
-                │   │   │       └── patt_opt
-                │   │   │           └──  <- 'NULL'
-                │   │   └── rhs
-                │   │       ├── ARROW <- '->'
-                │   │       ├── ids
-                │   │       │   ├── ids
-                │   │       │   │   ├── ids
-                │   │       │   │   │   └──  <- 'NULL'
-                │   │       │   │   └── ID <- 's'
-                │   │       │   └── ID <- 'B'
-                │   │       └── patt_opt
-                │   │           └──  <- 'NULL'
-                │   └── rhs
-                │       ├── ARROW <- '->'
-                │       ├── ids
-                │       │   └──  <- 'NULL'
-                │       └── patt_opt
-                │           └── PATTC <- '`SEPARATED:`'
-                └── SEMI <- ';'"
+    └── regions
+        ├── regions
+        │   ├── regions
+        │   │   └── region
+        │   │       └── alphabet
+        │   │           ├── ALPHABET <- 'alphabet'
+        │   │           └── CILC <- ''ab''
+        │   └── region
+        │       └── cdfa
+        │           ├── CDFA <- 'cdfa'
+        │           ├── LBRACE <- '{'
+        │           ├── states
+        │           │   └── state
+        │           │       ├── sdec
+        │           │       │   └── targets
+        │           │       │       └── ID <- 'start'
+        │           │       ├── trans_opt
+        │           │       │   └── trans
+        │           │       │       ├── trans
+        │           │       │       │   └── tran
+        │           │       │       │       ├── mtcs
+        │           │       │       │       │   └── mtc
+        │           │       │       │       │       └── CILC <- ''a''
+        │           │       │       │       ├── ARROW <- '->'
+        │           │       │       │       └── trand
+        │           │       │       │           └── acceptor
+        │           │       │       │               ├── HAT <- '^'
+        │           │       │       │               ├── id_or_def
+        │           │       │       │               │   └── ID <- 'A'
+        │           │       │       │               └── accd_opt
+        │           │       │       │                   └──  <- 'NULL'
+        │           │       │       └── tran
+        │           │       │           ├── mtcs
+        │           │       │           │   └── mtc
+        │           │       │           │       └── CILC <- ''b''
+        │           │       │           ├── ARROW <- '->'
+        │           │       │           └── trand
+        │           │       │               └── acceptor
+        │           │       │                   ├── HAT <- '^'
+        │           │       │                   ├── id_or_def
+        │           │       │                   │   └── ID <- 'B'
+        │           │       │                   └── accd_opt
+        │           │       │                       └──  <- 'NULL'
+        │           │       └── SEMI <- ';'
+        │           └── RBRACE <- '}'
+        └── region
+            └── grammar
+                ├── GRAMMAR <- 'grammar'
+                ├── LBRACE <- '{'
+                ├── prods
+                │   └── prod
+                │       ├── ID <- 's'
+                │       ├── patt_opt
+                │       │   └── PATTC <- '`{} {}`'
+                │       ├── rhss
+                │       │   ├── rhss
+                │       │   │   ├── rhss
+                │       │   │   │   └── rhs
+                │       │   │   │       ├── OR <- '|'
+                │       │   │   │       ├── ids
+                │       │   │   │       │   ├── ids
+                │       │   │   │       │   │   ├── ids
+                │       │   │   │       │   │   │   └──  <- 'NULL'
+                │       │   │   │       │   │   └── ID <- 's'
+                │       │   │   │       │   └── ID <- 'A'
+                │       │   │   │       └── patt_opt
+                │       │   │   │           └──  <- 'NULL'
+                │       │   │   └── rhs
+                │       │   │       ├── OR <- '|'
+                │       │   │       ├── ids
+                │       │   │       │   ├── ids
+                │       │   │       │   │   ├── ids
+                │       │   │       │   │   │   └──  <- 'NULL'
+                │       │   │       │   │   └── ID <- 's'
+                │       │   │       │   └── ID <- 'B'
+                │       │   │       └── patt_opt
+                │       │   │           └──  <- 'NULL'
+                │       │   └── rhs
+                │       │       ├── OR <- '|'
+                │       │       ├── ids
+                │       │       │   └──  <- 'NULL'
+                │       │       └── patt_opt
+                │       │           └── PATTC <- '`SEPARATED:`'
+                │       └── SEMI <- ';'
+                └── RBRACE <- '}'"
         );
     }
 
