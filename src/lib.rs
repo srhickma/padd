@@ -741,5 +741,41 @@ grammar {
         assert!(err.cause().is_none());
     }
 
-    //TODO add test(s) for missing spec regions
+    #[test]
+    fn failed_missing_required_region() {
+        //setup
+        let spec = "
+alphabet ''
+
+grammar {
+    s |;
+}
+        ".to_string();
+
+        //exercise
+        let res = FormatJobRunner::build(&spec);
+
+        //verify
+        assert!(res.is_err());
+
+        let mut err: &Error = &res.err().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "Failed to generate specification: Region error: Missing required region: 'CDFA'"
+        );
+
+        err = err.cause().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "Region error: Missing required region: 'CDFA'"
+        );
+
+        err = err.cause().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "Missing required region: 'CDFA'"
+        );
+
+        assert!(err.cause().is_none());
+    }
 }

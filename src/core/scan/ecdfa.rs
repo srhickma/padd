@@ -170,7 +170,9 @@ CDFABuilder<State, Kind, EncodedCDFA<Kind>> for EncodedCDFABuilder<State, Kind> 
     }
 
     fn mark_start(&mut self, state: &State) -> &mut Self {
-        self.start = self.encode(state);
+        if self.start == usize::max_value() {
+            self.start = self.encode(state);
+        }
         self
     }
 

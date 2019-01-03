@@ -48,7 +48,7 @@ impl std::fmt::Display for GenError {
             GenError::MappingErr(ref err) => write!(f, "ECDFA to grammar mapping error: {}", err),
             GenError::CDFAErr(ref err) => write!(f, "ECDFA generation error: {}", err),
             GenError::PatternErr(ref err) => write!(f, "Pattern build error: {}", err),
-            GenError::RegionErr(ref err) => write!(f, "{}", err),
+            GenError::RegionErr(ref err) => write!(f, "Region error: {}", err),
         }
     }
 }
@@ -1281,8 +1281,6 @@ kind=NUM lexeme=3
 kind=BANG lexeme=!
 kind=A lexeme=a")
     }
-
-    //TODO add test(s) for duplicated regions
 
     fn tokens_string(tokens: Vec<Token<String>>) -> String {
         let mut res_string = String::new();

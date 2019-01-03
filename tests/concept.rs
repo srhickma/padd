@@ -1,6 +1,6 @@
 extern crate padd;
 
-use padd::{FormatJobRunner, FormatJob};
+use padd::{FormatJob, FormatJobRunner};
 
 #[test]
 fn test_def_input_matcher() {
@@ -433,4 +433,49 @@ region1 {
 region2 {
 \t558905
 }");
+}
+
+#[test]
+fn test_duplicate_spec_regions() {
+    //setup
+    let spec = "
+alphabet 'something else'
+
+cdfa {
+    start
+        'in' -> ^IN
+        ' ' -> ^_
+        _ -> ^ID;
+}
+
+grammar {
+    s
+        | x s
+        | x;
+}
+
+cdfa {
+    ID | IN
+        ' ' -> fail
+        _ -> ID;
+}
+
+grammar {
+    x
+        | ID
+        | IN ``;
+}
+
+alphabet 'inj '
+    ".to_string();
+
+    let input = "i ij ijjjijijiji inj in iii".to_string();
+
+    let fjr = FormatJobRunner::build(&spec).unwrap();
+
+    //exercise
+    let res = fjr.format(FormatJob::from_text(input)).unwrap();
+
+    //verify
+    assert_eq!(res, "iijijjjijijijiinjiii");
 }
