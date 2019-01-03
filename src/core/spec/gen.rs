@@ -13,7 +13,10 @@ use {
             Kind,
             State,
         },
-        spec,
+        spec::{
+            self,
+            region::{self, RegionType},
+        },
         util::string_utils,
     },
     std::collections::HashSet,
@@ -50,46 +53,22 @@ fn traverse_spec_regions<CDFABuilderType, CDFAType>(
     CDFAType: CDFA<usize, String>,
     CDFABuilderType: CDFABuilder<String, String, CDFAType>
 {
-    if regions_node.children.len() == 2 {
-        traverse_spec_regions(
-            regions_node.get_child(0),
-            cdfa_builder,
-            grammar_builder,
-            formatter_builder,
-        )?;
-    }
+    let mut region_handler = |inner_node: &Tree, region_type: &RegionType| {
+        match region_type {
+            RegionType::Alphabet => traverse_alphabet_region(inner_node, cdfa_builder),
+            RegionType::CDFA => traverse_cdfa_region(inner_node, cdfa_builder)?,
+            RegionType::Grammar => traverse_grammar_region(
+                inner_node,
+                grammar_builder,
+                formatter_builder,
+            )?,
+        }
 
-    traverse_spec_region(
-        regions_node.children.last().unwrap(),
-        cdfa_builder,
-        grammar_builder,
-        formatter_builder,
-    )
+        Ok(())
+    };
+
+    region::traverse(regions_node, &mut region_handler)
 }
-
-fn traverse_spec_region<CDFABuilderType, CDFAType>(
-    region_node: &Tree,
-    cdfa_builder: &mut CDFABuilderType,
-    grammar_builder: &mut GrammarBuilder,
-    formatter_builder: &mut FormatterBuilder,
-) -> Result<(), spec::GenError> where
-    CDFAType: CDFA<usize, String>,
-    CDFABuilderType: CDFABuilder<String, String, CDFAType>
-{
-    let region_type_node = region_node.get_child(0);
-    let region_type = &region_type_node.lhs.kind;
-
-    match &region_type[..] {
-        "alphabet" => traverse_alphabet_region(region_type_node, cdfa_builder),
-        "cdfa" => traverse_cdfa_region(region_type_node, cdfa_builder)?,
-        "grammar" => traverse_grammar_region(region_type_node, grammar_builder, formatter_builder)?,
-        &_ => return Err(spec::GenError::RegionTypeErr(region_type.clone()))
-    }
-
-    Ok(())
-}
-
-//TODO generalize region handling using enums and maps
 
 fn traverse_alphabet_region<CDFABuilderType, CDFAType>(
     alphabet_node: &Tree,

@@ -20,6 +20,7 @@ use {
 
 mod gen;
 mod lang;
+mod region;
 
 pub static DEF_MATCHER: &'static str = "_";
 
@@ -33,21 +34,21 @@ pub fn generate_spec(parse: &Tree) -> Result<(EncodedCDFA<Kind>, Grammar, Format
 
 #[derive(Debug)]
 pub enum GenError {
-    RegionTypeErr(String),
     MatcherErr(String),
     MappingErr(String),
     CDFAErr(scan::CDFAError),
     PatternErr(fmt::BuildError),
+    RegionErr(region::Error),
 }
 
 impl std::fmt::Display for GenError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
-            GenError::RegionTypeErr(ref region) => write!(f, "Invalid region type: '{}'", region),
             GenError::MatcherErr(ref err) => write!(f, "Matcher definition error: {}", err),
             GenError::MappingErr(ref err) => write!(f, "ECDFA to grammar mapping error: {}", err),
             GenError::CDFAErr(ref err) => write!(f, "ECDFA generation error: {}", err),
             GenError::PatternErr(ref err) => write!(f, "Pattern build error: {}", err),
+            GenError::RegionErr(ref err) => write!(f, "{}", err),
         }
     }
 }
@@ -55,11 +56,11 @@ impl std::fmt::Display for GenError {
 impl error::Error for GenError {
     fn cause(&self) -> Option<&error::Error> {
         match *self {
-            GenError::RegionTypeErr(_) => None,
             GenError::MatcherErr(_) => None,
             GenError::MappingErr(_) => None,
             GenError::CDFAErr(ref err) => Some(err),
             GenError::PatternErr(ref err) => Some(err),
+            GenError::RegionErr(ref err) => Some(err),
         }
     }
 }
@@ -73,6 +74,12 @@ impl From<scan::CDFAError> for GenError {
 impl From<fmt::BuildError> for GenError {
     fn from(err: fmt::BuildError) -> GenError {
         GenError::PatternErr(err)
+    }
+}
+
+impl From<region::Error> for GenError {
+    fn from(err: region::Error) -> GenError {
+        GenError::RegionErr(err)
     }
 }
 
