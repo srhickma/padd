@@ -1,1031 +1,1027 @@
-# SIGMA
-'<>=+-*/\\%(){}[],.;:#!?^$@&|"\'`~ \t\n_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+alphabet '<>=+-*/\\%(){}[],.;:#!?^$@&|"\'`~ \t\n_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
 
-#----------------------------------------------------------------------------------------------------------------------#
-# CDFA                                                                                                                 #
-#----------------------------------------------------------------------------------------------------------------------#
+cdfa {
+    start
+        '{' -> ^LBRACE
+        '}' -> ^RBRACE
+        '(' -> ^LPAREN
+        ')' -> ^RPAREN
+        '[' -> ^LARRI
+        ']' -> ^RARRI
 
-start
-    '{' -> ^LBRACE
-    '}' -> ^RBRACE
-    '(' -> ^LPAREN
-    ')' -> ^RPAREN
-    '[' -> ^LARRI
-    ']' -> ^RARRI
+        ',' -> ^COMMA
+        ';' -> ^SEMI
+        ':' -> colon
 
-    ',' -> ^COMMA
-    ';' -> ^SEMI
-    ':' -> colon
+        '@' -> ^AT
 
-    '@' -> ^AT
+        # OPERATORS
+        '=' -> eq
+        '<' -> lt
+        '>' -> gt
+        '!' -> not
+        '+' -> plus
+        '-' -> minus
+        '*' -> star
+        '%' -> pct
+        '/' -> slash
+        '~' -> ^COMP
+        '&' -> and
+        '^' -> hat
+        '|' -> or
+        '?' -> ^QST
+        '.' -> dot
 
+        # LITERALS
+        '"' -> string
+        '\'' -> char
+        '0' -> zero
+        'true' | 'false' | 'null' -> char_lit
+        '1' .. '9' -> num
+
+        # KEYWORDS
+        'abstract' -> ^MOD
+        'assert' -> ^ASSERT
+        'boolean' -> ^PRIM
+        'break' -> ^BREAK
+        'byte' -> ^PRIM
+        'case' -> ^CASE
+        'catch' -> ^CATCH
+        'char' -> ^PRIM
+        'class' -> ^CLASS
+        'continue' -> ^CONTINUE
+        'default' -> ^DEFAULT
+        'do' -> do
+        'else' -> ^ELSE
+        'enum' -> ^ENUM
+        'extends' -> ^EXTENDS
+        'final' -> final
+        'float' -> ^PRIM
+        'for' -> ^FOR
+        'if' -> ^IF
+        'implements' -> ^IMPLEMENTS
+        'import' -> ^IMPORT
+        'instanceof' -> ^INSTANCEOF
+        'int' -> int
+        'long' -> ^PRIM
+        'native' -> ^MOD
+        'new' -> ^NEW
+        'package' -> ^PACKAGE
+        'private' -> ^MOD
+        'protected' -> ^MOD
+        'public' -> ^MOD
+        'return' -> ^RETURN
+        'short' -> ^PRIM
+        'static' -> ^STATIC
+        'strictfp' -> ^MOD
+        'super' -> ^SUPER
+        'switch' -> ^SWITCH
+        'synchronized' -> ^SYNCHRONIZED
+        'this' -> ^THIS
+        'throw' -> throw
+        'transient' -> ^MOD
+        'try' -> ^TRY
+        'void' -> ^VOID
+        'volatile' -> ^MOD
+        'while' -> ^WHILE
+
+        # MISC
+        ' ' | '\t' | '\n' -> ws
+        '#' | '$' | '`' -> fail
+        _ -> id;
+
+    #
     # OPERATORS
-    '=' -> eq
-    '<' -> lt
-    '>' -> gt
-    '!' -> not
-    '+' -> plus
-    '-' -> minus
-    '*' -> star
-    '%' -> pct
-    '/' -> slash
-    '~' -> ^COMP
-    '&' -> and
-    '^' -> hat
-    '|' -> or
-    '?' -> ^QST
-    '.' -> dot
+    #
 
+    eq      ^ASSN
+        '=' -> ^CMP_EQ;
+
+    not     ^NOT
+        '=' -> ^CMP_EQ;
+
+    lt      ^LT
+        '<=' -> ^ASSN
+        '=' -> ^CMP_REL;
+
+    gt      ^GT
+        '>=' | '>>=' -> ^ASSN
+        '=' -> ^CMP_REL;
+
+    plus    ^PLUS
+        '+' -> ^INC
+        '=' -> ^ASSN;
+
+    minus   ^MINUS
+        '>' -> ^ARROW
+        '-' -> ^DEC
+        '=' -> ^ASSN;
+
+    star    ^STAR
+        '=' -> ^ASSN;
+
+    pct     ^PCT
+        '=' -> ^ASSN;
+
+    slash   ^SLASH
+        '/' -> lcom
+        '*' -> bcom
+        '=' -> ^ASSN;
+
+    and     ^AND
+        '=' -> ^ASSN
+        '&' -> ^AND_L;
+
+    or      ^OR_BI
+        '=' -> ^ASSN
+        '|' -> ^OR_L;
+
+    dot     ^DOT
+        '0' .. '9' -> float
+        '..' -> ^TRIDOT;
+
+    hat     ^OR_BE
+        '=' -> ^ASSN;
+
+    #
     # LITERALS
-    '"' -> string
-    '\'' -> char
-    '0' -> zero
-    'true' | 'false' | 'null' -> char_lit
-    '1' .. '9' -> num
+    #
 
-    # KEYWORDS
-    'abstract' -> ^MOD
-    'assert' -> ^ASSERT
-    'boolean' -> ^PRIM
-    'break' -> ^BREAK
-    'byte' -> ^PRIM
-    'case' -> ^CASE
-    'catch' -> ^CATCH
-    'char' -> ^PRIM
-    'class' -> ^CLASS
-    'continue' -> ^CONTINUE
-    'default' -> ^DEFAULT
-    'do' -> do
-    'else' -> ^ELSE
-    'enum' -> ^ENUM
-    'extends' -> ^EXTENDS
-    'final' -> final
-    'float' -> ^PRIM
-    'for' -> ^FOR
-    'if' -> ^IF
-    'implements' -> ^IMPLEMENTS
-    'import' -> ^IMPORT
-    'instanceof' -> ^INSTANCEOF
-    'int' -> int
-    'long' -> ^PRIM
-    'native' -> ^MOD
-    'new' -> ^NEW
-    'package' -> ^PACKAGE
-    'private' -> ^MOD
-    'protected' -> ^MOD
-    'public' -> ^MOD
-    'return' -> ^RETURN
-    'short' -> ^PRIM
-    'static' -> ^STATIC
-    'strictfp' -> ^MOD
-    'super' -> ^SUPER
-    'switch' -> ^SWITCH
-    'synchronized' -> ^SYNCHRONIZED
-    'this' -> ^THIS
-    'throw' -> throw
-    'transient' -> ^MOD
-    'try' -> ^TRY
-    'void' -> ^VOID
-    'volatile' -> ^MOD
-    'while' -> ^WHILE
+    char_lit    ^LIT
+        '<' .. '\n' -> fail
+        _ -> id;
 
+    string
+        '"' -> ^LIT
+        '\\' -> string_esc
+        _ -> string;
+
+    string_esc
+        _ -> string;
+
+    char
+        '\'' -> ^LIT
+        '\\' -> char_esc
+        _ -> char;
+
+    char_esc
+        _ -> char;
+
+    zero    ^LIT
+        '0' -> zero
+        'x' | 'X' -> hex
+        'b' | 'B' -> bin
+        '1' .. '9' -> oct
+        '.' -> float
+        'e' | 'E' -> floatexp
+        'f' | 'd' | 'l' | 'F' | 'D' | 'L' -> ^LIT;
+
+    num     ^LIT
+        '0' .. '9' | '_' -> num
+        '.' -> float
+        'e' | 'E' -> floatexp
+        'f' | 'd' | 'l' | 'F' | 'D' | 'L' -> ^LIT;
+
+    bin  ^LIT
+        '0' | '1' | '_' -> bin;
+
+    hex     ^LIT
+        'L' -> ^LIT
+        '0' .. '9' | 'a' .. 'f' | 'A' .. 'F' | '_' -> hex;
+
+    oct   ^LIT
+        'L' -> ^LIT
+        '0' .. '7' | '_' -> oct;
+
+    float   ^LIT
+        '0' .. '9' | '_' -> float
+        'e' | 'E' -> floatexp
+        'f' | 'd' | 'F' | 'D' -> ^LIT;
+
+    floatexp
+        '-' | '+' -> floatexp
+        '1' .. '9' -> float;
+
+    #
     # MISC
-    ' ' | '\t' | '\n' -> ws
-    '#' | '$' | '`' -> fail
-    _ -> id;
-
-#
-# OPERATORS
-#
-
-eq      ^ASSN
-    '=' -> ^CMP_EQ;
-
-not     ^NOT
-    '=' -> ^CMP_EQ;
-
-lt      ^LT
-    '<=' -> ^ASSN
-    '=' -> ^CMP_REL;
-
-gt      ^GT
-    '>=' | '>>=' -> ^ASSN
-    '=' -> ^CMP_REL;
-
-plus    ^PLUS
-    '+' -> ^INC
-    '=' -> ^ASSN;
-
-minus   ^MINUS
-    '>' -> ^ARROW
-    '-' -> ^DEC
-    '=' -> ^ASSN;
-
-star    ^STAR
-    '=' -> ^ASSN;
-
-pct     ^PCT
-    '=' -> ^ASSN;
-
-slash   ^SLASH
-    '/' -> lcom
-    '*' -> bcom
-    '=' -> ^ASSN;
-
-and     ^AND
-    '=' -> ^ASSN
-    '&' -> ^AND_L;
-
-or      ^OR_BI
-    '=' -> ^ASSN
-    '|' -> ^OR_L;
-
-dot     ^DOT
-    '0' .. '9' -> float
-    '..' -> ^TRIDOT;
-
-hat     ^OR_BE
-    '=' -> ^ASSN;
-
-#
-# LITERALS
-#
-
-char_lit    ^LIT
-    '<' .. '\n' -> fail
-    _ -> id;
-
-string
-    '"' -> ^LIT
-    '\\' -> string_esc
-    _ -> string;
-
-string_esc
-    _ -> string;
-
-char
-    '\'' -> ^LIT
-    '\\' -> char_esc
-    _ -> char;
-
-char_esc
-    _ -> char;
-
-zero    ^LIT
-    '0' -> zero
-    'x' | 'X' -> hex
-    'b' | 'B' -> bin
-    '1' .. '9' -> oct
-    '.' -> float
-    'e' | 'E' -> floatexp
-    'f' | 'd' | 'l' | 'F' | 'D' | 'L' -> ^LIT;
-
-num     ^LIT
-    '0' .. '9' | '_' -> num
-    '.' -> float
-    'e' | 'E' -> floatexp
-    'f' | 'd' | 'l' | 'F' | 'D' | 'L' -> ^LIT;
-
-bin  ^LIT
-    '0' | '1' | '_' -> bin;
-
-hex     ^LIT
-    'L' -> ^LIT
-    '0' .. '9' | 'a' .. 'f' | 'A' .. 'F' | '_' -> hex;
-
-oct   ^LIT
-    'L' -> ^LIT
-    '0' .. '7' | '_' -> oct;
-
-float   ^LIT
-    '0' .. '9' | '_' -> float
-    'e' | 'E' -> floatexp
-    'f' | 'd' | 'F' | 'D' -> ^LIT;
-
-floatexp
-    '-' | '+' -> floatexp
-    '1' .. '9' -> float;
-
-#
-# MISC
-#
-
-do      ^DO
-    'uble' -> ^PRIM
-    '<' .. '\n' -> fail
-    _ -> id;
-
-throw   ^THROW
-    's' -> ^THROWS
-    '<' .. '\n' -> fail
-    _ -> id;
-
-int     ^PRIM
-    'erface' -> ^INTERFACE
-    '<' .. '\n' -> fail
-    _ -> id;
-
-final   ^FINAL
-    'ly' -> ^FINALLY
-    '<' .. '\n' -> fail
-    _ -> id;
-
-colon   ^COLON
-    ':' -> ^M_REF;
-
-ws      ^_
-    ' ' | '\t' | '\n' -> ws;
-
-lcom    ^_
-    '\n' -> fail
-    _ -> lcom;
-
-bcom
-    '*/' -> bcomm # TODO get rid of this after introducing comments
-    _ -> bcom;
-
-bcomm   ^_; # TODO get rid of this after introducing comments
-
-MOD | ASSERT | PRIM | BREAK | CASE | CATCH | ENUM | CLASS | CONTINUE | DEFAULT | DO | ELSE | EXTENDS | FINALLY | FOR
-    | IF | IMPLEMENTS | IMPORT | INSTANCEOF | NEW | PACKAGE | RETURN | SUPER | SWITCH | THIS | THROWS | TRY | VOID | WHILE
-    | INTERFACE | SYNCHRONIZED | STATIC
-    '<' .. '\n' -> fail
-     _ -> id;
-
-id      ^ID
-    '_' .. '9' | '$' -> id;
-
-#----------------------------------------------------------------------------------------------------------------------#
-# GRAMMAR                                                                                                              #
-#----------------------------------------------------------------------------------------------------------------------#
-
-cmp_unit
-    -> [package_decl] [import_decls] [type_decls] `{}{}{;indent=    }`;
-
-package_decl
-    -> [annotations] PACKAGE id_chain SEMI `{}{} {}{}\n\n`;
-
-import_decls
-    -> import_decl import_decls `{}\n{}`
-    -> import_decl `{}\n\n`;
-import_decl `{} {} {}{}{}{}`
-    -> IMPORT typename SEMI `{} {}{}`
-    -> IMPORT typename DOT STAR SEMI `{} {}{}{}{}`
-    -> IMPORT STATIC typename DOT ID SEMI
-    -> IMPORT STATIC typename DOT STAR SEMI;
-
-type_decls
-    -> type_decl type_decls `{}\n{}`
-    -> type_decl;
-type_decl
-    -> class_dec
-    -> enum_dec
-    -> interface_dec
-    -> annotation_dec
-    -> SEMI;
-
-#
-# CLASS
-#
-
-class_dec
-    -> modifiers_opt CLASS ID [type_parameters] [superclass] [superinterfaces] class_body
-        `{}{} {}{}{}{}{}`;
-
-superclass
-    -> EXTENDS class_type ` {} {}`;
-
-superinterfaces
-    -> IMPLEMENTS class_type_list ` {} {}`;
-
-class_body
-    -> inline_class_body `{}\n`;
-inline_class_body
-    -> LBRACE [class_body_decs] RBRACE ` {}\n{;prefix=[prefix][indent]}[prefix]{}`;
-class_body_decs
-    -> class_body_dec class_body_decs `[prefix]{}\n{}`
-    -> class_body_dec `[prefix]{}`;
-class_body_dec
-    -> class_member_dec
-    -> block `{}\n`
-    -> STATIC block `{} {}\n`
-    -> constructor_dec;
-
-class_member_dec
-    -> field_dec
-    -> method_dec
-    -> class_dec
-    -> interface_dec
-    -> enum_dec
-    -> annotation_dec
-    -> SEMI;
-
-constructor_dec
-    -> modifiers_opt constructor_declarator [throws] constructor_body `{}{} {}{}`;
-constructor_body
-    -> LBRACE constructor_statements RBRACE `{}\n{;prefix=[prefix][indent]}[prefix]{}\n`;
-constructor_declarator
-    -> [type_parameters] ID LPAREN [formal_parameter_list] RPAREN;
-
-argument_list
-    -> short_argument_list
-    -> long_argument_list `{;prefix=[prefix][indent]}\n[prefix]`;
-short_argument_list
-    -> expr COMMA expr `{}{} {}`
-    -> expr;
-long_argument_list
-    -> inline_argument_list COMMA expr COMMA expr `{}{}\n[prefix]{}{}\n[prefix]{}`;
-inline_argument_list
-    -> inline_argument_list COMMA expr `{}{}\n[prefix]{}`
-    -> expr `\n[prefix]{}`;
-
-field_dec
-    -> modifiers_opt type variable_declarator_list SEMI `{}{} {}{}\n`;
-
-method_dec
-    -> modifiers_opt method_header method_body `{}{}{}\n`;
-method_header
-    -> result method_declarator [method_throws] `{} {}{}`
-    -> type_parameters [annotations] result method_declarator [method_throws] `{} {}{} {}{}`;
-method_declarator
-    -> ID LPAREN [formal_parameter_list] RPAREN [array_dims];
-method_body
-    -> block ` {}`
-    -> SEMI;
-method_throws
-    -> throws ` {}`;
-
-formal_parameter_list
-    -> receiver_parameter
-    -> last_formal_parameter
-    -> short_formal_parameter_list
-    -> long_formal_parameter_list `{;prefix=[prefix][indent]}\n[prefix]`;
-short_formal_parameter_list `{}{} {}`
-    -> formal_parameter COMMA last_formal_parameter
-    -> receiver_parameter COMMA last_formal_parameter;
-long_formal_parameter_list `{}{}\n[prefix]{}{}\n[prefix]{}`
-    -> formal_parameters COMMA formal_parameter COMMA last_formal_parameter
-    -> formal_parameters COMMA receiver_parameter COMMA last_formal_parameter;
-formal_parameters `\n[prefix]{}{}{}`
-    -> formal_parameter COMMA formal_parameters
-    -> receiver_parameter COMMA formal_parameters
-    -> formal_parameter `\n[prefix]{}`
-    -> receiver_parameter `\n[prefix]{}`;
-formal_parameter
-    -> modifiers_opt type variable_declarator_id `{}{} {}`;
-receiver_parameter
-    -> [annotations] type ID DOT THIS `{}{} {}{}{}`
-    -> [annotations] type THIS `{}{} {}`;
-last_formal_parameter
-    -> modifiers_opt type [annotations] TRIDOT variable_declarator_id `{}{}{}{} {}`
-    -> formal_parameter;
-
-throws
-    -> THROWS exception_type_list `{} {} `;
-
-exception_type_list
-    -> exception_type COMMA exception_type_list `{}{} {}`
-    -> exception_type;
-exception_type
-    -> class_type
-    -> type_variable;
-
-result
-    -> type
-    -> VOID;
-
-#
-# ENUM
-#
-
-enum_dec
-    -> modifiers_opt ENUM ID [superinterfaces] enum_body `{}{} {} {}{}`;
-
-enum_body
-    -> LBRACE [enum_const_list] [COMMA] [enum_body_declarations] RBRACE
-        `{}\n{;prefix=[prefix][indent]}{}\n{;prefix=[prefix][indent]}[prefix]{}\n`;
-
-enum_const_list
-    -> enum_const COMMA enum_const_list `[prefix]{}{}\n{}`
-    -> enum_const `[prefix]{}`;
-enum_const
-    -> [annotations] ID [enum_const_arg_list] [inline_class_body];
-enum_const_arg_list
-    -> LPAREN [argument_list] RPAREN;
-
-enum_body_declarations
-    -> SEMI [class_body_decs] `[prefix]{}\n{}`;
-
-#
-# INTERFACE
-#
-
-interface_dec
-    -> modifiers_opt INTERFACE ID [type_parameters] [extends_interfaces] interface_body `{}{} {}{} {}{}`;
-
-extends_interfaces
-    -> EXTENDS class_type_list `{} {} `;
-
-interface_body
-    -> LBRACE [interface_member_decs] RBRACE `{}\n{;prefix=[prefix][indent]}{}\n`;
-
-interface_member_decs
-    -> class_member_dec interface_member_decs `[prefix]{}\n{}`
-    -> class_member_dec `[prefix]{}`;
-
-#
-# ANNOTATION
-#
-
-annotation_dec
-    -> modifiers_opt AT INTERFACE ID annotation_body `{}{}{} {} {}`;
-
-annotation_body
-    -> LBRACE [annotation_member_decs] RBRACE `{}\n{;prefix=[prefix][indent]}{}\n`;
-
-annotation_member_decs
-    -> annotation_member_dec annotation_member_decs `[prefix]{}\n{}`
-    -> annotation_member_dec `[prefix]{}`;
-annotation_member_dec
-    -> annotation_element_dec
-    -> class_member_dec;
-
-annotation_element_dec
-    -> modifiers_opt type ID LPAREN RPAREN [array_dims] [default_value] SEMI `{}{} {}{}{}{}{}{}\n`;
-
-default_value
-    -> DEFAULT element_value ` {} {}`;
-
-#
-# TYPE
-#
-
-type_parameters
-    -> LT type_parameter_list GT;
-type_parameter_list
-    -> type_parameter COMMA type_parameter_list `{}{} {}`
-    -> type_parameter;
-type_parameter
-    -> [annotations] ID [type_bound];
-
-type_bound
-    -> EXTENDS type_variable ` {} {}`
-    -> EXTENDS class_type [additional_bounds]  ` {} {} {}`;
-additional_bounds
-    -> AND class_type additional_bounds `{} {} {}`
-    -> AND class_type `{} {}`;
-
-type_arguments
-    -> LT type_argument_list GT;
-type_argument_list
-    -> type_argument COMMA type_argument_list `{}{} {}`
-    -> type_argument;
-type_argument
-    -> type
-    -> wildcard;
-
-type
-    -> non_array_type [array_dims];
-
-typename
-    -> typename DOT ID
-    -> ID;
-
-array_type
-    -> non_array_type array_dims;
-
-non_array_type
-    -> class_type
-    -> primitive_type;
-
-class_type_list
-    -> class_type COMMA class_type_list `{}{} {}`
-    -> class_type;
-class_type
-    -> class_type DOT class_type_internal
-    -> class_type_internal;
-class_type_internal
-    -> type_variable [type_arguments];
-
-class_type_to_instantiate
-    -> annotated_ids type_arguments
-    -> annotated_ids LT GT
-    -> annotated_ids;
-
-class_literal
-    -> typename [array_dims] DOT CLASS
-    -> PRIM [array_dims] DOT CLASS
-    -> VOID DOT CLASS;
-
-type_variable
-    -> [annotations] ID;
-
-primitive_type
-    -> [annotations] PRIM;
-
-array_dims
-    -> array_dim array_dims
-    -> array_dim;
-array_dim
-    -> [annotations] LARRI RARRI;
-
-wildcard
-    -> [annotations] QST [wildcard_bounds];
-wildcard_bounds ` {} {}`
-    -> EXTENDS type
-    -> SUPER type;
-
-#
-# MISC
-#
-
-element_value_pairs
-    -> element_value_pair COMMA element_value_pairs `{}{} {}`
-    -> element_value_pair;
-element_value_pair
-    -> ID ASSN element_value `{} {} {}`;
-element_value
-    -> conditional_expr
-    -> element_value_array_initializer
-    -> annotation;
-element_value_array_initializer
-    -> LBRACE [element_values] [COMMA] RBRACE;
-element_values
-    -> element_value COMMA element_values `{}{} {}`
-    -> element_value;
-
-annotations
-    -> annotation annotations `{} {} `
-    -> annotation `{} `;
-annotation
-    -> AT typename LPAREN [element_value_pairs] RPAREN
-    -> AT typename LPAREN element_value RPAREN
-    -> AT typename;
-
-annotated_ids
-    -> [annotations] ID DOT annotated_ids
-    -> [annotations] ID;
-
-id_chain
-    -> ID DOT id_chain
-    -> ID;
-
-id_list
-    -> ID COMMA id_list `{}{} {}`
-    -> ID;
-
-variable_declarator_list
-    -> variable_declarator COMMA variable_declarator_list `{}{} {}`
-    -> variable_declarator;
-variable_declarator
-    -> variable_declarator_id variable_initializer_opt;
-variable_declarator_id
-    -> ID [array_dims];
-
-variable_initializers
-    -> variable_initializer COMMA variable_initializers `{}{} {}`
-    -> variable_initializer;
-variable_initializer_opt
-    -> ASSN variable_initializer ` {} {}`
-    ->;
-variable_initializer
-    -> expr
-    -> array_initializer;
-
-array_initializer
-    -> LBRACE [variable_initializers] [COMMA] RBRACE;
-
-block
-    -> LBRACE [prefixed_block_statements] RBRACE `{}\n{;prefix=[prefix][indent]}[prefix]{}`;
-
-#
-# STATEMENTS
-#
-
-prefixed_block_statements
-    -> block_statements `[prefix]{}`;
-block_statements `{}\n`
-    -> isolated_block_statement block_statements `{}\n[prefix]{}`
-    -> grouped_statements isolated_block_statement block_statements `{}\n\n[prefix]{}\n[prefix]{}`
-    -> grouped_statements inline_isolated_block_statement `{}\n\n[prefix]{}\n`
-    -> inline_isolated_block_statement
-    -> grouped_statements;
-
-isolated_block_statement `{}\n`
-    -> class_dec
-    -> block
-    -> lvar_dec_statement `{}`
-    -> isolated_statement;
-
-inline_isolated_block_statement
-    -> class_dec
-    -> block
-    -> lvar_dec_statement
-    -> isolated_statement;
-
-lvar_dec_statement
-    -> lvar_dec SEMI;
-lvar_dec
-    -> modifiers_opt type variable_declarator_list `{}{} {}`;
-
-statement
-    -> block
-    -> inline_statement;
-
-forced_statement
-    -> block
-    -> inline_statement `\\{\n[prefix][indent]{;prefix=[prefix][indent]}\n[prefix]\\}`;
-
-inline_statement
-    -> grouped_statement
-    -> isolated_statement;
-
-inline_statement_no_if
-    -> grouped_statement
-    -> isolated_statement_no_if;
-
-grouped_statements
-    -> grouped_statement grouped_statements `{}\n[prefix]{}`
-    -> grouped_statement;
-grouped_statement
-    -> labeled_statement
-    -> SEMI
-    -> statement_expression SEMI
-    -> assert_statement
-    -> break_statement
-    -> continue_statement
-    -> return_statement
-    -> throw_statement;
-
-isolated_statement
-    -> if_statement
-    -> isolated_statement_no_if;
-
-isolated_statement_no_if
-    -> while_statement
-    -> for_statement
-    -> synchronized_statement
-    -> try_statement
-    -> do_statement
-    -> switch_statement;
-
-statement_expression_list
-    -> statement_expression COMMA statement_expression_list `{}{} {}`
-    -> statement_expression;
-statement_expression
-    -> assignment
-    -> INC unary_expr
-    -> DEC unary_expr
-    -> postfix_expr INC
-    -> postfix_expr DEC
-    -> method_invocation
-    -> class_icreation_expr;
-
-assignment
-    -> lhs ASSN expr `{} {} {}`;
-
-assert_statement
-    -> ASSERT expr SEMI `{} {}{}`
-    -> ASSERT expr COLON expr SEMI `{} {}{} {}{}`;
-
-switch_statement
-    -> SWITCH LPAREN expr RPAREN switch_block `{} {}{}{} {}`;
-
-switch_block
-    -> LBRACE [switch_bsgs] [switch_labels] RBRACE `{}\n{;prefix=[prefix][indent]}{;prefix=[prefix][indent]}[prefix]{}`;
-
-switch_bsgs
-    -> switch_bsg switch_bsgs
-    -> switch_bsg;
-switch_bsg
-    -> switch_labels prefixed_block_statements `{}\n{;prefix=[prefix][indent]}`;
-
-switch_labels
-    -> switch_label switch_labels
-    -> switch_label;
-switch_label `[prefix]{} {}{}`
-    -> CASE expr COLON
-    -> CASE ID COLON
-    -> DEFAULT COLON `[prefix]{}{}`;
-
-break_statement
-    -> BREAK SEMI
-    -> BREAK ID SEMI `{} {}{}`;
-
-continue_statement
-    -> CONTINUE SEMI
-    -> CONTINUE ID SEMI `{} {}{}`;
-
-return_statement
-    -> RETURN SEMI
-    -> RETURN expr SEMI `{} {}{}`;
-
-synchronized_statement
-    -> SYNCHRONIZED LPAREN expr RPAREN block `{} {}{}{} {}`;
-
-throw_statement
-    -> THROW expr SEMI `{} {}{}`;
-
-try_statement
-    -> try_header
-    -> try_header catches `{} {}`
-    -> try_header finally `{} {}`
-    -> try_header catches finally `{} {} {}`;
-
-try_header
-    -> TRY block `{} {}`
-    -> TRY resources_specification block `{} {} {}`;
-
-resources_specification
-    -> LPAREN resources [SEMI] RPAREN;
-resources
-    -> resource SEMI resources `{}{} {}`
-    -> resource;
-resource
-    -> [inline_modifiers] type variable_declarator_id ASSN expr `{}{} {} {} {}`;
-
-finally
-    -> FINALLY block `{} {}`;
-
-catches
-    -> catch_clause catches `{} {}`
-    -> catch_clause `{}`;
-catch_clause
-    -> CATCH LPAREN catch_formal_parameter RPAREN block `{} {}{}{} {}`;
-catch_formal_parameter
-    -> modifiers_opt catch_type variable_declarator_id `{}{} {}`;
-catch_type
-    -> class_type catch_type_internal;
-catch_type_internal
-    -> OR_BI class_type catch_type_internal ` {} {}{}`
-    ->;
-
-labeled_statement
-    -> ID COLON statement `{}{} {}`;
-
-if_statement
-    -> if_then_statement
-    -> if_then_else_statement;
-
-if_then_statement
-    -> IF LPAREN expr RPAREN forced_statement `{} {}{}{} {}`;
-
-if_then_else_statement
-    -> IF LPAREN expr RPAREN forced_statement ELSE else_statement`{} {}{}{} {} {} {}`;
-
-else_statement
-    -> block
-    -> inline_statement_no_if `\\{\n[prefix][indent]{;prefix=[prefix][indent]}\n[prefix]\\}`
-    -> if_statement;
-
-while_statement
-    -> WHILE LPAREN expr RPAREN forced_statement `{} {}{}{} {}`;
-
-do_statement
-    -> DO forced_statement WHILE LPAREN expr RPAREN SEMI `{} {} {} {}{}{}{}`;
-
-for_statement `{} {}`
-    -> basic_for_statement forced_statement
-    -> enhanced_for_statement forced_statement;
-
-basic_for_statement
-    -> FOR LPAREN [for_init] SEMI [for_expr] SEMI [for_update] RPAREN `{} {}{}{}{}{}{}{}`;
-
-for_init
-    -> [inline_modifiers] type variable_declarator_list `{}{} {}`
-    -> statement_expression_list;
-for_expr
-    -> expr ` {}`;
-for_update
-    -> statement_expression_list ` {}`;
-
-enhanced_for_statement
-    -> FOR LPAREN modifiers_opt type variable_declarator_id COLON expr RPAREN `{} {}{}{} {} {} {}{}`;
-
-constructor_statements
-    -> [prefixed_block_statements]
-    -> explicit_constructor_invocation_statement prefixed_block_statements `[prefix]{}\n\n{}`
-    -> explicit_constructor_invocation_statement `[prefix]{}\n`;
-
-explicit_constructor_invocation_statement
-    -> [type_arguments] THIS LPAREN [argument_list] RPAREN SEMI
-    -> [type_arguments] SUPER LPAREN [argument_list] RPAREN SEMI
-    -> expr_name DOT [type_arguments] SUPER LPAREN [argument_list] RPAREN SEMI
-    -> primary DOT [type_arguments] SUPER LPAREN [argument_list] RPAREN SEMI;
-
-#
-# EXPRESSIONS
-#
-
-expr
-    -> non_assn_expr
-    -> lhs ASSN expr `{} {} {}`;
-
-non_assn_expr
-    -> lambda_expr
-    -> conditional_expr;
-
-lhs
-    -> expr_name
-    -> field_access
-    -> array_access;
-
-lambda_expr
-    -> lambda_parameters ARROW lambda_body;
-
-lambda_parameters
-    -> ID
-    -> LPAREN [formal_parameter_list] RPAREN
-    -> LPAREN id_list RPAREN;
-
-lambda_body
-    -> expr
-    -> block `{}`;
-
-conditional_expr
-    -> conditional_or_expr
-    -> conditional_or_expr QST expr COLON non_assn_expr `{} {} {} {} {}`;
-
-conditional_or_expr
-    -> conditional_and_expr
-    -> conditional_or_expr OR_L conditional_and_expr `{} {} {}`;
-
-conditional_and_expr
-    -> inclusive_or_expr
-    -> conditional_and_expr AND_L inclusive_or_expr `{} {} {}`;
-
-inclusive_or_expr
-    -> exclusive_or_expr
-    -> inclusive_or_expr OR_BI exclusive_or_expr `{} {} {}`;
-
-exclusive_or_expr
-    -> and_expr
-    -> exclusive_or_expr OR_BE and_expr `{} {} {}`;
-
-and_expr
-    -> equality_expr
-    -> and_expr AND equality_expr `{} {} {}`;
-
-equality_expr
-    -> relational_expr
-    -> equality_expr CMP_EQ relational_expr `{} {} {}`;
-
-relational_expr
-    -> shift_expr
-    -> relational_expr INSTANCEOF type `{} {} {}`
-    -> relational_expr relational_op shift_expr `{} {} {}`;
-
-shift_expr
-    -> additive_expr
-    -> shift_expr shift_op additive_expr `{} {} {}`;
-
-additive_expr
-    -> multiplicative_expr
-    -> additive_expr additive_op multiplicative_expr `{} {} {}`;
-
-multiplicative_expr
-    -> unary_expr
-    -> multiplicative_expr multiplicative_op unary_expr `{} {} {}`;
-
-unary_expr
-    -> INC unary_expr
-    -> DEC unary_expr
-    -> PLUS unary_expr
-    -> MINUS unary_expr
-    -> unary_expr_not_plus_minus;
-
-unary_expr_not_plus_minus
-    -> COMP unary_expr
-    -> NOT unary_expr
-    -> postfix_expr
-    -> cast_expr;
-
-postfix_expr
-    -> primary
-    -> expr_name
-    -> postfix_expr INC
-    -> postfix_expr DEC;
-
-cast_expr
-    -> LPAREN PRIM RPAREN unary_expr
-    -> LPAREN type [additional_bounds] RPAREN unary_expr_not_plus_minus
-    -> LPAREN type [additional_bounds] RPAREN lambda_expr;
-
-expr_name
-    -> ID
-    -> expr_name DOT ID;
-
-primary
-    -> primary_no_new_array
-    -> array_creation_expr;
-
-primary_no_new_array
-    -> LIT
-    -> class_literal
-    -> THIS
-    -> typename DOT THIS
-    -> LPAREN expr RPAREN
-    -> class_icreation_expr
-    -> field_access
-    -> array_access
-    -> method_invocation
-    -> method_reference;
-
-class_icreation_expr
-    -> unqualified_class_icreation_expr
-    -> expr_name DOT unqualified_class_icreation_expr
-    -> primary DOT unqualified_class_icreation_expr;
-
-unqualified_class_icreation_expr
-    -> NEW [type_arguments] class_type_to_instantiate LPAREN [argument_list] RPAREN [inline_class_body]
-    `{} {}{}{}{}{}{}`;
-
-field_access
-    -> primary DOT ID
-    -> SUPER DOT ID
-    -> typename DOT SUPER DOT ID;
-
-array_access
-    -> expr_name LARRI expr RARRI
-    -> primary_no_new_array LARRI expr RARRI;
-
-method_invocation
-    -> ID LPAREN [argument_list] RPAREN
-    -> typename DOT [type_arguments] ID LPAREN [argument_list] RPAREN
-    -> expr_name DOT [type_arguments] ID LPAREN [argument_list] RPAREN
-    -> primary DOT [type_arguments] ID LPAREN [argument_list] RPAREN
-    -> SUPER DOT [type_arguments] ID LPAREN [argument_list] RPAREN
-    -> typename DOT SUPER DOT [type_arguments] ID LPAREN [argument_list] RPAREN;
-
-method_reference
-    -> expr_name M_REF [type_arguments] ID
-    -> type M_REF [type_arguments] ID
-    -> primary M_REF [type_arguments] ID
-    -> SUPER M_REF [type_arguments] ID
-    -> typename M_REF [type_arguments] ID
-    -> class_type M_REF [type_arguments] NEW
-    -> array_type M_REF NEW;
-
-array_creation_expr
-    -> array_creation_type dim_exprs [array_dims]
-    -> array_creation_type array_dims array_initializer;
-
-array_creation_type `{} {}`
-    -> NEW PRIM
-    -> NEW class_type;
-
-dim_exprs
-    -> dim_expr dim_exprs
-    -> dim_expr;
-dim_expr
-    -> [annotations] LARRI expr RARRI;
-
-#
-# MODIFIERS
-#
-
-modifiers_opt
-    -> [annotation_modifiers] [non_annotation_modifiers];
-
-annotation_modifiers
-    -> annotation annotation_modifiers `{}\n[prefix]{}`
-    -> annotation `{}\n[prefix]`;
-
-non_annotation_modifiers
-    -> first_modifier inline_modifiers `{} {}`
-    -> first_modifier `{} `;
-first_modifier
-    -> MOD
-    -> SYNCHRONIZED
-    -> STATIC
-    -> FINAL
-    -> DEFAULT;
-inline_modifiers
-    -> modifier inline_modifiers `{} {}`
-    -> modifier `{} `;
-modifier
-    -> annotation
-    -> first_modifier;
-
-#
-# OPERATORS
-#
-
-shift_op
-    -> LT LT
-    -> GT GT
-    -> GT GT GT;
-
-relational_op
-    -> CMP_REL
-    -> LT
-    -> GT;
-
-additive_op
-    -> PLUS
-    -> MINUS;
-
-multiplicative_op
-    -> STAR
-    -> PCT
-    -> SLASH;
+    #
+
+    do      ^DO
+        'uble' -> ^PRIM
+        '<' .. '\n' -> fail
+        _ -> id;
+
+    throw   ^THROW
+        's' -> ^THROWS
+        '<' .. '\n' -> fail
+        _ -> id;
+
+    int     ^PRIM
+        'erface' -> ^INTERFACE
+        '<' .. '\n' -> fail
+        _ -> id;
+
+    final   ^FINAL
+        'ly' -> ^FINALLY
+        '<' .. '\n' -> fail
+        _ -> id;
+
+    colon   ^COLON
+        ':' -> ^M_REF;
+
+    ws      ^_
+        ' ' | '\t' | '\n' -> ws;
+
+    lcom    ^_
+        '\n' -> fail
+        _ -> lcom;
+
+    bcom
+        '*/' -> bcomm # TODO get rid of this after introducing comments
+        _ -> bcom;
+
+    bcomm   ^_; # TODO get rid of this after introducing comments
+
+    MOD | ASSERT | PRIM | BREAK | CASE | CATCH | ENUM | CLASS | CONTINUE | DEFAULT | DO | ELSE | EXTENDS | FINALLY | FOR
+        | IF | IMPLEMENTS | IMPORT | INSTANCEOF | NEW | PACKAGE | RETURN | SUPER | SWITCH | THIS | THROWS | TRY | VOID
+        | WHILE | INTERFACE | SYNCHRONIZED | STATIC
+        '<' .. '\n' -> fail
+         _ -> id;
+
+    id      ^ID
+        '_' .. '9' | '$' -> id;
+}
+
+grammar {
+    cmp_unit
+        | [package_decl] [import_decls] [type_decls] `{}{}{;indent=    }`;
+
+    package_decl
+        | [annotations] PACKAGE id_chain SEMI `{}{} {}{}\n\n`;
+
+    import_decls
+        | import_decl import_decls `{}\n{}`
+        | import_decl `{}\n\n`;
+    import_decl `{} {} {}{}{}{}`
+        | IMPORT typename SEMI `{} {}{}`
+        | IMPORT typename DOT STAR SEMI `{} {}{}{}{}`
+        | IMPORT STATIC typename DOT ID SEMI
+        | IMPORT STATIC typename DOT STAR SEMI;
+
+    type_decls
+        | type_decl type_decls `{}\n{}`
+        | type_decl;
+    type_decl
+        | class_dec
+        | enum_dec
+        | interface_dec
+        | annotation_dec
+        | SEMI;
+
+    #
+    # CLASS
+    #
+
+    class_dec
+        | modifiers_opt CLASS ID [type_parameters] [superclass] [superinterfaces] class_body
+            `{}{} {}{}{}{}{}`;
+
+    superclass
+        | EXTENDS class_type ` {} {}`;
+
+    superinterfaces
+        | IMPLEMENTS class_type_list ` {} {}`;
+
+    class_body
+        | inline_class_body `{}\n`;
+    inline_class_body
+        | LBRACE [class_body_decs] RBRACE ` {}\n{;prefix=[prefix][indent]}[prefix]{}`;
+    class_body_decs
+        | class_body_dec class_body_decs `[prefix]{}\n{}`
+        | class_body_dec `[prefix]{}`;
+    class_body_dec
+        | class_member_dec
+        | block `{}\n`
+        | STATIC block `{} {}\n`
+        | constructor_dec;
+
+    class_member_dec
+        | field_dec
+        | method_dec
+        | class_dec
+        | interface_dec
+        | enum_dec
+        | annotation_dec
+        | SEMI;
+
+    constructor_dec
+        | modifiers_opt constructor_declarator [throws] constructor_body `{}{} {}{}`;
+    constructor_body
+        | LBRACE constructor_statements RBRACE `{}\n{;prefix=[prefix][indent]}[prefix]{}\n`;
+    constructor_declarator
+        | [type_parameters] ID LPAREN [formal_parameter_list] RPAREN;
+
+    argument_list
+        | short_argument_list
+        | long_argument_list `{;prefix=[prefix][indent]}\n[prefix]`;
+    short_argument_list
+        | expr COMMA expr `{}{} {}`
+        | expr;
+    long_argument_list
+        | inline_argument_list COMMA expr COMMA expr `{}{}\n[prefix]{}{}\n[prefix]{}`;
+    inline_argument_list
+        | inline_argument_list COMMA expr `{}{}\n[prefix]{}`
+        | expr `\n[prefix]{}`;
+
+    field_dec
+        | modifiers_opt type variable_declarator_list SEMI `{}{} {}{}\n`;
+
+    method_dec
+        | modifiers_opt method_header method_body `{}{}{}\n`;
+    method_header
+        | result method_declarator [method_throws] `{} {}{}`
+        | type_parameters [annotations] result method_declarator [method_throws] `{} {}{} {}{}`;
+    method_declarator
+        | ID LPAREN [formal_parameter_list] RPAREN [array_dims];
+    method_body
+        | block ` {}`
+        | SEMI;
+    method_throws
+        | throws ` {}`;
+
+    formal_parameter_list
+        | receiver_parameter
+        | last_formal_parameter
+        | short_formal_parameter_list
+        | long_formal_parameter_list `{;prefix=[prefix][indent]}\n[prefix]`;
+    short_formal_parameter_list `{}{} {}`
+        | formal_parameter COMMA last_formal_parameter
+        | receiver_parameter COMMA last_formal_parameter;
+    long_formal_parameter_list `{}{}\n[prefix]{}{}\n[prefix]{}`
+        | formal_parameters COMMA formal_parameter COMMA last_formal_parameter
+        | formal_parameters COMMA receiver_parameter COMMA last_formal_parameter;
+    formal_parameters `\n[prefix]{}{}{}`
+        | formal_parameter COMMA formal_parameters
+        | receiver_parameter COMMA formal_parameters
+        | formal_parameter `\n[prefix]{}`
+        | receiver_parameter `\n[prefix]{}`;
+    formal_parameter
+        | modifiers_opt type variable_declarator_id `{}{} {}`;
+    receiver_parameter
+        | [annotations] type ID DOT THIS `{}{} {}{}{}`
+        | [annotations] type THIS `{}{} {}`;
+    last_formal_parameter
+        | modifiers_opt type [annotations] TRIDOT variable_declarator_id `{}{}{}{} {}`
+        | formal_parameter;
+
+    throws
+        | THROWS exception_type_list `{} {} `;
+
+    exception_type_list
+        | exception_type COMMA exception_type_list `{}{} {}`
+        | exception_type;
+    exception_type
+        | class_type
+        | type_variable;
+
+    result
+        | type
+        | VOID;
+
+    #
+    # ENUM
+    #
+
+    enum_dec
+        | modifiers_opt ENUM ID [superinterfaces] enum_body `{}{} {} {}{}`;
+
+    enum_body
+        | LBRACE [enum_const_list] [COMMA] [enum_body_declarations] RBRACE
+            `{}\n{;prefix=[prefix][indent]}{}\n{;prefix=[prefix][indent]}[prefix]{}\n`;
+
+    enum_const_list
+        | enum_const COMMA enum_const_list `[prefix]{}{}\n{}`
+        | enum_const `[prefix]{}`;
+    enum_const
+        | [annotations] ID [enum_const_arg_list] [inline_class_body];
+    enum_const_arg_list
+        | LPAREN [argument_list] RPAREN;
+
+    enum_body_declarations
+        | SEMI [class_body_decs] `[prefix]{}\n{}`;
+
+    #
+    # INTERFACE
+    #
+
+    interface_dec
+        | modifiers_opt INTERFACE ID [type_parameters] [extends_interfaces] interface_body `{}{} {}{} {}{}`;
+
+    extends_interfaces
+        | EXTENDS class_type_list `{} {} `;
+
+    interface_body
+        | LBRACE [interface_member_decs] RBRACE `{}\n{;prefix=[prefix][indent]}{}\n`;
+
+    interface_member_decs
+        | class_member_dec interface_member_decs `[prefix]{}\n{}`
+        | class_member_dec `[prefix]{}`;
+
+    #
+    # ANNOTATION
+    #
+
+    annotation_dec
+        | modifiers_opt AT INTERFACE ID annotation_body `{}{}{} {} {}`;
+
+    annotation_body
+        | LBRACE [annotation_member_decs] RBRACE `{}\n{;prefix=[prefix][indent]}{}\n`;
+
+    annotation_member_decs
+        | annotation_member_dec annotation_member_decs `[prefix]{}\n{}`
+        | annotation_member_dec `[prefix]{}`;
+    annotation_member_dec
+        | annotation_element_dec
+        | class_member_dec;
+
+    annotation_element_dec
+        | modifiers_opt type ID LPAREN RPAREN [array_dims] [default_value] SEMI `{}{} {}{}{}{}{}{}\n`;
+
+    default_value
+        | DEFAULT element_value ` {} {}`;
+
+    #
+    # TYPE
+    #
+
+    type_parameters
+        | LT type_parameter_list GT;
+    type_parameter_list
+        | type_parameter COMMA type_parameter_list `{}{} {}`
+        | type_parameter;
+    type_parameter
+        | [annotations] ID [type_bound];
+
+    type_bound
+        | EXTENDS type_variable ` {} {}`
+        | EXTENDS class_type [additional_bounds]  ` {} {} {}`;
+    additional_bounds
+        | AND class_type additional_bounds `{} {} {}`
+        | AND class_type `{} {}`;
+
+    type_arguments
+        | LT type_argument_list GT;
+    type_argument_list
+        | type_argument COMMA type_argument_list `{}{} {}`
+        | type_argument;
+    type_argument
+        | type
+        | wildcard;
+
+    type
+        | non_array_type [array_dims];
+
+    typename
+        | typename DOT ID
+        | ID;
+
+    array_type
+        | non_array_type array_dims;
+
+    non_array_type
+        | class_type
+        | primitive_type;
+
+    class_type_list
+        | class_type COMMA class_type_list `{}{} {}`
+        | class_type;
+    class_type
+        | class_type DOT class_type_internal
+        | class_type_internal;
+    class_type_internal
+        | type_variable [type_arguments];
+
+    class_type_to_instantiate
+        | annotated_ids type_arguments
+        | annotated_ids LT GT
+        | annotated_ids;
+
+    class_literal
+        | typename [array_dims] DOT CLASS
+        | PRIM [array_dims] DOT CLASS
+        | VOID DOT CLASS;
+
+    type_variable
+        | [annotations] ID;
+
+    primitive_type
+        | [annotations] PRIM;
+
+    array_dims
+        | array_dim array_dims
+        | array_dim;
+    array_dim
+        | [annotations] LARRI RARRI;
+
+    wildcard
+        | [annotations] QST [wildcard_bounds];
+    wildcard_bounds ` {} {}`
+        | EXTENDS type
+        | SUPER type;
+
+    #
+    # MISC
+    #
+
+    element_value_pairs
+        | element_value_pair COMMA element_value_pairs `{}{} {}`
+        | element_value_pair;
+    element_value_pair
+        | ID ASSN element_value `{} {} {}`;
+    element_value
+        | conditional_expr
+        | element_value_array_initializer
+        | annotation;
+    element_value_array_initializer
+        | LBRACE [element_values] [COMMA] RBRACE;
+    element_values
+        | element_value COMMA element_values `{}{} {}`
+        | element_value;
+
+    annotations
+        | annotation annotations `{} {} `
+        | annotation `{} `;
+    annotation
+        | AT typename LPAREN [element_value_pairs] RPAREN
+        | AT typename LPAREN element_value RPAREN
+        | AT typename;
+
+    annotated_ids
+        | [annotations] ID DOT annotated_ids
+        | [annotations] ID;
+
+    id_chain
+        | ID DOT id_chain
+        | ID;
+
+    id_list
+        | ID COMMA id_list `{}{} {}`
+        | ID;
+
+    variable_declarator_list
+        | variable_declarator COMMA variable_declarator_list `{}{} {}`
+        | variable_declarator;
+    variable_declarator
+        | variable_declarator_id variable_initializer_opt;
+    variable_declarator_id
+        | ID [array_dims];
+
+    variable_initializers
+        | variable_initializer COMMA variable_initializers `{}{} {}`
+        | variable_initializer;
+    variable_initializer_opt
+        | ASSN variable_initializer ` {} {}`
+        |;
+    variable_initializer
+        | expr
+        | array_initializer;
+
+    array_initializer
+        | LBRACE [variable_initializers] [COMMA] RBRACE;
+
+    block
+        | LBRACE [prefixed_block_statements] RBRACE `{}\n{;prefix=[prefix][indent]}[prefix]{}`;
+
+    #
+    # STATEMENTS
+    #
+
+    prefixed_block_statements
+        | block_statements `[prefix]{}`;
+    block_statements `{}\n`
+        | isolated_block_statement block_statements `{}\n[prefix]{}`
+        | grouped_statements isolated_block_statement block_statements `{}\n\n[prefix]{}\n[prefix]{}`
+        | grouped_statements inline_isolated_block_statement `{}\n\n[prefix]{}\n`
+        | inline_isolated_block_statement
+        | grouped_statements;
+
+    isolated_block_statement `{}\n`
+        | class_dec
+        | block
+        | lvar_dec_statement `{}`
+        | isolated_statement;
+
+    inline_isolated_block_statement
+        | class_dec
+        | block
+        | lvar_dec_statement
+        | isolated_statement;
+
+    lvar_dec_statement
+        | lvar_dec SEMI;
+    lvar_dec
+        | modifiers_opt type variable_declarator_list `{}{} {}`;
+
+    statement
+        | block
+        | inline_statement;
+
+    forced_statement
+        | block
+        | inline_statement `\\{\n[prefix][indent]{;prefix=[prefix][indent]}\n[prefix]\\}`;
+
+    inline_statement
+        | grouped_statement
+        | isolated_statement;
+
+    inline_statement_no_if
+        | grouped_statement
+        | isolated_statement_no_if;
+
+    grouped_statements
+        | grouped_statement grouped_statements `{}\n[prefix]{}`
+        | grouped_statement;
+    grouped_statement
+        | labeled_statement
+        | SEMI
+        | statement_expression SEMI
+        | assert_statement
+        | break_statement
+        | continue_statement
+        | return_statement
+        | throw_statement;
+
+    isolated_statement
+        | if_statement
+        | isolated_statement_no_if;
+
+    isolated_statement_no_if
+        | while_statement
+        | for_statement
+        | synchronized_statement
+        | try_statement
+        | do_statement
+        | switch_statement;
+
+    statement_expression_list
+        | statement_expression COMMA statement_expression_list `{}{} {}`
+        | statement_expression;
+    statement_expression
+        | assignment
+        | INC unary_expr
+        | DEC unary_expr
+        | postfix_expr INC
+        | postfix_expr DEC
+        | method_invocation
+        | class_icreation_expr;
+
+    assignment
+        | lhs ASSN expr `{} {} {}`;
+
+    assert_statement
+        | ASSERT expr SEMI `{} {}{}`
+        | ASSERT expr COLON expr SEMI `{} {}{} {}{}`;
+
+    switch_statement
+        | SWITCH LPAREN expr RPAREN switch_block `{} {}{}{} {}`;
+
+    switch_block
+        | LBRACE [switch_bsgs] [switch_labels] RBRACE
+        `{}\n{;prefix=[prefix][indent]}{;prefix=[prefix][indent]}[prefix]{}`;
+
+    switch_bsgs
+        | switch_bsg switch_bsgs
+        | switch_bsg;
+    switch_bsg
+        | switch_labels prefixed_block_statements `{}\n{;prefix=[prefix][indent]}`;
+
+    switch_labels
+        | switch_label switch_labels
+        | switch_label;
+    switch_label `[prefix]{} {}{}`
+        | CASE expr COLON
+        | CASE ID COLON
+        | DEFAULT COLON `[prefix]{}{}`;
+
+    break_statement
+        | BREAK SEMI
+        | BREAK ID SEMI `{} {}{}`;
+
+    continue_statement
+        | CONTINUE SEMI
+        | CONTINUE ID SEMI `{} {}{}`;
+
+    return_statement
+        | RETURN SEMI
+        | RETURN expr SEMI `{} {}{}`;
+
+    synchronized_statement
+        | SYNCHRONIZED LPAREN expr RPAREN block `{} {}{}{} {}`;
+
+    throw_statement
+        | THROW expr SEMI `{} {}{}`;
+
+    try_statement
+        | try_header
+        | try_header catches `{} {}`
+        | try_header finally `{} {}`
+        | try_header catches finally `{} {} {}`;
+
+    try_header
+        | TRY block `{} {}`
+        | TRY resources_specification block `{} {} {}`;
+
+    resources_specification
+        | LPAREN resources [SEMI] RPAREN;
+    resources
+        | resource SEMI resources `{}{} {}`
+        | resource;
+    resource
+        | [inline_modifiers] type variable_declarator_id ASSN expr `{}{} {} {} {}`;
+
+    finally
+        | FINALLY block `{} {}`;
+
+    catches
+        | catch_clause catches `{} {}`
+        | catch_clause `{}`;
+    catch_clause
+        | CATCH LPAREN catch_formal_parameter RPAREN block `{} {}{}{} {}`;
+    catch_formal_parameter
+        | modifiers_opt catch_type variable_declarator_id `{}{} {}`;
+    catch_type
+        | class_type catch_type_internal;
+    catch_type_internal
+        | OR_BI class_type catch_type_internal ` {} {}{}`
+        |;
+
+    labeled_statement
+        | ID COLON statement `{}{} {}`;
+
+    if_statement
+        | if_then_statement
+        | if_then_else_statement;
+
+    if_then_statement
+        | IF LPAREN expr RPAREN forced_statement `{} {}{}{} {}`;
+
+    if_then_else_statement
+        | IF LPAREN expr RPAREN forced_statement ELSE else_statement`{} {}{}{} {} {} {}`;
+
+    else_statement
+        | block
+        | inline_statement_no_if `\\{\n[prefix][indent]{;prefix=[prefix][indent]}\n[prefix]\\}`
+        | if_statement;
+
+    while_statement
+        | WHILE LPAREN expr RPAREN forced_statement `{} {}{}{} {}`;
+
+    do_statement
+        | DO forced_statement WHILE LPAREN expr RPAREN SEMI `{} {} {} {}{}{}{}`;
+
+    for_statement `{} {}`
+        | basic_for_statement forced_statement
+        | enhanced_for_statement forced_statement;
+
+    basic_for_statement
+        | FOR LPAREN [for_init] SEMI [for_expr] SEMI [for_update] RPAREN `{} {}{}{}{}{}{}{}`;
+
+    for_init
+        | [inline_modifiers] type variable_declarator_list `{}{} {}`
+        | statement_expression_list;
+    for_expr
+        | expr ` {}`;
+    for_update
+        | statement_expression_list ` {}`;
+
+    enhanced_for_statement
+        | FOR LPAREN modifiers_opt type variable_declarator_id COLON expr RPAREN `{} {}{}{} {} {} {}{}`;
+
+    constructor_statements
+        | [prefixed_block_statements]
+        | explicit_constructor_invocation_statement prefixed_block_statements `[prefix]{}\n\n{}`
+        | explicit_constructor_invocation_statement `[prefix]{}\n`;
+
+    explicit_constructor_invocation_statement
+        | [type_arguments] THIS LPAREN [argument_list] RPAREN SEMI
+        | [type_arguments] SUPER LPAREN [argument_list] RPAREN SEMI
+        | expr_name DOT [type_arguments] SUPER LPAREN [argument_list] RPAREN SEMI
+        | primary DOT [type_arguments] SUPER LPAREN [argument_list] RPAREN SEMI;
+
+    #
+    # EXPRESSIONS
+    #
+
+    expr
+        | non_assn_expr
+        | lhs ASSN expr `{} {} {}`;
+
+    non_assn_expr
+        | lambda_expr
+        | conditional_expr;
+
+    lhs
+        | expr_name
+        | field_access
+        | array_access;
+
+    lambda_expr
+        | lambda_parameters ARROW lambda_body;
+
+    lambda_parameters
+        | ID
+        | LPAREN [formal_parameter_list] RPAREN
+        | LPAREN id_list RPAREN;
+
+    lambda_body
+        | expr
+        | block `{}`;
+
+    conditional_expr
+        | conditional_or_expr
+        | conditional_or_expr QST expr COLON non_assn_expr `{} {} {} {} {}`;
+
+    conditional_or_expr
+        | conditional_and_expr
+        | conditional_or_expr OR_L conditional_and_expr `{} {} {}`;
+
+    conditional_and_expr
+        | inclusive_or_expr
+        | conditional_and_expr AND_L inclusive_or_expr `{} {} {}`;
+
+    inclusive_or_expr
+        | exclusive_or_expr
+        | inclusive_or_expr OR_BI exclusive_or_expr `{} {} {}`;
+
+    exclusive_or_expr
+        | and_expr
+        | exclusive_or_expr OR_BE and_expr `{} {} {}`;
+
+    and_expr
+        | equality_expr
+        | and_expr AND equality_expr `{} {} {}`;
+
+    equality_expr
+        | relational_expr
+        | equality_expr CMP_EQ relational_expr `{} {} {}`;
+
+    relational_expr
+        | shift_expr
+        | relational_expr INSTANCEOF type `{} {} {}`
+        | relational_expr relational_op shift_expr `{} {} {}`;
+
+    shift_expr
+        | additive_expr
+        | shift_expr shift_op additive_expr `{} {} {}`;
+
+    additive_expr
+        | multiplicative_expr
+        | additive_expr additive_op multiplicative_expr `{} {} {}`;
+
+    multiplicative_expr
+        | unary_expr
+        | multiplicative_expr multiplicative_op unary_expr `{} {} {}`;
+
+    unary_expr
+        | INC unary_expr
+        | DEC unary_expr
+        | PLUS unary_expr
+        | MINUS unary_expr
+        | unary_expr_not_plus_minus;
+
+    unary_expr_not_plus_minus
+        | COMP unary_expr
+        | NOT unary_expr
+        | postfix_expr
+        | cast_expr;
+
+    postfix_expr
+        | primary
+        | expr_name
+        | postfix_expr INC
+        | postfix_expr DEC;
+
+    cast_expr
+        | LPAREN PRIM RPAREN unary_expr
+        | LPAREN type [additional_bounds] RPAREN unary_expr_not_plus_minus
+        | LPAREN type [additional_bounds] RPAREN lambda_expr;
+
+    expr_name
+        | ID
+        | expr_name DOT ID;
+
+    primary
+        | primary_no_new_array
+        | array_creation_expr;
+
+    primary_no_new_array
+        | LIT
+        | class_literal
+        | THIS
+        | typename DOT THIS
+        | LPAREN expr RPAREN
+        | class_icreation_expr
+        | field_access
+        | array_access
+        | method_invocation
+        | method_reference;
+
+    class_icreation_expr
+        | unqualified_class_icreation_expr
+        | expr_name DOT unqualified_class_icreation_expr
+        | primary DOT unqualified_class_icreation_expr;
+
+    unqualified_class_icreation_expr
+        | NEW [type_arguments] class_type_to_instantiate LPAREN [argument_list] RPAREN [inline_class_body]
+        `{} {}{}{}{}{}{}`;
+
+    field_access
+        | primary DOT ID
+        | SUPER DOT ID
+        | typename DOT SUPER DOT ID;
+
+    array_access
+        | expr_name LARRI expr RARRI
+        | primary_no_new_array LARRI expr RARRI;
+
+    method_invocation
+        | ID LPAREN [argument_list] RPAREN
+        | typename DOT [type_arguments] ID LPAREN [argument_list] RPAREN
+        | expr_name DOT [type_arguments] ID LPAREN [argument_list] RPAREN
+        | primary DOT [type_arguments] ID LPAREN [argument_list] RPAREN
+        | SUPER DOT [type_arguments] ID LPAREN [argument_list] RPAREN
+        | typename DOT SUPER DOT [type_arguments] ID LPAREN [argument_list] RPAREN;
+
+    method_reference
+        | expr_name M_REF [type_arguments] ID
+        | type M_REF [type_arguments] ID
+        | primary M_REF [type_arguments] ID
+        | SUPER M_REF [type_arguments] ID
+        | typename M_REF [type_arguments] ID
+        | class_type M_REF [type_arguments] NEW
+        | array_type M_REF NEW;
+
+    array_creation_expr
+        | array_creation_type dim_exprs [array_dims]
+        | array_creation_type array_dims array_initializer;
+
+    array_creation_type `{} {}`
+        | NEW PRIM
+        | NEW class_type;
+
+    dim_exprs
+        | dim_expr dim_exprs
+        | dim_expr;
+    dim_expr
+        | [annotations] LARRI expr RARRI;
+
+    #
+    # MODIFIERS
+    #
+
+    modifiers_opt
+        | [annotation_modifiers] [non_annotation_modifiers];
+
+    annotation_modifiers
+        | annotation annotation_modifiers `{}\n[prefix]{}`
+        | annotation `{}\n[prefix]`;
+
+    non_annotation_modifiers
+        | first_modifier inline_modifiers `{} {}`
+        | first_modifier `{} `;
+    first_modifier
+        | MOD
+        | SYNCHRONIZED
+        | STATIC
+        | FINAL
+        | DEFAULT;
+    inline_modifiers
+        | modifier inline_modifiers `{} {}`
+        | modifier `{} `;
+    modifier
+        | annotation
+        | first_modifier;
+
+    #
+    # OPERATORS
+    #
+
+    shift_op
+        | LT LT
+        | GT GT
+        | GT GT GT;
+
+    relational_op
+        | CMP_REL
+        | LT
+        | GT;
+
+    additive_op
+        | PLUS
+        | MINUS;
+
+    multiplicative_op
+        | STAR
+        | PCT
+        | SLASH;
+}

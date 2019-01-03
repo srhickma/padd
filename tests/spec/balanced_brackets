@@ -1,12 +1,17 @@
-' \t\n{}'
+alphabet ' \t\n{}'
 
-# dfa
-start
- ' ' | '\t' | '\n' -> ^_
- '{' -> ^LBRACKET
- '}' -> ^RBRACKET;
+cdfa {
+    start
+        ' ' | '\t' | '\n' -> ^_
+        '{' -> ^LBRACKET
+        '}' -> ^RBRACKET;
+}
 
-# grammar
-s -> s b
-  ->;
-b -> LBRACKET s RBRACKET `[prefix]{}\n\n{;prefix=[prefix]\t}[prefix]{}\n\n`;
+grammar {
+    s
+        | s b
+        |;
+
+    b
+        | LBRACKET s RBRACKET `[prefix]{}\n\n{;prefix=[prefix]\t}[prefix]{}\n\n`;
+}

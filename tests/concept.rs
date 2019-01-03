@@ -1,23 +1,30 @@
 extern crate padd;
 
-use padd::{FormatJobRunner, FormatJob};
+use padd::{FormatJob, FormatJobRunner};
 
 #[test]
 fn test_def_input_matcher() {
     //setup
     let spec = "
-'abcdefghijklmnopqrstuvwxyz'
+alphabet 'abcdefghijklmnopqrstuvwxyz'
 
-start 'a' -> a;
+cdfa {
+    start
+        'a' -> a;
 
-a^ACC
-'a' -> fail
-_ -> a;
+    a   ^ACC
+        'a' -> fail
+        _ -> a;
+}
 
-s -> acc s `{}\\n{}`
--> acc;
+grammar {
+    s
+        | acc s `{}\\n{}`
+        | acc;
 
-acc -> ACC;
+    acc
+        | ACC;
+}
     ".to_string();
 
     let input = "abasdfergrthergerghera".to_string();
@@ -39,19 +46,26 @@ a"
 fn test_ignore_tokens() {
     //setup
     let spec = "
-'a \n\t'
+alphabet 'a \n\t'
 
-start 'a' -> a
-' ' | '\n' | '\t' -> ^_;
+cdfa {
+    start
+        'a' -> a
+        ' ' | '\n' | '\t' -> ^_;
 
-a^ACC
-'a' -> a
-_ -> fail;
+    a   ^ACC
+        'a' -> a
+        _ -> fail;
+}
 
-s -> acc s `{} {}`
--> acc;
+grammar {
+    s
+        | acc s `{} {}`
+        | acc;
 
-acc -> ACC;
+    acc
+        | ACC;
+}
     ".to_string();
 
     let input = "aaaa \t \n  a aa  aa ".to_string();
@@ -69,20 +83,28 @@ acc -> ACC;
 fn test_advanced_operators() {
     //setup
     let spec = "
-        'inj '
-        start
-            'in' -> ^IN
-            ' ' -> ^_
-            _ -> ^ID;
-        ID | IN
-            ' ' -> fail
-            _ -> ID;
-        s
-            -> x s
-            -> x;
-        x
-            -> ID
-            -> IN ``;".to_string();
+alphabet 'inj '
+
+cdfa {
+    start
+        'in' -> ^IN
+        ' ' -> ^_
+        _ -> ^ID;
+
+    ID | IN
+        ' ' -> fail
+        _ -> ID;
+}
+
+grammar {
+    s
+        | x s
+        | x;
+    x
+        | ID
+        | IN ``;
+}
+    ".to_string();
 
     let input = "i ij ijjjijijiji inj in iii".to_string();
 
@@ -99,16 +121,22 @@ fn test_advanced_operators() {
 fn test_single_reference_optional_shorthand() {
     //setup
     let spec = "
-'ab'
+alphabet 'ab'
 
-start
-  'a' -> ^A
-  'b' -> ^B;
+cdfa {
+    start
+        'a' -> ^A
+        'b' -> ^B;
+}
 
-s -> A [b] s
-  ->;
+grammar {
+    s
+        | A [b] s
+        |;
 
-b -> B `\n{}\n`;
+    b
+        | B `\n{}\n`;
+}
     ".to_string();
 
     let input = "ababaaaaababaaba".to_string();
@@ -126,16 +154,22 @@ b -> B `\n{}\n`;
 fn test_multiple_reference_optional_shorthand() {
     //setup
     let spec = "
-'ab'
+alphabet 'ab'
 
-start
-  'a' -> ^A
-  'b' -> ^B;
+cdfa {
+    start
+        'a' -> ^A
+        'b' -> ^B;
+}
 
-s -> A [b] s
-  ->;
+grammar {
+    s
+        | A [b] s
+        |;
 
-b -> B [b] `\n{} {}`;
+    b
+        | B [b] `\n{} {}`;
+}
     ".to_string();
 
     let input = "abbbabaaaabbbbababaaba".to_string();
@@ -153,13 +187,18 @@ b -> B [b] `\n{} {}`;
 fn test_optional_shorthand_state_order() {
     //setup
     let spec = "
-'ab'
+alphabet 'ab'
 
-start
-  'a' -> ^A
-  'b' -> ^B;
+cdfa {
+    start
+        'a' -> ^A
+        'b' -> ^B;
+}
 
-s -> [A] [B];
+grammar {
+    s
+        | [A] [B];
+}
     ".to_string();
 
     let input = "ab".to_string();
@@ -177,18 +216,23 @@ s -> [A] [B];
 fn test_escapable_patterns() {
     //setup
     let spec = "
-' \t\n{}'
+alphabet ' \t\n{}'
 
-# dfa
-start
- ' ' | '\t' | '\n' -> ^_
- '{' -> ^LBRACKET
- '}' -> ^RBRACKET;
+cdfa {
+    start
+        ' ' | '\t' | '\n' -> ^_
+        '{' -> ^LBRACKET
+        '}' -> ^RBRACKET;
+}
 
-# grammar
-s -> s b `\\\\[@LAYER s\\\\={} b\\\\={}\\\\]`
-  ->;
-b -> LBRACKET s RBRACKET `[prefix]{}{;prefix=[prefix]\t}[prefix]{}`;
+grammar {
+    s
+        | s b `\\\\[@LAYER s\\\\={} b\\\\={}\\\\]`
+        |;
+
+    b
+        | LBRACKET s RBRACKET `[prefix]{}{;prefix=[prefix]\t}[prefix]{}`;
+}
     ".to_string();
 
     let input = " {{} }  { {}}".to_string();
@@ -206,16 +250,20 @@ b -> LBRACKET s RBRACKET `[prefix]{}{;prefix=[prefix]\t}[prefix]{}`;
 fn test_def_non_terminal_pattern() {
     //setup
     let spec = "
-'ab'
+alphabet 'ab'
 
-start
-    'a' -> ^A
-    'b' -> ^B;
+cdfa {
+    start
+        'a' -> ^A
+        'b' -> ^B;
+}
 
-s `{} {}`
-    -> s A
-    -> s B
-    -> `SEPARATED:`;
+grammar {
+    s `{} {}`
+        | s A
+        | s B
+        | `SEPARATED:`;
+}
     ".to_string();
 
     let input = "abbaba".to_string();
@@ -233,22 +281,26 @@ s `{} {}`
 fn test_range_based_matcher() {
     //setup
     let spec = "
-'abcdefghijklmnopqrstuvwxyz'
+alphabet 'abcdefghijklmnopqrstuvwxyz'
 
-start
-    'a' .. 'k' -> ^FIRST
-    'l' .. 'z' -> ^LAST;
+cdfa {
+    start
+        'a' .. 'k' -> ^FIRST
+        'l' .. 'z' -> ^LAST;
+}
 
-s
-    -> first last `{1} {0}`;
+grammar {
+    s
+        | first last `{1} {0}`;
 
-first
-    -> first FIRST
-    -> FIRST;
+    first
+        | first FIRST
+        | FIRST;
 
-last
-    -> last LAST
-    -> LAST;
+    last
+        | last LAST
+        | LAST;
+}
     ".to_string();
 
     let input = "abcdefghijklmnopqrstuvwxyz".to_string();
@@ -266,32 +318,36 @@ last
 fn test_online_context_sensitive_scanner() {
     //setup
     let spec = "
-'a!123456789'
+alphabet 'a!123456789'
 
-start
-    'a' -> a
-    '!' -> ^_ -> hidden;
+cdfa {
+    start
+        'a' -> a
+        '!' -> ^_ -> hidden;
 
-a       ^A
-    'a' -> a;
+    a       ^A
+        'a' -> a;
 
-hidden
-    '1' .. '9' -> num
-    '!' -> ^_ -> start;
+    hidden
+        '1' .. '9' -> num
+        '!' -> ^_ -> start;
 
-num     ^NUM
-    '1' .. '9' -> num;
+    num     ^NUM
+        '1' .. '9' -> num;
+}
 
-s
-    -> [regions];
+grammar {
+    s
+        | [regions];
 
-regions
-    -> regions region `{} {}`
-    -> region;
+    regions
+        | regions region `{} {}`
+        | region;
 
-region
-    -> A
-    -> NUM;
+    region
+        | A
+        | NUM;
+}
     ".to_string();
 
     let input = "!!aaa!!a!49913!a".to_string();
@@ -309,51 +365,55 @@ region
 fn test_region_based_scanner() {
     //setup
     let spec = "
-'abcdefghijklmnopqrstuvwxyz0123456789{}'
+alphabet 'abcdefghijklmnopqrstuvwxyz0123456789{}'
 
-start
-    'region1' -> ^R1_DEC -> r1_dec
-    'region2' -> ^R2_DEC -> r2_dec;
+cdfa {
+    start
+        'region1' -> ^R1_DEC -> r1_dec
+        'region2' -> ^R2_DEC -> r2_dec;
 
-r1_dec
-   '{' -> ^LBRACE_R1 -> r1_body;
+    r1_dec
+       '{' -> ^LBRACE_R1 -> r1_body;
 
-r2_dec
-   '{' -> ^LBRACE_R2 -> r2_body;
+    r2_dec
+       '{' -> ^LBRACE_R2 -> r2_body;
 
-r1_body
-    'a' -> ^A
-    'b' -> ^B
-    '}' -> ^RBRACE -> start;
+    r1_body
+        'a' -> ^A
+        'b' -> ^B
+        '}' -> ^RBRACE -> start;
 
-r2_body
-    '0' .. '9' -> num
-    '}' -> ^RBRACE -> start;
+    r2_body
+        '0' .. '9' -> num
+        '}' -> ^RBRACE -> start;
 
-num     ^NUM
-    '0' .. '9' -> num;
+    num     ^NUM
+        '0' .. '9' -> num;
+}
 
-s
-    -> [regions];
+grammar {
+    s
+        | [regions];
 
-regions
-    -> regions region `{}\\n{}`
-    -> region;
+    regions
+        | regions region `{}\\n{}`
+        | region;
 
-region
-    -> region1
-    -> region2;
+    region
+        | region1
+        | region2;
 
-region1
-    -> R1_DEC LBRACE_R1 abs RBRACE `{} {}\\n\\t{}\\n{}`;
+    region1
+        | R1_DEC LBRACE_R1 abs RBRACE `{} {}\\n\\t{}\\n{}`;
 
-abs
-    -> abs A
-    -> abs B
-    -> ;
+    abs
+        | abs A
+        | abs B
+        | ;
 
-region2
-    -> R2_DEC LBRACE_R2 [NUM] RBRACE `{} {}\\n\\t{}\\n{}`;
+    region2
+        | R2_DEC LBRACE_R2 [NUM] RBRACE `{} {}\\n\\t{}\\n{}`;
+}
     ".to_string();
 
     let input = "region1{abaaba}region1{bb}region2{558905}".to_string();
@@ -373,4 +433,49 @@ region1 {
 region2 {
 \t558905
 }");
+}
+
+#[test]
+fn test_duplicate_spec_regions() {
+    //setup
+    let spec = "
+alphabet 'something else'
+
+cdfa {
+    start
+        'in' -> ^IN
+        ' ' -> ^_
+        _ -> ^ID;
+}
+
+grammar {
+    s
+        | x s
+        | x;
+}
+
+cdfa {
+    ID | IN
+        ' ' -> fail
+        _ -> ID;
+}
+
+grammar {
+    x
+        | ID
+        | IN ``;
+}
+
+alphabet 'inj '
+    ".to_string();
+
+    let input = "i ij ijjjijijiji inj in iii".to_string();
+
+    let fjr = FormatJobRunner::build(&spec).unwrap();
+
+    //exercise
+    let res = fjr.format(FormatJob::from_text(input)).unwrap();
+
+    //verify
+    assert_eq!(res, "iijijjjijijijiinjiii");
 }

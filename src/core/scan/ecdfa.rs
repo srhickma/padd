@@ -170,7 +170,9 @@ CDFABuilder<State, Kind, EncodedCDFA<Kind>> for EncodedCDFABuilder<State, Kind> 
     }
 
     fn mark_start(&mut self, state: &State) -> &mut Self {
-        self.start = self.encode(state);
+        if self.start == usize::max_value() {
+            self.start = self.encode(state);
+        }
         self
     }
 
@@ -974,7 +976,7 @@ ID <- 'fdk'
             .accept_to_from_all(&S::Hidden).unwrap();
         builder.state(&S::BangOut)
             .tokenize(&"BANG".to_string())
-            .accept_to_from_all(&S::Start);
+            .accept_to_from_all(&S::Start).unwrap();
         builder.state(&S::Hidden)
             .mark_range(&S::Num, '1', '9').unwrap()
             .mark_trans(&S::BangOut, '!').unwrap();
