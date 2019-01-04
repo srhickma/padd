@@ -1,10 +1,14 @@
 use {
     core::{
-        data::stream::StreamSource,
+        data::{
+            Data,
+            stream::StreamSource,
+        },
         parse::{
             self,
             grammar::{Grammar, GrammarBuilder},
             Tree,
+            Production,
         },
         scan::{
             self,
@@ -54,15 +58,11 @@ enum S {
 }
 
 thread_local! {
-    static SPEC_ECDFA: EncodedCDFA<String> = build_spec_ecdfa().unwrap();
+    static SPEC_ECDFA: EncodedCDFA<Symbol> = build_spec_ecdfa().unwrap();
 }
 
-lazy_static! {
-    static ref SPEC_GRAMMAR: Grammar = build_spec_grammar();
-}
-
-fn build_spec_ecdfa() -> Result<EncodedCDFA<String>, scan::CDFAError> {
-    let mut builder: EncodedCDFABuilder<S, String> = EncodedCDFABuilder::new();
+fn build_spec_ecdfa() -> Result<EncodedCDFA<Symbol>, scan::CDFAError> {
+    let mut builder: EncodedCDFABuilder<S, Symbol> = EncodedCDFABuilder::new();
 
     builder.set_alphabet(SPEC_ALPHABET.chars())
         .mark_start(&S::Start);
@@ -80,7 +80,7 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<String>, scan::CDFAError> {
 
     builder.state(&S::AlphabetTag)
         .accept_to_from_all(&S::Alphabet)?
-        .tokenize(&"ALPHABET".to_string());
+        .tokenize(&Symbol::TAlphabet);
 
     builder.state(&S::Alphabet)
         .mark_trans(&S::AlphabetStringPartial, '\'')?
@@ -96,7 +96,7 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<String>, scan::CDFAError> {
 
     builder.state(&S::AlphabetString)
         .accept_to_from_all(&S::Start)?
-        .tokenize(&"CILC".to_string());
+        .tokenize(&Symbol::TCil);
 
     builder.state(&S::AlphabetStringEscaped)
         .default_to(&S::AlphabetStringPartial)?;
@@ -105,7 +105,7 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<String>, scan::CDFAError> {
 
     builder.state(&S::CDFATag)
         .accept_to_from_all(&S::CDFA)?
-        .tokenize(&"CDFA".to_string());
+        .tokenize(&Symbol::TCDFA);
 
     builder.state(&S::CDFA)
         .mark_trans(&S::CDFAEntryBrace, '{')?
@@ -116,7 +116,7 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<String>, scan::CDFAError> {
 
     builder.state(&S::CDFAEntryBrace)
         .accept_to_from_all(&S::CDFABody)?
-        .tokenize(&"LBRACE".to_string());
+        .tokenize(&Symbol::TLeftBrace);
 
     builder.state(&S::CDFABody)
         .mark_trans(&S::Or, '|')?
@@ -135,25 +135,25 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<String>, scan::CDFAError> {
 
     builder.state(&S::Hat)
         .accept()
-        .tokenize(&"HAT".to_string());
+        .tokenize(&Symbol::THat);
 
     builder.state(&S::Arrow)
         .accept()
-        .tokenize(&"ARROW".to_string());
+        .tokenize(&Symbol::TArrow);
 
     builder.state(&S::Range)
         .accept()
-        .tokenize(&"RANGE".to_string());
+        .tokenize(&Symbol::TRange);
 
     builder.state(&S::Def)
         .accept()
-        .tokenize(&"DEF".to_string());
+        .tokenize(&Symbol::TDef);
 
     // Grammar
 
     builder.state(&S::GrammarTag)
         .accept_to_from_all(&S::Grammar)?
-        .tokenize(&"GRAMMAR".to_string());
+        .tokenize(&Symbol::TGrammar);
 
     builder.state(&S::Grammar)
         .mark_trans(&S::GrammarEntryBrace, '{')?
@@ -164,7 +164,7 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<String>, scan::CDFAError> {
 
     builder.state(&S::GrammarEntryBrace)
         .accept_to_from_all(&S::GrammarBody)?
-        .tokenize(&"LBRACE".to_string());
+        .tokenize(&Symbol::TLeftBrace);
 
     builder.state(&S::GrammarBody)
         .mark_trans(&S::Or, '|')?
@@ -184,7 +184,7 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<String>, scan::CDFAError> {
 
     builder.state(&S::OptId)
         .accept()
-        .tokenize(&"COPTID".to_string());
+        .tokenize(&Symbol::TOptId);
 
     builder.state(&S::PatternPartial)
         .mark_trans(&S::Pattern, '`')?
@@ -192,7 +192,7 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<String>, scan::CDFAError> {
 
     builder.state(&S::Pattern)
         .accept()
-        .tokenize(&"PATTC".to_string());
+        .tokenize(&Symbol::TPattern);
 
     // Shared
 
@@ -201,15 +201,15 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<String>, scan::CDFAError> {
 
     builder.state(&S::RegionExitBrace)
         .accept_to_from_all(&S::Start)?
-        .tokenize(&"RBRACE".to_string());
+        .tokenize(&Symbol::TRightBrace);
 
     builder.state(&S::Or)
         .accept()
-        .tokenize(&"OR".to_string());
+        .tokenize(&Symbol::TOr);
 
     builder.state(&S::Semi)
         .accept()
-        .tokenize(&"SEMI".to_string());
+        .tokenize(&Symbol::TSemi);
 
     builder.state(&S::CilPartial)
         .mark_trans(&S::Cil, '\'')?
@@ -218,7 +218,7 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<String>, scan::CDFAError> {
 
     builder.state(&S::Cil)
         .accept()
-        .tokenize(&"CILC".to_string());
+        .tokenize(&Symbol::TCil);
 
     builder.state(&S::CilEscaped)
         .default_to(&S::CilPartial)?;
@@ -226,7 +226,7 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<String>, scan::CDFAError> {
     builder.state(&S::Id)
         .mark_range(&S::Id, '_', 'Z')?
         .accept()
-        .tokenize(&"ID".to_string());
+        .tokenize(&Symbol::TId);
 
     builder.state(&S::Comment)
         .mark_trans(&S::Fail, '\n')?
@@ -236,53 +236,128 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<String>, scan::CDFAError> {
     builder.build()
 }
 
-fn build_spec_grammar() -> Grammar {
-    let productions = parse::build_prods(&[
-        "spec regions",
-        "regions regions region",
-        "regions region",
-        "region alphabet",
-        "region cdfa",
-        "region grammar",
-        "alphabet ALPHABET CILC",
-        "cdfa CDFA LBRACE states RBRACE",
-        "states states state",
-        "states state",
-        "state sdec trans_opt SEMI",
-        "sdec targets",
-        "sdec targets acceptor",
-        "acceptor HAT id_or_def accd_opt",
-        "accd_opt ARROW ID",
-        "accd_opt ",
-        "targets ID",
-        "targets targets OR ID",
-        "trans_opt trans",
-        "trans_opt ",
-        "trans trans tran",
-        "trans tran",
-        "tran mtcs ARROW trand",
-        "tran DEF ARROW trand",
-        "trand ID",
-        "trand acceptor",
-        "mtcs mtcs OR mtc",
-        "mtcs mtc",
-        "mtc CILC",
-        "mtc CILC RANGE CILC",
-        "grammar GRAMMAR LBRACE prods RBRACE",
-        "prods prods prod",
-        "prods prod",
-        "prod ID patt_opt rhss SEMI",
-        "rhss rhss rhs",
-        "rhss rhs",
-        "rhs OR ids patt_opt",
-        "patt_opt PATTC",
-        "patt_opt ",
-        "ids ids ID",
-        "ids ids COPTID",
-        "ids ",
-        "id_or_def ID",
-        "id_or_def DEF"
-    ]);
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
+pub enum Symbol {
+    Spec,
+    Regions,
+    Region,
+    Alphabet,
+    CDFA,
+    States,
+    State,
+    StateDeclarator,
+    TransitionsOpt,
+    Transitions,
+    Transition,
+    TransitionDestination,
+    Matchers,
+    Matcher,
+    Targets,
+    Acceptor,
+    IdOrDef,
+    AcceptorDestinationOpt,
+    Grammar,
+    Productions,
+    Production,
+    PatternOpt,
+    RightHandSides,
+    RightHandSide,
+    Ids,
+    TAlphabet,
+    TCil,
+    TCDFA,
+    TLeftBrace,
+    TRightBrace,
+    TSemi,
+    THat,
+    TArrow,
+    TId,
+    TOr,
+    TRange,
+    TGrammar,
+    TPattern,
+    TOptId,
+    TDef,
+}
+
+impl Default for Symbol {
+    fn default() -> Symbol { Symbol::Spec }
+}
+
+impl Data for Symbol {
+    fn to_string(&self) -> String {
+        format!("{:?}", self)
+    }
+}
+
+lazy_static! {
+    static ref SPEC_GRAMMAR: Grammar<Symbol> = build_spec_grammar();
+}
+
+fn build_spec_grammar() -> Grammar<Symbol> {
+    //TODO create macros to make this declaration simpler
+    let productions: Vec<Production<Symbol>> = vec![
+        Production::from(Symbol::Spec, vec![Symbol::Regions]),
+        Production::from(Symbol::Regions, vec![Symbol::Regions, Symbol::Region]),
+        Production::from(Symbol::Regions, vec![Symbol::Region]),
+        Production::from(Symbol::Region, vec![Symbol::Alphabet]),
+        Production::from(Symbol::Region, vec![Symbol::CDFA]),
+        Production::from(Symbol::Region, vec![Symbol::Grammar]),
+        Production::from(Symbol::Alphabet, vec![Symbol::TAlphabet, Symbol::TCil]),
+        Production::from(Symbol::CDFA, vec![
+            Symbol::TCDFA, Symbol::TLeftBrace, Symbol::States, Symbol::TRightBrace
+        ]),
+        Production::from(Symbol::States, vec![Symbol::States, Symbol::State]),
+        Production::from(Symbol::States, vec![Symbol::State]),
+        Production::from(Symbol::State, vec![
+            Symbol::StateDeclarator, Symbol::TransitionsOpt, Symbol::TSemi
+        ]),
+        Production::from(Symbol::StateDeclarator, vec![Symbol::Targets]),
+        Production::from(Symbol::StateDeclarator, vec![Symbol::Targets, Symbol::Acceptor]),
+        Production::from(Symbol::Acceptor, vec![
+            Symbol::THat, Symbol::IdOrDef, Symbol::AcceptorDestinationOpt
+        ]),
+        Production::from(Symbol::AcceptorDestinationOpt, vec![Symbol::TArrow, Symbol::TId]),
+        Production::epsilon(Symbol::AcceptorDestinationOpt),
+        Production::from(Symbol::Targets, vec![Symbol::TId]),
+        Production::from(Symbol::Targets, vec![Symbol::Targets, Symbol::TOr, Symbol::TId]),
+        Production::from(Symbol::TransitionsOpt, vec![Symbol::Transitions]),
+        Production::epsilon(Symbol::TransitionsOpt),
+        Production::from(Symbol::Transitions, vec![Symbol::Transitions, Symbol::Transition]),
+        Production::from(Symbol::Transitions, vec![Symbol::Transition]),
+        Production::from(Symbol::Transition, vec![
+            Symbol::Matchers, Symbol::TArrow, Symbol::TransitionDestination
+        ]),
+        Production::from(Symbol::Transition, vec![
+            Symbol::TDef, Symbol::TArrow, Symbol::TransitionDestination
+        ]),
+        Production::from(Symbol::TransitionDestination, vec![Symbol::TId]),
+        Production::from(Symbol::TransitionDestination, vec![Symbol::Acceptor]),
+        Production::from(Symbol::Matchers, vec![Symbol::Matchers, Symbol::TOr, Symbol::Matcher]),
+        Production::from(Symbol::Matchers, vec![Symbol::Matcher]),
+        Production::from(Symbol::Matcher, vec![Symbol::TCil]),
+        Production::from(Symbol::Matcher, vec![Symbol::TCil, Symbol::TRange, Symbol::TCil]),
+        Production::from(Symbol::Grammar, vec![
+            Symbol::TGrammar, Symbol::TLeftBrace, Symbol::Productions, Symbol::TRightBrace
+        ]),
+        Production::from(Symbol::Productions, vec![Symbol::Productions, Symbol::Production]),
+        Production::from(Symbol::Productions, vec![Symbol::Production]),
+        Production::from(Symbol::Production, vec![
+            Symbol::TId, Symbol::PatternOpt, Symbol::RightHandSides, Symbol::TSemi
+        ]),
+        Production::from(Symbol::RightHandSides, vec![
+            Symbol::RightHandSides, Symbol::RightHandSide
+        ]),
+        Production::from(Symbol::RightHandSides, vec![Symbol::RightHandSide]),
+        Production::from(Symbol::RightHandSide, vec![Symbol::TOr, Symbol::Ids, Symbol::PatternOpt]),
+        Production::from(Symbol::PatternOpt, vec![Symbol::TPattern]),
+        Production::epsilon(Symbol::PatternOpt),
+        Production::from(Symbol::Ids, vec![Symbol::Ids, Symbol::TId]),
+        Production::from(Symbol::Ids, vec![Symbol::Ids, Symbol::TOptId]),
+        Production::epsilon(Symbol::Ids),
+        Production::from(Symbol::IdOrDef, vec![Symbol::TId]),
+        Production::from(Symbol::IdOrDef, vec![Symbol::TDef]),
+    ];
 
     let mut builder = GrammarBuilder::new();
     builder.try_mark_start(&productions.first().unwrap().lhs);
@@ -290,8 +365,8 @@ fn build_spec_grammar() -> Grammar {
     builder.build()
 }
 
-pub fn parse_spec(input: &str) -> Result<Tree, spec::ParseError> {
-    SPEC_ECDFA.with(|cdfa| -> Result<Tree, spec::ParseError> {
+pub fn parse_spec(input: &str) -> Result<Tree<Symbol>, spec::ParseError> {
+    SPEC_ECDFA.with(|cdfa| -> Result<Tree<Symbol>, spec::ParseError> {
         let mut iter = input.chars();
         let mut getter = || iter.next();
         let mut source = StreamSource::observe(&mut getter);

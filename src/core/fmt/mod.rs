@@ -14,7 +14,7 @@ pub struct Formatter {
 }
 
 impl Formatter {
-    pub fn format(&self, parse: &Tree) -> String {
+    pub fn format<Symbol: Data + Default>(&self, parse: &Tree<Symbol>) -> String {
         let format_job = FormatJob {
             parse,
             pattern_map: &self.pattern_map,
@@ -42,7 +42,10 @@ impl FormatterBuilder {
         }
     }
 
-    pub fn add_pattern(&mut self, pair: PatternPair) -> Result<(), BuildError> {
+    pub fn add_pattern<Symbol: Data + Default>(
+        &mut self,
+        pair: PatternPair<Symbol>
+    ) -> Result<(), BuildError> {
         let key = pair.production.to_string();
 
         if let Some(pattern) = self.memory.get(&pair.pattern) {
@@ -59,22 +62,22 @@ impl FormatterBuilder {
 
 pub type BuildError = pattern::BuildError;
 
-struct FormatJob<'a> {
-    parse: &'a Tree,
-    pattern_map: &'a HashMap<String, Pattern>,
+struct FormatJob<'parse, Symbol: Data + Default + 'parse> {
+    parse: &'parse Tree<Symbol>,
+    pattern_map: &'parse HashMap<String, Pattern>,
 }
 
-impl<'a> FormatJob<'a> {
+impl<'parse, Symbol: Data + Default + 'parse> FormatJob<'parse, Symbol> {
     fn run(&self) -> String {
         self.recur(self.parse, &HashMap::new())
     }
 
-    fn recur(&self, node: &Tree, scope: &HashMap<String, String>) -> String {
+    fn recur(&self, node: &Tree<Symbol>, scope: &HashMap<String, String>) -> String {
         if node.is_leaf() {
             if node.is_null() {
                 return String::new();
             }
-            return node.lhs.lexeme.clone();
+            return node.lhs.lexeme().clone();
         }
 
         let pattern = self.pattern_map.get(&node.production()[..]);
@@ -93,7 +96,7 @@ impl<'a> FormatJob<'a> {
     fn fill_pattern(
         &self,
         pattern: &Pattern,
-        children: &Vec<Tree>,
+        children: &Vec<Tree<Symbol>>,
         scope: &HashMap<String, String>,
     ) -> String {
         let mut res: String = String::new();
@@ -114,7 +117,7 @@ impl<'a> FormatJob<'a> {
     fn evaluate_capture(
         &self,
         capture: &Capture,
-        children: &Vec<Tree>,
+        children: &Vec<Tree<Symbol>>,
         outer_scope: &HashMap<String, String>,
     ) -> String {
         if capture.declarations.len() > 0 {
@@ -146,7 +149,7 @@ impl<'a> FormatJob<'a> {
     }
 }
 
-pub struct PatternPair {
-    pub production: Production,
+pub struct PatternPair<Symbol: Data + Default> {
+    pub production: Production<Symbol>,
     pub pattern: String,
 }

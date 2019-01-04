@@ -9,7 +9,6 @@ use {
         scan::{
             self,
             ecdfa::EncodedCDFA,
-            Kind,
         },
     },
     std::{
@@ -22,13 +21,17 @@ mod gen;
 mod lang;
 mod region;
 
+pub type Symbol = lang::Symbol;
+
 pub static DEF_MATCHER: &'static str = "_";
 
-pub fn parse_spec(input: &str) -> Result<Tree, ParseError> {
+pub fn parse_spec(input: &str) -> Result<Tree<Symbol>, ParseError> {
     lang::parse_spec(input)
 }
 
-pub fn generate_spec(parse: &Tree) -> Result<(EncodedCDFA<Kind>, Grammar, Formatter), GenError> {
+pub fn generate_spec(
+    parse: &Tree<Symbol>
+) -> Result<(EncodedCDFA<String>, Grammar<String>, Formatter), GenError> {
     gen::generate_spec(parse)
 }
 
@@ -1199,12 +1202,7 @@ grammar {
         let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
 
         //verify
-        let mut res_string = String::new();
-        for token in tokens {
-            res_string = format!("{}\nkind={} lexeme={}", res_string, token.kind, token.lexeme);
-        }
-
-        assert_eq!(res_string, "
+        assert_eq!(tokens_string(tokens), "
 kind=A lexeme=a
 kind=A lexeme=b
 kind=A lexeme=c
@@ -1285,7 +1283,12 @@ kind=A lexeme=a")
     fn tokens_string(tokens: Vec<Token<String>>) -> String {
         let mut res_string = String::new();
         for token in tokens {
-            res_string = format!("{}\nkind={} lexeme={}", res_string, token.kind, token.lexeme);
+            res_string = format!(
+                "{}\nkind={:?} lexeme={}",
+                res_string,
+                token.kind(),
+                token.lexeme()
+            );
         }
         res_string
     }

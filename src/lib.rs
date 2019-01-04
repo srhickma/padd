@@ -14,7 +14,6 @@ use {
         scan::{
             self,
             ecdfa::EncodedCDFA,
-            Kind,
             Scanner,
         },
         spec,
@@ -37,11 +36,11 @@ impl FormatJob {
 }
 
 pub struct FormatJobRunner {
-    cdfa: EncodedCDFA<Kind>,
-    grammar: Grammar,
+    cdfa: EncodedCDFA<String>,
+    grammar: Grammar<String>,
     formatter: Formatter,
     scanner: Box<Scanner<usize, String>>,
-    parser: Box<Parser>,
+    parser: Box<Parser<String>>,
 }
 
 impl FormatJobRunner {
@@ -295,19 +294,19 @@ grammar {
         assert_eq!(
             format!("{}", err),
             "Failed to parse specification: Parse error: Recognition failed at token 10: \
-            ID <- 'SOMETHING'"
+            TId <- 'SOMETHING'"
         );
 
         err = err.cause().unwrap();
         assert_eq!(
             format!("{}", err),
-            "Parse error: Recognition failed at token 10: ID <- 'SOMETHING'"
+            "Parse error: Recognition failed at token 10: TId <- 'SOMETHING'"
         );
 
         err = err.cause().unwrap();
         assert_eq!(
             format!("{}", err),
-            "Recognition failed at token 10: ID <- 'SOMETHING'"
+            "Recognition failed at token 10: TId <- 'SOMETHING'"
         );
 
         assert!(err.cause().is_none());

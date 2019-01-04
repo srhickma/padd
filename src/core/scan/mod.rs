@@ -105,19 +105,58 @@ impl From<String> for CDFAError {
     }
 }
 
-#[derive(PartialEq, Clone, Debug)]
-pub struct Token<Kind: fmt::Debug> {
-    pub kind: Kind,
-    pub lexeme: String,
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
+pub struct Token<Symbol: fmt::Debug> {
+    kind: Option<Symbol>,
+    lexeme: String,
 }
 
-impl<Kind: Data> Data for Token<Kind> {
+impl<Symbol: Data> Token<Symbol> {
+    pub fn leaf(kind: Symbol, lexeme: String) -> Self {
+        Token {
+            kind: Some(kind),
+            lexeme,
+        }
+    }
+
+    pub fn interior(kind: Symbol) -> Self {
+        Token {
+            kind: Some(kind),
+            lexeme: String::new(),
+        }
+    }
+
+    pub fn null() -> Self {
+        Token {
+            kind: None,
+            lexeme: String::from("NULL"),
+        }
+    }
+
+    pub fn is_null(&self) -> bool {
+        self.kind.is_none()
+    }
+
+    pub fn kind(&self) -> &Symbol {
+        self.kind.as_ref().unwrap()
+    }
+
+    pub fn lexeme(&self) -> &String {
+        &self.lexeme
+    }
+}
+
+impl<Symbol: Data> Data for Token<Symbol> {
     fn to_string(&self) -> String {
-        format!(
-            "{} <- '{}'",
-            self.kind.to_string(),
+        let lexeme_string = format!(
+            " <- '{}'",
             self.lexeme.replace('\n', "\\n").replace('\t', "\\t")
-        )
+        );
+
+        match &self.kind {
+            None => lexeme_string,
+            Some(kind) => format!("{}{}", kind.to_string(), lexeme_string)
+        }
     }
 }
 
@@ -146,5 +185,4 @@ impl error::Error for Error {
     }
 }
 
-pub type Kind = String;
 pub type State = String;

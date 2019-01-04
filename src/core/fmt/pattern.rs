@@ -25,115 +25,159 @@ static PATTERN_ALPHABET: &'static str =
 
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
 enum S {
-    START,
-    LBRACE,
-    RBRACE,
-    LBRACKET,
-    RBRACKET,
-    SEMI,
-    EQ,
-    ZERO,
-    NUM,
-    ALPHA,
-    FILLER,
-    ESC,
-    FAIL,
+    Start,
+    LeftBrace,
+    RightBrace,
+    LeftBracket,
+    RightBracket,
+    Semi,
+    Equals,
+    Zero,
+    Number,
+    Alpha,
+    Filler,
+    Escape,
+    Fail,
 }
 
 thread_local! {
-    static PATTERN_ECDFA: EncodedCDFA<String> = build_pattern_ecdfa().unwrap();
+    static PATTERN_ECDFA: EncodedCDFA<Symbol> = build_pattern_ecdfa().unwrap();
 }
 
-lazy_static! {
-    static ref PATTERN_GRAMMAR: Grammar = build_pattern_grammar();
-}
-
-fn build_pattern_ecdfa() -> Result<EncodedCDFA<String>, scan::CDFAError> {
-    let mut builder: EncodedCDFABuilder<S, String> = EncodedCDFABuilder::new();
+fn build_pattern_ecdfa() -> Result<EncodedCDFA<Symbol>, scan::CDFAError> {
+    let mut builder: EncodedCDFABuilder<S, Symbol> = EncodedCDFABuilder::new();
 
     builder.set_alphabet(PATTERN_ALPHABET.chars())
-        .mark_start(&S::START);
+        .mark_start(&S::Start);
 
-    builder.state(&S::START)
-        .mark_trans(&S::LBRACE, '{')?
-        .mark_trans(&S::RBRACE, '}')?
-        .mark_trans(&S::LBRACKET, '[')?
-        .mark_trans(&S::RBRACKET, ']')?
-        .mark_trans(&S::SEMI, ';')?
-        .mark_trans(&S::EQ, '=')?
-        .mark_trans(&S::ESC, '\\')?
-        .mark_trans(&S::ZERO, '0')?
-        .mark_range(&S::NUM, '1', '9')?
-        .mark_range(&S::ALPHA, 'a', 'Z')?
-        .default_to(&S::FILLER)?;
+    builder.state(&S::Start)
+        .mark_trans(&S::LeftBrace, '{')?
+        .mark_trans(&S::RightBrace, '}')?
+        .mark_trans(&S::LeftBracket, '[')?
+        .mark_trans(&S::RightBracket, ']')?
+        .mark_trans(&S::Semi, ';')?
+        .mark_trans(&S::Equals, '=')?
+        .mark_trans(&S::Escape, '\\')?
+        .mark_trans(&S::Zero, '0')?
+        .mark_range(&S::Number, '1', '9')?
+        .mark_range(&S::Alpha, 'a', 'Z')?
+        .default_to(&S::Filler)?;
 
-    builder.state(&S::FILLER)
-        .mark_trans(&S::ESC, '\\')?
-        .mark_trans(&S::FAIL, '{')?
-        .mark_trans(&S::FAIL, '}')?
-        .mark_trans(&S::FAIL, '[')?
-        .mark_trans(&S::FAIL, ';')?
-        .mark_trans(&S::FAIL, '=')?
-        .default_to(&S::FILLER)?
+    builder.state(&S::Filler)
+        .mark_trans(&S::Escape, '\\')?
+        .mark_trans(&S::Fail, '{')?
+        .mark_trans(&S::Fail, '}')?
+        .mark_trans(&S::Fail, '[')?
+        .mark_trans(&S::Fail, ';')?
+        .mark_trans(&S::Fail, '=')?
+        .default_to(&S::Filler)?
         .accept()
-        .tokenize(&"FILLER".to_string());
+        .tokenize(&Symbol::TFiller);
 
-    builder.default_to(&S::ESC, &S::FILLER)?;
+    builder.default_to(&S::Escape, &S::Filler)?;
 
-    builder.state(&S::NUM)
-        .mark_range(&S::NUM, '0', '9')?
+    builder.state(&S::Number)
+        .mark_range(&S::Number, '0', '9')?
         .accept()
-        .tokenize(&"NUM".to_string());
+        .tokenize(&Symbol::TNumber);
 
-    builder.state(&S::ALPHA)
-        .mark_range(&S::ALPHA, 'a', 'Z')?
+    builder.state(&S::Alpha)
+        .mark_range(&S::Alpha, 'a', 'Z')?
         .accept()
-        .tokenize(&"ALPHA".to_string());
+        .tokenize(&Symbol::TAlpha);
 
     builder
-        .accept(&S::SEMI)
-        .accept(&S::EQ)
-        .accept(&S::LBRACE)
-        .accept(&S::RBRACE)
-        .accept(&S::LBRACKET)
-        .accept(&S::RBRACKET)
-        .accept(&S::ZERO);
+        .accept(&S::Semi)
+        .accept(&S::Equals)
+        .accept(&S::LeftBrace)
+        .accept(&S::RightBrace)
+        .accept(&S::LeftBracket)
+        .accept(&S::RightBracket)
+        .accept(&S::Zero);
 
     builder
-        .tokenize(&S::SEMI, &"SEMI".to_string())
-        .tokenize(&S::EQ, &"EQ".to_string())
-        .tokenize(&S::LBRACE, &"LBRACE".to_string())
-        .tokenize(&S::RBRACE, &"RBRACE".to_string())
-        .tokenize(&S::LBRACKET, &"LBRACKET".to_string())
-        .tokenize(&S::RBRACKET, &"RBRACKET".to_string())
-        .tokenize(&S::ZERO, &"NUM".to_string());
+        .tokenize(&S::Semi, &Symbol::TSemi)
+        .tokenize(&S::Equals, &Symbol::TEquals)
+        .tokenize(&S::LeftBrace, &Symbol::TLeftBrace)
+        .tokenize(&S::RightBrace, &Symbol::TRightBrace)
+        .tokenize(&S::LeftBracket, &Symbol::TLeftBracket)
+        .tokenize(&S::RightBracket, &Symbol::TRightBracket)
+        .tokenize(&S::Zero, &Symbol::TNumber);
 
     builder.build()
 }
 
-fn build_pattern_grammar() -> Grammar {
-    let productions = parse::build_prods(&[
-        "pattern segs",
-        "segs seg segs",
-        "segs ",
-        "seg filler",
-        "seg sub",
-        "seg cap",
-        "filler FILLER",
-        "filler ALPHA",
-        "filler NUM",
-        "sub LBRACKET ALPHA RBRACKET",
-        "cap LBRACE capdesc RBRACE",
-        "capdesc capindex",
-        "capdesc capindex SEMI decls",
-        "capindex NUM",
-        "capindex ",
-        "decls decls SEMI decl",
-        "decls decl",
-        "decl ALPHA EQ val",
-        "val pattern",
-        "val ",
-    ]);
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
+pub enum Symbol {
+    Pattern,
+    Segments,
+    Segment,
+    Filler,
+    Substitution,
+    Capture,
+    CaptureDescriptor,
+    CaptureIndex,
+    Declarations,
+    Declaration,
+    Value,
+    TFiller,
+    TAlpha,
+    TNumber,
+    TLeftBracket,
+    TRightBracket,
+    TLeftBrace,
+    TRightBrace,
+    TSemi,
+    TEquals,
+}
+
+impl Default for Symbol {
+    fn default() -> Symbol { Symbol::Pattern }
+}
+
+impl Data for Symbol {
+    fn to_string(&self) -> String {
+        format!("{:?}", self)
+    }
+}
+
+lazy_static! {
+    static ref PATTERN_GRAMMAR: Grammar<Symbol> = build_pattern_grammar();
+}
+
+fn build_pattern_grammar() -> Grammar<Symbol> {
+    //TODO create macros to make this declaration simpler
+    //TODO optimize for left recursion
+    let productions: Vec<Production<Symbol>> = vec![
+        Production::from(Symbol::Pattern, vec![Symbol::Segments]),
+        Production::from(Symbol::Segments, vec![Symbol::Segment, Symbol::Segments]),
+        Production::epsilon(Symbol::Segments),
+        Production::from(Symbol::Segment, vec![Symbol::Filler]),
+        Production::from(Symbol::Segment, vec![Symbol::Substitution]),
+        Production::from(Symbol::Segment, vec![Symbol::Capture]),
+        Production::from(Symbol::Filler, vec![Symbol::TFiller]),
+        Production::from(Symbol::Filler, vec![Symbol::TAlpha]),
+        Production::from(Symbol::Filler, vec![Symbol::TNumber]),
+        Production::from(Symbol::Substitution, vec![
+            Symbol::TLeftBracket, Symbol::TAlpha, Symbol::TRightBracket
+        ]),
+        Production::from(Symbol::Capture, vec![
+            Symbol::TLeftBrace, Symbol::CaptureDescriptor, Symbol::TRightBrace
+        ]),
+        Production::from(Symbol::CaptureDescriptor, vec![Symbol::CaptureIndex]),
+        Production::from(Symbol::CaptureDescriptor, vec![
+            Symbol::CaptureIndex, Symbol::TSemi, Symbol::Declarations
+        ]),
+        Production::from(Symbol::CaptureIndex, vec![Symbol::TNumber]),
+        Production::epsilon(Symbol::CaptureIndex),
+        Production::from(Symbol::Declarations, vec![
+            Symbol::Declarations, Symbol::TSemi, Symbol::Declaration
+        ]),
+        Production::from(Symbol::Declarations, vec![Symbol::Declaration]),
+        Production::from(Symbol::Declaration, vec![Symbol::TAlpha, Symbol::TEquals, Symbol::Value]),
+        Production::from(Symbol::Value, vec![Symbol::Pattern]),
+        Production::epsilon(Symbol::Value),
+    ];
 
     let mut builder = GrammarBuilder::new();
     builder.try_mark_start(&productions.first().unwrap().lhs);
@@ -165,32 +209,42 @@ pub struct Declaration {
     pub value: Option<Pattern>,
 }
 
-pub fn generate_pattern(input: &str, prod: &Production) -> Result<Pattern, BuildError> {
+pub fn generate_pattern<SpecSymbol: Data + Default>(
+    input: &str,
+    prod: &Production<SpecSymbol>,
+) -> Result<Pattern, BuildError> {
     let parse = parse_pattern(input)?;
     generate_pattern_internal(&parse, prod)
 }
 
-pub fn generate_pattern_internal(root: &Tree, prod: &Production) -> Result<Pattern, BuildError> {
+pub fn generate_pattern_internal<SpecSymbol: Data + Default>(
+    root: &Tree<Symbol>,
+    prod: &Production<SpecSymbol>,
+) -> Result<Pattern, BuildError> {
     let mut segments: Vec<Segment> = vec![];
     generate_pattern_recursive(&root, &mut segments, prod, 0)?;
     Ok(Pattern { segments })
 }
 
-fn generate_pattern_recursive<'a>(
-    node: &'a Tree,
-    accumulator: &'a mut Vec<Segment>,
-    prod: &Production,
+fn generate_pattern_recursive<'scope, SpecSymbol: Data + Default>(
+    node: &'scope Tree<Symbol>,
+    accumulator: &'scope mut Vec<Segment>,
+    prod: &Production<SpecSymbol>,
     captures: usize,
 ) -> Result<usize, BuildError> {
-    match &node.lhs.kind[..] {
-        "FILLER" | "ALPHA" | "NUM" => {
-            let name = string_utils::replace_escapes(&node.lhs.lexeme[..]);
+    if node.lhs.is_null() {
+        return Ok(captures);
+    }
+
+    match node.lhs.kind() {
+        Symbol::TFiller | Symbol::TAlpha | Symbol::TNumber => {
+            let name = string_utils::replace_escapes(&node.lhs.lexeme()[..]);
             accumulator.push(Segment::Filler(name));
         }
-        "sub" => {
-            accumulator.push(Segment::Substitution(node.get_child(1).lhs.lexeme.clone()));
+        Symbol::Substitution => {
+            accumulator.push(Segment::Substitution(node.get_child(1).lhs.lexeme().clone()));
         }
-        "capdesc" => {
+        Symbol::CaptureDescriptor => {
             let mut declarations: Vec<Declaration> = Vec::new();
             if node.children.len() == 3 {
                 parse_decls(&node.get_child(2), &mut declarations, prod)?
@@ -200,7 +254,7 @@ fn generate_pattern_recursive<'a>(
             let child_index = if cap_index.is_empty() {
                 captures
             } else {
-                cap_index.get_child(0).lhs.lexeme.parse::<usize>().unwrap()
+                cap_index.get_child(0).lhs.lexeme().parse::<usize>().unwrap()
             };
 
             if child_index >= prod.rhs.len() {
@@ -226,10 +280,10 @@ fn generate_pattern_recursive<'a>(
     Ok(captures)
 }
 
-fn parse_decls<'a>(
-    decls_node: &'a Tree,
-    accumulator: &'a mut Vec<Declaration>,
-    prod: &Production,
+fn parse_decls<'scope, SpecSymbol: Data + Default>(
+    decls_node: &'scope Tree<Symbol>,
+    accumulator: &'scope mut Vec<Declaration>,
+    prod: &Production<SpecSymbol>,
 ) -> Result<(), BuildError> {
     accumulator.push(parse_decl(decls_node.children.last().unwrap(), prod)?);
     if decls_node.children.len() == 3 {
@@ -238,10 +292,13 @@ fn parse_decls<'a>(
     Ok(())
 }
 
-fn parse_decl(decl: &Tree, prod: &Production) -> Result<Declaration, BuildError> {
+fn parse_decl<SpecSymbol: Data + Default>(
+    decl: &Tree<Symbol>,
+    prod: &Production<SpecSymbol>,
+) -> Result<Declaration, BuildError> {
     let val_node = decl.get_child(2).get_child(0);
     Ok(Declaration {
-        key: decl.get_child(0).lhs.lexeme.clone(),
+        key: decl.get_child(0).lhs.lexeme().clone(),
         value: if val_node.is_null() {
             None
         } else {
@@ -250,8 +307,8 @@ fn parse_decl(decl: &Tree, prod: &Production) -> Result<Declaration, BuildError>
     })
 }
 
-fn parse_pattern(input: &str) -> Result<Tree, BuildError> {
-    PATTERN_ECDFA.with(|cdfa| -> Result<Tree, BuildError> {
+fn parse_pattern(input: &str) -> Result<Tree<Symbol>, BuildError> {
+    PATTERN_ECDFA.with(|cdfa| -> Result<Tree<Symbol>, BuildError> {
         let mut iter = input.chars();
         let mut getter = || iter.next();
         let mut source = StreamSource::observe(&mut getter);
@@ -315,89 +372,89 @@ mod tests {
 
         //verify
         assert_eq!(tree.unwrap().to_string(),
-                   "└── pattern
-    └── segs
-        ├── seg
-        │   └── filler
-        │       └── FILLER <- '\\t \\n\\n\\n\\n'
-        └── segs
-            ├── seg
-            │   └── cap
-            │       ├── LBRACE <- '{'
-            │       ├── capdesc
-            │       │   └── capindex
-            │       │       └── NUM <- '1'
-            │       └── RBRACE <- '}'
-            └── segs
-                ├── seg
-                │   └── filler
-                │       └── FILLER <- '  '
-                └── segs
-                    ├── seg
-                    │   └── cap
-                    │       ├── LBRACE <- '{'
-                    │       ├── capdesc
-                    │       │   └── capindex
-                    │       │       └── NUM <- '2'
-                    │       └── RBRACE <- '}'
-                    └── segs
-                        ├── seg
-                        │   └── filler
-                        │       └── FILLER <- '  '
-                        └── segs
-                            ├── seg
-                            │   └── cap
-                            │       ├── LBRACE <- '{'
-                            │       ├── capdesc
-                            │       │   ├── capindex
-                            │       │   │   └── NUM <- '45'
-                            │       │   ├── SEMI <- ';'
-                            │       │   └── decls
-                            │       │       └── decl
-                            │       │           ├── ALPHA <- 'something'
-                            │       │           ├── EQ <- '='
-                            │       │           └── val
-                            │       │               └── pattern
-                            │       │                   └── segs
-                            │       │                       ├── seg
-                            │       │                       │   └── filler
-                            │       │                       │       └── FILLER <- '\\n\\n \\t'
-                            │       │                       └── segs
+                   "└── Pattern
+    └── Segments
+        ├── Segment
+        │   └── Filler
+        │       └── TFiller <- '\\t \\n\\n\\n\\n'
+        └── Segments
+            ├── Segment
+            │   └── Capture
+            │       ├── TLeftBrace <- '{'
+            │       ├── CaptureDescriptor
+            │       │   └── CaptureIndex
+            │       │       └── TNumber <- '1'
+            │       └── TRightBrace <- '}'
+            └── Segments
+                ├── Segment
+                │   └── Filler
+                │       └── TFiller <- '  '
+                └── Segments
+                    ├── Segment
+                    │   └── Capture
+                    │       ├── TLeftBrace <- '{'
+                    │       ├── CaptureDescriptor
+                    │       │   └── CaptureIndex
+                    │       │       └── TNumber <- '2'
+                    │       └── TRightBrace <- '}'
+                    └── Segments
+                        ├── Segment
+                        │   └── Filler
+                        │       └── TFiller <- '  '
+                        └── Segments
+                            ├── Segment
+                            │   └── Capture
+                            │       ├── TLeftBrace <- '{'
+                            │       ├── CaptureDescriptor
+                            │       │   ├── CaptureIndex
+                            │       │   │   └── TNumber <- '45'
+                            │       │   ├── TSemi <- ';'
+                            │       │   └── Declarations
+                            │       │       └── Declaration
+                            │       │           ├── TAlpha <- 'something'
+                            │       │           ├── TEquals <- '='
+                            │       │           └── Value
+                            │       │               └── Pattern
+                            │       │                   └── Segments
+                            │       │                       ├── Segment
+                            │       │                       │   └── Filler
+                            │       │                       │       └── TFiller <- '\\n\\n \\t'
+                            │       │                       └── Segments
                             │       │                           └──  <- 'NULL'
-                            │       └── RBRACE <- '}'
-                            └── segs
-                                ├── seg
-                                │   └── filler
-                                │       └── FILLER <- ' '
-                                └── segs
-                                    ├── seg
-                                    │   └── cap
-                                    │       ├── LBRACE <- '{'
-                                    │       ├── capdesc
-                                    │       │   ├── capindex
-                                    │       │   │   └── NUM <- '46'
-                                    │       │   ├── SEMI <- ';'
-                                    │       │   └── decls
-                                    │       │       ├── decls
-                                    │       │       │   └── decl
-                                    │       │       │       ├── ALPHA <- 'somethinelse'
-                                    │       │       │       ├── EQ <- '='
-                                    │       │       │       └── val
-                                    │       │       │           └── pattern
-                                    │       │       │               └── segs
-                                    │       │       │                   ├── seg
-                                    │       │       │                   │   └── filler
-                                    │       │       │                   │       └── FILLER <- '\\n\\n \\t'
-                                    │       │       │                   └── segs
+                            │       └── TRightBrace <- '}'
+                            └── Segments
+                                ├── Segment
+                                │   └── Filler
+                                │       └── TFiller <- ' '
+                                └── Segments
+                                    ├── Segment
+                                    │   └── Capture
+                                    │       ├── TLeftBrace <- '{'
+                                    │       ├── CaptureDescriptor
+                                    │       │   ├── CaptureIndex
+                                    │       │   │   └── TNumber <- '46'
+                                    │       │   ├── TSemi <- ';'
+                                    │       │   └── Declarations
+                                    │       │       ├── Declarations
+                                    │       │       │   └── Declaration
+                                    │       │       │       ├── TAlpha <- 'somethinelse'
+                                    │       │       │       ├── TEquals <- '='
+                                    │       │       │       └── Value
+                                    │       │       │           └── Pattern
+                                    │       │       │               └── Segments
+                                    │       │       │                   ├── Segment
+                                    │       │       │                   │   └── Filler
+                                    │       │       │                   │       └── TFiller <- '\\n\\n \\t'
+                                    │       │       │                   └── Segments
                                     │       │       │                       └──  <- 'NULL'
-                                    │       │       ├── SEMI <- ';'
-                                    │       │       └── decl
-                                    │       │           ├── ALPHA <- 'some'
-                                    │       │           ├── EQ <- '='
-                                    │       │           └── val
+                                    │       │       ├── TSemi <- ';'
+                                    │       │       └── Declaration
+                                    │       │           ├── TAlpha <- 'some'
+                                    │       │           ├── TEquals <- '='
+                                    │       │           └── Value
                                     │       │               └──  <- 'NULL'
-                                    │       └── RBRACE <- '}'
-                                    └── segs
+                                    │       └── TRightBrace <- '}'
+                                    └── Segments
                                         └──  <- 'NULL'"
         );
     }
@@ -407,8 +464,10 @@ mod tests {
         //setup
         let input = "\t \n\n\n\n{1}  {2}  {4;something=\n\n \t} {3;somethinelse=\n\n \t;some=}";
         let prod = Production {
-            lhs: String::new(),
-            rhs: vec![String::new(), String::new(), String::new(), String::new(), String::new()],
+            lhs: Symbol::Pattern,
+            rhs: vec![
+                Symbol::Pattern, Symbol::Pattern, Symbol::Pattern, Symbol::Pattern, Symbol::Pattern
+            ],
         };
 
         //exercise
@@ -463,8 +522,10 @@ mod tests {
         //setup
         let input = "\t \n\n\n\n{1}  {}  {;something=\n\n \t} {;somethinelse=\n\n \t;some=}";
         let prod = Production {
-            lhs: String::new(),
-            rhs: vec![String::new(), String::new(), String::new(), String::new(), String::new()],
+            lhs: Symbol::Pattern,
+            rhs: vec![
+                Symbol::Pattern, Symbol::Pattern, Symbol::Pattern, Symbol::Pattern, Symbol::Pattern
+            ],
         };
 
         //exercise
@@ -519,8 +580,8 @@ mod tests {
         //setup
         let input = "\t \n[a]{1}  {} [prefix] ";
         let prod = Production {
-            lhs: String::new(),
-            rhs: vec![String::new(), String::new()],
+            lhs: Symbol::Pattern,
+            rhs: vec![Symbol::Pattern, Symbol::Pattern],
         };
 
         //exercise
@@ -575,8 +636,8 @@ mod tests {
         //setup
         let input = "1234567890abcdefghijklmnopqrstuvwxyz \n\t`~!@#$%^&*()_-+:'\"<>,.?/|{}\\{\\}\\[\\]\\;\\=\\\\";
         let prod = Production {
-            lhs: String::new(),
-            rhs: vec![String::new()],
+            lhs: Symbol::Pattern,
+            rhs: vec![Symbol::Pattern],
         };
 
         //exercise
@@ -616,7 +677,7 @@ mod tests {
         //setup
         let input = "\\";
         let prod = Production {
-            lhs: String::new(),
+            lhs: Symbol::Pattern,
             rhs: vec![],
         };
 
@@ -636,7 +697,7 @@ mod tests {
         //setup
         let input = "{";
         let prod = Production {
-            lhs: String::new(),
+            lhs: Symbol::Pattern,
             rhs: vec![],
         };
 
@@ -656,8 +717,8 @@ mod tests {
         //setup
         let input = "{1}";
         let prod = Production {
-            lhs: String::from("lhs"),
-            rhs: vec![String::from("rhs_item")],
+            lhs: Symbol::Pattern,
+            rhs: vec![Symbol::TSemi],
         };
 
         //exercise
@@ -667,7 +728,8 @@ mod tests {
         assert!(res.is_err());
         assert_eq!(
             format!("{}", res.err().unwrap()),
-            "Pattern capture error: Capture index 1 out of bounds for production 'lhs rhs_item' with 1 children"
+            "Pattern capture error: \
+            Capture index 1 out of bounds for production 'Pattern TSemi' with 1 children"
         );
     }
 }
