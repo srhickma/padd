@@ -17,12 +17,12 @@ use {
 
 pub struct MaximalMunchScanner;
 
-impl<State: Data, Kind: Data> Scanner<State, Kind> for MaximalMunchScanner {
+impl<State: Data, Symbol: Data> Scanner<State, Symbol> for MaximalMunchScanner {
     fn scan<'a, 'b>(
         &self,
         stream_source: &'a mut StreamSource<char>,
-        cdfa: &'b CDFA<State, Kind>,
-    ) -> Result<Vec<Token<Kind>>, scan::Error> {
+        cdfa: &'b CDFA<State, Symbol>,
+    ) -> Result<Vec<Token<Symbol>>, scan::Error> {
         struct ScanOneResult<State> {
             scanned: String,
             end_state: Option<State>,
@@ -100,7 +100,7 @@ impl<State: Data, Kind: Data> Scanner<State, Kind> for MaximalMunchScanner {
             last_accepting
         }
 
-        let mut tokens: Vec<Token<Kind>> = vec![];
+        let mut tokens: Vec<Token<Symbol>> = vec![];
         let mut next_start = cdfa.start();
         let mut line: usize = 1;
         let mut character: usize = 1;
@@ -143,13 +143,7 @@ impl<State: Data, Kind: Data> Scanner<State, Kind> for MaximalMunchScanner {
                     }
                 }
                 Some(state) => if let Some(kind) = cdfa.tokenize(&state) {
-                    let token = Token {
-                        kind,
-                        lexeme: result.scanned,
-                    };
-
-                    //TODO write tokens to another ReadDrivenStream
-                    tokens.push(token);
+                    tokens.push(Token::leaf(kind, result.scanned));
                 }
             }
         }

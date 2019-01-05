@@ -1,9 +1,12 @@
-use std::fmt;
+use std::{
+    fmt,
+    hash::Hash,
+};
 
 pub mod stream;
 pub mod map;
 
-pub trait Data: PartialEq + Clone + fmt::Debug {
+pub trait Data: PartialEq + Eq + Hash + Clone + fmt::Debug {
     fn to_string(&self) -> String;
 }
 

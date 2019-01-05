@@ -1,7 +1,10 @@
 use {
     core::{
         parse::Tree,
-        spec,
+        spec::{
+            self,
+            lang::Symbol,
+        },
     },
     std::{
         collections::HashSet,
@@ -26,8 +29,8 @@ lazy_static! {
 }
 
 pub fn traverse(
-    regions_node: &Tree,
-    handler: &mut FnMut(&Tree, &RegionType) -> Result<(), spec::GenError>,
+    regions_node: &Tree<Symbol>,
+    handler: &mut FnMut(&Tree<Symbol>, &RegionType) -> Result<(), spec::GenError>,
 ) -> Result<(), spec::GenError> {
     let mut region_types: HashSet<RegionType> = HashSet::new();
 
@@ -43,8 +46,8 @@ pub fn traverse(
 }
 
 fn traverse_regions_node(
-    regions_node: &Tree,
-    handler: &mut FnMut(&Tree, &RegionType) -> Result<(), spec::GenError>,
+    regions_node: &Tree<Symbol>,
+    handler: &mut FnMut(&Tree<Symbol>, &RegionType) -> Result<(), spec::GenError>,
     region_types: &mut HashSet<RegionType>,
 ) -> Result<(), spec::GenError> {
     if regions_node.children.len() == 2 {
@@ -63,8 +66,8 @@ fn traverse_regions_node(
 }
 
 fn traverse_region_node(
-    region_node: &Tree,
-    handler: &mut FnMut(&Tree, &RegionType) -> Result<(), spec::GenError>,
+    region_node: &Tree<Symbol>,
+    handler: &mut FnMut(&Tree<Symbol>, &RegionType) -> Result<(), spec::GenError>,
     region_types: &mut HashSet<RegionType>,
 ) -> Result<(), spec::GenError> {
     let inner_node = region_node.get_child(0);
@@ -76,13 +79,13 @@ fn traverse_region_node(
     Ok(())
 }
 
-fn type_from_node(region_node: &Tree) -> RegionType {
-    let region_type_string = &region_node.get_child(0).lhs.kind;
-    match &region_type_string[..] {
-        "alphabet" => RegionType::Alphabet,
-        "cdfa" => RegionType::CDFA,
-        "grammar" => RegionType::Grammar,
-        &_ => panic!("Invalid specification region type: '{}'", region_type_string)
+fn type_from_node(region_node: &Tree<Symbol>) -> RegionType {
+    let region_symbol = &region_node.get_child(0).lhs.kind();
+    match region_symbol {
+        Symbol::Alphabet => RegionType::Alphabet,
+        Symbol::CDFA => RegionType::CDFA,
+        Symbol::Grammar => RegionType::Grammar,
+        &_ => panic!("Invalid specification region type: '{:?}'", region_symbol)
     }
 }
 

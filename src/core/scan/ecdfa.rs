@@ -1,6 +1,7 @@
 use {
     core::{
         data::{
+            Data,
             map::{CEHashMap, CEHashMapIterator},
             stream::StreamConsumer,
         },
@@ -19,7 +20,7 @@ use {
     },
 };
 
-pub struct EncodedCDFABuilder<State: Eq + Hash + Clone + Debug, Kind: Default + Clone> {
+pub struct EncodedCDFABuilder<State: Eq + Hash + Clone + Debug, Symbol: Data + Default> {
     encoder: HashMap<State, usize>,
     decoder: Vec<State>,
     alphabet_str: String,
@@ -27,11 +28,11 @@ pub struct EncodedCDFABuilder<State: Eq + Hash + Clone + Debug, Kind: Default + 
     alphabet: HashedAlphabet,
     accepting: HashMap<usize, AcceptorDestinationMux>,
     t_delta: CEHashMap<TransitionTrie>,
-    tokenizer: CEHashMap<Kind>,
+    tokenizer: CEHashMap<Symbol>,
     start: usize,
 }
 
-impl<State: Eq + Hash + Clone + Debug, Kind: Default + Clone> EncodedCDFABuilder<State, Kind> {
+impl<State: Eq + Hash + Clone + Debug, Symbol: Data + Default> EncodedCDFABuilder<State, Symbol> {
     fn encode(&mut self, val: &State) -> usize {
         if self.encoder.contains_key(val) {
             *self.encoder.get(val).unwrap()
@@ -70,7 +71,7 @@ impl<State: Eq + Hash + Clone + Debug, Kind: Default + Clone> EncodedCDFABuilder
     pub fn state<'scope, 'state: 'scope>(
         &'scope mut self,
         state: &'state State,
-    ) -> EncodedCDFAStateBuilder<'scope, 'state, State, Kind> {
+    ) -> EncodedCDFAStateBuilder<'scope, 'state, State, Symbol> {
         EncodedCDFAStateBuilder {
             ecdfa_builder: self,
             state,
@@ -78,8 +79,8 @@ impl<State: Eq + Hash + Clone + Debug, Kind: Default + Clone> EncodedCDFABuilder
     }
 }
 
-impl<State: Eq + Hash + Clone + Debug, Kind: Default + Clone>
-CDFABuilder<State, Kind, EncodedCDFA<Kind>> for EncodedCDFABuilder<State, Kind> {
+impl<State: Eq + Hash + Clone + Debug, Symbol: Data + Default>
+CDFABuilder<State, Symbol, EncodedCDFA<Symbol>> for EncodedCDFABuilder<State, Symbol> {
     fn new() -> Self {
         EncodedCDFABuilder {
             encoder: HashMap::new(),
@@ -94,7 +95,7 @@ CDFABuilder<State, Kind, EncodedCDFA<Kind>> for EncodedCDFABuilder<State, Kind> 
         }
     }
 
-    fn build(self) -> Result<EncodedCDFA<Kind>, CDFAError> {
+    fn build(self) -> Result<EncodedCDFA<Symbol>, CDFAError> {
         if self.start == usize::max_value() {
             Err(CDFAError::BuildErr("No start state was set".to_string()))
         } else if self.start > self.t_delta.size() {
@@ -261,7 +262,7 @@ CDFABuilder<State, Kind, EncodedCDFA<Kind>> for EncodedCDFABuilder<State, Kind> 
         }
     }
 
-    fn tokenize(&mut self, state: &State, token: &Kind) -> &mut Self {
+    fn tokenize(&mut self, state: &State, token: &Symbol) -> &mut Self {
         let state_encoded = self.encode(state);
         self.tokenizer.insert(state_encoded, token.clone());
         self
@@ -272,9 +273,9 @@ pub struct EncodedCDFAStateBuilder<
     'scope,
     'state: 'scope,
     State: 'state + Eq + Hash + Clone + Debug,
-    Kind: 'scope + Default + Clone
+    Symbol: 'scope + Data + Default
 > {
-    ecdfa_builder: &'scope mut EncodedCDFABuilder<State, Kind>,
+    ecdfa_builder: &'scope mut EncodedCDFABuilder<State, Symbol>,
     state: &'state State,
 }
 
@@ -282,8 +283,8 @@ impl<
     'scope,
     'state: 'scope,
     State: 'state + Eq + Hash + Clone + Debug,
-    Kind: 'scope + Default + Clone
-> EncodedCDFAStateBuilder<'scope, 'state, State, Kind> {
+    Symbol: 'scope + Data + Default
+> EncodedCDFAStateBuilder<'scope, 'state, State, Symbol> {
     pub fn accept(&mut self) -> &mut Self {
         self.ecdfa_builder.accept(self.state);
         self
@@ -327,29 +328,29 @@ impl<
         Ok(self)
     }
 
-    pub fn tokenize(&mut self, token: &Kind) -> &mut Self {
+    pub fn tokenize(&mut self, token: &Symbol) -> &mut Self {
         self.ecdfa_builder.tokenize(self.state, token);
         self
     }
 }
 
-pub struct EncodedCDFA<Kind: Default + Clone> {
+pub struct EncodedCDFA<Symbol: Default + Clone> {
     //TODO add separate error message if character not in alphabet
     #[allow(dead_code)]
     alphabet: HashedAlphabet,
     accepting: HashMap<usize, AcceptorDestinationMux>,
     t_delta: CEHashMap<TransitionTrie>,
-    tokenizer: CEHashMap<Kind>,
+    tokenizer: CEHashMap<Symbol>,
     start: usize,
 }
 
-impl<Kind: Default + Clone> EncodedCDFA<Kind> {
-    pub fn produces(&self) -> CEHashMapIterator<Kind> {
+impl<Symbol: Default + Clone> EncodedCDFA<Symbol> {
+    pub fn produces(&self) -> CEHashMapIterator<Symbol> {
         self.tokenizer.iter()
     }
 }
 
-impl<Kind: Default + Clone> CDFA<usize, Kind> for EncodedCDFA<Kind> {
+impl<Symbol: Default + Clone> CDFA<usize, Symbol> for EncodedCDFA<Symbol> {
     fn transition(&self, state: &usize, stream: &mut StreamConsumer<char>) -> Option<usize> {
         match self.t_delta.get(*state) {
             None => None,
@@ -380,7 +381,7 @@ impl<Kind: Default + Clone> CDFA<usize, Kind> for EncodedCDFA<Kind> {
         }
     }
 
-    fn tokenize(&self, state: &usize) -> Option<Kind> {
+    fn tokenize(&self, state: &usize) -> Option<Symbol> {
         match self.tokenizer.get(*state) {
             None => None,
             Some(dest) => Some(dest.clone())

@@ -1,47 +1,50 @@
 use {
-    core::parse::Production,
+    core::{
+        data::Data,
+        parse::Production,
+    },
     std::collections::{HashMap, HashSet},
 };
 
-pub struct Grammar {
-    prods_by_lhs: HashMap<String, Vec<Production>>,
-    nss: HashSet<String>,
+pub struct Grammar<Symbol: Data + Default> {
+    prods_by_lhs: HashMap<Symbol, Vec<Production<Symbol>>>,
+    nss: HashSet<Symbol>,
     #[allow(dead_code)]
-    non_terminals: HashSet<String>,
-    terminals: HashSet<String>,
-    start: String,
+    non_terminals: HashSet<Symbol>,
+    terminals: HashSet<Symbol>,
+    start: Symbol,
 }
 
-impl Grammar {
-    pub fn is_nullable(&self, prod: &Production) -> bool {
+impl<Symbol: Data + Default> Grammar<Symbol> {
+    pub fn is_nullable(&self, prod: &Production<Symbol>) -> bool {
         self.nss.contains(&prod.lhs)
     }
 
-    pub fn is_nullable_nt(&self, lhs: &String) -> bool {
+    pub fn is_nullable_nt(&self, lhs: &Symbol) -> bool {
         self.nss.contains(lhs)
     }
 
-    pub fn is_terminal(&self, symbol: &str) -> bool {
+    pub fn is_terminal(&self, symbol: &Symbol) -> bool {
         self.terminals.contains(symbol)
     }
 
-    pub fn terminals(&self) -> &HashSet<String> { &self.terminals }
+    pub fn terminals(&self) -> &HashSet<Symbol> { &self.terminals }
 
-    pub fn start(&self) -> &String {
+    pub fn start(&self) -> &Symbol {
         &self.start
     }
 
-    pub fn productions_for_lhs(&self, lhs: &str) -> Option<&Vec<Production>> {
+    pub fn productions_for_lhs(&self, lhs: &Symbol) -> Option<&Vec<Production<Symbol>>> {
         self.prods_by_lhs.get(lhs)
     }
 }
 
-pub struct GrammarBuilder {
-    prods_by_lhs: HashMap<String, Vec<Production>>,
-    start: Option<String>,
+pub struct GrammarBuilder<Symbol: Data + Default> {
+    prods_by_lhs: HashMap<Symbol, Vec<Production<Symbol>>>,
+    start: Option<Symbol>,
 }
 
-impl GrammarBuilder {
+impl<Symbol: Data + Default> GrammarBuilder<Symbol> {
     pub fn new() -> Self {
         GrammarBuilder {
             prods_by_lhs: HashMap::new(),
@@ -49,15 +52,13 @@ impl GrammarBuilder {
         }
     }
 
-    pub fn add_optional_state(&mut self, dest: &str) -> String {
-        let opt_state: String = format!("opt#{}", dest);
-
-        if !self.prods_by_lhs.contains_key(&opt_state) {
+    pub fn add_optional_state(&mut self, opt_state: &Symbol, dest_state: &Symbol) {
+        if !self.prods_by_lhs.contains_key(opt_state) {
             self.prods_by_lhs.entry(opt_state.clone())
                 .or_insert(vec![
                     Production {
                         lhs: opt_state.clone(),
-                        rhs: vec![String::from(dest)],
+                        rhs: vec![dest_state.clone()],
                     },
                     Production {
                         lhs: opt_state.clone(),
@@ -65,12 +66,10 @@ impl GrammarBuilder {
                     }
                 ]);
         }
-
-        opt_state
     }
 
-    pub fn add_production(&mut self, production: Production) {
-        if let Some(vec) = self.prods_by_lhs.get_mut(&production.lhs[..]) {
+    pub fn add_production(&mut self, production: Production<Symbol>) {
+        if let Some(vec) = self.prods_by_lhs.get_mut(&production.lhs) {
             vec.push(production);
             return;
         }
@@ -78,21 +77,21 @@ impl GrammarBuilder {
         self.prods_by_lhs.insert(production.lhs.clone(), vec![production]);
     }
 
-    pub fn add_productions(&mut self, productions: Vec<Production>) {
+    pub fn add_productions(&mut self, productions: Vec<Production<Symbol>>) {
         for prod in productions {
             self.add_production(prod);
         }
     }
 
-    pub fn try_mark_start(&mut self, start: &str) {
+    pub fn try_mark_start(&mut self, start: &Symbol) {
         if self.start.is_some() {
             return;
         }
 
-        self.start = Some(start.to_string());
+        self.start = Some(start.clone());
     }
 
-    pub fn build(self) -> Grammar {
+    pub fn build(self) -> Grammar<Symbol> {
         if self.start.is_none() {
             panic!("No start state specified for grammar");
         }
@@ -102,14 +101,14 @@ impl GrammarBuilder {
             panic!("Start state has no productions");
         }
 
-        let nss: HashSet<String> = GrammarBuilder::build_nss(&self.prods_by_lhs);
+        let nss: HashSet<Symbol> = GrammarBuilder::build_nss(&self.prods_by_lhs);
 
-        let non_terminals: HashSet<String> = self.prods_by_lhs.iter()
+        let non_terminals: HashSet<Symbol> = self.prods_by_lhs.iter()
             .map(|(lhs, _)| lhs)
             .cloned()
             .collect();
 
-        let terminals: HashSet<String> = self.prods_by_lhs.iter()
+        let terminals: HashSet<Symbol> = self.prods_by_lhs.iter()
             .flat_map(|(_, prods)| prods)
             .flat_map(|prod| &prod.rhs)
             .filter(|symbol| !non_terminals.contains(*symbol))
@@ -125,10 +124,12 @@ impl GrammarBuilder {
         }
     }
 
-    fn build_nss(prods_by_lhs: &HashMap<String, Vec<Production>>) -> HashSet<String> {
-        let mut nss: HashSet<String> = HashSet::new();
-        let mut prods_by_rhs: HashMap<&String, Vec<&Production>> = HashMap::new();
-        let mut work_stack: Vec<&String> = Vec::new();
+    fn build_nss(
+        prods_by_lhs: &HashMap<Symbol, Vec<Production<Symbol>>>
+    ) -> HashSet<Symbol> {
+        let mut nss: HashSet<Symbol> = HashSet::new();
+        let mut prods_by_rhs: HashMap<&Symbol, Vec<&Production<Symbol>>> = HashMap::new();
+        let mut work_stack: Vec<&Symbol> = Vec::new();
 
         prods_by_lhs.iter()
             .flat_map(|(_, prods)| prods)

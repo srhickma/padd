@@ -9,7 +9,6 @@ use {
         scan::{
             self,
             ecdfa::EncodedCDFA,
-            Kind,
         },
     },
     std::{
@@ -22,13 +21,17 @@ mod gen;
 mod lang;
 mod region;
 
+pub type Symbol = lang::Symbol;
+
 pub static DEF_MATCHER: &'static str = "_";
 
-pub fn parse_spec(input: &str) -> Result<Tree, ParseError> {
+pub fn parse_spec(input: &str) -> Result<Tree<Symbol>, ParseError> {
     lang::parse_spec(input)
 }
 
-pub fn generate_spec(parse: &Tree) -> Result<(EncodedCDFA<Kind>, Grammar, Formatter), GenError> {
+pub fn generate_spec(
+    parse: &Tree<Symbol>
+) -> Result<(EncodedCDFA<String>, Grammar<String>, Formatter), GenError> {
     gen::generate_spec(parse)
 }
 
@@ -141,49 +144,49 @@ mod tests {
 
         //verify
         assert_eq!(tree.to_string(),
-                   "└── spec
-    └── regions
-        ├── regions
-        │   ├── regions
-        │   │   └── region
-        │   │       └── alphabet
-        │   │           ├── ALPHABET <- 'alphabet'
-        │   │           └── CILC <- '' ''
-        │   └── region
-        │       └── cdfa
-        │           ├── CDFA <- 'cdfa'
-        │           ├── LBRACE <- '{'
-        │           ├── states
-        │           │   └── state
-        │           │       ├── sdec
-        │           │       │   └── targets
-        │           │       │       └── ID <- 'start'
-        │           │       ├── trans_opt
+                   "└── Spec
+    └── Regions
+        ├── Regions
+        │   ├── Regions
+        │   │   └── Region
+        │   │       └── Alphabet
+        │   │           ├── TAlphabet <- 'alphabet'
+        │   │           └── TCil <- '' ''
+        │   └── Region
+        │       └── CDFA
+        │           ├── TCDFA <- 'cdfa'
+        │           ├── TLeftBrace <- '{'
+        │           ├── States
+        │           │   └── State
+        │           │       ├── StateDeclarator
+        │           │       │   └── Targets
+        │           │       │       └── TId <- 'start'
+        │           │       ├── TransitionsOpt
         │           │       │   └──  <- 'NULL'
-        │           │       └── SEMI <- ';'
-        │           └── RBRACE <- '}'
-        └── region
-            └── grammar
-                ├── GRAMMAR <- 'grammar'
-                ├── LBRACE <- '{'
-                ├── prods
-                │   └── prod
-                │       ├── ID <- 's'
-                │       ├── patt_opt
+        │           │       └── TSemi <- ';'
+        │           └── TRightBrace <- '}'
+        └── Region
+            └── Grammar
+                ├── TGrammar <- 'grammar'
+                ├── TLeftBrace <- '{'
+                ├── Productions
+                │   └── Production
+                │       ├── TId <- 's'
+                │       ├── PatternOpt
                 │       │   └──  <- 'NULL'
-                │       ├── rhss
-                │       │   └── rhs
-                │       │       ├── OR <- '|'
-                │       │       ├── ids
-                │       │       │   ├── ids
-                │       │       │   │   ├── ids
+                │       ├── RightHandSides
+                │       │   └── RightHandSide
+                │       │       ├── TOr <- '|'
+                │       │       ├── Ids
+                │       │       │   ├── Ids
+                │       │       │   │   ├── Ids
                 │       │       │   │   │   └──  <- 'NULL'
-                │       │       │   │   └── ID <- 's'
-                │       │       │   └── ID <- 'b'
-                │       │       └── patt_opt
+                │       │       │   │   └── TId <- 's'
+                │       │       │   └── TId <- 'b'
+                │       │       └── PatternOpt
                 │       │           └──  <- 'NULL'
-                │       └── SEMI <- ';'
-                └── RBRACE <- '}'"
+                │       └── TSemi <- ';'
+                └── TRightBrace <- '}'"
         );
     }
 
@@ -228,203 +231,409 @@ grammar {
 
         //verify
         assert_eq!(tree.to_string(),
-                   "└── spec
-    └── regions
-        ├── regions
-        │   ├── regions
-        │   │   └── region
-        │   │       └── alphabet
-        │   │           ├── ALPHABET <- 'alphabet'
-        │   │           └── CILC <- '' \\t\\n{}''
-        │   └── region
-        │       └── cdfa
-        │           ├── CDFA <- 'cdfa'
-        │           ├── LBRACE <- '{'
-        │           ├── states
-        │           │   ├── states
-        │           │   │   ├── states
-        │           │   │   │   ├── states
-        │           │   │   │   │   └── state
-        │           │   │   │   │       ├── sdec
-        │           │   │   │   │       │   └── targets
-        │           │   │   │   │       │       └── ID <- 'start'
-        │           │   │   │   │       ├── trans_opt
-        │           │   │   │   │       │   └── trans
-        │           │   │   │   │       │       ├── trans
-        │           │   │   │   │       │       │   ├── trans
-        │           │   │   │   │       │       │   │   ├── trans
-        │           │   │   │   │       │       │   │   │   ├── trans
-        │           │   │   │   │       │       │   │   │   │   └── tran
-        │           │   │   │   │       │       │   │   │   │       ├── mtcs
-        │           │   │   │   │       │       │   │   │   │       │   └── mtc
-        │           │   │   │   │       │       │   │   │   │       │       └── CILC <- '' ''
-        │           │   │   │   │       │       │   │   │   │       ├── ARROW <- '->'
-        │           │   │   │   │       │       │   │   │   │       └── trand
-        │           │   │   │   │       │       │   │   │   │           └── ID <- 'ws'
-        │           │   │   │   │       │       │   │   │   └── tran
-        │           │   │   │   │       │       │   │   │       ├── mtcs
-        │           │   │   │   │       │       │   │   │       │   └── mtc
-        │           │   │   │   │       │       │   │   │       │       └── CILC <- ''\\t''
-        │           │   │   │   │       │       │   │   │       ├── ARROW <- '->'
-        │           │   │   │   │       │       │   │   │       └── trand
-        │           │   │   │   │       │       │   │   │           └── ID <- 'ws'
-        │           │   │   │   │       │       │   │   └── tran
-        │           │   │   │   │       │       │   │       ├── mtcs
-        │           │   │   │   │       │       │   │       │   └── mtc
-        │           │   │   │   │       │       │   │       │       └── CILC <- ''\\n''
-        │           │   │   │   │       │       │   │       ├── ARROW <- '->'
-        │           │   │   │   │       │       │   │       └── trand
-        │           │   │   │   │       │       │   │           └── ID <- 'ws'
-        │           │   │   │   │       │       │   └── tran
-        │           │   │   │   │       │       │       ├── mtcs
-        │           │   │   │   │       │       │       │   └── mtc
-        │           │   │   │   │       │       │       │       └── CILC <- ''{''
-        │           │   │   │   │       │       │       ├── ARROW <- '->'
-        │           │   │   │   │       │       │       └── trand
-        │           │   │   │   │       │       │           └── ID <- 'lbr'
-        │           │   │   │   │       │       └── tran
-        │           │   │   │   │       │           ├── mtcs
-        │           │   │   │   │       │           │   └── mtc
-        │           │   │   │   │       │           │       └── CILC <- ''}''
-        │           │   │   │   │       │           ├── ARROW <- '->'
-        │           │   │   │   │       │           └── trand
-        │           │   │   │   │       │               └── ID <- 'rbr'
-        │           │   │   │   │       └── SEMI <- ';'
-        │           │   │   │   └── state
-        │           │   │   │       ├── sdec
-        │           │   │   │       │   ├── targets
-        │           │   │   │       │   │   └── ID <- 'ws'
-        │           │   │   │       │   └── acceptor
-        │           │   │   │       │       ├── HAT <- '^'
-        │           │   │   │       │       ├── id_or_def
-        │           │   │   │       │       │   └── ID <- 'WHITESPACE'
-        │           │   │   │       │       └── accd_opt
+                   "└── Spec
+    └── Regions
+        ├── Regions
+        │   ├── Regions
+        │   │   └── Region
+        │   │       └── Alphabet
+        │   │           ├── TAlphabet <- 'alphabet'
+        │   │           └── TCil <- '' \\t\\n{}''
+        │   └── Region
+        │       └── CDFA
+        │           ├── TCDFA <- 'cdfa'
+        │           ├── TLeftBrace <- '{'
+        │           ├── States
+        │           │   ├── States
+        │           │   │   ├── States
+        │           │   │   │   ├── States
+        │           │   │   │   │   └── State
+        │           │   │   │   │       ├── StateDeclarator
+        │           │   │   │   │       │   └── Targets
+        │           │   │   │   │       │       └── TId <- 'start'
+        │           │   │   │   │       ├── TransitionsOpt
+        │           │   │   │   │       │   └── Transitions
+        │           │   │   │   │       │       ├── Transitions
+        │           │   │   │   │       │       │   ├── Transitions
+        │           │   │   │   │       │       │   │   ├── Transitions
+        │           │   │   │   │       │       │   │   │   ├── Transitions
+        │           │   │   │   │       │       │   │   │   │   └── Transition
+        │           │   │   │   │       │       │   │   │   │       ├── Matchers
+        │           │   │   │   │       │       │   │   │   │       │   └── Matcher
+        │           │   │   │   │       │       │   │   │   │       │       └── TCil <- '' ''
+        │           │   │   │   │       │       │   │   │   │       ├── TArrow <- '->'
+        │           │   │   │   │       │       │   │   │   │       └── TransitionDestination
+        │           │   │   │   │       │       │   │   │   │           └── TId <- 'ws'
+        │           │   │   │   │       │       │   │   │   └── Transition
+        │           │   │   │   │       │       │   │   │       ├── Matchers
+        │           │   │   │   │       │       │   │   │       │   └── Matcher
+        │           │   │   │   │       │       │   │   │       │       └── TCil <- ''\\t''
+        │           │   │   │   │       │       │   │   │       ├── TArrow <- '->'
+        │           │   │   │   │       │       │   │   │       └── TransitionDestination
+        │           │   │   │   │       │       │   │   │           └── TId <- 'ws'
+        │           │   │   │   │       │       │   │   └── Transition
+        │           │   │   │   │       │       │   │       ├── Matchers
+        │           │   │   │   │       │       │   │       │   └── Matcher
+        │           │   │   │   │       │       │   │       │       └── TCil <- ''\\n''
+        │           │   │   │   │       │       │   │       ├── TArrow <- '->'
+        │           │   │   │   │       │       │   │       └── TransitionDestination
+        │           │   │   │   │       │       │   │           └── TId <- 'ws'
+        │           │   │   │   │       │       │   └── Transition
+        │           │   │   │   │       │       │       ├── Matchers
+        │           │   │   │   │       │       │       │   └── Matcher
+        │           │   │   │   │       │       │       │       └── TCil <- ''{''
+        │           │   │   │   │       │       │       ├── TArrow <- '->'
+        │           │   │   │   │       │       │       └── TransitionDestination
+        │           │   │   │   │       │       │           └── TId <- 'lbr'
+        │           │   │   │   │       │       └── Transition
+        │           │   │   │   │       │           ├── Matchers
+        │           │   │   │   │       │           │   └── Matcher
+        │           │   │   │   │       │           │       └── TCil <- ''}''
+        │           │   │   │   │       │           ├── TArrow <- '->'
+        │           │   │   │   │       │           └── TransitionDestination
+        │           │   │   │   │       │               └── TId <- 'rbr'
+        │           │   │   │   │       └── TSemi <- ';'
+        │           │   │   │   └── State
+        │           │   │   │       ├── StateDeclarator
+        │           │   │   │       │   ├── Targets
+        │           │   │   │       │   │   └── TId <- 'ws'
+        │           │   │   │       │   └── Acceptor
+        │           │   │   │       │       ├── THat <- '^'
+        │           │   │   │       │       ├── IdOrDef
+        │           │   │   │       │       │   └── TId <- 'WHITESPACE'
+        │           │   │   │       │       └── AcceptorDestinationOpt
         │           │   │   │       │           └──  <- 'NULL'
-        │           │   │   │       ├── trans_opt
-        │           │   │   │       │   └── trans
-        │           │   │   │       │       ├── trans
-        │           │   │   │       │       │   ├── trans
-        │           │   │   │       │       │   │   └── tran
-        │           │   │   │       │       │   │       ├── mtcs
-        │           │   │   │       │       │   │       │   └── mtc
-        │           │   │   │       │       │   │       │       └── CILC <- '' ''
-        │           │   │   │       │       │   │       ├── ARROW <- '->'
-        │           │   │   │       │       │   │       └── trand
-        │           │   │   │       │       │   │           └── ID <- 'ws'
-        │           │   │   │       │       │   └── tran
-        │           │   │   │       │       │       ├── mtcs
-        │           │   │   │       │       │       │   └── mtc
-        │           │   │   │       │       │       │       └── CILC <- ''\\t''
-        │           │   │   │       │       │       ├── ARROW <- '->'
-        │           │   │   │       │       │       └── trand
-        │           │   │   │       │       │           └── ID <- 'ws'
-        │           │   │   │       │       └── tran
-        │           │   │   │       │           ├── mtcs
-        │           │   │   │       │           │   └── mtc
-        │           │   │   │       │           │       └── CILC <- ''\\n''
-        │           │   │   │       │           ├── ARROW <- '->'
-        │           │   │   │       │           └── trand
-        │           │   │   │       │               └── ID <- 'ws'
-        │           │   │   │       └── SEMI <- ';'
-        │           │   │   └── state
-        │           │   │       ├── sdec
-        │           │   │       │   ├── targets
-        │           │   │       │   │   └── ID <- 'lbr'
-        │           │   │       │   └── acceptor
-        │           │   │       │       ├── HAT <- '^'
-        │           │   │       │       ├── id_or_def
-        │           │   │       │       │   └── ID <- 'LBRACKET'
-        │           │   │       │       └── accd_opt
+        │           │   │   │       ├── TransitionsOpt
+        │           │   │   │       │   └── Transitions
+        │           │   │   │       │       ├── Transitions
+        │           │   │   │       │       │   ├── Transitions
+        │           │   │   │       │       │   │   └── Transition
+        │           │   │   │       │       │   │       ├── Matchers
+        │           │   │   │       │       │   │       │   └── Matcher
+        │           │   │   │       │       │   │       │       └── TCil <- '' ''
+        │           │   │   │       │       │   │       ├── TArrow <- '->'
+        │           │   │   │       │       │   │       └── TransitionDestination
+        │           │   │   │       │       │   │           └── TId <- 'ws'
+        │           │   │   │       │       │   └── Transition
+        │           │   │   │       │       │       ├── Matchers
+        │           │   │   │       │       │       │   └── Matcher
+        │           │   │   │       │       │       │       └── TCil <- ''\\t''
+        │           │   │   │       │       │       ├── TArrow <- '->'
+        │           │   │   │       │       │       └── TransitionDestination
+        │           │   │   │       │       │           └── TId <- 'ws'
+        │           │   │   │       │       └── Transition
+        │           │   │   │       │           ├── Matchers
+        │           │   │   │       │           │   └── Matcher
+        │           │   │   │       │           │       └── TCil <- ''\\n''
+        │           │   │   │       │           ├── TArrow <- '->'
+        │           │   │   │       │           └── TransitionDestination
+        │           │   │   │       │               └── TId <- 'ws'
+        │           │   │   │       └── TSemi <- ';'
+        │           │   │   └── State
+        │           │   │       ├── StateDeclarator
+        │           │   │       │   ├── Targets
+        │           │   │       │   │   └── TId <- 'lbr'
+        │           │   │       │   └── Acceptor
+        │           │   │       │       ├── THat <- '^'
+        │           │   │       │       ├── IdOrDef
+        │           │   │       │       │   └── TId <- 'LBRACKET'
+        │           │   │       │       └── AcceptorDestinationOpt
         │           │   │       │           └──  <- 'NULL'
-        │           │   │       ├── trans_opt
+        │           │   │       ├── TransitionsOpt
         │           │   │       │   └──  <- 'NULL'
-        │           │   │       └── SEMI <- ';'
-        │           │   └── state
-        │           │       ├── sdec
-        │           │       │   ├── targets
-        │           │       │   │   └── ID <- 'rbr'
-        │           │       │   └── acceptor
-        │           │       │       ├── HAT <- '^'
-        │           │       │       ├── id_or_def
-        │           │       │       │   └── ID <- 'RBRACKET'
-        │           │       │       └── accd_opt
+        │           │   │       └── TSemi <- ';'
+        │           │   └── State
+        │           │       ├── StateDeclarator
+        │           │       │   ├── Targets
+        │           │       │   │   └── TId <- 'rbr'
+        │           │       │   └── Acceptor
+        │           │       │       ├── THat <- '^'
+        │           │       │       ├── IdOrDef
+        │           │       │       │   └── TId <- 'RBRACKET'
+        │           │       │       └── AcceptorDestinationOpt
         │           │       │           └──  <- 'NULL'
-        │           │       ├── trans_opt
+        │           │       ├── TransitionsOpt
         │           │       │   └──  <- 'NULL'
-        │           │       └── SEMI <- ';'
-        │           └── RBRACE <- '}'
-        └── region
-            └── grammar
-                ├── GRAMMAR <- 'grammar'
-                ├── LBRACE <- '{'
-                ├── prods
-                │   ├── prods
-                │   │   ├── prods
-                │   │   │   └── prod
-                │   │   │       ├── ID <- 's'
-                │   │   │       ├── patt_opt
+        │           │       └── TSemi <- ';'
+        │           └── TRightBrace <- '}'
+        └── Region
+            └── Grammar
+                ├── TGrammar <- 'grammar'
+                ├── TLeftBrace <- '{'
+                ├── Productions
+                │   ├── Productions
+                │   │   ├── Productions
+                │   │   │   └── Production
+                │   │   │       ├── TId <- 's'
+                │   │   │       ├── PatternOpt
                 │   │   │       │   └──  <- 'NULL'
-                │   │   │       ├── rhss
-                │   │   │       │   ├── rhss
-                │   │   │       │   │   └── rhs
-                │   │   │       │   │       ├── OR <- '|'
-                │   │   │       │   │       ├── ids
-                │   │   │       │   │       │   ├── ids
-                │   │   │       │   │       │   │   ├── ids
+                │   │   │       ├── RightHandSides
+                │   │   │       │   ├── RightHandSides
+                │   │   │       │   │   └── RightHandSide
+                │   │   │       │   │       ├── TOr <- '|'
+                │   │   │       │   │       ├── Ids
+                │   │   │       │   │       │   ├── Ids
+                │   │   │       │   │       │   │   ├── Ids
                 │   │   │       │   │       │   │   │   └──  <- 'NULL'
-                │   │   │       │   │       │   │   └── ID <- 's'
-                │   │   │       │   │       │   └── ID <- 'b'
-                │   │   │       │   │       └── patt_opt
+                │   │   │       │   │       │   │   └── TId <- 's'
+                │   │   │       │   │       │   └── TId <- 'b'
+                │   │   │       │   │       └── PatternOpt
                 │   │   │       │   │           └──  <- 'NULL'
-                │   │   │       │   └── rhs
-                │   │   │       │       ├── OR <- '|'
-                │   │   │       │       ├── ids
+                │   │   │       │   └── RightHandSide
+                │   │   │       │       ├── TOr <- '|'
+                │   │   │       │       ├── Ids
                 │   │   │       │       │   └──  <- 'NULL'
-                │   │   │       │       └── patt_opt
+                │   │   │       │       └── PatternOpt
                 │   │   │       │           └──  <- 'NULL'
-                │   │   │       └── SEMI <- ';'
-                │   │   └── prod
-                │   │       ├── ID <- 'b'
-                │   │       ├── patt_opt
+                │   │   │       └── TSemi <- ';'
+                │   │   └── Production
+                │   │       ├── TId <- 'b'
+                │   │       ├── PatternOpt
                 │   │       │   └──  <- 'NULL'
-                │   │       ├── rhss
-                │   │       │   ├── rhss
-                │   │       │   │   └── rhs
-                │   │       │   │       ├── OR <- '|'
-                │   │       │   │       ├── ids
-                │   │       │   │       │   ├── ids
-                │   │       │   │       │   │   ├── ids
-                │   │       │   │       │   │   │   ├── ids
+                │   │       ├── RightHandSides
+                │   │       │   ├── RightHandSides
+                │   │       │   │   └── RightHandSide
+                │   │       │   │       ├── TOr <- '|'
+                │   │       │   │       ├── Ids
+                │   │       │   │       │   ├── Ids
+                │   │       │   │       │   │   ├── Ids
+                │   │       │   │       │   │   │   ├── Ids
                 │   │       │   │       │   │   │   │   └──  <- 'NULL'
-                │   │       │   │       │   │   │   └── ID <- 'LBRACKET'
-                │   │       │   │       │   │   └── ID <- 's'
-                │   │       │   │       │   └── ID <- 'RBRACKET'
-                │   │       │   │       └── patt_opt
-                │   │       │   │           └── PATTC <- '``'
-                │   │       │   └── rhs
-                │   │       │       ├── OR <- '|'
-                │   │       │       ├── ids
-                │   │       │       │   ├── ids
+                │   │       │   │       │   │   │   └── TId <- 'LBRACKET'
+                │   │       │   │       │   │   └── TId <- 's'
+                │   │       │   │       │   └── TId <- 'RBRACKET'
+                │   │       │   │       └── PatternOpt
+                │   │       │   │           └── TPattern <- '``'
+                │   │       │   └── RightHandSide
+                │   │       │       ├── TOr <- '|'
+                │   │       │       ├── Ids
+                │   │       │       │   ├── Ids
                 │   │       │       │   │   └──  <- 'NULL'
-                │   │       │       │   └── ID <- 'w'
-                │   │       │       └── patt_opt
+                │   │       │       │   └── TId <- 'w'
+                │   │       │       └── PatternOpt
                 │   │       │           └──  <- 'NULL'
-                │   │       └── SEMI <- ';'
-                │   └── prod
-                │       ├── ID <- 'w'
-                │       ├── patt_opt
+                │   │       └── TSemi <- ';'
+                │   └── Production
+                │       ├── TId <- 'w'
+                │       ├── PatternOpt
                 │       │   └──  <- 'NULL'
-                │       ├── rhss
-                │       │   └── rhs
-                │       │       ├── OR <- '|'
-                │       │       ├── ids
-                │       │       │   ├── ids
+                │       ├── RightHandSides
+                │       │   └── RightHandSide
+                │       │       ├── TOr <- '|'
+                │       │       ├── Ids
+                │       │       │   ├── Ids
                 │       │       │   │   └──  <- 'NULL'
-                │       │       │   └── ID <- 'WHITESPACE'
-                │       │       └── patt_opt
-                │       │           └── PATTC <- '`[prefix]{0}\\n\\n{1;prefix=[prefix]\\t}[prefix]{2}\\n\\n`'
-                │       └── SEMI <- ';'
-                └── RBRACE <- '}'"
+                │       │       │   └── TId <- 'WHITESPACE'
+                │       │       └── PatternOpt
+                │       │           └── TPattern <- '`[prefix]{0}\\n\\n{1;prefix=[prefix]\\t}[prefix]{2}\\n\\n`'
+                │       └── TSemi <- ';'
+                └── TRightBrace <- '}'"
+        );
+    }
+
+    #[test]
+    fn parse_spec_complex() {
+        //setup
+        let input = "
+alphabet 'vinj '
+
+cdfa {
+    start
+        'i' -> ki
+        _ -> ^ID;
+
+    ki
+        'n' -> ^IN -> ki;
+
+    ID | ki
+        ' ' -> fail
+        _ -> ID;
+
+    state   ^ACC -> other_start
+        'v' -> ^_
+        'i' .. 'j' -> def_acc;
+
+    def_acc ^_;
+}
+
+grammar {
+    s `{} {}`
+        | ID s
+        | ID `{}`;
+}
+        ";
+
+        //exercise
+        let tree = lang::parse_spec(input).unwrap();
+
+        //verify
+        assert_eq!(tree.to_string(),
+                   "└── Spec
+    └── Regions
+        ├── Regions
+        │   ├── Regions
+        │   │   └── Region
+        │   │       └── Alphabet
+        │   │           ├── TAlphabet <- 'alphabet'
+        │   │           └── TCil <- ''vinj ''
+        │   └── Region
+        │       └── CDFA
+        │           ├── TCDFA <- 'cdfa'
+        │           ├── TLeftBrace <- '{'
+        │           ├── States
+        │           │   ├── States
+        │           │   │   ├── States
+        │           │   │   │   ├── States
+        │           │   │   │   │   ├── States
+        │           │   │   │   │   │   └── State
+        │           │   │   │   │   │       ├── StateDeclarator
+        │           │   │   │   │   │       │   └── Targets
+        │           │   │   │   │   │       │       └── TId <- 'start'
+        │           │   │   │   │   │       ├── TransitionsOpt
+        │           │   │   │   │   │       │   └── Transitions
+        │           │   │   │   │   │       │       ├── Transitions
+        │           │   │   │   │   │       │       │   └── Transition
+        │           │   │   │   │   │       │       │       ├── Matchers
+        │           │   │   │   │   │       │       │       │   └── Matcher
+        │           │   │   │   │   │       │       │       │       └── TCil <- ''i''
+        │           │   │   │   │   │       │       │       ├── TArrow <- '->'
+        │           │   │   │   │   │       │       │       └── TransitionDestination
+        │           │   │   │   │   │       │       │           └── TId <- 'ki'
+        │           │   │   │   │   │       │       └── Transition
+        │           │   │   │   │   │       │           ├── TDef <- '_'
+        │           │   │   │   │   │       │           ├── TArrow <- '->'
+        │           │   │   │   │   │       │           └── TransitionDestination
+        │           │   │   │   │   │       │               └── Acceptor
+        │           │   │   │   │   │       │                   ├── THat <- '^'
+        │           │   │   │   │   │       │                   ├── IdOrDef
+        │           │   │   │   │   │       │                   │   └── TId <- 'ID'
+        │           │   │   │   │   │       │                   └── AcceptorDestinationOpt
+        │           │   │   │   │   │       │                       └──  <- 'NULL'
+        │           │   │   │   │   │       └── TSemi <- ';'
+        │           │   │   │   │   └── State
+        │           │   │   │   │       ├── StateDeclarator
+        │           │   │   │   │       │   └── Targets
+        │           │   │   │   │       │       └── TId <- 'ki'
+        │           │   │   │   │       ├── TransitionsOpt
+        │           │   │   │   │       │   └── Transitions
+        │           │   │   │   │       │       └── Transition
+        │           │   │   │   │       │           ├── Matchers
+        │           │   │   │   │       │           │   └── Matcher
+        │           │   │   │   │       │           │       └── TCil <- ''n''
+        │           │   │   │   │       │           ├── TArrow <- '->'
+        │           │   │   │   │       │           └── TransitionDestination
+        │           │   │   │   │       │               └── Acceptor
+        │           │   │   │   │       │                   ├── THat <- '^'
+        │           │   │   │   │       │                   ├── IdOrDef
+        │           │   │   │   │       │                   │   └── TId <- 'IN'
+        │           │   │   │   │       │                   └── AcceptorDestinationOpt
+        │           │   │   │   │       │                       ├── TArrow <- '->'
+        │           │   │   │   │       │                       └── TId <- 'ki'
+        │           │   │   │   │       └── TSemi <- ';'
+        │           │   │   │   └── State
+        │           │   │   │       ├── StateDeclarator
+        │           │   │   │       │   └── Targets
+        │           │   │   │       │       ├── Targets
+        │           │   │   │       │       │   └── TId <- 'ID'
+        │           │   │   │       │       ├── TOr <- '|'
+        │           │   │   │       │       └── TId <- 'ki'
+        │           │   │   │       ├── TransitionsOpt
+        │           │   │   │       │   └── Transitions
+        │           │   │   │       │       ├── Transitions
+        │           │   │   │       │       │   └── Transition
+        │           │   │   │       │       │       ├── Matchers
+        │           │   │   │       │       │       │   └── Matcher
+        │           │   │   │       │       │       │       └── TCil <- '' ''
+        │           │   │   │       │       │       ├── TArrow <- '->'
+        │           │   │   │       │       │       └── TransitionDestination
+        │           │   │   │       │       │           └── TId <- 'fail'
+        │           │   │   │       │       └── Transition
+        │           │   │   │       │           ├── TDef <- '_'
+        │           │   │   │       │           ├── TArrow <- '->'
+        │           │   │   │       │           └── TransitionDestination
+        │           │   │   │       │               └── TId <- 'ID'
+        │           │   │   │       └── TSemi <- ';'
+        │           │   │   └── State
+        │           │   │       ├── StateDeclarator
+        │           │   │       │   ├── Targets
+        │           │   │       │   │   └── TId <- 'state'
+        │           │   │       │   └── Acceptor
+        │           │   │       │       ├── THat <- '^'
+        │           │   │       │       ├── IdOrDef
+        │           │   │       │       │   └── TId <- 'ACC'
+        │           │   │       │       └── AcceptorDestinationOpt
+        │           │   │       │           ├── TArrow <- '->'
+        │           │   │       │           └── TId <- 'other_start'
+        │           │   │       ├── TransitionsOpt
+        │           │   │       │   └── Transitions
+        │           │   │       │       ├── Transitions
+        │           │   │       │       │   └── Transition
+        │           │   │       │       │       ├── Matchers
+        │           │   │       │       │       │   └── Matcher
+        │           │   │       │       │       │       └── TCil <- ''v''
+        │           │   │       │       │       ├── TArrow <- '->'
+        │           │   │       │       │       └── TransitionDestination
+        │           │   │       │       │           └── Acceptor
+        │           │   │       │       │               ├── THat <- '^'
+        │           │   │       │       │               ├── IdOrDef
+        │           │   │       │       │               │   └── TDef <- '_'
+        │           │   │       │       │               └── AcceptorDestinationOpt
+        │           │   │       │       │                   └──  <- 'NULL'
+        │           │   │       │       └── Transition
+        │           │   │       │           ├── Matchers
+        │           │   │       │           │   └── Matcher
+        │           │   │       │           │       ├── TCil <- ''i''
+        │           │   │       │           │       ├── TRange <- '..'
+        │           │   │       │           │       └── TCil <- ''j''
+        │           │   │       │           ├── TArrow <- '->'
+        │           │   │       │           └── TransitionDestination
+        │           │   │       │               └── TId <- 'def_acc'
+        │           │   │       └── TSemi <- ';'
+        │           │   └── State
+        │           │       ├── StateDeclarator
+        │           │       │   ├── Targets
+        │           │       │   │   └── TId <- 'def_acc'
+        │           │       │   └── Acceptor
+        │           │       │       ├── THat <- '^'
+        │           │       │       ├── IdOrDef
+        │           │       │       │   └── TDef <- '_'
+        │           │       │       └── AcceptorDestinationOpt
+        │           │       │           └──  <- 'NULL'
+        │           │       ├── TransitionsOpt
+        │           │       │   └──  <- 'NULL'
+        │           │       └── TSemi <- ';'
+        │           └── TRightBrace <- '}'
+        └── Region
+            └── Grammar
+                ├── TGrammar <- 'grammar'
+                ├── TLeftBrace <- '{'
+                ├── Productions
+                │   └── Production
+                │       ├── TId <- 's'
+                │       ├── PatternOpt
+                │       │   └── TPattern <- '`{} {}`'
+                │       ├── RightHandSides
+                │       │   ├── RightHandSides
+                │       │   │   └── RightHandSide
+                │       │   │       ├── TOr <- '|'
+                │       │   │       ├── Ids
+                │       │   │       │   ├── Ids
+                │       │   │       │   │   ├── Ids
+                │       │   │       │   │   │   └──  <- 'NULL'
+                │       │   │       │   │   └── TId <- 'ID'
+                │       │   │       │   └── TId <- 's'
+                │       │   │       └── PatternOpt
+                │       │   │           └──  <- 'NULL'
+                │       │   └── RightHandSide
+                │       │       ├── TOr <- '|'
+                │       │       ├── Ids
+                │       │       │   ├── Ids
+                │       │       │   │   └──  <- 'NULL'
+                │       │       │   └── TId <- 'ID'
+                │       │       └── PatternOpt
+                │       │           └── TPattern <- '`{}`'
+                │       └── TSemi <- ';'
+                └── TRightBrace <- '}'"
         );
     }
 
@@ -687,6 +896,9 @@ grammar {
     s |;
 }
         ";
+        let tree = lang::parse_spec(spec);
+        let parse = tree.unwrap();
+        let (cdfa, _, _) = generate_spec(&parse).unwrap();
 
         let input = "fdkgdfjgdjglkdjglkdjgljbnhbduhoifjeoigjeoghknhkjdfjgoirjt for if endif elseif somethign eldsfnj hi bob joe here final for fob else if id idhere fobre f ".to_string();
         let mut iter = input.chars();
@@ -696,9 +908,6 @@ grammar {
         let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
 
         let scanner = scan::def_scanner();
-        let tree = lang::parse_spec(spec);
-        let parse = tree.unwrap();
-        let (cdfa, _, _) = generate_spec(&parse).unwrap();
 
         //exercise
         let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
@@ -730,258 +939,6 @@ kind=ID lexeme=f")
     }
 
     #[test]
-    fn parse_spec_olap_trans() {
-        //setup
-        let input = "
-alphabet 'inj '
-
-cdfa {
-    start
-        'i' -> ki
-        _ -> ^ID;
-
-    ki
-        'n' -> ^IN;
-
-    ID | ki
-        ' ' -> fail
-        _ -> ID;
-}
-
-grammar {
-    s
-        | ID s
-        | ID;
-}
-        ";
-
-        //exercise
-        let tree = lang::parse_spec(input).unwrap();
-
-        //verify
-        assert_eq!(tree.to_string(),
-                   "└── spec
-    └── regions
-        ├── regions
-        │   ├── regions
-        │   │   └── region
-        │   │       └── alphabet
-        │   │           ├── ALPHABET <- 'alphabet'
-        │   │           └── CILC <- ''inj ''
-        │   └── region
-        │       └── cdfa
-        │           ├── CDFA <- 'cdfa'
-        │           ├── LBRACE <- '{'
-        │           ├── states
-        │           │   ├── states
-        │           │   │   ├── states
-        │           │   │   │   └── state
-        │           │   │   │       ├── sdec
-        │           │   │   │       │   └── targets
-        │           │   │   │       │       └── ID <- 'start'
-        │           │   │   │       ├── trans_opt
-        │           │   │   │       │   └── trans
-        │           │   │   │       │       ├── trans
-        │           │   │   │       │       │   └── tran
-        │           │   │   │       │       │       ├── mtcs
-        │           │   │   │       │       │       │   └── mtc
-        │           │   │   │       │       │       │       └── CILC <- ''i''
-        │           │   │   │       │       │       ├── ARROW <- '->'
-        │           │   │   │       │       │       └── trand
-        │           │   │   │       │       │           └── ID <- 'ki'
-        │           │   │   │       │       └── tran
-        │           │   │   │       │           ├── DEF <- '_'
-        │           │   │   │       │           ├── ARROW <- '->'
-        │           │   │   │       │           └── trand
-        │           │   │   │       │               └── acceptor
-        │           │   │   │       │                   ├── HAT <- '^'
-        │           │   │   │       │                   ├── id_or_def
-        │           │   │   │       │                   │   └── ID <- 'ID'
-        │           │   │   │       │                   └── accd_opt
-        │           │   │   │       │                       └──  <- 'NULL'
-        │           │   │   │       └── SEMI <- ';'
-        │           │   │   └── state
-        │           │   │       ├── sdec
-        │           │   │       │   └── targets
-        │           │   │       │       └── ID <- 'ki'
-        │           │   │       ├── trans_opt
-        │           │   │       │   └── trans
-        │           │   │       │       └── tran
-        │           │   │       │           ├── mtcs
-        │           │   │       │           │   └── mtc
-        │           │   │       │           │       └── CILC <- ''n''
-        │           │   │       │           ├── ARROW <- '->'
-        │           │   │       │           └── trand
-        │           │   │       │               └── acceptor
-        │           │   │       │                   ├── HAT <- '^'
-        │           │   │       │                   ├── id_or_def
-        │           │   │       │                   │   └── ID <- 'IN'
-        │           │   │       │                   └── accd_opt
-        │           │   │       │                       └──  <- 'NULL'
-        │           │   │       └── SEMI <- ';'
-        │           │   └── state
-        │           │       ├── sdec
-        │           │       │   └── targets
-        │           │       │       ├── targets
-        │           │       │       │   └── ID <- 'ID'
-        │           │       │       ├── OR <- '|'
-        │           │       │       └── ID <- 'ki'
-        │           │       ├── trans_opt
-        │           │       │   └── trans
-        │           │       │       ├── trans
-        │           │       │       │   └── tran
-        │           │       │       │       ├── mtcs
-        │           │       │       │       │   └── mtc
-        │           │       │       │       │       └── CILC <- '' ''
-        │           │       │       │       ├── ARROW <- '->'
-        │           │       │       │       └── trand
-        │           │       │       │           └── ID <- 'fail'
-        │           │       │       └── tran
-        │           │       │           ├── DEF <- '_'
-        │           │       │           ├── ARROW <- '->'
-        │           │       │           └── trand
-        │           │       │               └── ID <- 'ID'
-        │           │       └── SEMI <- ';'
-        │           └── RBRACE <- '}'
-        └── region
-            └── grammar
-                ├── GRAMMAR <- 'grammar'
-                ├── LBRACE <- '{'
-                ├── prods
-                │   └── prod
-                │       ├── ID <- 's'
-                │       ├── patt_opt
-                │       │   └──  <- 'NULL'
-                │       ├── rhss
-                │       │   ├── rhss
-                │       │   │   └── rhs
-                │       │   │       ├── OR <- '|'
-                │       │   │       ├── ids
-                │       │   │       │   ├── ids
-                │       │   │       │   │   ├── ids
-                │       │   │       │   │   │   └──  <- 'NULL'
-                │       │   │       │   │   └── ID <- 'ID'
-                │       │   │       │   └── ID <- 's'
-                │       │   │       └── patt_opt
-                │       │   │           └──  <- 'NULL'
-                │       │   └── rhs
-                │       │       ├── OR <- '|'
-                │       │       ├── ids
-                │       │       │   ├── ids
-                │       │       │   │   └──  <- 'NULL'
-                │       │       │   └── ID <- 'ID'
-                │       │       └── patt_opt
-                │       │           └──  <- 'NULL'
-                │       └── SEMI <- ';'
-                └── RBRACE <- '}'"
-        );
-    }
-
-    #[test]
-    fn parse_spec_optional_shorthand() {
-        //setup
-        let spec = "
-alphabet 'ab'
-
-cdfa {
-    start
-        'a' -> ^A
-        'b' -> ^B;
-}
-
-grammar {
-    s
-        | A [B] s
-        |;
-}
-        ";
-
-        //exercise
-        let tree = lang::parse_spec(spec).unwrap();
-
-        //verify
-        assert_eq!(tree.to_string(),
-                   "└── spec
-    └── regions
-        ├── regions
-        │   ├── regions
-        │   │   └── region
-        │   │       └── alphabet
-        │   │           ├── ALPHABET <- 'alphabet'
-        │   │           └── CILC <- ''ab''
-        │   └── region
-        │       └── cdfa
-        │           ├── CDFA <- 'cdfa'
-        │           ├── LBRACE <- '{'
-        │           ├── states
-        │           │   └── state
-        │           │       ├── sdec
-        │           │       │   └── targets
-        │           │       │       └── ID <- 'start'
-        │           │       ├── trans_opt
-        │           │       │   └── trans
-        │           │       │       ├── trans
-        │           │       │       │   └── tran
-        │           │       │       │       ├── mtcs
-        │           │       │       │       │   └── mtc
-        │           │       │       │       │       └── CILC <- ''a''
-        │           │       │       │       ├── ARROW <- '->'
-        │           │       │       │       └── trand
-        │           │       │       │           └── acceptor
-        │           │       │       │               ├── HAT <- '^'
-        │           │       │       │               ├── id_or_def
-        │           │       │       │               │   └── ID <- 'A'
-        │           │       │       │               └── accd_opt
-        │           │       │       │                   └──  <- 'NULL'
-        │           │       │       └── tran
-        │           │       │           ├── mtcs
-        │           │       │           │   └── mtc
-        │           │       │           │       └── CILC <- ''b''
-        │           │       │           ├── ARROW <- '->'
-        │           │       │           └── trand
-        │           │       │               └── acceptor
-        │           │       │                   ├── HAT <- '^'
-        │           │       │                   ├── id_or_def
-        │           │       │                   │   └── ID <- 'B'
-        │           │       │                   └── accd_opt
-        │           │       │                       └──  <- 'NULL'
-        │           │       └── SEMI <- ';'
-        │           └── RBRACE <- '}'
-        └── region
-            └── grammar
-                ├── GRAMMAR <- 'grammar'
-                ├── LBRACE <- '{'
-                ├── prods
-                │   └── prod
-                │       ├── ID <- 's'
-                │       ├── patt_opt
-                │       │   └──  <- 'NULL'
-                │       ├── rhss
-                │       │   ├── rhss
-                │       │   │   └── rhs
-                │       │   │       ├── OR <- '|'
-                │       │   │       ├── ids
-                │       │   │       │   ├── ids
-                │       │   │       │   │   ├── ids
-                │       │   │       │   │   │   ├── ids
-                │       │   │       │   │   │   │   └──  <- 'NULL'
-                │       │   │       │   │   │   └── ID <- 'A'
-                │       │   │       │   │   └── COPTID <- '[B]'
-                │       │   │       │   └── ID <- 's'
-                │       │   │       └── patt_opt
-                │       │   │           └──  <- 'NULL'
-                │       │   └── rhs
-                │       │       ├── OR <- '|'
-                │       │       ├── ids
-                │       │       │   └──  <- 'NULL'
-                │       │       └── patt_opt
-                │       │           └──  <- 'NULL'
-                │       └── SEMI <- ';'
-                └── RBRACE <- '}'"
-        );
-    }
-
-    #[test]
     fn single_reference_optional_shorthand() {
         //setup
         let spec = "
@@ -1000,6 +957,10 @@ grammar {
 }
         ";
 
+        let tree = lang::parse_spec(spec);
+        let parse = tree.unwrap();
+        let (cdfa, grammar, _) = generate_spec(&parse).unwrap();
+
         let input = "ababaaaba".to_string();
         let mut iter = input.chars();
         let mut getter = || {
@@ -1008,9 +969,6 @@ grammar {
         let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
 
         let scanner = scan::def_scanner();
-        let tree = lang::parse_spec(spec);
-        let parse = tree.unwrap();
-        let (cdfa, grammar, _) = generate_spec(&parse).unwrap();
         let parser = parse::def_parser();
 
         //exercise
@@ -1068,98 +1026,27 @@ grammar {
 }
         ";
 
+        let tree = lang::parse_spec(spec);
+        let parse = tree.unwrap();
+        let (cdfa, grammar, formatter) = generate_spec(&parse).unwrap();
+
+        let input = "abaa".to_string();
+        let mut iter = input.chars();
+        let mut getter = || {
+            iter.next()
+        };
+        let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
+
+        let scanner = scan::def_scanner();
+        let parser = parse::def_parser();
+
         //exercise
-        let tree = lang::parse_spec(spec).unwrap();
+        let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
+        let tree = parser.parse(tokens, &grammar).unwrap();
+        let res = formatter.format(&tree);
 
         //verify
-        assert_eq!(tree.to_string(),
-                   "└── spec
-    └── regions
-        ├── regions
-        │   ├── regions
-        │   │   └── region
-        │   │       └── alphabet
-        │   │           ├── ALPHABET <- 'alphabet'
-        │   │           └── CILC <- ''ab''
-        │   └── region
-        │       └── cdfa
-        │           ├── CDFA <- 'cdfa'
-        │           ├── LBRACE <- '{'
-        │           ├── states
-        │           │   └── state
-        │           │       ├── sdec
-        │           │       │   └── targets
-        │           │       │       └── ID <- 'start'
-        │           │       ├── trans_opt
-        │           │       │   └── trans
-        │           │       │       ├── trans
-        │           │       │       │   └── tran
-        │           │       │       │       ├── mtcs
-        │           │       │       │       │   └── mtc
-        │           │       │       │       │       └── CILC <- ''a''
-        │           │       │       │       ├── ARROW <- '->'
-        │           │       │       │       └── trand
-        │           │       │       │           └── acceptor
-        │           │       │       │               ├── HAT <- '^'
-        │           │       │       │               ├── id_or_def
-        │           │       │       │               │   └── ID <- 'A'
-        │           │       │       │               └── accd_opt
-        │           │       │       │                   └──  <- 'NULL'
-        │           │       │       └── tran
-        │           │       │           ├── mtcs
-        │           │       │           │   └── mtc
-        │           │       │           │       └── CILC <- ''b''
-        │           │       │           ├── ARROW <- '->'
-        │           │       │           └── trand
-        │           │       │               └── acceptor
-        │           │       │                   ├── HAT <- '^'
-        │           │       │                   ├── id_or_def
-        │           │       │                   │   └── ID <- 'B'
-        │           │       │                   └── accd_opt
-        │           │       │                       └──  <- 'NULL'
-        │           │       └── SEMI <- ';'
-        │           └── RBRACE <- '}'
-        └── region
-            └── grammar
-                ├── GRAMMAR <- 'grammar'
-                ├── LBRACE <- '{'
-                ├── prods
-                │   └── prod
-                │       ├── ID <- 's'
-                │       ├── patt_opt
-                │       │   └── PATTC <- '`{} {}`'
-                │       ├── rhss
-                │       │   ├── rhss
-                │       │   │   ├── rhss
-                │       │   │   │   └── rhs
-                │       │   │   │       ├── OR <- '|'
-                │       │   │   │       ├── ids
-                │       │   │   │       │   ├── ids
-                │       │   │   │       │   │   ├── ids
-                │       │   │   │       │   │   │   └──  <- 'NULL'
-                │       │   │   │       │   │   └── ID <- 's'
-                │       │   │   │       │   └── ID <- 'A'
-                │       │   │   │       └── patt_opt
-                │       │   │   │           └──  <- 'NULL'
-                │       │   │   └── rhs
-                │       │   │       ├── OR <- '|'
-                │       │   │       ├── ids
-                │       │   │       │   ├── ids
-                │       │   │       │   │   ├── ids
-                │       │   │       │   │   │   └──  <- 'NULL'
-                │       │   │       │   │   └── ID <- 's'
-                │       │   │       │   └── ID <- 'B'
-                │       │   │       └── patt_opt
-                │       │   │           └──  <- 'NULL'
-                │       │   └── rhs
-                │       │       ├── OR <- '|'
-                │       │       ├── ids
-                │       │       │   └──  <- 'NULL'
-                │       │       └── patt_opt
-                │       │           └── PATTC <- '`SEPARATED:`'
-                │       └── SEMI <- ';'
-                └── RBRACE <- '}'"
-        );
+        assert_eq!(res, "SEPARATED: a b a a");
     }
 
     #[test]
@@ -1199,12 +1086,7 @@ grammar {
         let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
 
         //verify
-        let mut res_string = String::new();
-        for token in tokens {
-            res_string = format!("{}\nkind={} lexeme={}", res_string, token.kind, token.lexeme);
-        }
-
-        assert_eq!(res_string, "
+        assert_eq!(tokens_string(tokens), "
 kind=A lexeme=a
 kind=A lexeme=b
 kind=A lexeme=c
@@ -1285,7 +1167,12 @@ kind=A lexeme=a")
     fn tokens_string(tokens: Vec<Token<String>>) -> String {
         let mut res_string = String::new();
         for token in tokens {
-            res_string = format!("{}\nkind={} lexeme={}", res_string, token.kind, token.lexeme);
+            res_string = format!(
+                "{}\nkind={} lexeme={}",
+                res_string,
+                Data::to_string(token.kind()),
+                token.lexeme()
+            );
         }
         res_string
     }
