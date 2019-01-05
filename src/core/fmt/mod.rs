@@ -19,7 +19,6 @@ impl Formatter {
             parse,
             pattern_map: &self.pattern_map,
         };
-        println!("PATTERN MAP: {}", &format_job.pattern_map.len());
         format_job.run()
     }
 }
