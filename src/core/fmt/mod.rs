@@ -19,6 +19,7 @@ impl Formatter {
             parse,
             pattern_map: &self.pattern_map,
         };
+        println!("PATTERN MAP: {}", &format_job.pattern_map.len());
         format_job.run()
     }
 }
@@ -44,7 +45,7 @@ impl FormatterBuilder {
 
     pub fn add_pattern<Symbol: Data + Default>(
         &mut self,
-        pair: PatternPair<Symbol>
+        pair: PatternPair<Symbol>,
     ) -> Result<(), BuildError> {
         let key = pair.production.to_string();
 
@@ -80,7 +81,7 @@ impl<'parse, Symbol: Data + Default + 'parse> FormatJob<'parse, Symbol> {
             return node.lhs.lexeme().clone();
         }
 
-        let pattern = self.pattern_map.get(&node.production()[..]);
+        let pattern = self.pattern_map.get(&node.production().to_string());
         match pattern {
             Some(ref p) => self.fill_pattern(p, &node.children, scope),
             None => { //Reconstruct one after the other

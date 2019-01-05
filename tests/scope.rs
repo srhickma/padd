@@ -1,7 +1,7 @@
 extern crate padd;
 
 use {
-    padd::{FormatJobRunner, FormatJob},
+    padd::{FormatJob, FormatJobRunner},
     std::{
         fs::File,
         io::{Read, Write},

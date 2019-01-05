@@ -73,14 +73,19 @@ impl<Symbol: Data + Default> Tree<Symbol> {
         }
     }
 
-    pub fn production(&self) -> String {
-        let mut res_string = format!("{:?}", self.lhs.kind());
+    pub fn production(&self) -> Production<Symbol> {
+        let mut rhs: Vec<Symbol> = Vec::new();
 
         for child in &self.children {
-            res_string = format!(" {:?}", child.lhs.kind())
+            if !child.is_null() {
+                rhs.push(child.lhs.kind().clone())
+            }
         }
 
-        res_string
+        Production {
+            lhs: self.lhs.kind().clone(),
+            rhs,
+        }
     }
 }
 
@@ -128,10 +133,10 @@ impl<Symbol: Data + Default> Production<Symbol> {
 
 impl<Symbol: Data + Default> Data for Production<Symbol> {
     fn to_string(&self) -> String {
-        let mut res_string = format!("{:?}", self.lhs);
+        let mut res_string = self.lhs.to_string();
 
         for symbol in &self.rhs {
-            res_string = format!("{} {:?}", res_string, symbol);
+            res_string = format!("{} {}", res_string, symbol.to_string());
         }
 
         res_string
