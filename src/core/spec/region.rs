@@ -8,6 +8,7 @@ use {
 
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub enum RegionType {
+    Ignorable,
     Alphabet,
     CDFA,
     Grammar,
@@ -66,6 +67,7 @@ fn traverse_region_node(
 fn type_from_node(region_node: &Tree<Symbol>) -> RegionType {
     let region_symbol = &region_node.get_child(0).lhs.kind();
     match region_symbol {
+        Symbol::Ignorable => RegionType::Ignorable,
         Symbol::Alphabet => RegionType::Alphabet,
         Symbol::CDFA => RegionType::CDFA,
         Symbol::Grammar => RegionType::Grammar,

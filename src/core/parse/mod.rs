@@ -156,7 +156,7 @@ mod tests {
             "Verb runs",
         ]));
         grammar_builder.try_mark_start(&"Sentence".to_string());
-        let grammar = grammar_builder.build();
+        let grammar = grammar_builder.build().unwrap();
 
         let scan = vec![
             Token::leaf("mary".to_string(), "Hello".to_string()),
@@ -185,7 +185,7 @@ mod tests {
         let mut grammar_builder = GrammarBuilder::new();
         grammar_builder.add_productions(build_prods_from_strings(&["S BOF A EOF", "A x", "A A x"]));
         grammar_builder.try_mark_start(&"S".to_string());
-        let grammar = grammar_builder.build();
+        let grammar = grammar_builder.build().unwrap();
 
         let scan = vec![
             Token::leaf("BOF".to_string(), "a".to_string()),
@@ -220,7 +220,7 @@ mod tests {
             "expr ID",
         ]));
         grammar_builder.try_mark_start(&"S".to_string());
-        let grammar = grammar_builder.build();
+        let grammar = grammar_builder.build().unwrap();
 
         let scan = "( ID OP ID ) OP ID OP ( ID )"
             .split_whitespace()
@@ -275,7 +275,7 @@ mod tests {
             "Number NUM",
         ]));
         grammar_builder.try_mark_start(&"Sum".to_string());
-        let grammar = grammar_builder.build();
+        let grammar = grammar_builder.build().unwrap();
 
         let scan = "NUM AS LPAREN NUM MD NUM AS NUM RPAREN"
             .split_whitespace()
@@ -332,7 +332,7 @@ mod tests {
             "w WHITESPACE",
         ]));
         grammar_builder.try_mark_start(&"s".to_string());
-        let grammar = grammar_builder.build();
+        let grammar = grammar_builder.build().unwrap();
 
         let scan = "WHITESPACE LBRACKET WHITESPACE LBRACKET WHITESPACE RBRACKET WHITESPACE RBRACKET LBRACKET RBRACKET WHITESPACE".split_whitespace()
             .map(|kind| Token::leaf(kind.to_string(), "xy".to_string()))
@@ -399,7 +399,7 @@ mod tests {
             "w ",
         ]));
         grammar_builder.try_mark_start(&"s".to_string());
-        let grammar = grammar_builder.build();
+        let grammar = grammar_builder.build().unwrap();
 
         let scan = "WHITESPACE"
             .split_whitespace()
@@ -441,7 +441,7 @@ mod tests {
             "num DIGIT",
         ]));
         grammar_builder.try_mark_start(&"sum".to_string());
-        let grammar = grammar_builder.build();
+        let grammar = grammar_builder.build().unwrap();
 
         let scan = vec![
             Token::leaf("DIGIT".to_string(), "1".to_string()),
@@ -499,7 +499,7 @@ mod tests {
         let mut grammar_builder = GrammarBuilder::new();
         grammar_builder.add_productions(build_prods_from_strings(&["s "]));
         grammar_builder.try_mark_start(&"s".to_string());
-        let grammar = grammar_builder.build();
+        let grammar = grammar_builder.build().unwrap();
 
         let scan = vec![Token::leaf("kind".to_string(), "lexeme".to_string())];
 

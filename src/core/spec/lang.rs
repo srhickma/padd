@@ -2,7 +2,7 @@ use core::{
     data::Data,
     parse::{
         self,
-        grammar::{Grammar, GrammarBuilder},
+        grammar::{self, Grammar, GrammarBuilder},
         Tree,
     },
     scan::{
@@ -18,6 +18,9 @@ static SPEC_ALPHABET: &'static str = "`-=~!@#$%^&*()+{}|[]\\;':\"<>?,./_01234567
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
 enum S {
     Start,
+    Ignorable,
+    IgnorableTag,
+    IgnorableId,
     Alphabet,
     AlphabetTag,
     AlphabetString,
@@ -52,10 +55,10 @@ enum S {
 }
 
 thread_local! {
-    static SPEC_ECDFA: EncodedCDFA<Symbol> = build_spec_ecdfa().unwrap();
+    static SPEC_ECDFA: EncodedCDFA<Symbol> = build_ecdfa().unwrap();
 }
 
-fn build_spec_ecdfa() -> Result<EncodedCDFA<Symbol>, scan::CDFAError> {
+fn build_ecdfa() -> Result<EncodedCDFA<Symbol>, scan::CDFAError> {
     let mut builder: EncodedCDFABuilder<S, Symbol> = EncodedCDFABuilder::new();
 
     builder
@@ -64,6 +67,7 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<Symbol>, scan::CDFAError> {
 
     builder
         .state(&S::Start)
+        .mark_chain(&S::IgnorableTag, "ignore".chars())?
         .mark_chain(&S::AlphabetTag, "alphabet".chars())?
         .mark_chain(&S::CDFATag, "cdfa".chars())?
         .mark_chain(&S::GrammarTag, "grammar".chars())?
@@ -73,8 +77,75 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<Symbol>, scan::CDFAError> {
         .mark_trans(&S::Whitespace, '\n')?
         .mark_trans(&S::Whitespace, '\r')?;
 
-    // Alphabet
+    build_ignorable_region(&mut builder)?;
+    build_alphabet_region(&mut builder)?;
+    build_cdfa_region(&mut builder)?;
+    build_grammar_region(&mut builder)?;
 
+    builder.state(&S::Whitespace).accept();
+
+    builder
+        .state(&S::RegionExitBrace)
+        .accept_to_from_all(&S::Start)?
+        .tokenize(&Symbol::TRightBrace);
+
+    builder.state(&S::Or).accept().tokenize(&Symbol::TOr);
+
+    builder.state(&S::Semi).accept().tokenize(&Symbol::TSemi);
+
+    builder
+        .state(&S::CilPartial)
+        .mark_trans(&S::Cil, '\'')?
+        .mark_trans(&S::CilEscaped, '\\')?
+        .default_to(&S::CilPartial)?;
+
+    builder.state(&S::Cil).accept().tokenize(&Symbol::TCil);
+
+    builder.state(&S::CilEscaped).default_to(&S::CilPartial)?;
+
+    builder
+        .state(&S::Id)
+        .mark_range(&S::Id, '_', 'Z')?
+        .accept()
+        .tokenize(&Symbol::TId);
+
+    builder
+        .state(&S::Comment)
+        .mark_trans(&S::Fail, '\n')?
+        .default_to(&S::Comment)?
+        .accept();
+
+    builder.build()
+}
+
+fn build_ignorable_region(
+    builder: &mut EncodedCDFABuilder<S, Symbol>,
+) -> Result<(), scan::CDFAError> {
+    builder
+        .state(&S::IgnorableTag)
+        .accept_to_from_all(&S::Ignorable)?
+        .tokenize(&Symbol::TIgnorable);
+
+    builder
+        .state(&S::Ignorable)
+        .mark_range(&S::IgnorableId, '0', 'Z')?
+        .mark_trans(&S::Comment, '#')?
+        .mark_trans(&S::Whitespace, ' ')?
+        .mark_trans(&S::Whitespace, '\t')?
+        .mark_trans(&S::Whitespace, '\n')?;
+
+    builder
+        .state(&S::IgnorableId)
+        .mark_range(&S::IgnorableId, '_', 'Z')?
+        .accept_to_from_all(&S::Start)?
+        .tokenize(&Symbol::TId);
+
+    Ok(())
+}
+
+fn build_alphabet_region(
+    builder: &mut EncodedCDFABuilder<S, Symbol>,
+) -> Result<(), scan::CDFAError> {
     builder
         .state(&S::AlphabetTag)
         .accept_to_from_all(&S::Alphabet)?
@@ -104,8 +175,10 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<Symbol>, scan::CDFAError> {
         .state(&S::AlphabetStringEscaped)
         .default_to(&S::AlphabetStringPartial)?;
 
-    // CDFA
+    Ok(())
+}
 
+fn build_cdfa_region(builder: &mut EncodedCDFABuilder<S, Symbol>) -> Result<(), scan::CDFAError> {
     builder
         .state(&S::CDFATag)
         .accept_to_from_all(&S::CDFA)?
@@ -150,8 +223,12 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<Symbol>, scan::CDFAError> {
 
     builder.state(&S::Def).accept().tokenize(&Symbol::TDef);
 
-    // Grammar
+    Ok(())
+}
 
+fn build_grammar_region(
+    builder: &mut EncodedCDFABuilder<S, Symbol>,
+) -> Result<(), scan::CDFAError> {
     builder
         .state(&S::GrammarTag)
         .accept_to_from_all(&S::Grammar)?
@@ -202,42 +279,7 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<Symbol>, scan::CDFAError> {
         .accept()
         .tokenize(&Symbol::TPattern);
 
-    // Shared
-
-    builder.state(&S::Whitespace).accept();
-
-    builder
-        .state(&S::RegionExitBrace)
-        .accept_to_from_all(&S::Start)?
-        .tokenize(&Symbol::TRightBrace);
-
-    builder.state(&S::Or).accept().tokenize(&Symbol::TOr);
-
-    builder.state(&S::Semi).accept().tokenize(&Symbol::TSemi);
-
-    builder
-        .state(&S::CilPartial)
-        .mark_trans(&S::Cil, '\'')?
-        .mark_trans(&S::CilEscaped, '\\')?
-        .default_to(&S::CilPartial)?;
-
-    builder.state(&S::Cil).accept().tokenize(&Symbol::TCil);
-
-    builder.state(&S::CilEscaped).default_to(&S::CilPartial)?;
-
-    builder
-        .state(&S::Id)
-        .mark_range(&S::Id, '_', 'Z')?
-        .accept()
-        .tokenize(&Symbol::TId);
-
-    builder
-        .state(&S::Comment)
-        .mark_trans(&S::Fail, '\n')?
-        .default_to(&S::Comment)?
-        .accept();
-
-    builder.build()
+    Ok(())
 }
 
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
@@ -245,6 +287,7 @@ pub enum Symbol {
     Spec,
     Regions,
     Region,
+    Ignorable,
     Alphabet,
     CDFA,
     States,
@@ -282,6 +325,7 @@ pub enum Symbol {
     TPattern,
     TOptId,
     TDef,
+    TIgnorable,
 }
 
 impl Default for Symbol {
@@ -297,10 +341,10 @@ impl Data for Symbol {
 }
 
 lazy_static! {
-    static ref SPEC_GRAMMAR: Grammar<Symbol> = build_spec_grammar();
+    static ref SPEC_GRAMMAR: Grammar<Symbol> = build_spec_grammar().unwrap();
 }
 
-fn build_spec_grammar() -> Grammar<Symbol> {
+fn build_spec_grammar() -> Result<Grammar<Symbol>, grammar::BuildError> {
     let mut builder = GrammarBuilder::new();
     builder.try_mark_start(&Symbol::Spec);
 
@@ -313,9 +357,14 @@ fn build_spec_grammar() -> Grammar<Symbol> {
 
     builder
         .from(Symbol::Region)
+        .to(vec![Symbol::Ignorable])
         .to(vec![Symbol::Alphabet])
         .to(vec![Symbol::CDFA])
         .to(vec![Symbol::Grammar]);
+
+    builder
+        .from(Symbol::Ignorable)
+        .to(vec![Symbol::TIgnorable, Symbol::TId]);
 
     builder
         .from(Symbol::Alphabet)
