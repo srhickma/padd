@@ -33,7 +33,8 @@ after_success: |
       kcov --include-path=src \
         --exclude-path=src/cli/mod.rs \
         --exclude-path=src/cli/logger.rs \
-        --exclude-region='#[cfg(test)]:#[cfg(ccstop)],panic!(:)' \
+        --exclude-region='#[cfg(test)]:#[cfg(ccstop)]' \
+        --exclude-line='panic!' \
         "target/cov/$(basename $file)" "$file";
     done &&
     bash <(curl -s https://codecov.io/bash)
