@@ -40,7 +40,7 @@ pub enum GenError {
     MatcherErr(String),
     MappingErr(String),
     CDFAErr(scan::CDFAError),
-    PatternErr(fmt::BuildError),
+    FormatterErr(fmt::BuildError),
     RegionErr(region::Error),
 }
 
@@ -50,7 +50,7 @@ impl std::fmt::Display for GenError {
             GenError::MatcherErr(ref err) => write!(f, "Matcher definition error: {}", err),
             GenError::MappingErr(ref err) => write!(f, "ECDFA to grammar mapping error: {}", err),
             GenError::CDFAErr(ref err) => write!(f, "ECDFA generation error: {}", err),
-            GenError::PatternErr(ref err) => write!(f, "Pattern build error: {}", err),
+            GenError::FormatterErr(ref err) => write!(f, "Formatter build error: {}", err),
             GenError::RegionErr(ref err) => write!(f, "Region error: {}", err),
         }
     }
@@ -62,7 +62,7 @@ impl error::Error for GenError {
             GenError::MatcherErr(_) => None,
             GenError::MappingErr(_) => None,
             GenError::CDFAErr(ref err) => Some(err),
-            GenError::PatternErr(ref err) => Some(err),
+            GenError::FormatterErr(ref err) => Some(err),
             GenError::RegionErr(ref err) => Some(err),
         }
     }
@@ -76,7 +76,7 @@ impl From<scan::CDFAError> for GenError {
 
 impl From<fmt::BuildError> for GenError {
     fn from(err: fmt::BuildError) -> GenError {
-        GenError::PatternErr(err)
+        GenError::FormatterErr(err)
     }
 }
 
