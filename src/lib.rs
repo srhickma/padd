@@ -779,7 +779,57 @@ grammar {
     }
 
     #[test]
-    fn failed_pattern_build_error() {
+    fn failed_pattern_parse_error() {
+        //setup
+        let spec = "
+alphabet ''
+
+cdfa {
+    start ;
+}
+
+grammar {
+    s | `{`;
+}
+        ".to_string();
+
+        //exercise
+        let res = FormatJobRunner::build(&spec);
+
+        //verify
+        assert!(res.is_err());
+
+        let mut err: &Error = &res.err().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "Failed to generate specification: Formatter build error: Pattern parse error: \
+            Recognition failed after consuming all tokens"
+        );
+
+        err = err.cause().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "Formatter build error: Pattern parse error: \
+            Recognition failed after consuming all tokens"
+        );
+
+        err = err.cause().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "Pattern parse error: Recognition failed after consuming all tokens"
+        );
+
+        err = err.cause().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "Recognition failed after consuming all tokens"
+        );
+
+        assert!(err.cause().is_none());
+    }
+
+    #[test]
+    fn failed_pattern_capture_error() {
         //setup
         let spec = "
 alphabet ''
