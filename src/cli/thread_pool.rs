@@ -77,7 +77,6 @@ impl error::Error for ThreadPoolError {
 
 struct WorkerMux {}
 
-//TODO use helper objects to reduce number of parameters
 impl WorkerMux {
     fn spawn<JobRunner, Payload: 'static + Send>(
         size: usize,
@@ -242,6 +241,7 @@ mod tests {
         let counter = Arc::new(AtomicUsize::new(0));
 
         let pool = ThreadPool::spawn(1, 10, |(payload, counter): (usize, Arc<AtomicUsize>)| {
+            thread::yield_now();
             assert_eq!(counter.fetch_add(1, Ordering::SeqCst), payload);
         });
 
@@ -269,10 +269,12 @@ mod tests {
         //exercise/verify
         for i in 0..10 {
             pool.enqueue((i, counter.clone())).unwrap();
-            thread::sleep(Duration::new(0, 1000000))
         }
 
-        assert!(counter.load(Ordering::Relaxed) > 0);
+        thread::yield_now();
+        thread::sleep(Duration::new(0, 100000000));
+
+        assert!(counter.load(Ordering::SeqCst) > 0);
 
         pool.terminate_and_join().unwrap();
 

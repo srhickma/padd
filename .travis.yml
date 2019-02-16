@@ -28,10 +28,13 @@ after_success: |
     wget https://github.com/SimonKagstrom/kcov/archive/master.tar.gz &&
     tar xzf master.tar.gz && mkdir kcov-master/build && cd kcov-master/build && cmake .. && make &&
     sudo make install && cd ../.. &&
-    ls target/debug &&
-    for file in target/debug/padd-*[^\.d] target/debug/concept-*[^\.d] target/debug/scope-*[^\.d]; do
+    for file in $(find target/debug/ -regextype posix-extended -iregex '^target/debug/(padd|concept|scope)-[^\.]+$'); do
       mkdir -p "target/cov/$(basename $file)";
-      kcov --exclude-region='#[cfg(test)]:#[cfg(testkcovstopmarker)]' --include-path=src --exclude-path=src/cli/mod.rs --exclude-path=src/cli/logger.rs "target/cov/$(basename $file)" "$file";
+      kcov --include-path=src \
+        --exclude-path=src/cli/mod.rs \
+        --exclude-path=src/cli/logger.rs \
+        --exclude-region='#[cfg(test)]:#[cfg(ccstop)],panic!(:)' \
+        "target/cov/$(basename $file)" "$file";
     done &&
     bash <(curl -s https://codecov.io/bash)
   fi
