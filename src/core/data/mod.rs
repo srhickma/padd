@@ -3,7 +3,6 @@ use std::{
     hash::Hash,
 };
 
-pub mod stream;
 pub mod map;
 
 pub trait Data: PartialEq + Eq + Hash + Clone + fmt::Debug {
