@@ -1,9 +1,6 @@
 use {
     core::{
-        data::{
-            Data,
-            stream::StreamSource,
-        },
+        data::Data,
         parse::{
             self,
             grammar::{Grammar, GrammarBuilder},
@@ -367,11 +364,9 @@ fn build_spec_grammar() -> Grammar<Symbol> {
 
 pub fn parse_spec(input: &str) -> Result<Tree<Symbol>, spec::ParseError> {
     SPEC_ECDFA.with(|cdfa| -> Result<Tree<Symbol>, spec::ParseError> {
-        let mut iter = input.chars();
-        let mut getter = || iter.next();
-        let mut source = StreamSource::observe(&mut getter);
+        let chars: Vec<char> = input.chars().collect();
 
-        let tokens = scan::def_scanner().scan(&mut source, cdfa)?;
+        let tokens = scan::def_scanner().scan(&chars[..], cdfa)?;
         let parse = parse::def_parser().parse(tokens, &SPEC_GRAMMAR)?;
         Ok(parse)
     })

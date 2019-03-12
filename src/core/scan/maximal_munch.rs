@@ -1,9 +1,6 @@
 use {
     core::{
-        data::{
-            Data,
-            stream::{Stream, StreamSource},
-        },
+        data::Data,
         scan::{
             self,
             CDFA,
@@ -12,7 +9,6 @@ use {
             Token,
         },
     },
-    std::collections::LinkedList,
 };
 
 pub struct MaximalMunchScanner;
@@ -20,11 +16,11 @@ pub struct MaximalMunchScanner;
 impl<State: Data, Symbol: Data> Scanner<State, Symbol> for MaximalMunchScanner {
     fn scan<'a, 'b>(
         &self,
-        stream_source: &'a mut StreamSource<char>,
+        input: &[char],
         cdfa: &'b CDFA<State, Symbol>,
     ) -> Result<Vec<Token<Symbol>>, scan::Error> {
         struct ScanOneResult<State> {
-            scanned: String,
+            consumed: usize,
             end_state: Option<State>,
             next_start: Option<State>,
             line: usize,
@@ -32,103 +28,91 @@ impl<State: Data, Symbol: Data> Scanner<State, Symbol> for MaximalMunchScanner {
         }
 
         fn scan_one<State: Data, Kind: Data>(
-            stream_source: &mut StreamSource<char>,
+            input: &[char],
             start: State,
             line: usize,
             character: usize,
             cdfa: &CDFA<State, Kind>,
         ) -> ScanOneResult<State> {
+            let mut remaining = input;
             let mut state: State = start;
             let mut line: usize = line;
             let mut character: usize = character;
 
             let mut last_accepting = ScanOneResult {
-                scanned: String::new(),
+                consumed: 0,
                 end_state: None,
                 next_start: None,
                 line,
                 character,
             };
 
-            let mut consumed: LinkedList<char> = LinkedList::new();
-
-            let mut stream: Stream<char> = stream_source.head();
-            stream = stream.split();
+            let mut consumed: usize = 0;
 
             loop {
-                let res: Option<State> = {
-                    let mut consumer = stream
-                        .consumer(Box::new(|list: &LinkedList<char>| {
-                            for c in list {
-                                character += 1;
-                                if *c == '\n' {
-                                    line += 1;
-                                    character = 1;
-                                }
+                let res = cdfa.transition(&state, remaining);
 
-                                consumed.push_back(*c)
-                            }
-                        }));
+                consumed += res.consumed;
 
-                    cdfa.transition(&state, &mut consumer)
-                };
+                for i in 0..res.consumed {
+                    character += 1;
+                    if remaining[i] == '\n' {
+                        line += 1;
+                        character = 1;
+                    }
+                }
 
-                match res {
+                match res.state {
                     None => break,
                     Some(next) => {
                         if cdfa.accepts(&next) {
                             last_accepting = ScanOneResult {
-                                scanned: consumed.iter().collect(),
+                                consumed,
                                 end_state: Some(next.clone()),
                                 next_start: cdfa.acceptor_destination(&next, &state),
                                 line,
                                 character,
                             };
-                            stream.detach_tail();
-                            stream = stream.split();
                         }
+
                         state = next;
                     }
                 }
-            }
 
-            if stream.has_tail() {
-                stream = stream.detach_head();
+                remaining = &remaining[res.consumed..];
             }
-            stream.replay();
 
             last_accepting
         }
 
+        let mut remaining = input;
         let mut tokens: Vec<Token<Symbol>> = vec![];
         let mut next_start = cdfa.start();
         let mut line: usize = 1;
         let mut character: usize = 1;
 
         loop {
-            let result: ScanOneResult<State> = scan_one(
-                stream_source,
+            let res: ScanOneResult<State> = scan_one(
+                remaining,
                 next_start.clone(),
                 line,
                 character,
                 cdfa,
             );
 
-            next_start = match result.next_start {
+            next_start = match res.next_start {
                 None => next_start,
                 Some(state) => state
             };
 
-            line = result.line;
-            character = result.character;
+            line = res.line;
+            character = res.character;
 
-            match result.end_state {
+            match res.end_state {
                 None => {
-                    let mut stream = stream_source.head();
-
-                    if stream.has_next() {
+                    if !remaining.is_empty() {
                         let sequence: String = (0..FAIL_SEQUENCE_LENGTH)
-                            .map(|_| stream.pull())
+                            .map(|i| remaining.get(i))
                             .filter(|opt| opt.is_some())
                             .map(|opt| opt.unwrap())
                             .collect();
@@ -138,14 +122,16 @@ impl<State: Data, Symbol: Data> Scanner<State, Symbol> for MaximalMunchScanner {
                             line,
                             character,
                         });
-                    } else {
-                        break;
                     }
+
+                    break;
                 }
                 Some(state) => if let Some(kind) = cdfa.tokenize(&state) {
-                    tokens.push(Token::leaf(kind, result.scanned));
+                    tokens.push(Token::leaf(kind, (&remaining[0..res.consumed]).iter().collect()));
                 }
             }
+
+            remaining = &remaining[res.consumed..];
         }
 
         Ok(tokens)
