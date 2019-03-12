@@ -3,13 +3,13 @@ use {
         data::{
             Data,
             map::{CEHashMap, CEHashMapIterator},
-            stream::StreamConsumer,
         },
         scan::{
             alphabet::HashedAlphabet,
             CDFA,
             CDFABuilder,
             CDFAError,
+            TransitionResult,
         },
     },
     std::{
@@ -351,18 +351,15 @@ impl<Symbol: Default + Clone> EncodedCDFA<Symbol> {
 }
 
 impl<Symbol: Default + Clone> CDFA<usize, Symbol> for EncodedCDFA<Symbol> {
-    fn transition(&self, state: &usize, stream: &mut StreamConsumer<char>) -> Option<usize> {
+    fn transition(&self, state: &usize, input: &[char]) -> TransitionResult<usize> {
         match self.t_delta.get(*state) {
-            None => None,
-            Some(t_trie) => t_trie.transition(stream)
+            None => TransitionResult::fail(),
+            Some(t_trie) => t_trie.transition(input)
         }
     }
 
-    fn has_transition(&self, state: &usize, stream: &mut StreamConsumer<char>) -> bool {
-        stream.block();
-        let res = self.transition(state, stream).is_some();
-        stream.unblock();
-        res
+    fn has_transition(&self, state: &usize, input: &[char]) -> bool {
+        self.transition(state, input).state.is_some()
     }
 
     fn accepts(&self, state: &usize) -> bool {
@@ -409,41 +406,37 @@ impl TransitionTrie {
         }
     }
 
-    fn transition(&self, stream: &mut StreamConsumer<char>) -> Option<usize> {
+    fn transition(&self, input: &[char]) -> TransitionResult<usize> {
         let mut curr: &TransitionNode = &self.root;
 
         if curr.children.is_empty() {
             match self.default {
-                None => None,
+                None => TransitionResult::fail(),
                 Some(state) => {
-                    match stream.pull() {
-                        None => None,
-                        Some(_) => {
-                            stream.consume();
-                            Some(state)
-                        }
+                    match input.first() {
+                        None => TransitionResult::fail(),
+                        Some(_) => TransitionResult::direct(state)
                     }
                 }
             }
         } else {
+            let mut cursor: usize = 0;
             while !curr.leaf() {
-                curr = match stream.pull() {
-                    None => return None,
+                curr = match input.get(cursor) {
+                    None => return TransitionResult::fail(),
                     Some(c) => match curr.get_child(c) {
                         None => match self.default {
-                            None => return None,
-                            Some(state) => {
-                                stream.replay().advance().consume();
-                                return Some(state);
-                            }
+                            None => return TransitionResult::fail(),
+                            Some(state) => return TransitionResult::direct(state)
                         }
                         Some(child) => child
                     }
-                }
+                };
+
+                cursor += 1;
             }
 
-            stream.consume();
-            Some(curr.dest)
+            TransitionResult::new(curr.dest, cursor)
         }
     }
 
@@ -467,7 +460,7 @@ impl TransitionTrie {
 
         let c = chars[i];
         TransitionTrie::insert_internal(c, node, i == chars.len() - 1, dest)?;
-        TransitionTrie::insert_chain_internal(i + 1, node.get_child_mut(c).unwrap(), chars, dest)
+        TransitionTrie::insert_chain_internal(i + 1, node.get_child_mut(&c).unwrap(), chars, dest)
     }
 
     fn insert_internal(
@@ -476,7 +469,7 @@ impl TransitionTrie {
         last: bool,
         dest: usize,
     ) -> Result<(), CDFAError> {
-        if !node.has_child(c) {
+        if !node.has_child(&c) {
             let child = TransitionNode {
                 children: HashMap::new(),
                 dest: if last { dest } else { usize::max_value() },
@@ -514,16 +507,16 @@ impl TransitionNode {
         self.children.is_empty()
     }
 
-    fn get_child(&self, c: char) -> Option<&TransitionNode> {
-        self.children.get(&c)
+    fn get_child(&self, c: &char) -> Option<&TransitionNode> {
+        self.children.get(c)
     }
 
-    fn get_child_mut(&mut self, c: char) -> Option<&mut TransitionNode> {
-        self.children.get_mut(&c)
+    fn get_child_mut(&mut self, c: &char) -> Option<&mut TransitionNode> {
+        self.children.get_mut(c)
     }
 
-    fn has_child(&self, c: char) -> bool {
-        self.children.contains_key(&c)
+    fn has_child(&self, c: &char) -> bool {
+        self.children.contains_key(c)
     }
 
     fn add_child(&mut self, c: char, child: TransitionNode) {
@@ -609,10 +602,7 @@ impl AcceptorDestinationMux {
 #[cfg(test)]
 mod tests {
     use core::{
-        data::{
-            Data,
-            stream::StreamSource,
-        },
+        data::Data,
         scan::{self, Token},
     };
 
@@ -639,16 +629,12 @@ mod tests {
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
 
         let input = "000011010101".to_string();
-        let mut iter = input.chars();
-
-        let mut getter = || iter.next();
-
-        let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
+        let chars: Vec<char> = input.chars().collect();
 
         let scanner = scan::def_scanner();
 
         //exercise
-        let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
+        let tokens = scanner.scan(&chars[..], &cdfa).unwrap();
 
         //verify
         assert_eq!(tokens_string(&tokens), "\
@@ -688,16 +674,12 @@ NZ <- '11010101'
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
 
         let input = "  {{\n}{}{} \t{} \t{}}".to_string();
-        let mut iter = input.chars();
-
-        let mut getter = || iter.next();
-
-        let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
+        let chars: Vec<char> = input.chars().collect();
 
         let scanner = scan::def_scanner();
 
         //exercise
-        let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
+        let tokens = scanner.scan(&chars[..], &cdfa).unwrap();
 
         //verify
         assert_eq!(tokens_string(&tokens), "\
@@ -747,16 +729,12 @@ RBR <- '}'
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
 
         let input = "  {{\n}{}{} \t{} \t{}}".to_string();
-        let mut iter = input.chars();
-
-        let mut getter = || iter.next();
-
-        let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
+        let chars: Vec<char> = input.chars().collect();
 
         let scanner = scan::def_scanner();
 
         //exercise
-        let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
+        let tokens = scanner.scan(&chars[..], &cdfa).unwrap();
 
         //verify
         assert_eq!(tokens_string(&tokens), "\
@@ -802,16 +780,12 @@ RBR <- '}'
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
 
         let input = "  {{\n}{}{} \tx{} \t{}}".to_string();
-        let mut iter = input.chars();
-
-        let mut getter = || iter.next();
-
-        let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
+        let chars: Vec<char> = input.chars().collect();
 
         let scanner = scan::def_scanner();
 
         //exercise
-        let result = scanner.scan(&mut stream, &cdfa);
+        let result = scanner.scan(&chars[..], &cdfa);
 
         //verify
         assert!(result.is_err());
@@ -848,16 +822,12 @@ RBR <- '}'
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
 
         let input = "   {  {  {{{\t}}}\n {} }  }   { {}\n }   {  {  {{{\t}}}\n {} }  } xyz  { {}\n }   {  {  {{{\t}}}\n {} }  }   { {}\n } ".to_string();
-        let mut iter = input.chars();
-
-        let mut getter = || iter.next();
-
-        let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
+        let chars: Vec<char> = input.chars().collect();
 
         let scanner = scan::def_scanner();
 
         //exercise
-        let result = scanner.scan(&mut stream, &cdfa);
+        let result = scanner.scan(&chars[..], &cdfa);
 
         //verify
         assert!(result.is_err());
@@ -886,16 +856,12 @@ RBR <- '}'
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
 
         let input = "fivefourfourfourfivefivefourfive".to_string();
-        let mut iter = input.chars();
-
-        let mut getter = || iter.next();
-
-        let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
+        let chars: Vec<char> = input.chars().collect();
 
         let scanner = scan::def_scanner();
 
         //exercise
-        let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
+        let tokens = scanner.scan(&chars[..], &cdfa).unwrap();
 
         //verify
         assert_eq!(tokens_string(&tokens), "\
@@ -931,16 +897,12 @@ FIVE <- 'five'
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
 
         let input = "fdk".to_string();
-        let mut iter = input.chars();
-
-        let mut getter = || iter.next();
-
-        let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
+        let chars: Vec<char> = input.chars().collect();
 
         let scanner = scan::def_scanner();
 
         //exercise
-        let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
+        let tokens = scanner.scan(&chars[..], &cdfa).unwrap();
 
         //verify
         assert_eq!(tokens_string(&tokens), "\
@@ -988,14 +950,12 @@ ID <- 'fdk'
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
 
         let input = "!!aaa!!a!49913!a".to_string();
-        let mut iter = input.chars();
-        let mut getter = || iter.next();
-        let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
+        let chars: Vec<char> = input.chars().collect();
 
         let scanner = scan::def_scanner();
 
         //exercise
-        let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
+        let tokens = scanner.scan(&chars[..], &cdfa).unwrap();
 
         //verify
         assert_eq!(tokens_string(&tokens), "\
@@ -1039,14 +999,12 @@ A <- 'a'
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
 
         let input = "aaaa".to_string();
-        let mut iter = input.chars();
-        let mut getter = || iter.next();
-        let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
+        let chars: Vec<char> = input.chars().collect();
 
         let scanner = scan::def_scanner();
 
         //exercise
-        let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
+        let tokens = scanner.scan(&chars[..], &cdfa).unwrap();
 
         //verify
         assert_eq!(tokens_string(&tokens), "\
@@ -1079,14 +1037,12 @@ A <- 'a'
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
 
         let input = "aa".to_string();
-        let mut iter = input.chars();
-        let mut getter = || iter.next();
-        let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
+        let chars: Vec<char> = input.chars().collect();
 
         let scanner = scan::def_scanner();
 
         //exercise
-        let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
+        let tokens = scanner.scan(&chars[..], &cdfa).unwrap();
 
         //verify
         assert_eq!(tokens_string(&tokens), "\

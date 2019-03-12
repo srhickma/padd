@@ -4,7 +4,6 @@ extern crate stopwatch;
 
 use {
     core::{
-        data::stream::StreamSource,
         fmt::Formatter,
         parse::{
             self,
@@ -57,10 +56,9 @@ impl FormatJobRunner {
     }
 
     pub fn format(&self, job: FormatJob) -> Result<String, FormatError> {
-        let mut iter = job.text.chars();
-        let mut getter = || iter.next();
-        let mut source = StreamSource::observe(&mut getter);
-        let tokens = self.scanner.scan(&mut source, &self.cdfa)?;
+        let chars: Vec<char> = job.text.chars().collect();
+
+        let tokens = self.scanner.scan(&chars[..], &self.cdfa)?;
         let parse = self.parser.parse(tokens, &self.grammar)?;
         Ok(self.formatter.format(&parse))
     }

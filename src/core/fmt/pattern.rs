@@ -1,9 +1,6 @@
 use {
     core::{
-        data::{
-            Data,
-            stream::StreamSource,
-        },
+        data::Data,
         parse::{
             self,
             grammar::{Grammar, GrammarBuilder},
@@ -309,11 +306,9 @@ fn parse_decl<SpecSymbol: Data + Default>(
 
 fn parse_pattern(input: &str) -> Result<Tree<Symbol>, BuildError> {
     PATTERN_ECDFA.with(|cdfa| -> Result<Tree<Symbol>, BuildError> {
-        let mut iter = input.chars();
-        let mut getter = || iter.next();
-        let mut source = StreamSource::observe(&mut getter);
+        let chars: Vec<char> = input.chars().collect();
 
-        let tokens = scan::def_scanner().scan(&mut source, cdfa)?;
+        let tokens = scan::def_scanner().scan(&chars[..], cdfa)?;
         let parse = parse::def_parser().parse(tokens, &PATTERN_GRAMMAR)?;
         Ok(parse)
     })

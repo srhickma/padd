@@ -671,11 +671,7 @@ grammar {
         ";
 
         let input = "  {  {  {{{\t}}}\n {} }  }   { {}\n } ".to_string();
-        let mut iter = input.chars();
-        let mut getter = || {
-            iter.next()
-        };
-        let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
+        let chars: Vec<char> = input.chars().collect();
 
         let scanner = scan::def_scanner();
         let parser = parse::def_parser();
@@ -686,7 +682,7 @@ grammar {
         let (cdfa, grammar, formatter) = generate_spec(&parse).unwrap();
 
         //input
-        let tokens = scanner.scan(&mut stream, &cdfa);
+        let tokens = scanner.scan(&chars[..], &cdfa);
         let tree = parser.parse(tokens.unwrap(), &grammar);
         let parse = tree.unwrap();
 
@@ -752,11 +748,7 @@ grammar {
         ";
 
         let input = "i ij ijjjijijiji inj in iii".to_string();
-        let mut iter = input.chars();
-        let mut getter = || {
-            iter.next()
-        };
-        let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
+        let chars: Vec<char> = input.chars().collect();
 
         let scanner = scan::def_scanner();
 
@@ -765,7 +757,7 @@ grammar {
         let (cdfa, _, _) = generate_spec(&parse).unwrap();
 
         //exercise
-        let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
+        let tokens = scanner.scan(&chars[..], &cdfa).unwrap();
 
         let mut result = String::new();
         for token in tokens {
@@ -805,11 +797,7 @@ grammar {
         ";
 
         let input = "c c".to_string();
-        let mut iter = input.chars();
-        let mut getter = || {
-            iter.next()
-        };
-        let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
+        let chars: Vec<char> = input.chars().collect();
 
         let scanner = scan::def_scanner();
 
@@ -818,7 +806,7 @@ grammar {
         let (cdfa, _, _) = generate_spec(&parse).unwrap();
 
         //exercise
-        let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
+        let tokens = scanner.scan(&chars[..], &cdfa).unwrap();
 
         //verify
         assert_eq!(tokens_string(tokens), "\nkind=ID lexeme=c\nkind=WS lexeme= \nkind=ID lexeme=c")
@@ -852,11 +840,7 @@ grammar {
         ";
 
         let input = "a ababab _abab ab_abba_".to_string();
-        let mut iter = input.chars();
-        let mut getter = || {
-            iter.next()
-        };
-        let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
+        let chars: Vec<char> = input.chars().collect();
 
         let scanner = scan::def_scanner();
 
@@ -865,7 +849,7 @@ grammar {
         let (cdfa, _, _) = generate_spec(&parse).unwrap();
 
         //exercise
-        let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
+        let tokens = scanner.scan(&chars[..], &cdfa).unwrap();
 
         //verify
         assert_eq!(tokens_string(tokens), "\nkind=ID lexeme=a\nkind=ID lexeme=ababab\nkind=ID lexeme=_abab\nkind=ID lexeme=ab_abba_")
@@ -901,16 +885,12 @@ grammar {
         let (cdfa, _, _) = generate_spec(&parse).unwrap();
 
         let input = "fdkgdfjgdjglkdjglkdjgljbnhbduhoifjeoigjeoghknhkjdfjgoirjt for if endif elseif somethign eldsfnj hi bob joe here final for fob else if id idhere fobre f ".to_string();
-        let mut iter = input.chars();
-        let mut getter = || {
-            iter.next()
-        };
-        let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
+        let chars: Vec<char> = input.chars().collect();
 
         let scanner = scan::def_scanner();
 
         //exercise
-        let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
+        let tokens = scanner.scan(&chars[..], &cdfa).unwrap();
 
         //verify
         assert_eq!(tokens_string(tokens), "
@@ -962,17 +942,13 @@ grammar {
         let (cdfa, grammar, _) = generate_spec(&parse).unwrap();
 
         let input = "ababaaaba".to_string();
-        let mut iter = input.chars();
-        let mut getter = || {
-            iter.next()
-        };
-        let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
+        let chars: Vec<char> = input.chars().collect();
 
         let scanner = scan::def_scanner();
         let parser = parse::def_parser();
 
         //exercise
-        let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
+        let tokens = scanner.scan(&chars[..], &cdfa).unwrap();
         let tree = parser.parse(tokens, &grammar).unwrap();
 
         //verify
@@ -1031,17 +1007,13 @@ grammar {
         let (cdfa, grammar, formatter) = generate_spec(&parse).unwrap();
 
         let input = "abaa".to_string();
-        let mut iter = input.chars();
-        let mut getter = || {
-            iter.next()
-        };
-        let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
+        let chars: Vec<char> = input.chars().collect();
 
         let scanner = scan::def_scanner();
         let parser = parse::def_parser();
 
         //exercise
-        let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
+        let tokens = scanner.scan(&chars[..], &cdfa).unwrap();
         let tree = parser.parse(tokens, &grammar).unwrap();
         let res = formatter.format(&tree);
 
@@ -1073,9 +1045,7 @@ grammar {
         ";
 
         let input = "abcdefghijklmnopqrstuvwxyz".to_string();
-        let mut iter = input.chars();
-        let mut getter = || iter.next();
-        let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
+        let chars: Vec<char> = input.chars().collect();
 
         let scanner = scan::def_scanner();
         let tree = lang::parse_spec(spec);
@@ -1083,7 +1053,7 @@ grammar {
         let (cdfa, _, _) = generate_spec(&parse).unwrap();
 
         //exercise
-        let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
+        let tokens = scanner.scan(&chars[..], &cdfa).unwrap();
 
         //verify
         assert_eq!(tokens_string(tokens), "
@@ -1134,9 +1104,7 @@ grammar {
         ";
 
         let input = "!!aaa!!a!49913!a".to_string();
-        let mut iter = input.chars();
-        let mut getter = || iter.next();
-        let mut stream: StreamSource<char> = StreamSource::observe(&mut getter);
+        let chars: Vec<char> = input.chars().collect();
 
         let scanner = scan::def_scanner();
         let tree = lang::parse_spec(spec);
@@ -1144,7 +1112,7 @@ grammar {
         let (cdfa, _, _) = generate_spec(&parse).unwrap();
 
         //exercise
-        let tokens = scanner.scan(&mut stream, &cdfa).unwrap();
+        let tokens = scanner.scan(&chars[..], &cdfa).unwrap();
 
         //verify
         assert_eq!(tokens_string(tokens), "

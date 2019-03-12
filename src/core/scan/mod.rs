@@ -1,9 +1,6 @@
 use {
     core::{
-        data::{
-            Data,
-            stream::{StreamConsumer, StreamSource},
-        },
+        data::Data,
     },
     std::{error, fmt},
 };
@@ -15,11 +12,7 @@ pub mod maximal_munch;
 static FAIL_SEQUENCE_LENGTH: usize = 10;
 
 pub trait Scanner<State: Data, Kind: Data>: 'static + Send + Sync {
-    fn scan<'a, 'b>(
-        &self,
-        stream: &'a mut StreamSource<char>,
-        cdfa: &'b CDFA<State, Kind>,
-    ) -> Result<Vec<Token<Kind>>, Error>;
+    fn scan(&self, input: &[char], cdfa: &CDFA<State, Kind>) -> Result<Vec<Token<Kind>>, Error>;
 }
 
 pub fn def_scanner<State: Data, Kind: Data>() -> Box<Scanner<State, Kind>> {
@@ -27,8 +20,8 @@ pub fn def_scanner<State: Data, Kind: Data>() -> Box<Scanner<State, Kind>> {
 }
 
 pub trait CDFA<State, Kind> {
-    fn transition(&self, state: &State, stream: &mut StreamConsumer<char>) -> Option<State>;
-    fn has_transition(&self, state: &State, stream: &mut StreamConsumer<char>) -> bool;
+    fn transition(&self, state: &State, input: &[char]) -> TransitionResult<State>;
+    fn has_transition(&self, state: &State, input: &[char]) -> bool;
     fn accepts(&self, state: &State) -> bool;
     fn acceptor_destination(&self, state: &State, from: &State) -> Option<State>;
     fn tokenize(&self, state: &State) -> Option<Kind>;
@@ -76,6 +69,31 @@ pub trait CDFABuilder<State, Kind, CDFAType> {
     ) -> Result<&mut Self, CDFAError>;
     fn default_to(&mut self, from: &State, to: &State) -> Result<&mut Self, CDFAError>;
     fn tokenize(&mut self, state: &State, token: &Kind) -> &mut Self;
+}
+
+pub struct TransitionResult<State> {
+    state: Option<State>,
+    consumed: usize,
+}
+
+impl<State> TransitionResult<State> {
+    pub fn fail() -> Self {
+        TransitionResult {
+            state: None,
+            consumed: 0,
+        }
+    }
+
+    pub fn direct(state: State) -> Self {
+        TransitionResult::new(state, 1)
+    }
+
+    pub fn new(state: State, consumed: usize) -> Self {
+        TransitionResult {
+            state: Some(state),
+            consumed,
+        }
+    }
 }
 
 #[derive(Debug)]
