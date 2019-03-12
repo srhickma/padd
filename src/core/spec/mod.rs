@@ -125,10 +125,7 @@ impl From<parse::Error> for ParseError {
 #[cfg(test)]
 mod tests {
     use core::{
-        data::{
-            Data,
-            stream::StreamSource,
-        },
+        data::Data,
         scan::Token,
     };
 

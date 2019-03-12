@@ -73,12 +73,13 @@ impl<State: Data, Symbol: Data> Scanner<State, Symbol> for MaximalMunchScanner {
                                 line,
                                 character,
                             };
-
-                            remaining = &remaining[res.consumed..];
                         }
+
                         state = next;
                     }
                 }
+
+                remaining = &remaining[res.consumed..];
             }
 
             last_accepting
