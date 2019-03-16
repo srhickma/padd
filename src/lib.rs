@@ -43,7 +43,7 @@ pub struct FormatJobRunner {
 }
 
 impl FormatJobRunner {
-    pub fn build(spec: &String) -> Result<FormatJobRunner, BuildError> {
+    pub fn build(spec: &str) -> Result<FormatJobRunner, BuildError> {
         let parse = spec::parse_spec(spec)?;
         let (cdfa, grammar, formatter) = spec::generate_spec(&parse)?;
         Ok(FormatJobRunner {
@@ -84,7 +84,7 @@ impl fmt::Display for BuildError {
 }
 
 impl error::Error for BuildError {
-    fn cause(&self) -> Option<&error::Error> {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match *self {
             BuildError::SpecParseErr(ref err) => Some(err),
             BuildError::SpecGenErr(ref err) => Some(err),
@@ -120,7 +120,7 @@ impl fmt::Display for FormatError {
 }
 
 impl error::Error for FormatError {
-    fn cause(&self) -> Option<&error::Error> {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match *self {
             FormatError::ScanErr(ref err) => Some(err),
             FormatError::ParseErr(ref err) => Some(err),
@@ -175,13 +175,13 @@ grammar {
             "Failed to scan input: No accepting scans after (1,1): b..."
         );
 
-        err = err.cause().unwrap();
+        err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
             "No accepting scans after (1,1): b..."
         );
 
-        assert!(err.cause().is_none());
+        assert!(err.source().is_none());
     }
 
     #[test]
@@ -215,13 +215,13 @@ grammar {
             "Failed to parse input: Recognition failed at token 1: ACC <- 'a'"
         );
 
-        err = err.cause().unwrap();
+        err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
             "Recognition failed at token 1: ACC <- 'a'"
         );
 
-        assert!(err.cause().is_none());
+        assert!(err.source().is_none());
     }
 
     #[test]
@@ -252,19 +252,19 @@ grammar {
             ~\n\ncdfa {\n..."
         );
 
-        err = err.cause().unwrap();
+        err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
             "Scan error: No accepting scans after (2,14): ~\n\ncdfa {\n..."
         );
 
-        err = err.cause().unwrap();
+        err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
             "No accepting scans after (2,14): ~\n\ncdfa {\n..."
         );
 
-        assert!(err.cause().is_none());
+        assert!(err.source().is_none());
     }
 
     #[test]
@@ -295,19 +295,19 @@ grammar {
             TId <- 'SOMETHING'"
         );
 
-        err = err.cause().unwrap();
+        err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
             "Parse error: Recognition failed at token 10: TId <- 'SOMETHING'"
         );
 
-        err = err.cause().unwrap();
+        err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
             "Recognition failed at token 10: TId <- 'SOMETHING'"
         );
 
-        assert!(err.cause().is_none());
+        assert!(err.source().is_none());
     }
 
     #[test]
@@ -327,19 +327,19 @@ grammar {
             "Failed to parse specification: Parse error: No tokens scanned"
         );
 
-        err = err.cause().unwrap();
+        err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
             "Parse error: No tokens scanned"
         );
 
-        err = err.cause().unwrap();
+        err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
             "No tokens scanned"
         );
 
-        assert!(err.cause().is_none());
+        assert!(err.source().is_none());
     }
 
     #[test]
@@ -372,19 +372,19 @@ grammar {
             Default matcher used twice"
         );
 
-        err = err.cause().unwrap();
+        err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
             "ECDFA generation error: Failed to build CDFA: Default matcher used twice"
         );
 
-        err = err.cause().unwrap();
+        err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
             "Failed to build CDFA: Default matcher used twice"
         );
 
-        assert!(err.cause().is_none());
+        assert!(err.source().is_none());
     }
 
     #[test]
@@ -417,20 +417,20 @@ grammar {
             Transition trie is not prefix free on character 'a'"
         );
 
-        err = err.cause().unwrap();
+        err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
             "ECDFA generation error: Failed to build CDFA: \
             Transition trie is not prefix free on character 'a'"
         );
 
-        err = err.cause().unwrap();
+        err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
             "Failed to build CDFA: Transition trie is not prefix free on character 'a'"
         );
 
-        assert!(err.cause().is_none());
+        assert!(err.source().is_none());
     }
 
     #[test]
@@ -463,20 +463,20 @@ grammar {
             Transition trie is not prefix free on character 'l'"
         );
 
-        err = err.cause().unwrap();
+        err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
             "ECDFA generation error: Failed to build CDFA: \
             Transition trie is not prefix free on character 'l'"
         );
 
-        err = err.cause().unwrap();
+        err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
             "Failed to build CDFA: Transition trie is not prefix free on character 'l'"
         );
 
-        assert!(err.cause().is_none());
+        assert!(err.source().is_none());
     }
 
     #[test]
@@ -508,13 +508,13 @@ grammar {
             Range start must be one character, but was 'aa'"
         );
 
-        err = err.cause().unwrap();
+        err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
             "Matcher definition error: Range start must be one character, but was 'aa'"
         );
 
-        assert!(err.cause().is_none());
+        assert!(err.source().is_none());
     }
 
     #[test]
@@ -546,13 +546,13 @@ grammar {
             Range end must be one character, but was 'cd'"
         );
 
-        err = err.cause().unwrap();
+        err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
             "Matcher definition error: Range end must be one character, but was 'cd'"
         );
 
-        assert!(err.cause().is_none());
+        assert!(err.source().is_none());
     }
 
     #[test]
@@ -585,14 +585,14 @@ grammar {
             Orphaned terminal 'ORPHANED' is not tokenized by the ECDFA"
         );
 
-        err = err.cause().unwrap();
+        err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
             "ECDFA to grammar mapping error: \
             Orphaned terminal 'ORPHANED' is not tokenized by the ECDFA"
         );
 
-        assert!(err.cause().is_none());
+        assert!(err.source().is_none());
     }
 
     #[test]
@@ -625,21 +625,21 @@ grammar {
             State \"A\" is accepted multiple times with different destinations"
         );
 
-        err = err.cause().unwrap();
+        err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
             "ECDFA generation error: Failed to build CDFA: \
             State \"A\" is accepted multiple times with different destinations"
         );
 
-        err = err.cause().unwrap();
+        err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
             "Failed to build CDFA: \
             State \"A\" is accepted multiple times with different destinations"
         );
 
-        assert!(err.cause().is_none());
+        assert!(err.source().is_none());
     }
 
     #[test]
@@ -673,21 +673,21 @@ grammar {
             State \"A\" already has an acceptance destination from all incoming states"
         );
 
-        err = err.cause().unwrap();
+        err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
             "ECDFA generation error: Failed to build CDFA: \
             State \"A\" already has an acceptance destination from all incoming states"
         );
 
-        err = err.cause().unwrap();
+        err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
             "Failed to build CDFA: \
             State \"A\" already has an acceptance destination from all incoming states"
         );
 
-        assert!(err.cause().is_none());
+        assert!(err.source().is_none());
     }
 
     #[test]
@@ -721,21 +721,21 @@ grammar {
             State \"A\" already has an acceptance destination from a specific state"
         );
 
-        err = err.cause().unwrap();
+        err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
             "ECDFA generation error: Failed to build CDFA: \
             State \"A\" already has an acceptance destination from a specific state"
         );
 
-        err = err.cause().unwrap();
+        err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
             "Failed to build CDFA: \
             State \"A\" already has an acceptance destination from a specific state"
         );
 
-        assert!(err.cause().is_none());
+        assert!(err.source().is_none());
     }
 
     #[test]
@@ -761,19 +761,19 @@ grammar {
             "Failed to generate specification: Region error: Missing required region: 'CDFA'"
         );
 
-        err = err.cause().unwrap();
+        err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
             "Region error: Missing required region: 'CDFA'"
         );
 
-        err = err.cause().unwrap();
+        err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
             "Missing required region: 'CDFA'"
         );
 
-        assert!(err.cause().is_none());
+        assert!(err.source().is_none());
     }
 
     #[test]
@@ -804,26 +804,26 @@ grammar {
             Recognition failed after consuming all tokens"
         );
 
-        err = err.cause().unwrap();
+        err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
             "Formatter build error: Pattern parse error: \
             Recognition failed after consuming all tokens"
         );
 
-        err = err.cause().unwrap();
+        err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
             "Pattern parse error: Recognition failed after consuming all tokens"
         );
 
-        err = err.cause().unwrap();
+        err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
             "Recognition failed after consuming all tokens"
         );
 
-        assert!(err.cause().is_none());
+        assert!(err.source().is_none());
     }
 
     #[test]
@@ -854,20 +854,20 @@ grammar {
             Capture index 4 out of bounds for production \'s\' with 0 children"
         );
 
-        err = err.cause().unwrap();
+        err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
             "Formatter build error: Pattern capture error: \
             Capture index 4 out of bounds for production \'s\' with 0 children"
         );
 
-        err = err.cause().unwrap();
+        err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
             "Pattern capture error: \
             Capture index 4 out of bounds for production \'s\' with 0 children"
         );
 
-        assert!(err.cause().is_none());
+        assert!(err.source().is_none());
     }
 }

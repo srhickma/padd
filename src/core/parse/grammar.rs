@@ -55,7 +55,7 @@ impl<Symbol: Data + Default> GrammarBuilder<Symbol> {
     pub fn add_optional_state(&mut self, opt_state: &Symbol, dest_state: &Symbol) {
         if !self.prods_by_lhs.contains_key(opt_state) {
             self.prods_by_lhs.entry(opt_state.clone())
-                .or_insert(vec![
+                .or_insert_with(|| vec![
                     Production {
                         lhs: opt_state.clone(),
                         rhs: vec![dest_state.clone()],
@@ -136,7 +136,7 @@ impl<Symbol: Data + Default> GrammarBuilder<Symbol> {
             .for_each(|prod| {
                 for s in &prod.rhs {
                     prods_by_rhs.entry(s)
-                        .or_insert(Vec::new())
+                        .or_insert_with(Vec::new)
                         .push(prod);
                 }
 

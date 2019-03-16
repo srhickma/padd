@@ -101,7 +101,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
 
         fn scan_full<'inner, 'grammar: 'inner, Symbol: Data + Default>(
             cursor: usize,
-            scan: &Vec<Token<Symbol>>,
+            scan: &[Token<Symbol>],
             grammar: &'grammar Grammar<Symbol>,
             chart: &'inner mut RChart<'grammar, Symbol>,
             parse_chart: &mut PChart<'grammar, Symbol>,
@@ -230,36 +230,34 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
                     ),
                 })
             }
+        } else if scan.is_empty() {
+            Err(parse::Error {
+                message: "No tokens scanned".to_string(),
+            })
+        } else if cursor - 1 == scan.len() {
+            Err(parse::Error {
+                message: "Recognition failed after consuming all tokens".to_string(),
+            })
         } else {
-            if scan.len() == 0 {
-                Err(parse::Error {
-                    message: "No tokens scanned".to_string(),
-                })
-            } else if cursor - 1 == scan.len() {
-                Err(parse::Error {
-                    message: format!("Recognition failed after consuming all tokens"),
-                })
-            } else {
-                Err(parse::Error {
-                    message: format!(
-                        "Recognition failed at token {}: {}",
-                        cursor,
-                        scan[cursor - 1].to_string()
-                    ),
-                })
-            }
+            Err(parse::Error {
+                message: format!(
+                    "Recognition failed at token {}: {}",
+                    cursor,
+                    scan[cursor - 1].to_string()
+                ),
+            })
         };
 
         fn parse_tree<'scope, Symbol: Data + Default>(
             grammar: &'scope Grammar<Symbol>,
-            scan: &'scope Vec<Token<Symbol>>,
+            scan: &'scope [Token<Symbol>],
             chart: PChart<'scope, Symbol>,
         ) -> Tree<Symbol> {
             fn recur<'scope, Symbol: Data + Default>(
                 start: Node,
                 edge: &Edge<Symbol>,
                 grammar: &'scope Grammar<Symbol>,
-                scan: &'scope Vec<Token<Symbol>>,
+                scan: &'scope [Token<Symbol>],
                 chart: &PChart<Symbol>,
             ) -> Tree<Symbol> {
                 match edge.rule {
@@ -303,7 +301,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
             start: Node,
             edge: &Edge<Symbol>,
             grammar: &'scope Grammar<Symbol>,
-            scan: &'scope Vec<Token<Symbol>>,
+            scan: &'scope [Token<Symbol>],
             chart: &'scope PChart<'scope, Symbol>,
         ) -> Vec<(Node, Edge<'scope, Symbol>)> {
             let symbols: &Vec<Symbol> = &edge.rule.unwrap().rhs;
@@ -376,11 +374,11 @@ impl<'item, Symbol: Data + Default + 'item> RChart<'item, Symbol> {
     }
 
     fn row(&self, i: usize) -> &RChartRow<'item, Symbol> {
-        self.rows.get(i).unwrap()
+        &self.rows[i]
     }
 
     fn row_mut(&mut self, i: usize) -> &mut RChartRow<'item, Symbol> {
-        self.rows.get_mut(i).unwrap()
+        &mut self.rows[i]
     }
 
     #[allow(dead_code)]
@@ -468,7 +466,7 @@ impl<'item, Symbol: Data + Default + 'item> Items<'item, Symbol> {
     }
 
     fn item(&self, i: usize) -> &Item<'item, Symbol> {
-        self.items.get(i).unwrap()
+        &self.items[i]
     }
 
     fn contains(&self, item: &Item<'item, Symbol>) -> bool {
@@ -524,7 +522,7 @@ impl<'rule, Symbol: Data + Default> Data for Item<'rule, Symbol> {
             if i == self.next {
                 rule_string.push_str(". ");
             }
-            rule_string = format!("{}{:?} ", rule_string, self.rule.rhs.get(i).unwrap());
+            rule_string = format!("{}{:?} ", rule_string, self.rule.rhs[i]);
         }
         if self.next == self.rule.rhs.len() {
             rule_string.push_str(". ");
@@ -553,11 +551,11 @@ impl<'edge, Symbol: Data + Default + 'edge> PChart<'edge, Symbol> {
     }
 
     fn row(&self, i: usize) -> &PChartRow<Symbol> {
-        self.rows.get(i).unwrap()
+        &self.rows[i]
     }
 
     fn row_mut(&mut self, i: usize) -> &mut PChartRow<'edge, Symbol> {
-        self.rows.get_mut(i).unwrap()
+        &mut self.rows[i]
     }
 
     #[allow(dead_code)]
@@ -624,7 +622,7 @@ impl<'prod, Symbol: Data + Default + 'prod> Data for Edge<'prod, Symbol> {
             Some(rule) => {
                 let mut rule_string = format!("{:?} -> ", rule.lhs);
                 for i in 0..rule.rhs.len() {
-                    rule_string = format!("{}{:?} ", rule_string, rule.rhs.get(i).unwrap());
+                    rule_string = format!("{}{:?} ", rule_string, rule.rhs[i]);
                 }
                 format!("{} ({})", rule_string, self.finish)
             }

@@ -12,6 +12,7 @@ use {
             CDFABuilder,
             ecdfa::{EncodedCDFA, EncodedCDFABuilder},
             State,
+            Kind,
         },
         spec::{
             self,
@@ -25,8 +26,8 @@ use {
 
 pub fn generate_spec(
     parse: &Tree<Symbol>
-) -> Result<(EncodedCDFA<String>, Grammar<String>, Formatter), spec::GenError> {
-    let mut ecdfa_builder: EncodedCDFABuilder<String, String> = EncodedCDFABuilder::new();
+) -> Result<(EncodedCDFA<Kind>, Grammar<Kind>, Formatter), spec::GenError> {
+    let mut ecdfa_builder: EncodedCDFABuilder<String, Kind> = EncodedCDFABuilder::new();
     let mut grammar_builder = GrammarBuilder::new();
     let mut formatter_builder = FormatterBuilder::new();
 
@@ -48,11 +49,11 @@ pub fn generate_spec(
 fn traverse_spec_regions<CDFABuilderType, CDFAType>(
     regions_node: &Tree<Symbol>,
     cdfa_builder: &mut CDFABuilderType,
-    grammar_builder: &mut GrammarBuilder<String>,
+    grammar_builder: &mut GrammarBuilder<Kind>,
     formatter_builder: &mut FormatterBuilder,
 ) -> Result<(), spec::GenError> where
-    CDFAType: CDFA<usize, String>,
-    CDFABuilderType: CDFABuilder<String, String, CDFAType>
+    CDFAType: CDFA<usize, Kind>,
+    CDFABuilderType: CDFABuilder<String, Kind, CDFAType>
 {
     let mut region_handler = |inner_node: &Tree<Symbol>, region_type: &RegionType| {
         match region_type {
@@ -76,7 +77,7 @@ fn traverse_alphabet_region<CDFABuilderType, CDFAType>(
     cdfa_builder: &mut CDFABuilderType,
 ) where
     CDFAType: CDFA<usize, String>,
-    CDFABuilderType: CDFABuilder<String, String, CDFAType>
+    CDFABuilderType: CDFABuilder<String, Kind, CDFAType>
 {
     let escaped_alphabet = alphabet_node.get_child(1).lhs.lexeme().trim_matches('\'');
     let alphabet = string_utils::replace_escapes(&escaped_alphabet);
@@ -88,15 +89,15 @@ fn traverse_cdfa_region<CDFABuilderType, CDFAType>(
     cdfa_node: &Tree<Symbol>,
     cdfa_builder: &mut CDFABuilderType,
 ) -> Result<(), spec::GenError> where
-    CDFAType: CDFA<usize, String>,
-    CDFABuilderType: CDFABuilder<String, String, CDFAType>
+    CDFAType: CDFA<usize, Kind>,
+    CDFABuilderType: CDFABuilder<String, Kind, CDFAType>
 {
     generate_cdfa_states(cdfa_node.get_child(2), cdfa_builder)
 }
 
 fn traverse_grammar_region(
     grammar_node: &Tree<Symbol>,
-    grammar_builder: &mut GrammarBuilder<String>,
+    grammar_builder: &mut GrammarBuilder<Kind>,
     formatter_builder: &mut FormatterBuilder,
 ) -> Result<(), spec::GenError> {
     generate_grammar_prods(grammar_node.get_child(2), grammar_builder, formatter_builder)
@@ -106,8 +107,8 @@ fn generate_cdfa_states<CDFABuilderType, CDFAType>(
     states_node: &Tree<Symbol>,
     builder: &mut CDFABuilderType,
 ) -> Result<(), spec::GenError> where
-    CDFAType: CDFA<usize, String>,
-    CDFABuilderType: CDFABuilder<String, String, CDFAType>
+    CDFAType: CDFA<usize, Kind>,
+    CDFABuilderType: CDFABuilder<String, Kind, CDFAType>
 {
     let state_node = states_node.get_child(states_node.children.len() - 1);
 
@@ -156,11 +157,11 @@ fn generate_cdfa_targets<'tree>(
 
 fn generate_cdfa_trans<CDFABuilderType, CDFAType>(
     trans_node: &Tree<Symbol>,
-    sources: &Vec<&State>,
+    sources: &[&State],
     builder: &mut CDFABuilderType,
 ) -> Result<(), spec::GenError> where
-    CDFAType: CDFA<usize, String>,
-    CDFABuilderType: CDFABuilder<String, String, CDFAType>
+    CDFAType: CDFA<usize, Kind>,
+    CDFABuilderType: CDFABuilder<String, Kind, CDFAType>
 {
     let tran_node = trans_node.get_child(trans_node.children.len() - 1);
 
@@ -201,14 +202,15 @@ fn generate_cdfa_trans<CDFABuilderType, CDFAType>(
     }
 }
 
+#[allow(clippy::ptr_arg)]
 fn generate_cdfa_mtcs<CDFABuilderType, CDFAType>(
     mtcs_node: &Tree<Symbol>,
-    sources: &Vec<&State>,
+    sources: &[&State],
     dest: &State,
     builder: &mut CDFABuilderType,
 ) -> Result<(), spec::GenError> where
-    CDFAType: CDFA<usize, String>,
-    CDFABuilderType: CDFABuilder<String, String, CDFAType>
+    CDFAType: CDFA<usize, Kind>,
+    CDFABuilderType: CDFABuilder<String, Kind, CDFAType>
 {
     let mtc_node = mtcs_node.children.last().unwrap();
 
@@ -269,15 +271,16 @@ fn generate_cdfa_mtcs<CDFABuilderType, CDFAType>(
     }
 }
 
+#[allow(clippy::ptr_arg)]
 fn add_cdfa_tokenizer<CDFABuilderType, CDFAType, Symbol: Data + Default>(
     acceptor_node: &Tree<Symbol>,
     state: &State,
     from: Option<&State>,
-    kind: &String,
+    kind: &Kind,
     builder: &mut CDFABuilderType,
 ) -> Result<(), spec::GenError> where
-    CDFAType: CDFA<usize, String>,
-    CDFABuilderType: CDFABuilder<String, String, CDFAType>
+    CDFAType: CDFA<usize, Kind>,
+    CDFABuilderType: CDFABuilder<String, Kind, CDFAType>
 {
     let accd_opt_node = acceptor_node.get_child(2);
     if accd_opt_node.is_empty() {
@@ -298,7 +301,7 @@ fn add_cdfa_tokenizer<CDFABuilderType, CDFAType, Symbol: Data + Default>(
 
 fn generate_grammar_prods(
     prods_node: &Tree<Symbol>,
-    grammar_builder: &mut GrammarBuilder<String>,
+    grammar_builder: &mut GrammarBuilder<Kind>,
     formatter_builder: &mut FormatterBuilder,
 ) -> Result<(), spec::GenError> {
     if prods_node.children.len() == 2 {
@@ -322,9 +325,9 @@ fn generate_grammar_prods(
 
 fn generate_grammar_rhss(
     rhss_node: &Tree<Symbol>,
-    lhs: &String,
+    lhs: &str,
     def_pattern_node: &Tree<Symbol>,
-    grammar_builder: &mut GrammarBuilder<String>,
+    grammar_builder: &mut GrammarBuilder<Kind>,
     formatter_builder: &mut FormatterBuilder,
 ) -> Result<(), spec::GenError> {
     let rhs_node = rhss_node.get_child(rhss_node.children.len() - 1);
@@ -333,11 +336,11 @@ fn generate_grammar_rhss(
     generate_grammar_ids(rhs_node.get_child(1), &mut ids, grammar_builder);
 
     let production = Production {
-        lhs: lhs.clone(),
+        lhs: lhs.to_string(),
         rhs: ids,
     };
 
-    grammar_builder.try_mark_start(lhs);
+    grammar_builder.try_mark_start(&production.lhs);
     grammar_builder.add_production(production.clone());
 
     let mut pattopt_node = rhs_node.get_child(2);
@@ -372,7 +375,7 @@ fn generate_grammar_rhss(
 fn generate_grammar_ids(
     ids_node: &Tree<Symbol>,
     ids_accumulator: &mut Vec<String>,
-    grammar_builder: &mut GrammarBuilder<String>,
+    grammar_builder: &mut GrammarBuilder<Kind>,
 ) {
     if !ids_node.is_empty() {
         generate_grammar_ids(ids_node.get_child(0), ids_accumulator, grammar_builder);

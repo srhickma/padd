@@ -30,11 +30,11 @@ pub struct Tree<Symbol: Data + Default> {
 
 impl<Symbol: Data + Default> Tree<Symbol> {
     pub fn get_child(&self, i: usize) -> &Tree<Symbol> {
-        self.children.get(i).unwrap()
+        &self.children[i]
     }
 
     pub fn is_leaf(&self) -> bool {
-        self.children.len() == 0
+        self.children.is_empty()
     }
 
     pub fn is_empty(&self) -> bool {
@@ -53,7 +53,7 @@ impl<Symbol: Data + Default> Tree<Symbol> {
     }
 
     fn to_string_internal(&self, prefix: String, is_tail: bool) -> String {
-        if self.children.len() == 0 {
+        if self.children.is_empty() {
             format!(
                 "{}{}{}", prefix, if is_tail { "└── " } else { "├── " }, self.lhs.to_string()
             )
@@ -61,13 +61,11 @@ impl<Symbol: Data + Default> Tree<Symbol> {
             let mut builder = format!(
                 "{}{}{}", prefix, if is_tail { "└── " } else { "├── " }, self.lhs.kind().to_string()
             );
-            let mut i = 0;
             let len = self.children.len();
-            for child in &self.children {
+            for (i, child) in self.children.iter().enumerate() {
                 let margin = format!("{}{}", prefix, if is_tail { "    " } else { "│   " });
                 let child_string = child.to_string_internal(margin, i == len - 1);
                 builder = format!("{}\n{}", builder, child_string);
-                i += 1;
             }
             builder
         }
@@ -107,7 +105,7 @@ impl fmt::Display for Error {
 }
 
 impl error::Error for Error {
-    fn cause(&self) -> Option<&error::Error> {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         None
     }
 }

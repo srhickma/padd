@@ -1,8 +1,7 @@
 pub fn replace_escapes(input: &str) -> String {
     let mut res = String::with_capacity(input.as_bytes().len());
-    let mut i = 0;
     let mut last_char: char = ' ';
-    for c in input.chars() {
+    for (i, c) in input.chars().enumerate() {
         let mut hit_double_slash = false;
         if i != 0 && last_char == '\\' {
             res.push(match c {
@@ -22,7 +21,6 @@ pub fn replace_escapes(input: &str) -> String {
         if !hit_double_slash {
             last_char = c;
         }
-        i += 1;
     }
     res
 }

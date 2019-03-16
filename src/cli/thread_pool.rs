@@ -67,7 +67,7 @@ impl fmt::Display for ThreadPoolError {
 }
 
 impl error::Error for ThreadPoolError {
-    fn cause(&self) -> Option<&error::Error> {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match *self {
             ThreadPoolError::QueueErr(_) => None,
             ThreadPoolError::TermError(_) => None,
@@ -112,7 +112,7 @@ impl WorkerMux {
                     Signal::TERM => break,
                     Signal::JOB(payload) => {
                         let worker_id = idle_workers.pop_back().unwrap();
-                        workers.get(worker_id).unwrap().run_job(payload);
+                        workers[worker_id].run_job(payload);
                     }
                 }
             }
@@ -412,7 +412,7 @@ mod tests {
             "Error enqueuing worker job: sending on a closed channel"
         );
 
-        assert!(err.cause().is_none());
+        assert!(err.source().is_none());
     }
 
     #[test]
@@ -432,6 +432,6 @@ mod tests {
             "Error enqueuing worker termination signal: sending on a closed channel"
         );
 
-        assert!(err.cause().is_none());
+        assert!(err.source().is_none());
     }
 }

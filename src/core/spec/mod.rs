@@ -57,7 +57,7 @@ impl std::fmt::Display for GenError {
 }
 
 impl error::Error for GenError {
-    fn cause(&self) -> Option<&error::Error> {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match *self {
             GenError::MatcherErr(_) => None,
             GenError::MappingErr(_) => None,
@@ -102,7 +102,7 @@ impl std::fmt::Display for ParseError {
 }
 
 impl error::Error for ParseError {
-    fn cause(&self) -> Option<&error::Error> {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match *self {
             ParseError::ScanErr(ref err) => Some(err),
             ParseError::ParseErr(ref err) => Some(err),

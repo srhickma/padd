@@ -14,10 +14,10 @@ use {
 pub struct MaximalMunchScanner;
 
 impl<State: Data, Symbol: Data> Scanner<State, Symbol> for MaximalMunchScanner {
-    fn scan<'a, 'b>(
+    fn scan<'cdfa>(
         &self,
         input: &[char],
-        cdfa: &'b CDFA<State, Symbol>,
+        cdfa: &'cdfa CDFA<State, Symbol>,
     ) -> Result<Vec<Token<Symbol>>, scan::Error> {
         struct ScanOneResult<State> {
             consumed: usize,
@@ -54,9 +54,9 @@ impl<State: Data, Symbol: Data> Scanner<State, Symbol> for MaximalMunchScanner {
 
                 consumed += res.consumed;
 
-                for i in 0..res.consumed {
+                for c in remaining.iter().take(res.consumed) {
                     character += 1;
-                    if remaining[i] == '\n' {
+                    if *c == '\n' {
                         line += 1;
                         character = 1;
                     }
@@ -113,8 +113,8 @@ impl<State: Data, Symbol: Data> Scanner<State, Symbol> for MaximalMunchScanner {
                     if !remaining.is_empty() {
                         let sequence: String = (0..FAIL_SEQUENCE_LENGTH)
                             .map(|i| remaining.get(i))
-                            .filter(|opt| opt.is_some())
-                            .map(|opt| opt.unwrap())
+                            .filter(Option::is_some)
+                            .map(Option::unwrap)
                             .collect();
 
                         return Err(scan::Error {
