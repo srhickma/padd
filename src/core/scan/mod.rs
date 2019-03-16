@@ -110,7 +110,7 @@ impl fmt::Display for CDFAError {
 }
 
 impl error::Error for CDFAError {
-    fn cause(&self) -> Option<&error::Error> {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match *self {
             CDFAError::BuildErr(_) => None,
         }
@@ -198,7 +198,7 @@ impl fmt::Display for Error {
 }
 
 impl error::Error for Error {
-    fn cause(&self) -> Option<&error::Error> {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         None
     }
 }

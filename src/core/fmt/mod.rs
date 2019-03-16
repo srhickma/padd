@@ -96,7 +96,7 @@ impl<'parse, Symbol: Data + Default + 'parse> FormatJob<'parse, Symbol> {
     fn fill_pattern(
         &self,
         pattern: &Pattern,
-        children: &Vec<Tree<Symbol>>,
+        children: &[Tree<Symbol>],
         scope: &HashMap<String, String>,
     ) -> String {
         let mut res: String = String::new();
@@ -117,7 +117,7 @@ impl<'parse, Symbol: Data + Default + 'parse> FormatJob<'parse, Symbol> {
     fn evaluate_capture(
         &self,
         capture: &Capture,
-        children: &Vec<Tree<Symbol>>,
+        children: &[Tree<Symbol>],
         outer_scope: &HashMap<String, String>,
     ) -> String {
         if capture.declarations.len() > 0 {

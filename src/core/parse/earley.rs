@@ -230,24 +230,22 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
                     ),
                 })
             }
+        } else if scan.len() == 0 {
+            Err(parse::Error {
+                message: "No tokens scanned".to_string(),
+            })
+        } else if cursor - 1 == scan.len() {
+            Err(parse::Error {
+                message: format!("Recognition failed after consuming all tokens"),
+            })
         } else {
-            if scan.len() == 0 {
-                Err(parse::Error {
-                    message: "No tokens scanned".to_string(),
-                })
-            } else if cursor - 1 == scan.len() {
-                Err(parse::Error {
-                    message: format!("Recognition failed after consuming all tokens"),
-                })
-            } else {
-                Err(parse::Error {
-                    message: format!(
-                        "Recognition failed at token {}: {}",
-                        cursor,
-                        scan[cursor - 1].to_string()
-                    ),
-                })
-            }
+            Err(parse::Error {
+                message: format!(
+                    "Recognition failed at token {}: {}",
+                    cursor,
+                    scan[cursor - 1].to_string()
+                ),
+            })
         };
 
         fn parse_tree<'scope, Symbol: Data + Default>(

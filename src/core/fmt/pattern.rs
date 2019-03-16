@@ -332,7 +332,7 @@ impl fmt::Display for BuildError {
 }
 
 impl error::Error for BuildError {
-    fn cause(&self) -> Option<&error::Error> {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match *self {
             BuildError::ScanErr(ref err) => Some(err),
             BuildError::ParseErr(ref err) => Some(err),
