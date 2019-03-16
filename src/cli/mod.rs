@@ -142,7 +142,7 @@ fn fmt(matches: &ArgMatches) {
 
     let file_regex: Option<Regex> = match matches.value_of("matching") {
         None => None,
-        Some(regex) => match Regex::new(format!(r#"{}"#, regex).as_str()) {
+        Some(regex) => match Regex::new(regex) {
             Ok(fn_regex) => Some(fn_regex),
             Err(err) => {
                 logger::fatal(format!("Failed to build file name regex: {}", err));
@@ -282,7 +282,7 @@ fn format_target(
     }
 }
 
-fn track_file(file_path: &Path, spec_sha: &String) {
+fn track_file(file_path: &Path, spec_sha: &str) {
     let tracker_path_buf = tracker_for(file_path);
     let tracker_path = tracker_path_buf.as_path();
     let tracker_path_string = tracker_path.to_string_lossy().to_string();
@@ -303,7 +303,7 @@ fn track_file(file_path: &Path, spec_sha: &String) {
         Ok(mut tracker_file) => {
             let since_epoch = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
             let elapsed_millis = since_epoch.as_secs() * 1000 +
-                since_epoch.subsec_nanos() as u64 / 1_000_000;
+                u64::from(since_epoch.subsec_nanos()) / 1_000_000;
             let line = format!("{}\n{}\n", spec_sha, elapsed_millis);
 
             if let Err(err) = tracker_file.write_all(line.as_bytes()) {
@@ -315,7 +315,7 @@ fn track_file(file_path: &Path, spec_sha: &String) {
     }
 }
 
-fn needs_formatting(file_path: &Path, spec_sha: &String) -> bool {
+fn needs_formatting(file_path: &Path, spec_sha: &str) -> bool {
     if let Some(formatted_at) = formatted_at(file_path, spec_sha) {
         if let Some(modified_at) = modified_at(file_path) {
             let formatted_dur = formatted_at.duration_since(UNIX_EPOCH).unwrap();
@@ -348,7 +348,7 @@ fn modified_at(file_path: &Path) -> Option<SystemTime> {
     None
 }
 
-fn formatted_at(file_path: &Path, spec_sha: &String) -> Option<SystemTime> {
+fn formatted_at(file_path: &Path, spec_sha: &str) -> Option<SystemTime> {
     let tracker_path_buf = tracker_for(file_path);
     let tracker_path = tracker_path_buf.as_path();
     let tracker_path_string = tracker_path.to_string_lossy().to_string();

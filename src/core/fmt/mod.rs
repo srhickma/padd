@@ -101,12 +101,12 @@ impl<'parse, Symbol: Data + Default + 'parse> FormatJob<'parse, Symbol> {
     ) -> String {
         let mut res: String = String::new();
         for seg in &pattern.segments {
-            match seg {
-                &Segment::Filler(ref s) => res = format!("{}{}", res, s),
-                &Segment::Substitution(ref s) => if let Some(value) = scope.get(s) {
+            match *seg {
+                Segment::Filler(ref s) => res = format!("{}{}", res, s),
+                Segment::Substitution(ref s) => if let Some(value) = scope.get(s) {
                     res = format!("{}{}", res, value);
                 },
-                &Segment::Capture(ref c) => res = format!(
+                Segment::Capture(ref c) => res = format!(
                     "{}{}", res, self.evaluate_capture(c, children, scope)
                 ),
             };
@@ -120,17 +120,17 @@ impl<'parse, Symbol: Data + Default + 'parse> FormatJob<'parse, Symbol> {
         children: &[Tree<Symbol>],
         outer_scope: &HashMap<String, String>,
     ) -> String {
-        if capture.declarations.len() > 0 {
+        if !capture.declarations.is_empty() {
             let mut inner_scope = outer_scope.clone();
             for decl in &capture.declarations {
-                match &decl.value {
-                    &Some(ref pattern) => {
+                match decl.value {
+                    Some(ref pattern) => {
                         inner_scope.insert(
                             decl.key.clone(),
                             self.fill_pattern(pattern, children, outer_scope),
                         );
                     }
-                    &None => {
+                    None => {
                         inner_scope.remove(&decl.key);
                     }
                 }

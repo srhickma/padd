@@ -35,7 +35,7 @@ pub struct EncodedCDFABuilder<State: Eq + Hash + Clone + Debug, Symbol: Data + D
 impl<State: Eq + Hash + Clone + Debug, Symbol: Data + Default> EncodedCDFABuilder<State, Symbol> {
     fn encode(&mut self, val: &State) -> usize {
         if self.encoder.contains_key(val) {
-            *self.encoder.get(val).unwrap()
+            self.encoder[val]
         } else {
             let key = self.decoder.len();
             self.decoder.push(val.clone());
@@ -369,12 +369,7 @@ impl<Symbol: Default + Clone> CDFA<usize, Symbol> for EncodedCDFA<Symbol> {
     fn acceptor_destination(&self, state: &usize, from: &usize) -> Option<usize> {
         match self.accepting.get(state) {
             None => None,
-            Some(accd_mux) => {
-                match accd_mux.get_destination(*from) {
-                    None => None,
-                    Some(destination) => Some(destination.clone())
-                }
-            }
+            Some(accd_mux) => accd_mux.get_destination(*from)
         }
     }
 
@@ -424,7 +419,7 @@ impl TransitionTrie {
             while !curr.leaf() {
                 curr = match input.get(cursor) {
                     None => return TransitionResult::fail(),
-                    Some(c) => match curr.get_child(c) {
+                    Some(c) => match curr.get_child(*c) {
                         None => match self.default {
                             None => return TransitionResult::fail(),
                             Some(state) => return TransitionResult::direct(state)
@@ -444,14 +439,14 @@ impl TransitionTrie {
         TransitionTrie::insert_internal(c, &mut self.root, true, dest)
     }
 
-    fn insert_chain(&mut self, chars: &Vec<char>, dest: usize) -> Result<(), CDFAError> {
+    fn insert_chain(&mut self, chars: &[char], dest: usize) -> Result<(), CDFAError> {
         TransitionTrie::insert_chain_internal(0, &mut self.root, chars, dest)
     }
 
     fn insert_chain_internal(
         i: usize,
         node: &mut TransitionNode,
-        chars: &Vec<char>,
+        chars: &[char],
         dest: usize,
     ) -> Result<(), CDFAError> {
         if i == chars.len() {
@@ -460,7 +455,7 @@ impl TransitionTrie {
 
         let c = chars[i];
         TransitionTrie::insert_internal(c, node, i == chars.len() - 1, dest)?;
-        TransitionTrie::insert_chain_internal(i + 1, node.get_child_mut(&c).unwrap(), chars, dest)
+        TransitionTrie::insert_chain_internal(i + 1, node.get_child_mut(c).unwrap(), chars, dest)
     }
 
     fn insert_internal(
@@ -469,7 +464,7 @@ impl TransitionTrie {
         last: bool,
         dest: usize,
     ) -> Result<(), CDFAError> {
-        if !node.has_child(&c) {
+        if !node.has_child(c) {
             let child = TransitionNode {
                 children: HashMap::new(),
                 dest: if last { dest } else { usize::max_value() },
@@ -507,16 +502,16 @@ impl TransitionNode {
         self.children.is_empty()
     }
 
-    fn get_child(&self, c: &char) -> Option<&TransitionNode> {
-        self.children.get(c)
+    fn get_child(&self, c: char) -> Option<&TransitionNode> {
+        self.children.get(&c)
     }
 
-    fn get_child_mut(&mut self, c: &char) -> Option<&mut TransitionNode> {
-        self.children.get_mut(c)
+    fn get_child_mut(&mut self, c: char) -> Option<&mut TransitionNode> {
+        self.children.get_mut(&c)
     }
 
-    fn has_child(&self, c: &char) -> bool {
-        self.children.contains_key(c)
+    fn has_child(&self, c: char) -> bool {
+        self.children.contains_key(&c)
     }
 
     fn add_child(&mut self, c: char, child: TransitionNode) {
@@ -549,7 +544,7 @@ impl AcceptorDestinationMux {
             )));
         }
 
-        if !self.mux.is_some() {
+        if self.mux.is_none() {
             let mut mux = HashMap::new();
             mux.insert(from_encoded, dest_encoded);
             self.mux = Some(mux);
@@ -591,7 +586,7 @@ impl AcceptorDestinationMux {
         } else if let Some(ref mux) = self.mux {
             match mux.get(&from_encoded) {
                 None => None,
-                Some(dest) => Some(dest.clone())
+                Some(dest) => Some(*dest)
             }
         } else {
             None

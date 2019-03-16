@@ -112,7 +112,7 @@ impl WorkerMux {
                     Signal::TERM => break,
                     Signal::JOB(payload) => {
                         let worker_id = idle_workers.pop_back().unwrap();
-                        workers.get(worker_id).unwrap().run_job(payload);
+                        workers[worker_id].run_job(payload);
                     }
                 }
             }

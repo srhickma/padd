@@ -156,7 +156,7 @@ fn generate_cdfa_targets<'tree>(
 
 fn generate_cdfa_trans<CDFABuilderType, CDFAType>(
     trans_node: &Tree<Symbol>,
-    sources: &Vec<&State>,
+    sources: &[&State],
     builder: &mut CDFABuilderType,
 ) -> Result<(), spec::GenError> where
     CDFAType: CDFA<usize, String>,
@@ -203,7 +203,7 @@ fn generate_cdfa_trans<CDFABuilderType, CDFAType>(
 
 fn generate_cdfa_mtcs<CDFABuilderType, CDFAType>(
     mtcs_node: &Tree<Symbol>,
-    sources: &Vec<&State>,
+    sources: &[&State],
     dest: &State,
     builder: &mut CDFABuilderType,
 ) -> Result<(), spec::GenError> where
@@ -322,7 +322,7 @@ fn generate_grammar_prods(
 
 fn generate_grammar_rhss(
     rhss_node: &Tree<Symbol>,
-    lhs: &String,
+    lhs: &str,
     def_pattern_node: &Tree<Symbol>,
     grammar_builder: &mut GrammarBuilder<String>,
     formatter_builder: &mut FormatterBuilder,
@@ -333,11 +333,11 @@ fn generate_grammar_rhss(
     generate_grammar_ids(rhs_node.get_child(1), &mut ids, grammar_builder);
 
     let production = Production {
-        lhs: lhs.clone(),
+        lhs: lhs.to_string(),
         rhs: ids,
     };
 
-    grammar_builder.try_mark_start(lhs);
+    grammar_builder.try_mark_start(&production.lhs);
     grammar_builder.add_production(production.clone());
 
     let mut pattopt_node = rhs_node.get_child(2);

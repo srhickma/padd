@@ -43,7 +43,7 @@ pub struct FormatJobRunner {
 }
 
 impl FormatJobRunner {
-    pub fn build(spec: &String) -> Result<FormatJobRunner, BuildError> {
+    pub fn build(spec: &str) -> Result<FormatJobRunner, BuildError> {
         let parse = spec::parse_spec(spec)?;
         let (cdfa, grammar, formatter) = spec::generate_spec(&parse)?;
         Ok(FormatJobRunner {
