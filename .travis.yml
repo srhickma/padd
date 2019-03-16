@@ -12,9 +12,12 @@ notifications:
     on_success: never
     on_failure: always
 
+before_script:
+- rustup component add clippy
 script:
 - cargo clean
 - cargo build
+- cargo clippy -- -D warnings
 - cargo test
 
 env:
