@@ -156,7 +156,9 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
                     next: 0,
                 };
 
-                if !chart.row(cursor).contains(&new_item) {
+                if symbol != grammar.start() {
+                    items_to_add.push(new_item);
+                } else if !chart.row(cursor).contains(&new_item) {
                     items_to_add.push(new_item);
                 }
             }
