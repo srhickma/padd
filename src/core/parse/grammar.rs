@@ -16,10 +16,6 @@ pub struct Grammar<Symbol: Data + Default> {
 }
 
 impl<Symbol: Data + Default> Grammar<Symbol> {
-    pub fn is_nullable(&self, prod: &Production<Symbol>) -> bool {
-        self.nss.contains(&prod.lhs)
-    }
-
     pub fn is_nullable_nt(&self, lhs: &Symbol) -> bool {
         self.nss.contains(lhs)
     }

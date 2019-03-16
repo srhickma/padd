@@ -9,7 +9,8 @@ use {
             Tree,
         },
         scan::Token,
-    }
+    },
+    std::collections::HashSet,
 };
 
 pub struct EarleyParser;
@@ -76,13 +77,29 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
             chart: &'inner mut RChart<'grammar, Symbol>,
         ) {
             let cursor = chart.len() - 1;
+            let mut symbols: HashSet<Symbol> = HashSet::new();
 
             let mut i = 0;
             while i < chart.row(cursor).incomplete().len() {
                 let item = chart.row(cursor).incomplete().item(i).clone();
-                if let Some(symbol) = (&item).next_symbol() {
-                    if !grammar.is_terminal(symbol) {
-                        predict_op(&item, cursor, symbol, grammar, chart);
+                let symbol = (&item).next_symbol().unwrap();
+
+                if !grammar.is_terminal(symbol) {
+                    if grammar.is_nullable_nt(symbol) {
+                        let new_item = Item {
+                            rule: item.rule,
+                            start: item.start,
+                            next: item.next + 1,
+                        };
+
+                        if !chart.row(cursor).contains(&new_item) {
+                            chart.row_mut(cursor).unsafe_append(new_item);
+                        }
+                    }
+
+                    if !symbols.contains(symbol) {
+                        predict_op(cursor, symbol, grammar, chart);
+                        symbols.insert(symbol.clone());
                     }
                 }
                 i += 1;
@@ -125,45 +142,27 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
         }
 
         fn predict_op<'inner, 'grammar, Symbol: Data + Default>(
-            item: &Item<'grammar, Symbol>,
-            i: usize,
-            symbol: &'grammar Symbol,
+            cursor: usize,
+            symbol: &Symbol,
             grammar: &'grammar Grammar<Symbol>,
             chart: &'inner mut RChart<'grammar, Symbol>,
         ) {
-            let mut nullable_found = false;
             let mut items_to_add = Vec::new();
 
             for prod in grammar.productions_for_lhs(symbol).unwrap() {
                 let new_item = Item {
                     rule: prod,
-                    start: i,
+                    start: cursor,
                     next: 0,
                 };
 
-                if !chart.row(i).contains(&new_item) {
+                if symbol != grammar.start() || !chart.row(cursor).contains(&new_item) {
                     items_to_add.push(new_item);
-                }
-
-                if !nullable_found && grammar.is_nullable(&prod) {
-                    nullable_found = true;
                 }
             }
 
             for new_item in items_to_add {
-                chart.row_mut(i).unsafe_append(new_item);
-            }
-
-            if nullable_found {
-                let new_item = Item {
-                    rule: item.rule,
-                    start: item.start,
-                    next: item.next + 1,
-                };
-
-                if !chart.row(i).contains(&new_item) {
-                    chart.row_mut(i).unsafe_append(new_item);
-                }
+                chart.row_mut(cursor).unsafe_append(new_item);
             }
         }
 
