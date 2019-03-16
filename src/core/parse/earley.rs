@@ -9,7 +9,8 @@ use {
             Tree,
         },
         scan::Token,
-    }
+    },
+    std::collections::HashSet,
 };
 
 pub struct EarleyParser;
@@ -76,6 +77,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
             chart: &'inner mut RChart<'grammar, Symbol>,
         ) {
             let cursor = chart.len() - 1;
+            let mut symbols: HashSet<Symbol> = HashSet::new();
 
             let mut i = 0;
             while i < chart.row(cursor).incomplete().len() {
@@ -95,7 +97,10 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
                         }
                     }
 
-                    predict_op(cursor, symbol, grammar, chart);
+                    if !symbols.contains(symbol) {
+                        predict_op(cursor, symbol, grammar, chart);
+                        symbols.insert(symbol.clone());
+                    }
                 }
                 i += 1;
             }
@@ -138,7 +143,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
 
         fn predict_op<'inner, 'grammar, Symbol: Data + Default>(
             cursor: usize,
-            symbol: &'grammar Symbol,
+            symbol: &Symbol,
             grammar: &'grammar Grammar<Symbol>,
             chart: &'inner mut RChart<'grammar, Symbol>,
         ) {
