@@ -113,8 +113,8 @@ impl<State: Data, Symbol: Data> Scanner<State, Symbol> for MaximalMunchScanner {
                     if !remaining.is_empty() {
                         let sequence: String = (0..FAIL_SEQUENCE_LENGTH)
                             .map(|i| remaining.get(i))
-                            .filter(|opt| opt.is_some())
-                            .map(|opt| opt.unwrap())
+                            .filter(Option::is_some)
+                            .map(Option::unwrap)
                             .collect();
 
                         return Err(scan::Error {
