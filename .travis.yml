@@ -17,7 +17,9 @@ before_script:
 script:
 - cargo clean
 - cargo build
-- cargo clippy -- -D warnings
+- if [[ "$TRAVIS_RUST_VERSION" == stable ]];
+    then cargo clippy -- -D warnings
+  fi
 - cargo test
 
 env:
