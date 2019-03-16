@@ -15,7 +15,7 @@ use {
         str::FromStr,
         sync::{
             Arc,
-            atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering},
+            atomic::{AtomicUsize, Ordering},
         },
         time::{Duration, SystemTime, UNIX_EPOCH},
     },
@@ -38,9 +38,9 @@ mod thread_pool;
 const TRACKER_DIR: &str = ".padd";
 const TRACKER_EXTENSION: &str = ".trk";
 
-static FORMATTED: AtomicUsize = ATOMIC_USIZE_INIT;
-static FAILED: AtomicUsize = ATOMIC_USIZE_INIT;
-static TOTAL: AtomicUsize = ATOMIC_USIZE_INIT;
+static FORMATTED: AtomicUsize = AtomicUsize::new(0);
+static FAILED: AtomicUsize = AtomicUsize::new(0);
+static TOTAL: AtomicUsize = AtomicUsize::new(0);
 
 pub fn run() {
     let matches = build_app();
