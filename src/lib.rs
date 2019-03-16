@@ -2,6 +2,9 @@
 extern crate lazy_static;
 extern crate stopwatch;
 
+#[cfg(pcf_profile)]
+use stopwatch::Stopwatch;
+
 use {
     core::{
         fmt::Formatter,
@@ -56,10 +59,32 @@ impl FormatJobRunner {
     }
 
     pub fn format(&self, job: FormatJob) -> Result<String, FormatError> {
+        #[cfg(pcf_profile)]
+        let mut sw = Stopwatch::start_new();
+
         let chars: Vec<char> = job.text.chars().collect();
 
         let tokens = self.scanner.scan(&chars[..], &self.cdfa)?;
+
+        #[cfg(pcf_profile)] {
+            println!("Scanning took: {} ms", sw.elapsed_ms());
+            sw.restart();
+        }
+
         let parse = self.parser.parse(tokens, &self.grammar)?;
+
+        #[cfg(pcf_profile)] {
+            println!("Parsing took: {} ms", sw.elapsed_ms());
+            sw.restart();
+        }
+
+        #[cfg(pcf_profile)] {
+            let result = self.formatter.format(&parse);
+            println!("Formatting took: {} ms", sw.elapsed_ms());
+            return Ok(result);
+        }
+
+        #[cfg(not(pcf_profile))]
         Ok(self.formatter.format(&parse))
     }
 }
