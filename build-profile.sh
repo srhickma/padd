@@ -1,2 +1,2 @@
 #!/bin/bash
-RUSTFLAGS="--cfg pcf_profile" cargo build --release
+RUSTFLAGS="--cfg pcf_profile" cargo +nightly build --release

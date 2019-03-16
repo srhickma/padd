@@ -12,6 +12,11 @@ use {
     },
     std::collections::HashSet,
 };
+#[cfg(pcf_profile)]
+use {
+    std::time::Duration,
+    stopwatch::Stopwatch,
+};
 
 pub struct EarleyParser;
 
@@ -21,6 +26,9 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
         scan: Vec<Token<Symbol>>,
         grammar: &Grammar<Symbol>,
     ) -> Result<Tree<Symbol>, parse::Error> {
+        #[cfg(pcf_profile)]
+        let mut sw = Stopwatch::start_new();
+
         let mut chart: RChart<Symbol> = RChart::new();
         let mut parse_chart: PChart<Symbol> = PChart::new();
 
@@ -33,14 +41,63 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
                 });
             });
 
+        #[cfg(pcf_profile)] {
+            println!("[PARSER] initialization took: {} ms", sw.elapsed_ms());
+            sw.restart();
+        }
+
+        #[cfg(pcf_profile)]
+        let mut completion_time = Duration::from_millis(0);
+        #[cfg(pcf_profile)]
+        let mut prediction_time = Duration::from_millis(0);
+        #[cfg(pcf_profile)]
+        let mut parse_mark_time = Duration::from_millis(0);
+        #[cfg(pcf_profile)]
+        let mut scan_time = Duration::from_millis(0);
+
         let mut cursor = 0;
         while cursor < chart.len() {
+            #[cfg(pcf_profile)]
+            let mut inner_sw = Stopwatch::start_new();
+
             complete_full(cursor, grammar, &mut chart);
+
+            #[cfg(pcf_profile)] {
+                completion_time += inner_sw.elapsed();
+                inner_sw.restart();
+            }
+
             predict_full(grammar, &mut chart);
+
+            #[cfg(pcf_profile)] {
+                prediction_time += inner_sw.elapsed();
+                inner_sw.restart();
+            }
+
             parse_mark_full(cursor, &chart, &mut parse_chart);
+
+            #[cfg(pcf_profile)] {
+                parse_mark_time += inner_sw.elapsed();
+                inner_sw.restart();
+            }
+
             scan_full(cursor, &scan, grammar, &mut chart, &mut parse_chart);
 
+            #[cfg(pcf_profile)] {
+                scan_time += inner_sw.elapsed();
+                inner_sw.restart();
+            }
+
             cursor += 1;
+        }
+
+        #[cfg(pcf_profile)] {
+            println!("[PARSER] total completion took: {} ms", completion_time.as_millis());
+            println!("[PARSER] total prediction took: {} ms", prediction_time.as_millis());
+            println!("[PARSER] total parse_mark took: {} ms", parse_mark_time.as_millis());
+            println!("[PARSER] total scan took: {} ms", scan_time.as_millis());
+            println!("[PARSER] recognition took: {} ms", sw.elapsed_ms());
+            sw.restart();
         }
 
         fn complete_full<'inner, 'grammar: 'inner, Symbol: Data + Default>(
@@ -219,7 +276,14 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
 
         return if recognized(grammar, &chart) {
             if cursor - 1 == scan.len() {
-                Ok(parse_tree(grammar, &scan, parse_chart))
+                #[cfg(pcf_profile)] {
+                    let result = parse_tree(grammar, &scan, parse_chart);
+                    println!("[PARSER] tree construction took: {} ms", sw.elapsed_ms());
+                    return Ok(result);
+                }
+
+                #[cfg(not(pcf_profile))]
+                    Ok(parse_tree(grammar, &scan, parse_chart))
             } else {
                 Err(parse::Error {
                     message: format!(

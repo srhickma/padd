@@ -67,20 +67,20 @@ impl FormatJobRunner {
         let tokens = self.scanner.scan(&chars[..], &self.cdfa)?;
 
         #[cfg(pcf_profile)] {
-            println!("Scanning took: {} ms", sw.elapsed_ms());
+            println!("[SCANNER] Scanning took: {} ms", sw.elapsed_ms());
             sw.restart();
         }
 
         let parse = self.parser.parse(tokens, &self.grammar)?;
 
         #[cfg(pcf_profile)] {
-            println!("Parsing took: {} ms", sw.elapsed_ms());
+            println!("[PARSER] Parsing took: {} ms", sw.elapsed_ms());
             sw.restart();
         }
 
         #[cfg(pcf_profile)] {
             let result = self.formatter.format(&parse);
-            println!("Formatting took: {} ms", sw.elapsed_ms());
+            println!("[FORMATTER] Formatting took: {} ms", sw.elapsed_ms());
             return Ok(result);
         }
 
