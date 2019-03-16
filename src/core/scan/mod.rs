@@ -204,3 +204,4 @@ impl error::Error for Error {
 }
 
 pub type State = String;
+pub type Kind = String;

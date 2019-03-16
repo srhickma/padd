@@ -140,13 +140,9 @@ CDFABuilder<State, Symbol, EncodedCDFA<Symbol>> for EncodedCDFABuilder<State, Sy
         let from_encoded = self.encode(from);
         let to_encoded = self.encode(to);
 
-        if !self.accepting.contains_key(&state_encoded) {
-            let mut accd_mux = AcceptorDestinationMux::new();
-            accd_mux.add_from(state, to_encoded, from_encoded)?;
-            self.accepting.insert(state_encoded, accd_mux);
-        } else if let Some(ref mut accd_mux) = self.accepting.get_mut(&state_encoded) {
-            accd_mux.add_from(state, to_encoded, from_encoded)?;
-        }
+        self.accepting.entry(state_encoded)
+            .or_insert_with(AcceptorDestinationMux::new)
+            .add_from(state, to_encoded, from_encoded)?;
 
         Ok(self)
     }
@@ -159,13 +155,9 @@ CDFABuilder<State, Symbol, EncodedCDFA<Symbol>> for EncodedCDFABuilder<State, Sy
         let state_encoded = self.encode(state);
         let to_encoded = self.encode(to);
 
-        if !self.accepting.contains_key(&state_encoded) {
-            let mut accd_mux = AcceptorDestinationMux::new();
-            accd_mux.add_from_all(state, to_encoded)?;
-            self.accepting.insert(state_encoded, accd_mux);
-        } else if let Some(ref mut accd_mux) = self.accepting.get_mut(&state_encoded) {
-            accd_mux.add_from_all(state, to_encoded)?;
-        }
+        self.accepting.entry(state_encoded)
+            .or_insert_with(AcceptorDestinationMux::new)
+            .add_from_all(state, to_encoded)?;
 
         Ok(self)
     }
