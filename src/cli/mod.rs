@@ -98,6 +98,10 @@ fn build_app<'a>() -> ArgMatches<'a> {
                 .long("no-track")
                 .help("Do not track file changes")
             )
+            .arg(Arg::with_name("no-write")
+                .long("no-write")
+                .help("Do not write changes to files")
+            )
         )
         .subcommand(SubCommand::with_name("forget")
             .about("Clears all file tracking data")
@@ -171,6 +175,7 @@ fn fmt(matches: &ArgMatches) {
 
     let no_skip = matches.is_present("no-skip");
     let no_track = matches.is_present("no-track");
+    let no_write = matches.is_present("no-write");
 
     println!();
 
@@ -181,7 +186,7 @@ fn fmt(matches: &ArgMatches) {
         thread_count * 2,
         |payload: FormatPayload| {
             let file_path = payload.file_path.as_path();
-            format_file(file_path, &payload.fjr_arc);
+            format_file(file_path, &payload.fjr_arc, payload.no_write);
 
             if !payload.no_track {
                 track_file(file_path, &payload.spec_sha);
@@ -201,6 +206,7 @@ fn fmt(matches: &ArgMatches) {
                 spec_sha: &spec_sha,
                 no_skip,
                 no_track,
+                no_write,
                 fjr_arc: &fjr_arc,
                 pool: &pool,
             };
@@ -270,6 +276,7 @@ fn format_target(
                 file_path: PathBuf::from(target_path),
                 spec_sha: criteria.spec_sha.clone(),
                 no_track: criteria.no_track,
+                no_write: criteria.no_write,
             }).unwrap();
         }
     }
@@ -411,19 +418,19 @@ fn term_loop(fjr_arc: &Arc<FormatJobRunner>) {
 
         target_path.pop();
 
-        format_file(&Path::new(&target_path), &fjr_arc);
+        format_file(&Path::new(&target_path), &fjr_arc, false);
     }
 }
 
-fn format_file(target_path: &Path, fjr: &FormatJobRunner) {
-    if format_file_internal(target_path, fjr) {
+fn format_file(target_path: &Path, fjr: &FormatJobRunner, no_write: bool) {
+    if format_file_internal(target_path, fjr, no_write) {
         FORMATTED.fetch_add(1, Ordering::SeqCst);
     } else {
         FAILED.fetch_add(1, Ordering::SeqCst);
     }
 }
 
-fn format_file_internal(target_path: &Path, fjr: &FormatJobRunner) -> bool {
+fn format_file_internal(target_path: &Path, fjr: &FormatJobRunner, no_write: bool) -> bool {
     logger::fmt(target_path.to_string_lossy().to_string());
     let target_file = OpenOptions::new().read(true).write(true).open(&target_path);
     let target_path_string = target_path.to_string_lossy().to_string();
@@ -445,6 +452,11 @@ fn format_file_internal(target_path: &Path, fjr: &FormatJobRunner) -> bool {
 
             match result {
                 Ok(res) => {
+                    if no_write {
+                        logger::fmt_ok(target_path_string);
+                        return true;
+                    }
+
                     if let Err(err) = target.seek(SeekFrom::Start(0)) {
                         logger::fmt_err(format!(
                             "Could not seek to start of target file \"{}\": {}",
@@ -522,6 +534,7 @@ struct FormatPayload {
     file_path: PathBuf,
     spec_sha: String,
     no_track: bool,
+    no_write: bool,
 }
 
 struct TargetSearchCriteria<'outer> {
@@ -529,6 +542,7 @@ struct TargetSearchCriteria<'outer> {
     spec_sha: &'outer String,
     no_skip: bool,
     no_track: bool,
+    no_write: bool,
     fjr_arc: &'outer Arc<FormatJobRunner>,
     pool: &'outer ThreadPool<FormatPayload>,
 }
