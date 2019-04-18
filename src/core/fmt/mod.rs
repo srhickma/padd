@@ -72,6 +72,7 @@ impl<'parse, Symbol: Data + Default + 'parse> FormatJob<'parse, Symbol> {
         self.recur(self.parse, &HashMap::new())
     }
 
+    #[inline(always)]
     fn recur(&self, node: &Tree<Symbol>, scope: &HashMap<String, String>) -> String {
         if node.is_leaf() {
             if node.is_null() {
@@ -93,6 +94,7 @@ impl<'parse, Symbol: Data + Default + 'parse> FormatJob<'parse, Symbol> {
         }
     }
 
+    #[inline(always)]
     fn fill_pattern(
         &self,
         pattern: &Pattern,
@@ -114,6 +116,7 @@ impl<'parse, Symbol: Data + Default + 'parse> FormatJob<'parse, Symbol> {
         res
     }
 
+    #[inline(always)]
     fn evaluate_capture(
         &self,
         capture: &Capture,
