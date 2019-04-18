@@ -70,7 +70,7 @@ fn test_java8_inline() {
 
 #[test]
 fn test_java8_stress() {
-    test_fjr("stress.java", "java8");
+    test_fjr("java8_stress", "java8");
 }
 
 fn test_fjr(case_name: &str, spec_name: &str) {
