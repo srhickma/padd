@@ -329,8 +329,13 @@ grammar {
         | expr;
     long_argument_list
         | inline_argument_list COMMA expr COMMA expr `{}{}\n[prefix]{}{}\n[prefix]{}`;
-    inline_argument_list
-        | inline_argument_list COMMA expr `{}{}\n[prefix]{}`
+    inline_argument_list #TODO replace with inline list
+        | inline_argument_list COMMA inline_argument COMMA inline_argument COMMA inline_argument COMMA inline_argument
+        | inline_argument COMMA inline_argument COMMA inline_argument COMMA inline_argument
+        | inline_argument COMMA inline_argument COMMA inline_argument
+        | inline_argument COMMA inline_argument
+        | inline_argument;
+    inline_argument
         | expr `\n[prefix]{}`;
 
     field_dec
