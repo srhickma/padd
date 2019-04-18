@@ -68,6 +68,11 @@ fn test_java8_inline() {
     test_fjr("java8_inline", "java8");
 }
 
+#[test]
+fn test_java8_stress() {
+    test_fjr("stress.java", "java8");
+}
+
 fn test_fjr(case_name: &str, spec_name: &str) {
     //setup
     let fjr = FormatJobRunner::build(&load_spec(spec_name)).unwrap();
