@@ -1,7 +1,4 @@
-use std::{
-    fmt,
-    hash::Hash,
-};
+use std::{fmt, hash::Hash};
 
 pub mod map;
 

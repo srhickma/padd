@@ -4,13 +4,12 @@ use {
         parse::{
             self,
             grammar::{Grammar, GrammarBuilder},
-            Production,
-            Tree,
+            Production, Tree,
         },
         scan::{
             self,
-            CDFABuilder,
             ecdfa::{EncodedCDFA, EncodedCDFABuilder},
+            CDFABuilder,
         },
         util::string_utils,
     },
@@ -44,10 +43,12 @@ thread_local! {
 fn build_pattern_ecdfa() -> Result<EncodedCDFA<Symbol>, scan::CDFAError> {
     let mut builder: EncodedCDFABuilder<S, Symbol> = EncodedCDFABuilder::new();
 
-    builder.set_alphabet(PATTERN_ALPHABET.chars())
+    builder
+        .set_alphabet(PATTERN_ALPHABET.chars())
         .mark_start(&S::Start);
 
-    builder.state(&S::Start)
+    builder
+        .state(&S::Start)
         .mark_trans(&S::LeftBrace, '{')?
         .mark_trans(&S::RightBrace, '}')?
         .mark_trans(&S::LeftBracket, '[')?
@@ -60,7 +61,8 @@ fn build_pattern_ecdfa() -> Result<EncodedCDFA<Symbol>, scan::CDFAError> {
         .mark_range(&S::Alpha, 'a', 'Z')?
         .default_to(&S::Filler)?;
 
-    builder.state(&S::Filler)
+    builder
+        .state(&S::Filler)
         .mark_trans(&S::Escape, '\\')?
         .mark_trans(&S::Fail, '{')?
         .mark_trans(&S::Fail, '}')?
@@ -73,12 +75,14 @@ fn build_pattern_ecdfa() -> Result<EncodedCDFA<Symbol>, scan::CDFAError> {
 
     builder.default_to(&S::Escape, &S::Filler)?;
 
-    builder.state(&S::Number)
+    builder
+        .state(&S::Number)
         .mark_range(&S::Number, '0', '9')?
         .accept()
         .tokenize(&Symbol::TNumber);
 
-    builder.state(&S::Alpha)
+    builder
+        .state(&S::Alpha)
         .mark_range(&S::Alpha, 'a', 'Z')?
         .accept()
         .tokenize(&Symbol::TAlpha);
@@ -129,7 +133,9 @@ pub enum Symbol {
 }
 
 impl Default for Symbol {
-    fn default() -> Symbol { Symbol::Pattern }
+    fn default() -> Symbol {
+        Symbol::Pattern
+    }
 }
 
 impl Data for Symbol {
@@ -155,23 +161,34 @@ fn build_pattern_grammar() -> Grammar<Symbol> {
         Production::from(Symbol::Filler, vec![Symbol::TFiller]),
         Production::from(Symbol::Filler, vec![Symbol::TAlpha]),
         Production::from(Symbol::Filler, vec![Symbol::TNumber]),
-        Production::from(Symbol::Substitution, vec![
-            Symbol::TLeftBracket, Symbol::TAlpha, Symbol::TRightBracket
-        ]),
-        Production::from(Symbol::Capture, vec![
-            Symbol::TLeftBrace, Symbol::CaptureDescriptor, Symbol::TRightBrace
-        ]),
+        Production::from(
+            Symbol::Substitution,
+            vec![Symbol::TLeftBracket, Symbol::TAlpha, Symbol::TRightBracket],
+        ),
+        Production::from(
+            Symbol::Capture,
+            vec![
+                Symbol::TLeftBrace,
+                Symbol::CaptureDescriptor,
+                Symbol::TRightBrace,
+            ],
+        ),
         Production::from(Symbol::CaptureDescriptor, vec![Symbol::CaptureIndex]),
-        Production::from(Symbol::CaptureDescriptor, vec![
-            Symbol::CaptureIndex, Symbol::TSemi, Symbol::Declarations
-        ]),
+        Production::from(
+            Symbol::CaptureDescriptor,
+            vec![Symbol::CaptureIndex, Symbol::TSemi, Symbol::Declarations],
+        ),
         Production::from(Symbol::CaptureIndex, vec![Symbol::TNumber]),
         Production::epsilon(Symbol::CaptureIndex),
-        Production::from(Symbol::Declarations, vec![
-            Symbol::Declarations, Symbol::TSemi, Symbol::Declaration
-        ]),
+        Production::from(
+            Symbol::Declarations,
+            vec![Symbol::Declarations, Symbol::TSemi, Symbol::Declaration],
+        ),
         Production::from(Symbol::Declarations, vec![Symbol::Declaration]),
-        Production::from(Symbol::Declaration, vec![Symbol::TAlpha, Symbol::TEquals, Symbol::Value]),
+        Production::from(
+            Symbol::Declaration,
+            vec![Symbol::TAlpha, Symbol::TEquals, Symbol::Value],
+        ),
         Production::from(Symbol::Value, vec![Symbol::Pattern]),
         Production::epsilon(Symbol::Value),
     ];
@@ -239,7 +256,9 @@ fn generate_pattern_recursive<'scope, SpecSymbol: Data + Default>(
             accumulator.push(Segment::Filler(name));
         }
         Symbol::Substitution => {
-            accumulator.push(Segment::Substitution(node.get_child(1).lhs.lexeme().clone()));
+            accumulator.push(Segment::Substitution(
+                node.get_child(1).lhs.lexeme().clone(),
+            ));
         }
         Symbol::CaptureDescriptor => {
             let mut declarations: Vec<Declaration> = Vec::new();
@@ -251,7 +270,12 @@ fn generate_pattern_recursive<'scope, SpecSymbol: Data + Default>(
             let child_index = if cap_index.is_empty() {
                 captures
             } else {
-                cap_index.get_child(0).lhs.lexeme().parse::<usize>().unwrap()
+                cap_index
+                    .get_child(0)
+                    .lhs
+                    .lexeme()
+                    .parse::<usize>()
+                    .unwrap()
             };
 
             if child_index >= prod.rhs.len() {
@@ -263,7 +287,10 @@ fn generate_pattern_recursive<'scope, SpecSymbol: Data + Default>(
                 )));
             }
 
-            accumulator.push(Segment::Capture(Capture { child_index, declarations }));
+            accumulator.push(Segment::Capture(Capture {
+                child_index,
+                declarations,
+            }));
             return Ok(captures + 1);
         }
         _ => {
@@ -326,7 +353,7 @@ impl fmt::Display for BuildError {
         match *self {
             BuildError::ScanErr(ref err) => write!(f, "Pattern scan error: {}", err),
             BuildError::ParseErr(ref err) => write!(f, "Pattern parse error: {}", err),
-            BuildError::CaptureErr(ref err) => write!(f, "Pattern capture error: {}", err)
+            BuildError::CaptureErr(ref err) => write!(f, "Pattern capture error: {}", err),
         }
     }
 }
@@ -336,7 +363,7 @@ impl error::Error for BuildError {
         match *self {
             BuildError::ScanErr(ref err) => Some(err),
             BuildError::ParseErr(ref err) => Some(err),
-            BuildError::CaptureErr(_) => None
+            BuildError::CaptureErr(_) => None,
         }
     }
 }
@@ -461,7 +488,11 @@ mod tests {
         let prod = Production {
             lhs: Symbol::Pattern,
             rhs: vec![
-                Symbol::Pattern, Symbol::Pattern, Symbol::Pattern, Symbol::Pattern, Symbol::Pattern
+                Symbol::Pattern,
+                Symbol::Pattern,
+                Symbol::Pattern,
+                Symbol::Pattern,
+                Symbol::Pattern,
             ],
         };
 
@@ -519,7 +550,11 @@ mod tests {
         let prod = Production {
             lhs: Symbol::Pattern,
             rhs: vec![
-                Symbol::Pattern, Symbol::Pattern, Symbol::Pattern, Symbol::Pattern, Symbol::Pattern
+                Symbol::Pattern,
+                Symbol::Pattern,
+                Symbol::Pattern,
+                Symbol::Pattern,
+                Symbol::Pattern,
             ],
         };
 
@@ -724,7 +759,7 @@ mod tests {
         assert_eq!(
             format!("{}", res.err().unwrap()),
             "Pattern capture error: \
-            Capture index 1 out of bounds for production 'Pattern TSemi' with 1 children"
+             Capture index 1 out of bounds for production 'Pattern TSemi' with 1 children"
         );
     }
 }

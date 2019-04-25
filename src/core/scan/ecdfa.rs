@@ -1,23 +1,12 @@
 use {
     core::{
         data::{
-            Data,
             map::{CEHashMap, CEHashMapIterator},
+            Data,
         },
-        scan::{
-            alphabet::HashedAlphabet,
-            CDFA,
-            CDFABuilder,
-            CDFAError,
-            TransitionResult,
-        },
+        scan::{alphabet::HashedAlphabet, CDFABuilder, CDFAError, TransitionResult, CDFA},
     },
-    std::{
-        collections::HashMap,
-        fmt::Debug,
-        hash::Hash,
-        usize,
-    },
+    std::{collections::HashMap, fmt::Debug, hash::Hash, usize},
 };
 
 pub struct EncodedCDFABuilder<State: Eq + Hash + Clone + Debug, Symbol: Data + Default> {
@@ -54,7 +43,8 @@ impl<State: Eq + Hash + Clone + Debug, Symbol: Data + Default> EncodedCDFABuilde
     fn get_alphabet_range(&self, start: char, end: char) -> Vec<char> {
         let mut in_range = false;
 
-        self.alphabet_str.chars()
+        self.alphabet_str
+            .chars()
             .filter(|c| {
                 if *c == start {
                     in_range = true;
@@ -80,7 +70,8 @@ impl<State: Eq + Hash + Clone + Debug, Symbol: Data + Default> EncodedCDFABuilde
 }
 
 impl<State: Eq + Hash + Clone + Debug, Symbol: Data + Default>
-CDFABuilder<State, Symbol, EncodedCDFA<Symbol>> for EncodedCDFABuilder<State, Symbol> {
+    CDFABuilder<State, Symbol, EncodedCDFA<Symbol>> for EncodedCDFABuilder<State, Symbol>
+{
     fn new() -> Self {
         EncodedCDFABuilder {
             encoder: HashMap::new(),
@@ -111,7 +102,7 @@ CDFABuilder<State, Symbol, EncodedCDFA<Symbol>> for EncodedCDFABuilder<State, Sy
         }
     }
 
-    fn set_alphabet(&mut self, chars: impl Iterator<Item=char>) -> &mut Self {
+    fn set_alphabet(&mut self, chars: impl Iterator<Item = char>) -> &mut Self {
         chars.for_each(|c| {
             self.alphabet_str.push(c);
             self.alphabet.insert(c);
@@ -126,7 +117,8 @@ CDFABuilder<State, Symbol, EncodedCDFA<Symbol>> for EncodedCDFABuilder<State, Sy
             return self;
         }
 
-        self.accepting.insert(state_encoded, AcceptorDestinationMux::new());
+        self.accepting
+            .insert(state_encoded, AcceptorDestinationMux::new());
         self
     }
 
@@ -140,22 +132,20 @@ CDFABuilder<State, Symbol, EncodedCDFA<Symbol>> for EncodedCDFABuilder<State, Sy
         let from_encoded = self.encode(from);
         let to_encoded = self.encode(to);
 
-        self.accepting.entry(state_encoded)
+        self.accepting
+            .entry(state_encoded)
             .or_insert_with(AcceptorDestinationMux::new)
             .add_from(state, to_encoded, from_encoded)?;
 
         Ok(self)
     }
 
-    fn accept_to_from_all(
-        &mut self,
-        state: &State,
-        to: &State,
-    ) -> Result<&mut Self, CDFAError> {
+    fn accept_to_from_all(&mut self, state: &State, to: &State) -> Result<&mut Self, CDFAError> {
         let state_encoded = self.encode(state);
         let to_encoded = self.encode(to);
 
-        self.accepting.entry(state_encoded)
+        self.accepting
+            .entry(state_encoded)
             .or_insert_with(AcceptorDestinationMux::new)
             .add_from_all(state, to_encoded)?;
 
@@ -169,12 +159,7 @@ CDFABuilder<State, Symbol, EncodedCDFA<Symbol>> for EncodedCDFABuilder<State, Sy
         self
     }
 
-    fn mark_trans(
-        &mut self,
-        from: &State,
-        to: &State,
-        on: char,
-    ) -> Result<&mut Self, CDFAError> {
+    fn mark_trans(&mut self, from: &State, to: &State, on: char) -> Result<&mut Self, CDFAError> {
         let from_encoded = self.encode(from);
         let to_encoded = self.encode(to);
 
@@ -190,7 +175,7 @@ CDFABuilder<State, Symbol, EncodedCDFA<Symbol>> for EncodedCDFABuilder<State, Sy
         &mut self,
         from: &State,
         to: &State,
-        on: impl Iterator<Item=char>,
+        on: impl Iterator<Item = char>,
     ) -> Result<&mut Self, CDFAError> {
         let from_encoded = self.encode(from);
         let to_encoded = self.encode(to);
@@ -224,7 +209,7 @@ CDFABuilder<State, Symbol, EncodedCDFA<Symbol>> for EncodedCDFABuilder<State, Sy
 
     fn mark_range_for_all<'state_o: 'state_i, 'state_i>(
         &mut self,
-        sources: impl Iterator<Item=&'state_i &'state_o State>,
+        sources: impl Iterator<Item = &'state_i &'state_o State>,
         to: &'state_o State,
         start: char,
         end: char,
@@ -250,7 +235,7 @@ CDFABuilder<State, Symbol, EncodedCDFA<Symbol>> for EncodedCDFABuilder<State, Sy
             t_trie.set_default(to_encoded)
         } {
             Err(err) => Err(err),
-            Ok(()) => Ok(self)
+            Ok(()) => Ok(self),
         }
     }
 
@@ -265,18 +250,19 @@ pub struct EncodedCDFAStateBuilder<
     'scope,
     'state: 'scope,
     State: 'state + Eq + Hash + Clone + Debug,
-    Symbol: 'scope + Data + Default
+    Symbol: 'scope + Data + Default,
 > {
     ecdfa_builder: &'scope mut EncodedCDFABuilder<State, Symbol>,
     state: &'state State,
 }
 
 impl<
-    'scope,
-    'state: 'scope,
-    State: 'state + Eq + Hash + Clone + Debug,
-    Symbol: 'scope + Data + Default
-> EncodedCDFAStateBuilder<'scope, 'state, State, Symbol> {
+        'scope,
+        'state: 'scope,
+        State: 'state + Eq + Hash + Clone + Debug,
+        Symbol: 'scope + Data + Default,
+    > EncodedCDFAStateBuilder<'scope, 'state, State, Symbol>
+{
     pub fn accept(&mut self) -> &mut Self {
         self.ecdfa_builder.accept(self.state);
         self
@@ -287,11 +273,7 @@ impl<
         Ok(self)
     }
 
-    pub fn mark_trans(
-        &mut self,
-        to: &State,
-        on: char,
-    ) -> Result<&mut Self, CDFAError> {
+    pub fn mark_trans(&mut self, to: &State, on: char) -> Result<&mut Self, CDFAError> {
         self.ecdfa_builder.mark_trans(self.state, to, on)?;
         Ok(self)
     }
@@ -299,7 +281,7 @@ impl<
     pub fn mark_chain(
         &mut self,
         to: &State,
-        on: impl Iterator<Item=char>,
+        on: impl Iterator<Item = char>,
     ) -> Result<&mut Self, CDFAError> {
         self.ecdfa_builder.mark_chain(self.state, to, on)?;
         Ok(self)
@@ -346,7 +328,7 @@ impl<Symbol: Default + Clone> CDFA<usize, Symbol> for EncodedCDFA<Symbol> {
     fn transition(&self, state: &usize, input: &[char]) -> TransitionResult<usize> {
         match self.t_delta.get(*state) {
             None => TransitionResult::fail(),
-            Some(t_trie) => t_trie.transition(input)
+            Some(t_trie) => t_trie.transition(input),
         }
     }
 
@@ -361,14 +343,14 @@ impl<Symbol: Default + Clone> CDFA<usize, Symbol> for EncodedCDFA<Symbol> {
     fn acceptor_destination(&self, state: &usize, from: &usize) -> Option<usize> {
         match self.accepting.get(state) {
             None => None,
-            Some(accd_mux) => accd_mux.get_destination(*from)
+            Some(accd_mux) => accd_mux.get_destination(*from),
         }
     }
 
     fn tokenize(&self, state: &usize) -> Option<Symbol> {
         match self.tokenizer.get(*state) {
             None => None,
-            Some(dest) => Some(dest.clone())
+            Some(dest) => Some(dest.clone()),
         }
     }
 
@@ -399,12 +381,10 @@ impl TransitionTrie {
         if curr.children.is_empty() {
             match self.default {
                 None => TransitionResult::fail(),
-                Some(state) => {
-                    match input.first() {
-                        None => TransitionResult::fail(),
-                        Some(_) => TransitionResult::direct(state)
-                    }
-                }
+                Some(state) => match input.first() {
+                    None => TransitionResult::fail(),
+                    Some(_) => TransitionResult::direct(state),
+                },
             }
         } else {
             let mut cursor: usize = 0;
@@ -414,10 +394,10 @@ impl TransitionTrie {
                     Some(c) => match curr.get_child(*c) {
                         None => match self.default {
                             None => return TransitionResult::fail(),
-                            Some(state) => return TransitionResult::direct(state)
-                        }
-                        Some(child) => child
-                    }
+                            Some(state) => return TransitionResult::direct(state),
+                        },
+                        Some(child) => child,
+                    },
                 };
 
                 cursor += 1;
@@ -464,7 +444,8 @@ impl TransitionTrie {
             node.add_child(c, child);
         } else if last {
             return Err(CDFAError::BuildErr(format!(
-                "Transition trie is not prefix free on character '{}'", c
+                "Transition trie is not prefix free on character '{}'",
+                c
             )));
         }
         Ok(())
@@ -472,7 +453,9 @@ impl TransitionTrie {
 
     fn set_default(&mut self, default: usize) -> Result<(), CDFAError> {
         if self.default.is_some() {
-            Err(CDFAError::BuildErr("Default matcher used twice".to_string()))
+            Err(CDFAError::BuildErr(
+                "Default matcher used twice".to_string(),
+            ))
         } else {
             self.default = Some(default);
             Ok(())
@@ -481,7 +464,9 @@ impl TransitionTrie {
 }
 
 impl Default for TransitionTrie {
-    fn default() -> TransitionTrie { TransitionTrie::new() }
+    fn default() -> TransitionTrie {
+        TransitionTrie::new()
+    }
 }
 
 struct TransitionNode {
@@ -532,7 +517,8 @@ impl AcceptorDestinationMux {
     ) -> Result<(), CDFAError> {
         if self.all.is_some() {
             return Err(CDFAError::BuildErr(format!(
-                "State {:?} already has an acceptance destination from all incoming states", state
+                "State {:?} already has an acceptance destination from all incoming states",
+                state
             )));
         }
 
@@ -545,7 +531,8 @@ impl AcceptorDestinationMux {
                 let entry = mux.get(&from_encoded);
                 if entry.is_some() && *entry.unwrap() != dest_encoded {
                     return Err(CDFAError::BuildErr(format!(
-                        "State {:?} is accepted multiple times with different destinations", state
+                        "State {:?} is accepted multiple times with different destinations",
+                        state
                     )));
                 }
             }
@@ -563,7 +550,8 @@ impl AcceptorDestinationMux {
     ) -> Result<(), CDFAError> {
         if self.mux.is_some() {
             return Err(CDFAError::BuildErr(format!(
-                "State {:?} already has an acceptance destination from a specific state", state
+                "State {:?} already has an acceptance destination from a specific state",
+                state
             )));
         }
 
@@ -578,7 +566,7 @@ impl AcceptorDestinationMux {
         } else if let Some(ref mux) = self.mux {
             match mux.get(&from_encoded) {
                 None => None,
-                Some(dest) => Some(*dest)
+                Some(dest) => Some(*dest),
             }
         } else {
             None
@@ -602,11 +590,16 @@ mod tests {
         builder
             .set_alphabet("01".chars())
             .mark_start(&"start".to_string());
-        builder.state(&"start".to_string())
-            .mark_trans(&"zero".to_string(), '0').unwrap()
-            .mark_trans(&"notzero".to_string(), '1').unwrap();
-        builder.state(&"notzero".to_string())
-            .default_to(&"notzero".to_string()).unwrap()
+        builder
+            .state(&"start".to_string())
+            .mark_trans(&"zero".to_string(), '0')
+            .unwrap()
+            .mark_trans(&"notzero".to_string(), '1')
+            .unwrap();
+        builder
+            .state(&"notzero".to_string())
+            .default_to(&"notzero".to_string())
+            .unwrap()
             .accept()
             .tokenize(&"NZ".to_string());
         builder
@@ -624,13 +617,16 @@ mod tests {
         let tokens = scanner.scan(&chars[..], &cdfa).unwrap();
 
         //verify
-        assert_eq!(tokens_string(&tokens), "\
+        assert_eq!(
+            tokens_string(&tokens),
+            "\
 ZERO <- '0'
 ZERO <- '0'
 ZERO <- '0'
 ZERO <- '0'
 NZ <- '11010101'
-");
+"
+        );
     }
 
     #[test]
@@ -640,16 +636,26 @@ NZ <- '11010101'
         builder
             .set_alphabet("{} \t\n".chars())
             .mark_start(&"start".to_string());
-        builder.state(&"start".to_string())
-            .mark_trans(&"ws".to_string(), ' ').unwrap()
-            .mark_trans(&"ws".to_string(), '\t').unwrap()
-            .mark_trans(&"ws".to_string(), '\n').unwrap()
-            .mark_trans(&"lbr".to_string(), '{').unwrap()
-            .mark_trans(&"rbr".to_string(), '}').unwrap();
-        builder.state(&"ws".to_string())
-            .mark_trans(&"ws".to_string(), ' ').unwrap()
-            .mark_trans(&"ws".to_string(), '\t').unwrap()
-            .mark_trans(&"ws".to_string(), '\n').unwrap()
+        builder
+            .state(&"start".to_string())
+            .mark_trans(&"ws".to_string(), ' ')
+            .unwrap()
+            .mark_trans(&"ws".to_string(), '\t')
+            .unwrap()
+            .mark_trans(&"ws".to_string(), '\n')
+            .unwrap()
+            .mark_trans(&"lbr".to_string(), '{')
+            .unwrap()
+            .mark_trans(&"rbr".to_string(), '}')
+            .unwrap();
+        builder
+            .state(&"ws".to_string())
+            .mark_trans(&"ws".to_string(), ' ')
+            .unwrap()
+            .mark_trans(&"ws".to_string(), '\t')
+            .unwrap()
+            .mark_trans(&"ws".to_string(), '\n')
+            .unwrap()
             .accept()
             .tokenize(&"WS".to_string());
         builder
@@ -669,7 +675,9 @@ NZ <- '11010101'
         let tokens = scanner.scan(&chars[..], &cdfa).unwrap();
 
         //verify
-        assert_eq!(tokens_string(&tokens), "\
+        assert_eq!(
+            tokens_string(&tokens),
+            "\
 WS <- '  '
 LBR <- '{'
 LBR <- '{'
@@ -686,7 +694,8 @@ WS <- ' \\t'
 LBR <- '{'
 RBR <- '}'
 RBR <- '}'
-");
+"
+        );
     }
 
     #[test]
@@ -696,16 +705,26 @@ RBR <- '}'
         builder
             .set_alphabet("{} \t\n".chars())
             .mark_start(&"start".to_string());
-        builder.state(&"start".to_string())
-            .mark_trans(&"ws".to_string(), ' ').unwrap()
-            .mark_trans(&"ws".to_string(), '\t').unwrap()
-            .mark_trans(&"ws".to_string(), '\n').unwrap()
-            .mark_trans(&"lbr".to_string(), '{').unwrap()
-            .mark_trans(&"rbr".to_string(), '}').unwrap();
-        builder.state(&"ws".to_string())
-            .mark_trans(&"ws".to_string(), ' ').unwrap()
-            .mark_trans(&"ws".to_string(), '\t').unwrap()
-            .mark_trans(&"ws".to_string(), '\n').unwrap()
+        builder
+            .state(&"start".to_string())
+            .mark_trans(&"ws".to_string(), ' ')
+            .unwrap()
+            .mark_trans(&"ws".to_string(), '\t')
+            .unwrap()
+            .mark_trans(&"ws".to_string(), '\n')
+            .unwrap()
+            .mark_trans(&"lbr".to_string(), '{')
+            .unwrap()
+            .mark_trans(&"rbr".to_string(), '}')
+            .unwrap();
+        builder
+            .state(&"ws".to_string())
+            .mark_trans(&"ws".to_string(), ' ')
+            .unwrap()
+            .mark_trans(&"ws".to_string(), '\t')
+            .unwrap()
+            .mark_trans(&"ws".to_string(), '\n')
+            .unwrap()
             .accept();
         builder
             .accept(&"lbr".to_string())
@@ -724,7 +743,9 @@ RBR <- '}'
         let tokens = scanner.scan(&chars[..], &cdfa).unwrap();
 
         //verify
-        assert_eq!(tokens_string(&tokens), "\
+        assert_eq!(
+            tokens_string(&tokens),
+            "\
 LBR <- '{'
 LBR <- '{'
 RBR <- '}'
@@ -737,7 +758,8 @@ RBR <- '}'
 LBR <- '{'
 RBR <- '}'
 RBR <- '}'
-");
+"
+        );
     }
 
     #[test]
@@ -747,16 +769,26 @@ RBR <- '}'
         builder
             .set_alphabet("{} \t\n".chars())
             .mark_start(&"start".to_string());
-        builder.state(&"start".to_string())
-            .mark_trans(&"ws".to_string(), ' ').unwrap()
-            .mark_trans(&"ws".to_string(), '\t').unwrap()
-            .mark_trans(&"ws".to_string(), '\n').unwrap()
-            .mark_trans(&"lbr".to_string(), '{').unwrap()
-            .mark_trans(&"rbr".to_string(), '}').unwrap();
-        builder.state(&"ws".to_string())
-            .mark_trans(&"ws".to_string(), ' ').unwrap()
-            .mark_trans(&"ws".to_string(), '\t').unwrap()
-            .mark_trans(&"ws".to_string(), '\n').unwrap()
+        builder
+            .state(&"start".to_string())
+            .mark_trans(&"ws".to_string(), ' ')
+            .unwrap()
+            .mark_trans(&"ws".to_string(), '\t')
+            .unwrap()
+            .mark_trans(&"ws".to_string(), '\n')
+            .unwrap()
+            .mark_trans(&"lbr".to_string(), '{')
+            .unwrap()
+            .mark_trans(&"rbr".to_string(), '}')
+            .unwrap();
+        builder
+            .state(&"ws".to_string())
+            .mark_trans(&"ws".to_string(), ' ')
+            .unwrap()
+            .mark_trans(&"ws".to_string(), '\t')
+            .unwrap()
+            .mark_trans(&"ws".to_string(), '\n')
+            .unwrap()
             .accept();
         builder
             .accept(&"lbr".to_string())
@@ -789,16 +821,26 @@ RBR <- '}'
         builder
             .set_alphabet("{} \t\n".chars())
             .mark_start(&"start".to_string());
-        builder.state(&"start".to_string())
-            .mark_trans(&"ws".to_string(), ' ').unwrap()
-            .mark_trans(&"ws".to_string(), '\t').unwrap()
-            .mark_trans(&"ws".to_string(), '\n').unwrap()
-            .mark_trans(&"lbr".to_string(), '{').unwrap()
-            .mark_trans(&"rbr".to_string(), '}').unwrap();
-        builder.state(&"ws".to_string())
-            .mark_trans(&"ws".to_string(), ' ').unwrap()
-            .mark_trans(&"ws".to_string(), '\t').unwrap()
-            .mark_trans(&"ws".to_string(), '\n').unwrap()
+        builder
+            .state(&"start".to_string())
+            .mark_trans(&"ws".to_string(), ' ')
+            .unwrap()
+            .mark_trans(&"ws".to_string(), '\t')
+            .unwrap()
+            .mark_trans(&"ws".to_string(), '\n')
+            .unwrap()
+            .mark_trans(&"lbr".to_string(), '{')
+            .unwrap()
+            .mark_trans(&"rbr".to_string(), '}')
+            .unwrap();
+        builder
+            .state(&"ws".to_string())
+            .mark_trans(&"ws".to_string(), ' ')
+            .unwrap()
+            .mark_trans(&"ws".to_string(), '\t')
+            .unwrap()
+            .mark_trans(&"ws".to_string(), '\n')
+            .unwrap()
             .accept();
         builder
             .accept(&"lbr".to_string())
@@ -831,9 +873,12 @@ RBR <- '}'
         builder
             .set_alphabet("fourive".chars())
             .mark_start(&"start".to_string());
-        builder.state(&"start".to_string())
-            .mark_chain(&"four".to_string(), "four".chars()).unwrap()
-            .mark_chain(&"five".to_string(), "five".chars()).unwrap();
+        builder
+            .state(&"start".to_string())
+            .mark_chain(&"four".to_string(), "four".chars())
+            .unwrap()
+            .mark_chain(&"five".to_string(), "five".chars())
+            .unwrap();
         builder
             .accept(&"four".to_string())
             .tokenize(&"four".to_string(), &"FOUR".to_string())
@@ -851,7 +896,9 @@ RBR <- '}'
         let tokens = scanner.scan(&chars[..], &cdfa).unwrap();
 
         //verify
-        assert_eq!(tokens_string(&tokens), "\
+        assert_eq!(
+            tokens_string(&tokens),
+            "\
 FIVE <- 'five'
 FOUR <- 'four'
 FOUR <- 'four'
@@ -860,7 +907,8 @@ FIVE <- 'five'
 FIVE <- 'five'
 FOUR <- 'four'
 FIVE <- 'five'
-");
+"
+        );
     }
 
     #[test]
@@ -870,16 +918,20 @@ FIVE <- 'five'
         builder
             .set_alphabet("fordk".chars())
             .mark_start(&"start".to_string());
-        builder.state(&"start".to_string())
-            .mark_chain(&"FOR".to_string(), "for".chars()).unwrap()
-            .default_to(&"id".to_string()).unwrap();
+        builder
+            .state(&"start".to_string())
+            .mark_chain(&"FOR".to_string(), "for".chars())
+            .unwrap()
+            .default_to(&"id".to_string())
+            .unwrap();
         builder
             .accept(&"FOR".to_string())
             .tokenize(&"FOR".to_string(), &"FOR".to_string())
             .accept(&"id".to_string())
             .tokenize(&"id".to_string(), &"ID".to_string());
         builder
-            .default_to(&"id".to_string(), &"id".to_string()).unwrap();
+            .default_to(&"id".to_string(), &"id".to_string())
+            .unwrap();
 
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
 
@@ -892,9 +944,12 @@ FIVE <- 'five'
         let tokens = scanner.scan(&chars[..], &cdfa).unwrap();
 
         //verify
-        assert_eq!(tokens_string(&tokens), "\
+        assert_eq!(
+            tokens_string(&tokens),
+            "\
 ID <- 'fdk'
-");
+"
+        );
     }
 
     #[test]
@@ -914,25 +969,35 @@ ID <- 'fdk'
         builder
             .set_alphabet("a!123456789".chars())
             .mark_start(&S::Start);
-        builder.state(&S::Start)
-            .mark_trans(&S::A, 'a').unwrap()
-            .mark_trans(&S::BangIn, '!').unwrap();
-        builder.state(&S::A)
-            .mark_trans(&S::A, 'a').unwrap()
+        builder
+            .state(&S::Start)
+            .mark_trans(&S::A, 'a')
+            .unwrap()
+            .mark_trans(&S::BangIn, '!')
+            .unwrap();
+        builder
+            .state(&S::A)
+            .mark_trans(&S::A, 'a')
+            .unwrap()
             .tokenize(&"A".to_string())
             .accept();
-        builder.state(&S::BangIn)
+        builder
+            .state(&S::BangIn)
             .tokenize(&"BANG".to_string())
-            .accept_to_from_all(&S::Hidden).unwrap();
-        builder.state(&S::BangOut)
+            .accept_to_from_all(&S::Hidden)
+            .unwrap();
+        builder
+            .state(&S::BangOut)
             .tokenize(&"BANG".to_string())
-            .accept_to_from_all(&S::Start).unwrap();
-        builder.state(&S::Hidden)
-            .mark_range(&S::Num, '1', '9').unwrap()
-            .mark_trans(&S::BangOut, '!').unwrap();
-        builder.state(&S::Num)
-            .tokenize(&"NUM".to_string())
-            .accept();
+            .accept_to_from_all(&S::Start)
+            .unwrap();
+        builder
+            .state(&S::Hidden)
+            .mark_range(&S::Num, '1', '9')
+            .unwrap()
+            .mark_trans(&S::BangOut, '!')
+            .unwrap();
+        builder.state(&S::Num).tokenize(&"NUM".to_string()).accept();
 
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
 
@@ -945,7 +1010,9 @@ ID <- 'fdk'
         let tokens = scanner.scan(&chars[..], &cdfa).unwrap();
 
         //verify
-        assert_eq!(tokens_string(&tokens), "\
+        assert_eq!(
+            tokens_string(&tokens),
+            "\
 BANG <- '!'
 BANG <- '!'
 A <- 'aaa'
@@ -960,7 +1027,8 @@ NUM <- '1'
 NUM <- '3'
 BANG <- '!'
 A <- 'a'
-");
+"
+        );
     }
 
     #[test]
@@ -974,9 +1042,7 @@ A <- 'a'
         }
 
         let mut builder: EncodedCDFABuilder<S, String> = EncodedCDFABuilder::new();
-        builder
-            .set_alphabet("a".chars())
-            .mark_start(&S::Start);
+        builder.set_alphabet("a".chars()).mark_start(&S::Start);
         builder.mark_trans(&S::Start, &S::A, 'a').unwrap();
         builder.accept_to(&S::A, &S::Start, &S::LastA).unwrap();
         builder.mark_trans(&S::LastA, &S::A, 'a').unwrap();
@@ -994,12 +1060,15 @@ A <- 'a'
         let tokens = scanner.scan(&chars[..], &cdfa).unwrap();
 
         //verify
-        assert_eq!(tokens_string(&tokens), "\
+        assert_eq!(
+            tokens_string(&tokens),
+            "\
 A <- 'a'
 A <- 'a'
 A <- 'a'
 A <- 'a'
-");
+"
+        );
     }
 
     #[test]
@@ -1013,9 +1082,7 @@ A <- 'a'
         }
 
         let mut builder: EncodedCDFABuilder<S, String> = EncodedCDFABuilder::new();
-        builder
-            .set_alphabet("a".chars())
-            .mark_start(&S::Start);
+        builder.set_alphabet("a".chars()).mark_start(&S::Start);
         builder.mark_trans(&S::Start, &S::A, 'a').unwrap();
         builder.accept_to_from_all(&S::A, &S::LastA).unwrap();
         builder.accept_to_from_all(&S::A, &S::Start).unwrap();
@@ -1032,10 +1099,13 @@ A <- 'a'
         let tokens = scanner.scan(&chars[..], &cdfa).unwrap();
 
         //verify
-        assert_eq!(tokens_string(&tokens), "\
+        assert_eq!(
+            tokens_string(&tokens),
+            "\
 A <- 'a'
 A <- 'a'
-");
+"
+        );
     }
 
     fn tokens_string<Kind: Data>(tokens: &Vec<Token<Kind>>) -> String {

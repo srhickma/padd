@@ -1,14 +1,6 @@
-use {
-    core::{
-        data::Data,
-        scan::{
-            self,
-            CDFA,
-            FAIL_SEQUENCE_LENGTH,
-            Scanner,
-            Token,
-        },
-    },
+use core::{
+    data::Data,
+    scan::{self, Scanner, Token, CDFA, FAIL_SEQUENCE_LENGTH},
 };
 
 pub struct MaximalMunchScanner;
@@ -92,17 +84,12 @@ impl<State: Data, Symbol: Data> Scanner<State, Symbol> for MaximalMunchScanner {
         let mut character: usize = 1;
 
         loop {
-            let res: ScanOneResult<State> = scan_one(
-                remaining,
-                next_start.clone(),
-                line,
-                character,
-                cdfa,
-            );
+            let res: ScanOneResult<State> =
+                scan_one(remaining, next_start.clone(), line, character, cdfa);
 
             next_start = match res.next_start {
                 None => next_start,
-                Some(state) => state
+                Some(state) => state,
             };
 
             line = res.line;
@@ -126,8 +113,13 @@ impl<State: Data, Symbol: Data> Scanner<State, Symbol> for MaximalMunchScanner {
 
                     break;
                 }
-                Some(state) => if let Some(kind) = cdfa.tokenize(&state) {
-                    tokens.push(Token::leaf(kind, (&remaining[0..res.consumed]).iter().collect()));
+                Some(state) => {
+                    if let Some(kind) = cdfa.tokenize(&state) {
+                        tokens.push(Token::leaf(
+                            kind,
+                            (&remaining[0..res.consumed]).iter().collect(),
+                        ));
+                    }
                 }
             }
 

@@ -25,7 +25,8 @@ grammar {
     acc
         | ACC;
 }
-    ".to_string();
+    "
+    .to_string();
 
     let input = "abasdfergrthergerghera".to_string();
 
@@ -35,8 +36,9 @@ grammar {
     let res = fjr.format(FormatJob::from_text(input)).unwrap();
 
     //verify
-    assert_eq!(res,
-               "ab
+    assert_eq!(
+        res,
+        "ab
 asdfergrthergergher
 a"
     );
@@ -66,7 +68,8 @@ grammar {
     acc
         | ACC;
 }
-    ".to_string();
+    "
+    .to_string();
 
     let input = "aaaa \t \n  a aa  aa ".to_string();
 
@@ -104,7 +107,8 @@ grammar {
         | ID
         | IN ``;
 }
-    ".to_string();
+    "
+    .to_string();
 
     let input = "i ij ijjjijijiji inj in iii".to_string();
 
@@ -137,7 +141,8 @@ grammar {
     b
         | B `\n{}\n`;
 }
-    ".to_string();
+    "
+    .to_string();
 
     let input = "ababaaaaababaaba".to_string();
 
@@ -170,7 +175,8 @@ grammar {
     b
         | B [b] `\n{} {}`;
 }
-    ".to_string();
+    "
+    .to_string();
 
     let input = "abbbabaaaabbbbababaaba".to_string();
 
@@ -180,7 +186,10 @@ grammar {
     let res = fjr.format(FormatJob::from_text(input)).unwrap();
 
     //verify
-    assert_eq!(res, "a\nb \nb \nb a\nb aaaa\nb \nb \nb \nb a\nb a\nb aa\nb a");
+    assert_eq!(
+        res,
+        "a\nb \nb \nb a\nb aaaa\nb \nb \nb \nb a\nb a\nb aa\nb a"
+    );
 }
 
 #[test]
@@ -199,7 +208,8 @@ grammar {
     s
         | [A] [B];
 }
-    ".to_string();
+    "
+    .to_string();
 
     let input = "ab".to_string();
 
@@ -233,7 +243,8 @@ grammar {
     b
         | LBRACKET s RBRACKET `[prefix]{}{;prefix=[prefix]\t}[prefix]{}`;
 }
-    ".to_string();
+    "
+    .to_string();
 
     let input = " {{} }  { {}}".to_string();
 
@@ -243,7 +254,10 @@ grammar {
     let res = fjr.format(FormatJob::from_text(input)).unwrap();
 
     //verify
-    assert_eq!(res, "[@LAYER s=[@LAYER s= b={[@LAYER s= b=\t{\t}]}] b={[@LAYER s= b=\t{\t}]}]");
+    assert_eq!(
+        res,
+        "[@LAYER s=[@LAYER s= b={[@LAYER s= b=\t{\t}]}] b={[@LAYER s= b=\t{\t}]}]"
+    );
 }
 
 #[test]
@@ -264,7 +278,8 @@ grammar {
         | s B
         | `SEPARATED:`;
 }
-    ".to_string();
+    "
+    .to_string();
 
     let input = "abbaba".to_string();
 
@@ -301,7 +316,8 @@ grammar {
         | last LAST
         | LAST;
 }
-    ".to_string();
+    "
+    .to_string();
 
     let input = "abcdefghijklmnopqrstuvwxyz".to_string();
 
@@ -348,7 +364,8 @@ grammar {
         | A
         | NUM;
 }
-    ".to_string();
+    "
+    .to_string();
 
     let input = "!!aaa!!a!49913!a".to_string();
 
@@ -414,7 +431,8 @@ grammar {
     region2
         | R2_DEC LBRACE_R2 [NUM] RBRACE `{} {}\\n\\t{}\\n{}`;
 }
-    ".to_string();
+    "
+    .to_string();
 
     let input = "region1{abaaba}region1{bb}region2{558905}".to_string();
 
@@ -424,7 +442,9 @@ grammar {
     let res = fjr.format(FormatJob::from_text(input)).unwrap();
 
     //verify
-    assert_eq!(res, "region1 {
+    assert_eq!(
+        res,
+        "region1 {
 \tabaaba
 }
 region1 {
@@ -432,7 +452,8 @@ region1 {
 }
 region2 {
 \t558905
-}");
+}"
+    );
 }
 
 #[test]
@@ -467,7 +488,8 @@ grammar {
 }
 
 alphabet 'inj '
-    ".to_string();
+    "
+    .to_string();
 
     let input = "i ij ijjjijijiji inj in iii".to_string();
 

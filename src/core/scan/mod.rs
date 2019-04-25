@@ -1,7 +1,5 @@
 use {
-    core::{
-        data::Data,
-    },
+    core::data::Data,
     std::{error, fmt},
 };
 
@@ -32,7 +30,7 @@ pub trait CDFABuilder<State, Kind, CDFAType> {
     fn new() -> Self;
     fn build(self) -> Result<CDFAType, CDFAError>;
 
-    fn set_alphabet(&mut self, chars: impl Iterator<Item=char>) -> &mut Self;
+    fn set_alphabet(&mut self, chars: impl Iterator<Item = char>) -> &mut Self;
     fn accept(&mut self, state: &State) -> &mut Self;
     fn accept_to(
         &mut self,
@@ -40,18 +38,14 @@ pub trait CDFABuilder<State, Kind, CDFAType> {
         from: &State,
         to: &State,
     ) -> Result<&mut Self, CDFAError>;
-    fn accept_to_from_all(
-        &mut self,
-        state: &State,
-        to: &State,
-    ) -> Result<&mut Self, CDFAError>;
+    fn accept_to_from_all(&mut self, state: &State, to: &State) -> Result<&mut Self, CDFAError>;
     fn mark_start(&mut self, state: &State) -> &mut Self;
     fn mark_trans(&mut self, from: &State, to: &State, on: char) -> Result<&mut Self, CDFAError>;
     fn mark_chain(
         &mut self,
         from: &State,
         to: &State,
-        on: impl Iterator<Item=char>,
+        on: impl Iterator<Item = char>,
     ) -> Result<&mut Self, CDFAError>;
     fn mark_range(
         &mut self,
@@ -62,7 +56,7 @@ pub trait CDFABuilder<State, Kind, CDFAType> {
     ) -> Result<&mut Self, CDFAError>;
     fn mark_range_for_all<'state_o: 'state_i, 'state_i>(
         &mut self,
-        sources: impl Iterator<Item=&'state_i &'state_o State>,
+        sources: impl Iterator<Item = &'state_i &'state_o State>,
         to: &'state_o State,
         start: char,
         end: char,
@@ -173,7 +167,7 @@ impl<Symbol: Data> Data for Token<Symbol> {
 
         match &self.kind {
             None => lexeme_string,
-            Some(kind) => format!("{}{}", kind.to_string(), lexeme_string)
+            Some(kind) => format!("{}{}", kind.to_string(), lexeme_string),
         }
     }
 }
@@ -190,9 +184,7 @@ impl fmt::Display for Error {
         write!(
             f,
             "No accepting scans after ({},{}): {}...",
-            self.line,
-            self.character,
-            self.sequence
+            self.line, self.character, self.sequence
         )
     }
 }

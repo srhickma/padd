@@ -1,13 +1,7 @@
 use {
     core::{
         data::Data,
-        parse::{
-            self,
-            grammar::Grammar,
-            Parser,
-            Production,
-            Tree,
-        },
+        parse::{self, grammar::Grammar, Parser, Production, Tree},
         scan::Token,
     },
     std::collections::HashSet,
@@ -24,7 +18,10 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
         let mut chart: RChart<Symbol> = RChart::new();
         let mut parse_chart: PChart<Symbol> = PChart::new();
 
-        grammar.productions_for_lhs(grammar.start()).unwrap().iter()
+        grammar
+            .productions_for_lhs(grammar.start())
+            .unwrap()
+            .iter()
             .for_each(|prod| {
                 chart.row_mut(0).unsafe_append(Item {
                     rule: prod,
@@ -167,7 +164,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
         }
 
         fn cross<'inner, 'grammar: 'inner, Symbol: Data + Default>(
-            src: impl Iterator<Item=&'inner Item<'grammar, Symbol>>,
+            src: impl Iterator<Item = &'inner Item<'grammar, Symbol>>,
             symbol: &Symbol,
             grammar: &'grammar Grammar<Symbol>,
         ) -> Vec<Item<'grammar, Symbol>> {
@@ -189,8 +186,10 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
 
                             match last_item.next_symbol() {
                                 None => break,
-                                Some(sym) => if !grammar.is_nullable_nt(sym) {
-                                    break;
+                                Some(sym) => {
+                                    if !grammar.is_nullable_nt(sym) {
+                                        break;
+                                    }
                                 }
                             }
                         }
@@ -212,8 +211,14 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
             });
         }
 
-        fn recognized<Symbol: Data + Default>(grammar: &Grammar<Symbol>, chart: &RChart<Symbol>) -> bool {
-            chart.row(chart.len() - 1).complete().items()
+        fn recognized<Symbol: Data + Default>(
+            grammar: &Grammar<Symbol>,
+            chart: &RChart<Symbol>,
+        ) -> bool {
+            chart
+                .row(chart.len() - 1)
+                .complete()
+                .items()
                 .any(|item| item.rule.lhs == *grammar.start() && item.start == 0)
         }
 
@@ -260,7 +265,8 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
                 chart: &PChart<Symbol>,
             ) -> Tree<Symbol> {
                 match edge.rule {
-                    None => Tree { //Non-empty rhs
+                    None => Tree {
+                        //Non-empty rhs
                         lhs: scan[start].clone(),
                         children: Vec::new(),
                     },
@@ -268,31 +274,32 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
                         lhs: Token::interior(rule.lhs.clone()),
                         children: {
                             let mut children: Vec<Tree<Symbol>> =
-                                top_list(start, edge, grammar, scan, chart).iter().rev()
-                                    .map(|&(node, ref edge)| recur(
-                                        node,
-                                        &edge,
-                                        grammar,
-                                        scan,
-                                        chart,
-                                    ))
+                                top_list(start, edge, grammar, scan, chart)
+                                    .iter()
+                                    .rev()
+                                    .map(|&(node, ref edge)| {
+                                        recur(node, &edge, grammar, scan, chart)
+                                    })
                                     .collect();
-                            if children.is_empty() { //Empty rhs
+                            if children.is_empty() {
+                                //Empty rhs
                                 children.push(Tree::null());
                             }
                             children
                         },
-                    }
+                    },
                 }
             }
 
             let finish: Node = chart.len() - 1;
 
-            let first_edge = chart.row(0).edges()
+            let first_edge = chart
+                .row(0)
+                .edges()
                 .find(|edge| edge.finish == finish && edge.rule.unwrap().lhs == *grammar.start());
             match first_edge {
                 None => panic!("Failed to find start item to begin parse"),
-                Some(edge) => recur(0, edge, grammar, scan, &chart)
+                Some(edge) => recur(0, edge, grammar, scan, &chart),
             }
         }
 
@@ -317,7 +324,9 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
                             }];
                         }
                     } else {
-                        return chart.row(node).edges()
+                        return chart
+                            .row(node)
+                            .edges()
                             .filter(|edge| edge.rule.unwrap().lhs == *symbol)
                             .cloned()
                             .collect();
@@ -347,20 +356,20 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
 
             match df_search(&edges, &leaf, 0, start) {
                 None => panic!("Failed to decompose parse edge of recognized scan"),
-                Some(path) => path
+                Some(path) => path,
             }
         }
     }
 }
 
 struct RChart<'item, Symbol: Data + Default + 'item> {
-    rows: Vec<RChartRow<'item, Symbol>>
+    rows: Vec<RChartRow<'item, Symbol>>,
 }
 
 impl<'item, Symbol: Data + Default + 'item> RChart<'item, Symbol> {
     fn new() -> Self {
         RChart {
-            rows: vec![RChartRow::new(Vec::new())]
+            rows: vec![RChartRow::new(Vec::new())],
         }
     }
 
@@ -446,14 +455,12 @@ impl<'item, Symbol: Data + Default + 'item> RChartRow<'item, Symbol> {
 }
 
 struct Items<'item, Symbol: Data + Default + 'item> {
-    items: Vec<Item<'item, Symbol>>
+    items: Vec<Item<'item, Symbol>>,
 }
 
 impl<'item, Symbol: Data + Default + 'item> Items<'item, Symbol> {
     fn new() -> Items<'item, Symbol> {
-        Items {
-            items: Vec::new()
-        }
+        Items { items: Vec::new() }
     }
 
     fn len(&self) -> usize {
@@ -485,7 +492,9 @@ struct ItemsIterator<'scope, 'item: 'scope, Symbol: Data + Default + 'item> {
     index: usize,
 }
 
-impl<'scope, 'item: 'scope, Symbol: Data + Default + 'item> Iterator for ItemsIterator<'scope, 'item, Symbol> {
+impl<'scope, 'item: 'scope, Symbol: Data + Default + 'item> Iterator
+    for ItemsIterator<'scope, 'item, Symbol>
+{
     type Item = &'scope Item<'item, Symbol>;
     fn next(&mut self) -> Option<&'scope Item<'item, Symbol>> {
         self.index += 1;
@@ -531,13 +540,13 @@ impl<'rule, Symbol: Data + Default> Data for Item<'rule, Symbol> {
 }
 
 struct PChart<'edge, Symbol: Data + Default + 'edge> {
-    rows: Vec<PChartRow<'edge, Symbol>>
+    rows: Vec<PChartRow<'edge, Symbol>>,
 }
 
 impl<'edge, Symbol: Data + Default + 'edge> PChart<'edge, Symbol> {
     fn new() -> Self {
         PChart {
-            rows: vec![PChartRow::new()]
+            rows: vec![PChartRow::new()],
         }
     }
 
@@ -569,14 +578,12 @@ impl<'edge, Symbol: Data + Default + 'edge> PChart<'edge, Symbol> {
 }
 
 struct PChartRow<'edge, Symbol: Data + Default + 'edge> {
-    edges: Vec<Edge<'edge, Symbol>>
+    edges: Vec<Edge<'edge, Symbol>>,
 }
 
 impl<'edge, Symbol: Data + Default + 'edge> PChartRow<'edge, Symbol> {
     fn new() -> Self {
-        PChartRow {
-            edges: Vec::new()
-        }
+        PChartRow { edges: Vec::new() }
     }
 
     fn add_edge(&mut self, edge: Edge<'edge, Symbol>) {
@@ -600,7 +607,9 @@ struct PChartRowIterator<'row, 'edge: 'row, Symbol: Data + Default + 'edge> {
     index: usize,
 }
 
-impl<'row, 'edge: 'row, Symbol: Data + Default + 'edge> Iterator for PChartRowIterator<'row, 'edge, Symbol> {
+impl<'row, 'edge: 'row, Symbol: Data + Default + 'edge> Iterator
+    for PChartRowIterator<'row, 'edge, Symbol>
+{
     type Item = &'row Edge<'row, Symbol>;
     fn next(&mut self) -> Option<&'edge Edge<'row, Symbol>> {
         self.index += 1;

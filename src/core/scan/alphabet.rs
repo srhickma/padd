@@ -5,13 +5,13 @@ pub trait Alphabet {
 }
 
 pub struct HashedAlphabet {
-    alphabet: HashSet<char>
+    alphabet: HashSet<char>,
 }
 
 impl HashedAlphabet {
     pub fn new() -> HashedAlphabet {
         HashedAlphabet {
-            alphabet: HashSet::new()
+            alphabet: HashSet::new(),
         }
     }
 

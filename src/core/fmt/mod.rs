@@ -38,7 +38,7 @@ impl FormatterBuilder {
 
     pub fn build(self) -> Formatter {
         Formatter {
-            pattern_map: self.pattern_map
+            pattern_map: self.pattern_map,
         }
     }
 
@@ -84,7 +84,8 @@ impl<'parse, Symbol: Data + Default + 'parse> FormatJob<'parse, Symbol> {
         let pattern = self.pattern_map.get(&node.production().to_string());
         match pattern {
             Some(ref p) => self.fill_pattern(p, &node.children, scope),
-            None => { //Reconstruct one after the other
+            None => {
+                //Reconstruct one after the other
                 let mut res = String::new();
                 for child in &node.children {
                     res = format!("{}{}", res, self.recur(child, scope));
@@ -105,12 +106,14 @@ impl<'parse, Symbol: Data + Default + 'parse> FormatJob<'parse, Symbol> {
         for seg in &pattern.segments {
             match *seg {
                 Segment::Filler(ref s) => res = format!("{}{}", res, s),
-                Segment::Substitution(ref s) => if let Some(value) = scope.get(s) {
-                    res = format!("{}{}", res, value);
-                },
-                Segment::Capture(ref c) => res = format!(
-                    "{}{}", res, self.evaluate_capture(c, children, scope)
-                ),
+                Segment::Substitution(ref s) => {
+                    if let Some(value) = scope.get(s) {
+                        res = format!("{}{}", res, value);
+                    }
+                }
+                Segment::Capture(ref c) => {
+                    res = format!("{}{}", res, self.evaluate_capture(c, children, scope))
+                }
             };
         }
         res
@@ -141,12 +144,20 @@ impl<'parse, Symbol: Data + Default + 'parse> FormatJob<'parse, Symbol> {
 
             match children.get(capture.child_index) {
                 Some(child) => self.recur(child, &inner_scope),
-                None => panic!("Pattern index out of bounds: index={} children={}", capture.child_index, children.len()),
+                None => panic!(
+                    "Pattern index out of bounds: index={} children={}",
+                    capture.child_index,
+                    children.len()
+                ),
             }
         } else {
             match children.get(capture.child_index) {
                 Some(child) => self.recur(child, outer_scope),
-                None => panic!("Pattern index out of bounds: index={} children={}", capture.child_index, children.len()),
+                None => panic!(
+                    "Pattern index out of bounds: index={} children={}",
+                    capture.child_index,
+                    children.len()
+                ),
             }
         }
     }

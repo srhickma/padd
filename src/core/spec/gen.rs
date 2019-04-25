@@ -4,15 +4,11 @@ use {
         fmt::{Formatter, FormatterBuilder, PatternPair},
         parse::{
             grammar::{Grammar, GrammarBuilder},
-            Production,
-            Tree,
+            Production, Tree,
         },
         scan::{
-            CDFA,
-            CDFABuilder,
             ecdfa::{EncodedCDFA, EncodedCDFABuilder},
-            State,
-            Kind,
+            CDFABuilder, Kind, State, CDFA,
         },
         spec::{
             self,
@@ -25,7 +21,7 @@ use {
 };
 
 pub fn generate_spec(
-    parse: &Tree<Symbol>
+    parse: &Tree<Symbol>,
 ) -> Result<(EncodedCDFA<Kind>, Grammar<Kind>, Formatter), spec::GenError> {
     let mut ecdfa_builder: EncodedCDFABuilder<String, Kind> = EncodedCDFABuilder::new();
     let mut grammar_builder = GrammarBuilder::new();
@@ -51,19 +47,18 @@ fn traverse_spec_regions<CDFABuilderType, CDFAType>(
     cdfa_builder: &mut CDFABuilderType,
     grammar_builder: &mut GrammarBuilder<Kind>,
     formatter_builder: &mut FormatterBuilder,
-) -> Result<(), spec::GenError> where
+) -> Result<(), spec::GenError>
+where
     CDFAType: CDFA<usize, Kind>,
-    CDFABuilderType: CDFABuilder<String, Kind, CDFAType>
+    CDFABuilderType: CDFABuilder<String, Kind, CDFAType>,
 {
     let mut region_handler = |inner_node: &Tree<Symbol>, region_type: &RegionType| {
         match region_type {
             RegionType::Alphabet => traverse_alphabet_region(inner_node, cdfa_builder),
             RegionType::CDFA => traverse_cdfa_region(inner_node, cdfa_builder)?,
-            RegionType::Grammar => traverse_grammar_region(
-                inner_node,
-                grammar_builder,
-                formatter_builder,
-            )?,
+            RegionType::Grammar => {
+                traverse_grammar_region(inner_node, grammar_builder, formatter_builder)?
+            }
         }
 
         Ok(())
@@ -77,7 +72,7 @@ fn traverse_alphabet_region<CDFABuilderType, CDFAType>(
     cdfa_builder: &mut CDFABuilderType,
 ) where
     CDFAType: CDFA<usize, String>,
-    CDFABuilderType: CDFABuilder<String, Kind, CDFAType>
+    CDFABuilderType: CDFABuilder<String, Kind, CDFAType>,
 {
     let escaped_alphabet = alphabet_node.get_child(1).lhs.lexeme().trim_matches('\'');
     let alphabet = string_utils::replace_escapes(&escaped_alphabet);
@@ -88,9 +83,10 @@ fn traverse_alphabet_region<CDFABuilderType, CDFAType>(
 fn traverse_cdfa_region<CDFABuilderType, CDFAType>(
     cdfa_node: &Tree<Symbol>,
     cdfa_builder: &mut CDFABuilderType,
-) -> Result<(), spec::GenError> where
+) -> Result<(), spec::GenError>
+where
     CDFAType: CDFA<usize, Kind>,
-    CDFABuilderType: CDFABuilder<String, Kind, CDFAType>
+    CDFABuilderType: CDFABuilder<String, Kind, CDFAType>,
 {
     generate_cdfa_states(cdfa_node.get_child(2), cdfa_builder)
 }
@@ -100,22 +96,30 @@ fn traverse_grammar_region(
     grammar_builder: &mut GrammarBuilder<Kind>,
     formatter_builder: &mut FormatterBuilder,
 ) -> Result<(), spec::GenError> {
-    generate_grammar_prods(grammar_node.get_child(2), grammar_builder, formatter_builder)
+    generate_grammar_prods(
+        grammar_node.get_child(2),
+        grammar_builder,
+        formatter_builder,
+    )
 }
 
 fn generate_cdfa_states<CDFABuilderType, CDFAType>(
     states_node: &Tree<Symbol>,
     builder: &mut CDFABuilderType,
-) -> Result<(), spec::GenError> where
+) -> Result<(), spec::GenError>
+where
     CDFAType: CDFA<usize, Kind>,
-    CDFABuilderType: CDFABuilder<String, Kind, CDFAType>
+    CDFABuilderType: CDFABuilder<String, Kind, CDFAType>,
 {
     let state_node = states_node.get_child(states_node.children.len() - 1);
 
     let sdec_node = state_node.get_child(0);
 
     let targets_node = sdec_node.get_child(0);
-    let head_state = targets_node.get_child(targets_node.children.len() - 1).lhs.lexeme();
+    let head_state = targets_node
+        .get_child(targets_node.children.len() - 1)
+        .lhs
+        .lexeme();
 
     let mut states: Vec<&State> = vec![head_state];
     if targets_node.children.len() == 3 {
@@ -149,7 +153,12 @@ fn generate_cdfa_targets<'tree>(
     targets_node: &'tree Tree<Symbol>,
     accumulator: &mut Vec<&'tree State>,
 ) {
-    accumulator.push(&targets_node.get_child(targets_node.children.len() - 1).lhs.lexeme());
+    accumulator.push(
+        &targets_node
+            .get_child(targets_node.children.len() - 1)
+            .lhs
+            .lexeme(),
+    );
     if targets_node.children.len() == 3 {
         generate_cdfa_targets(targets_node.get_child(0), accumulator);
     }
@@ -159,9 +168,10 @@ fn generate_cdfa_trans<CDFABuilderType, CDFAType>(
     trans_node: &Tree<Symbol>,
     sources: &[&State],
     builder: &mut CDFABuilderType,
-) -> Result<(), spec::GenError> where
+) -> Result<(), spec::GenError>
+where
     CDFAType: CDFA<usize, Kind>,
-    CDFABuilderType: CDFABuilder<String, Kind, CDFAType>
+    CDFABuilderType: CDFABuilder<String, Kind, CDFAType>,
 {
     let tran_node = trans_node.get_child(trans_node.children.len() - 1);
 
@@ -181,7 +191,7 @@ fn generate_cdfa_trans<CDFABuilderType, CDFAType>(
 
             token
         }
-        symbol => panic!("Unexpected transition destination symbol: {:?}", symbol)
+        symbol => panic!("Unexpected transition destination symbol: {:?}", symbol),
     };
 
     let matcher = tran_node.get_child(0);
@@ -189,9 +199,11 @@ fn generate_cdfa_trans<CDFABuilderType, CDFAType>(
         Symbol::Matchers => {
             generate_cdfa_mtcs(matcher, sources, dest, builder)?;
         }
-        Symbol::TDef => for source in sources {
-            builder.default_to(source, dest)?;
-        },
+        Symbol::TDef => {
+            for source in sources {
+                builder.default_to(source, dest)?;
+            }
+        }
         _ => panic!("Transition map input is neither Matchers nor TDef"),
     }
 
@@ -208,15 +220,19 @@ fn generate_cdfa_mtcs<CDFABuilderType, CDFAType>(
     sources: &[&State],
     dest: &State,
     builder: &mut CDFABuilderType,
-) -> Result<(), spec::GenError> where
+) -> Result<(), spec::GenError>
+where
     CDFAType: CDFA<usize, Kind>,
-    CDFABuilderType: CDFABuilder<String, Kind, CDFAType>
+    CDFABuilderType: CDFABuilder<String, Kind, CDFAType>,
 {
     let mtc_node = mtcs_node.children.last().unwrap();
 
     if mtc_node.children.len() == 1 {
         let matcher = mtc_node.get_child(0);
-        let matcher_string: String = matcher.lhs.lexeme().chars()
+        let matcher_string: String = matcher
+            .lhs
+            .lexeme()
+            .chars()
             .skip(1)
             .take(matcher.lhs.lexeme().len() - 2)
             .collect();
@@ -234,7 +250,10 @@ fn generate_cdfa_mtcs<CDFABuilderType, CDFAType>(
         let range_start_node = mtc_node.get_child(0);
         let range_end_node = mtc_node.get_child(2);
 
-        let escaped_range_start_string: String = range_start_node.lhs.lexeme().chars()
+        let escaped_range_start_string: String = range_start_node
+            .lhs
+            .lexeme()
+            .chars()
             .skip(1)
             .take(range_start_node.lhs.lexeme().len() - 2)
             .collect();
@@ -242,11 +261,15 @@ fn generate_cdfa_mtcs<CDFABuilderType, CDFAType>(
         let range_start_string = string_utils::replace_escapes(&escaped_range_start_string);
         if range_start_string.len() > 1 {
             return Err(spec::GenError::MatcherErr(format!(
-                "Range start must be one character, but was '{}'", range_start_string
+                "Range start must be one character, but was '{}'",
+                range_start_string
             )));
         }
 
-        let escaped_range_end_string: String = range_end_node.lhs.lexeme().chars()
+        let escaped_range_end_string: String = range_end_node
+            .lhs
+            .lexeme()
+            .chars()
             .skip(1)
             .take(range_end_node.lhs.lexeme().len() - 2)
             .collect();
@@ -254,7 +277,8 @@ fn generate_cdfa_mtcs<CDFABuilderType, CDFAType>(
         let range_end_string: String = string_utils::replace_escapes(&escaped_range_end_string);
         if range_end_string.len() > 1 {
             return Err(spec::GenError::MatcherErr(format!(
-                "Range end must be one character, but was '{}'", range_end_string
+                "Range end must be one character, but was '{}'",
+                range_end_string
             )));
         }
 
@@ -278,9 +302,10 @@ fn add_cdfa_tokenizer<CDFABuilderType, CDFAType, Symbol: Data + Default>(
     from: Option<&State>,
     kind: &Kind,
     builder: &mut CDFABuilderType,
-) -> Result<(), spec::GenError> where
+) -> Result<(), spec::GenError>
+where
     CDFAType: CDFA<usize, Kind>,
-    CDFABuilderType: CDFABuilder<String, Kind, CDFAType>
+    CDFABuilderType: CDFABuilder<String, Kind, CDFAType>,
 {
     let accd_opt_node = acceptor_node.get_child(2);
     if accd_opt_node.is_empty() {
@@ -289,7 +314,7 @@ fn add_cdfa_tokenizer<CDFABuilderType, CDFAType, Symbol: Data + Default>(
         let acceptor_destination = &accd_opt_node.get_child(1).lhs.lexeme();
         match from {
             None => builder.accept_to_from_all(state, acceptor_destination)?,
-            Some(from_state) => builder.accept_to(state, from_state, acceptor_destination)?
+            Some(from_state) => builder.accept_to(state, from_state, acceptor_destination)?,
         };
     }
 
@@ -392,7 +417,7 @@ fn generate_grammar_ids(
 
                 opt_state
             }
-            _ => panic!("Production identifier is neither a TId nor a TOptId")
+            _ => panic!("Production identifier is neither a TId nor a TOptId"),
         };
 
         ids_accumulator.push(id);
@@ -411,7 +436,8 @@ fn orphan_check<Symbol: Data + Default>(
     for symbol in grammar.terminals() {
         if !ecdfa_products.contains(symbol) {
             return Err(spec::GenError::MappingErr(format!(
-                "Orphaned terminal '{}' is not tokenized by the ECDFA", symbol.to_string()
+                "Orphaned terminal '{}' is not tokenized by the ECDFA",
+                symbol.to_string()
             )));
         }
     }

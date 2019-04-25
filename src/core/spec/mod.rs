@@ -1,20 +1,10 @@
 use {
     core::{
         fmt::{self, Formatter},
-        parse::{
-            self,
-            grammar::Grammar,
-            Tree,
-        },
-        scan::{
-            self,
-            ecdfa::EncodedCDFA,
-        },
+        parse::{self, grammar::Grammar, Tree},
+        scan::{self, ecdfa::EncodedCDFA},
     },
-    std::{
-        self,
-        error,
-    },
+    std::{self, error},
 };
 
 mod gen;
@@ -30,7 +20,7 @@ pub fn parse_spec(input: &str) -> Result<Tree<Symbol>, ParseError> {
 }
 
 pub fn generate_spec(
-    parse: &Tree<Symbol>
+    parse: &Tree<Symbol>,
 ) -> Result<(EncodedCDFA<String>, Grammar<String>, Formatter), GenError> {
     gen::generate_spec(parse)
 }
@@ -124,10 +114,7 @@ impl From<parse::Error> for ParseError {
 
 #[cfg(test)]
 mod tests {
-    use core::{
-        data::Data,
-        scan::Token,
-    };
+    use core::{data::Data, scan::Token};
 
     use super::*;
 
@@ -140,8 +127,9 @@ mod tests {
         let tree = lang::parse_spec(input).unwrap();
 
         //verify
-        assert_eq!(tree.to_string(),
-                   "└── Spec
+        assert_eq!(
+            tree.to_string(),
+            "└── Spec
     └── Regions
         ├── Regions
         │   ├── Regions
@@ -464,8 +452,9 @@ grammar {
         let tree = lang::parse_spec(input).unwrap();
 
         //verify
-        assert_eq!(tree.to_string(),
-                   "└── Spec
+        assert_eq!(
+            tree.to_string(),
+            "└── Spec
     └── Regions
         ├── Regions
         │   ├── Regions
@@ -687,8 +676,9 @@ grammar {
         let res = formatter.format(&parse);
 
         //verify
-        assert_eq!(res,
-                   "{
+        assert_eq!(
+            res,
+            "{
 
 	{
 
@@ -763,14 +753,17 @@ grammar {
         }
 
         //verify
-        assert_eq!(result, "\
+        assert_eq!(
+            result,
+            "\
 ID <- 'i'
 ID <- 'ij'
 ID <- 'ijjjijijiji'
 ID <- 'inj'
 IN <- 'in'
 ID <- 'iii'
-");
+"
+        );
     }
 
     #[test]
@@ -806,7 +799,10 @@ grammar {
         let tokens = scanner.scan(&chars[..], &cdfa).unwrap();
 
         //verify
-        assert_eq!(tokens_string(tokens), "\nkind=ID lexeme=c\nkind=WS lexeme= \nkind=ID lexeme=c")
+        assert_eq!(
+            tokens_string(tokens),
+            "\nkind=ID lexeme=c\nkind=WS lexeme= \nkind=ID lexeme=c"
+        )
     }
 
     #[test]
@@ -890,7 +886,9 @@ grammar {
         let tokens = scanner.scan(&chars[..], &cdfa).unwrap();
 
         //verify
-        assert_eq!(tokens_string(tokens), "
+        assert_eq!(
+            tokens_string(tokens),
+            "
 kind=ID lexeme=fdkgdfjgdjglkdjglkdjgljbnhbduhoifjeoigjeoghknhkjdfjgoirjt
 kind=FOR lexeme=for
 kind=IF lexeme=if
@@ -912,7 +910,8 @@ kind=ID lexeme=id
 kind=ID lexeme=idhere
 kind=FOB lexeme=fob
 kind=ID lexeme=re
-kind=ID lexeme=f")
+kind=ID lexeme=f"
+        )
     }
 
     #[test]
@@ -949,8 +948,9 @@ grammar {
         let tree = parser.parse(tokens, &grammar).unwrap();
 
         //verify
-        assert_eq!(tree.to_string(),
-                   "└── s
+        assert_eq!(
+            tree.to_string(),
+            "└── s
     ├── A <- 'a'
     ├── opt#B
     │   └── B <- 'b'
@@ -1053,7 +1053,9 @@ grammar {
         let tokens = scanner.scan(&chars[..], &cdfa).unwrap();
 
         //verify
-        assert_eq!(tokens_string(tokens), "
+        assert_eq!(
+            tokens_string(tokens),
+            "
 kind=A lexeme=a
 kind=A lexeme=b
 kind=A lexeme=c
@@ -1069,7 +1071,8 @@ kind=B lexeme=l
 kind=C lexeme=m
 kind=D lexeme=n
 kind=D lexeme=o
-kind=E lexeme=pqrstuvwxyz")
+kind=E lexeme=pqrstuvwxyz"
+        )
     }
 
     #[test]
@@ -1112,7 +1115,9 @@ grammar {
         let tokens = scanner.scan(&chars[..], &cdfa).unwrap();
 
         //verify
-        assert_eq!(tokens_string(tokens), "
+        assert_eq!(
+            tokens_string(tokens),
+            "
 kind=BANG lexeme=!
 kind=BANG lexeme=!
 kind=A lexeme=aaa
@@ -1126,7 +1131,8 @@ kind=NUM lexeme=9
 kind=NUM lexeme=1
 kind=NUM lexeme=3
 kind=BANG lexeme=!
-kind=A lexeme=a")
+kind=A lexeme=a"
+        )
     }
 
     fn tokens_string(tokens: Vec<Token<String>>) -> String {
