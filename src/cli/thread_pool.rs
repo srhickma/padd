@@ -1,10 +1,9 @@
 use std::{
     collections::LinkedList,
-    error,
-    fmt,
+    error, fmt,
     sync::{
-        Arc,
         mpsc::{self, Receiver, Sender, SyncSender},
+        Arc,
     },
     thread,
 };
@@ -19,22 +18,22 @@ impl<Payload: 'static + Send> ThreadPool<Payload> {
         size: usize,
         queue_size: usize,
         job_runner: JobRunner,
-    ) -> ThreadPool<Payload> where JobRunner: Fn(Payload) + 'static + Send + Sync {
+    ) -> ThreadPool<Payload>
+    where
+        JobRunner: Fn(Payload) + 'static + Send + Sync,
+    {
         let (queue_tx, queue_rx) = mpsc::sync_channel(queue_size);
         let (term_tx, term_rx) = mpsc::channel();
 
         WorkerMux::spawn(size, job_runner, queue_rx, term_tx);
 
-        ThreadPool {
-            queue_tx,
-            term_rx,
-        }
+        ThreadPool { queue_tx, term_rx }
     }
 
     pub fn enqueue(&self, payload: Payload) -> Result<(), ThreadPoolError> {
         match self.queue_tx.send(Signal::JOB(payload)) {
             Err(err) => Err(ThreadPoolError::QueueErr(err.to_string())),
-            Ok(()) => Ok(())
+            Ok(()) => Ok(()),
         }
     }
 
@@ -42,9 +41,12 @@ impl<Payload: 'static + Send> ThreadPool<Payload> {
         match self.queue_tx.send(Signal::TERM) {
             Err(err) => Err(ThreadPoolError::TermError(err.to_string())),
             Ok(()) => match self.term_rx.recv() {
-                Err(err) => panic!("Worker mux term tx closed before termination signal: {}", err),
-                Ok(()) => Ok(())
-            }
+                Err(err) => panic!(
+                    "Worker mux term tx closed before termination signal: {}",
+                    err
+                ),
+                Ok(()) => Ok(()),
+            },
         }
     }
 }
@@ -58,10 +60,10 @@ pub enum ThreadPoolError {
 impl fmt::Display for ThreadPoolError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            ThreadPoolError::QueueErr(ref err) =>
-                write!(f, "Error enqueuing worker job: {}", err),
-            ThreadPoolError::TermError(ref err) =>
-                write!(f, "Error enqueuing worker termination signal: {}", err),
+            ThreadPoolError::QueueErr(ref err) => write!(f, "Error enqueuing worker job: {}", err),
+            ThreadPoolError::TermError(ref err) => {
+                write!(f, "Error enqueuing worker termination signal: {}", err)
+            }
         }
     }
 }
@@ -84,7 +86,8 @@ impl WorkerMux {
         queue_rx: Receiver<Signal<Payload>>,
         term_tx: Sender<()>,
     ) -> WorkerMux
-        where JobRunner: Fn(Payload) + 'static + Send + Sync
+    where
+        JobRunner: Fn(Payload) + 'static + Send + Sync,
     {
         let job_runner_arc: Arc<JobRunner> = Arc::new(job_runner);
 
@@ -125,7 +128,7 @@ impl WorkerMux {
             while terminated_workers < size {
                 match WorkerMux::join_worker_report(&mux_rx).status {
                     WorkerStatus::IDLE => {}
-                    WorkerStatus::TERM => terminated_workers += 1
+                    WorkerStatus::TERM => terminated_workers += 1,
                 }
             }
 
@@ -138,22 +141,22 @@ impl WorkerMux {
     fn join_worker_report(mux_rx: &Receiver<WorkerReport>) -> WorkerReport {
         match mux_rx.recv() {
             Err(err) => panic!("Worker rx error on threadpool worker mux: {}", err),
-            Ok(report) => report
+            Ok(report) => report,
         }
     }
 
     fn join_job_queue<Payload: 'static + Send>(
-        queue_rx: &Receiver<Signal<Payload>>
+        queue_rx: &Receiver<Signal<Payload>>,
     ) -> Signal<Payload> {
         match queue_rx.recv() {
             Err(err) => panic!("Job queue rx error on threadpool worker mux: {}", err),
-            Ok(sig) => sig
+            Ok(sig) => sig,
         }
     }
 }
 
 struct Worker<Payload: 'static + Send> {
-    tx: Sender<Signal<Payload>>
+    tx: Sender<Signal<Payload>>,
 }
 
 impl<Payload: 'static + Send> Worker<Payload> {
@@ -161,7 +164,10 @@ impl<Payload: 'static + Send> Worker<Payload> {
         id: WorkerId,
         mux_tx: Sender<WorkerReport>,
         job_runner: Arc<JobRunner>,
-    ) -> Worker<Payload> where JobRunner: Fn(Payload) + 'static + Send + Sync {
+    ) -> Worker<Payload>
+    where
+        JobRunner: Fn(Payload) + 'static + Send + Sync,
+    {
         let (tx, rx) = mpsc::channel();
 
         thread::spawn(move || {
@@ -202,7 +208,7 @@ impl<Payload: 'static + Send> Worker<Payload> {
     fn join_job(rx: &Receiver<Signal<Payload>>, id: WorkerId) -> Signal<Payload> {
         match rx.recv() {
             Err(err) => panic!("Mux rx error on worker thread {}: {}", id, err),
-            Ok(sig) => sig
+            Ok(sig) => sig,
         }
     }
 }
@@ -286,13 +292,10 @@ mod tests {
         //setup
         let counter = Arc::new(AtomicUsize::new(0));
 
-        let pool = ThreadPool::spawn(
-            4,
-            16,
-            |(_, counter): (usize, Arc<AtomicUsize>)| {
-                thread::sleep(Duration::new(0, 100000000));
-                counter.fetch_add(1, Ordering::SeqCst);
-            });
+        let pool = ThreadPool::spawn(4, 16, |(_, counter): (usize, Arc<AtomicUsize>)| {
+            thread::sleep(Duration::new(0, 100000000));
+            counter.fetch_add(1, Ordering::SeqCst);
+        });
 
         //exercise
         for i in 0..16 {
@@ -324,13 +327,10 @@ mod tests {
         //setup
         let counter = Arc::new(AtomicUsize::new(0));
 
-        let pool = ThreadPool::spawn(
-            4,
-            16,
-            |(_, counter): (usize, Arc<AtomicUsize>)| {
-                thread::sleep(Duration::new(0, 1000));
-                counter.fetch_add(1, Ordering::SeqCst);
-            });
+        let pool = ThreadPool::spawn(4, 16, |(_, counter): (usize, Arc<AtomicUsize>)| {
+            thread::sleep(Duration::new(0, 1000));
+            counter.fetch_add(1, Ordering::SeqCst);
+        });
 
         //exercise
         for i in 0..16 {
@@ -349,13 +349,10 @@ mod tests {
         //setup
         let counter = Arc::new(AtomicUsize::new(0));
 
-        let pool = ThreadPool::spawn(
-            4,
-            4,
-            |(_, counter): (usize, Arc<AtomicUsize>)| {
-                thread::sleep(Duration::new(0, 1000000));
-                counter.fetch_add(1, Ordering::SeqCst);
-            });
+        let pool = ThreadPool::spawn(4, 4, |(_, counter): (usize, Arc<AtomicUsize>)| {
+            thread::sleep(Duration::new(0, 1000000));
+            counter.fetch_add(1, Ordering::SeqCst);
+        });
 
         //exercise
         for i in 0..100 {
@@ -375,13 +372,10 @@ mod tests {
         //setup
         let counter = Arc::new(AtomicUsize::new(0));
 
-        let pool = ThreadPool::spawn(
-            4,
-            100,
-            |(_, counter): (usize, Arc<AtomicUsize>)| {
-                thread::sleep(Duration::new(0, 1000000));
-                counter.fetch_add(1, Ordering::SeqCst);
-            });
+        let pool = ThreadPool::spawn(4, 100, |(_, counter): (usize, Arc<AtomicUsize>)| {
+            thread::sleep(Duration::new(0, 1000000));
+            counter.fetch_add(1, Ordering::SeqCst);
+        });
 
         //exercise
         for i in 0..100 {

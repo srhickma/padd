@@ -1,16 +1,9 @@
 use {
     core::{
         parse::Tree,
-        spec::{
-            self,
-            lang::Symbol,
-        },
+        spec::{self, lang::Symbol},
     },
-    std::{
-        collections::HashSet,
-        error,
-        fmt,
-    },
+    std::{collections::HashSet, error, fmt},
 };
 
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
@@ -21,11 +14,8 @@ pub enum RegionType {
 }
 
 lazy_static! {
-    static ref REQUIRED_REGIONS: Vec<RegionType> = vec![
-        RegionType::Alphabet,
-        RegionType::CDFA,
-        RegionType::Grammar,
-    ];
+    static ref REQUIRED_REGIONS: Vec<RegionType> =
+        vec![RegionType::Alphabet, RegionType::CDFA, RegionType::Grammar,];
 }
 
 pub fn traverse(
@@ -38,7 +28,9 @@ pub fn traverse(
 
     for region_type in REQUIRED_REGIONS.iter() {
         if !region_types.contains(&region_type) {
-            return Err(spec::GenError::from(Error::MissingRequired(region_type.clone())));
+            return Err(spec::GenError::from(Error::MissingRequired(
+                region_type.clone(),
+            )));
         }
     }
 
@@ -51,18 +43,10 @@ fn traverse_regions_node(
     region_types: &mut HashSet<RegionType>,
 ) -> Result<(), spec::GenError> {
     if regions_node.children.len() == 2 {
-        traverse_regions_node(
-            regions_node.get_child(0),
-            handler,
-            region_types,
-        )?;
+        traverse_regions_node(regions_node.get_child(0), handler, region_types)?;
     }
 
-    traverse_region_node(
-        regions_node.children.last().unwrap(),
-        handler,
-        region_types,
-    )
+    traverse_region_node(regions_node.children.last().unwrap(), handler, region_types)
 }
 
 fn traverse_region_node(
@@ -85,10 +69,9 @@ fn type_from_node(region_node: &Tree<Symbol>) -> RegionType {
         Symbol::Alphabet => RegionType::Alphabet,
         Symbol::CDFA => RegionType::CDFA,
         Symbol::Grammar => RegionType::Grammar,
-        &_ => panic!("Invalid specification region type: '{:?}'", region_symbol)
+        &_ => panic!("Invalid specification region type: '{:?}'", region_symbol),
     }
 }
-
 
 #[derive(Debug)]
 pub enum Error {
@@ -98,8 +81,9 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Error::MissingRequired(ref region) =>
-                write!(f, "Missing required region: '{:?}'", region),
+            Error::MissingRequired(ref region) => {
+                write!(f, "Missing required region: '{:?}'", region)
+            }
         }
     }
 }

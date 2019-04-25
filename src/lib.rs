@@ -5,16 +5,8 @@ extern crate stopwatch;
 use {
     core::{
         fmt::Formatter,
-        parse::{
-            self,
-            grammar::Grammar,
-            Parser,
-        },
-        scan::{
-            self,
-            ecdfa::EncodedCDFA,
-            Scanner,
-        },
+        parse::{self, grammar::Grammar, Parser},
+        scan::{self, ecdfa::EncodedCDFA, Scanner},
         spec,
     },
     std::{error, fmt},
@@ -23,14 +15,12 @@ use {
 mod core;
 
 pub struct FormatJob {
-    text: String
+    text: String,
 }
 
 impl FormatJob {
     pub fn from_text(text: String) -> Self {
-        FormatJob {
-            text
-        }
+        FormatJob { text }
     }
 }
 
@@ -73,12 +63,12 @@ pub enum BuildError {
 impl fmt::Display for BuildError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            BuildError::SpecParseErr(ref err) => write!(
-                f, "Failed to parse specification: {}", err
-            ),
-            BuildError::SpecGenErr(ref err) => write!(
-                f, "Failed to generate specification: {}", err
-            ),
+            BuildError::SpecParseErr(ref err) => {
+                write!(f, "Failed to parse specification: {}", err)
+            }
+            BuildError::SpecGenErr(ref err) => {
+                write!(f, "Failed to generate specification: {}", err)
+            }
         }
     }
 }
@@ -159,7 +149,8 @@ cdfa {
 grammar {
     s | ACC;
 }
-        ".to_string();
+        "
+        .to_string();
 
         let fjr = FormatJobRunner::build(&spec).unwrap();
 
@@ -176,10 +167,7 @@ grammar {
         );
 
         err = err.source().unwrap();
-        assert_eq!(
-            format!("{}", err),
-            "No accepting scans after (1,1): b..."
-        );
+        assert_eq!(format!("{}", err), "No accepting scans after (1,1): b...");
 
         assert!(err.source().is_none());
     }
@@ -199,7 +187,8 @@ cdfa {
 grammar {
     s | B;
 }
-        ".to_string();
+        "
+        .to_string();
 
         let fjr = FormatJobRunner::build(&spec).unwrap();
 
@@ -237,7 +226,8 @@ cdfa {
 grammar {
     s | ACC;
 }
-        ".to_string();
+        "
+        .to_string();
 
         //exercise
         let res = FormatJobRunner::build(&spec);
@@ -249,7 +239,7 @@ grammar {
         assert_eq!(
             format!("{}", err),
             "Failed to parse specification: Scan error: No accepting scans after (2,14): \
-            ~\n\ncdfa {\n..."
+             ~\n\ncdfa {\n..."
         );
 
         err = err.source().unwrap();
@@ -280,7 +270,8 @@ cdfa {
 grammar {
     s | B;
 }
-        ".to_string();
+        "
+        .to_string();
 
         //exercise
         let res = FormatJobRunner::build(&spec);
@@ -292,7 +283,7 @@ grammar {
         assert_eq!(
             format!("{}", err),
             "Failed to parse specification: Parse error: Recognition failed at token 10: \
-            TId <- 'SOMETHING'"
+             TId <- 'SOMETHING'"
         );
 
         err = err.source().unwrap();
@@ -328,16 +319,10 @@ grammar {
         );
 
         err = err.source().unwrap();
-        assert_eq!(
-            format!("{}", err),
-            "Parse error: No tokens scanned"
-        );
+        assert_eq!(format!("{}", err), "Parse error: No tokens scanned");
 
         err = err.source().unwrap();
-        assert_eq!(
-            format!("{}", err),
-            "No tokens scanned"
-        );
+        assert_eq!(format!("{}", err), "No tokens scanned");
 
         assert!(err.source().is_none());
     }
@@ -357,7 +342,8 @@ cdfa {
 grammar {
     s |;
 }
-        ".to_string();
+        "
+        .to_string();
 
         //exercise
         let res = FormatJobRunner::build(&spec);
@@ -369,7 +355,7 @@ grammar {
         assert_eq!(
             format!("{}", err),
             "Failed to generate specification: ECDFA generation error: Failed to build CDFA: \
-            Default matcher used twice"
+             Default matcher used twice"
         );
 
         err = err.source().unwrap();
@@ -402,7 +388,8 @@ cdfa {
 grammar {
     s |;
 }
-        ".to_string();
+        "
+        .to_string();
 
         //exercise
         let res = FormatJobRunner::build(&spec);
@@ -414,14 +401,14 @@ grammar {
         assert_eq!(
             format!("{}", err),
             "Failed to generate specification: ECDFA generation error: Failed to build CDFA: \
-            Transition trie is not prefix free on character 'a'"
+             Transition trie is not prefix free on character 'a'"
         );
 
         err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
             "ECDFA generation error: Failed to build CDFA: \
-            Transition trie is not prefix free on character 'a'"
+             Transition trie is not prefix free on character 'a'"
         );
 
         err = err.source().unwrap();
@@ -448,7 +435,8 @@ cdfa {
 grammar {
     s |;
 }
-        ".to_string();
+        "
+        .to_string();
 
         //exercise
         let res = FormatJobRunner::build(&spec);
@@ -460,14 +448,14 @@ grammar {
         assert_eq!(
             format!("{}", err),
             "Failed to generate specification: ECDFA generation error: Failed to build CDFA: \
-            Transition trie is not prefix free on character 'l'"
+             Transition trie is not prefix free on character 'l'"
         );
 
         err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
             "ECDFA generation error: Failed to build CDFA: \
-            Transition trie is not prefix free on character 'l'"
+             Transition trie is not prefix free on character 'l'"
         );
 
         err = err.source().unwrap();
@@ -493,7 +481,8 @@ cdfa {
 grammar {
     s |;
 }
-        ".to_string();
+        "
+        .to_string();
 
         //exercise
         let res = FormatJobRunner::build(&spec);
@@ -505,7 +494,7 @@ grammar {
         assert_eq!(
             format!("{}", err),
             "Failed to generate specification: Matcher definition error: \
-            Range start must be one character, but was 'aa'"
+             Range start must be one character, but was 'aa'"
         );
 
         err = err.source().unwrap();
@@ -531,7 +520,8 @@ cdfa {
 grammar {
     s |;
 }
-        ".to_string();
+        "
+        .to_string();
 
         //exercise
         let res = FormatJobRunner::build(&spec);
@@ -543,7 +533,7 @@ grammar {
         assert_eq!(
             format!("{}", err),
             "Failed to generate specification: Matcher definition error: \
-            Range end must be one character, but was 'cd'"
+             Range end must be one character, but was 'cd'"
         );
 
         err = err.source().unwrap();
@@ -570,7 +560,8 @@ cdfa {
 grammar {
     s | ORPHANED;
 }
-        ".to_string();
+        "
+        .to_string();
 
         //exercise
         let res = FormatJobRunner::build(&spec);
@@ -582,14 +573,14 @@ grammar {
         assert_eq!(
             format!("{}", err),
             "Failed to generate specification: ECDFA to grammar mapping error: \
-            Orphaned terminal 'ORPHANED' is not tokenized by the ECDFA"
+             Orphaned terminal 'ORPHANED' is not tokenized by the ECDFA"
         );
 
         err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
             "ECDFA to grammar mapping error: \
-            Orphaned terminal 'ORPHANED' is not tokenized by the ECDFA"
+             Orphaned terminal 'ORPHANED' is not tokenized by the ECDFA"
         );
 
         assert!(err.source().is_none());
@@ -610,7 +601,8 @@ cdfa {
 grammar {
     s |;
 }
-        ".to_string();
+        "
+        .to_string();
 
         //exercise
         let res = FormatJobRunner::build(&spec);
@@ -622,21 +614,21 @@ grammar {
         assert_eq!(
             format!("{}", err),
             "Failed to generate specification: ECDFA generation error: Failed to build CDFA: \
-            State \"A\" is accepted multiple times with different destinations"
+             State \"A\" is accepted multiple times with different destinations"
         );
 
         err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
             "ECDFA generation error: Failed to build CDFA: \
-            State \"A\" is accepted multiple times with different destinations"
+             State \"A\" is accepted multiple times with different destinations"
         );
 
         err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
             "Failed to build CDFA: \
-            State \"A\" is accepted multiple times with different destinations"
+             State \"A\" is accepted multiple times with different destinations"
         );
 
         assert!(err.source().is_none());
@@ -658,7 +650,8 @@ cdfa {
 grammar {
     s |;
 }
-        ".to_string();
+        "
+        .to_string();
 
         //exercise
         let res = FormatJobRunner::build(&spec);
@@ -670,21 +663,21 @@ grammar {
         assert_eq!(
             format!("{}", err),
             "Failed to generate specification: ECDFA generation error: Failed to build CDFA: \
-            State \"A\" already has an acceptance destination from all incoming states"
+             State \"A\" already has an acceptance destination from all incoming states"
         );
 
         err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
             "ECDFA generation error: Failed to build CDFA: \
-            State \"A\" already has an acceptance destination from all incoming states"
+             State \"A\" already has an acceptance destination from all incoming states"
         );
 
         err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
             "Failed to build CDFA: \
-            State \"A\" already has an acceptance destination from all incoming states"
+             State \"A\" already has an acceptance destination from all incoming states"
         );
 
         assert!(err.source().is_none());
@@ -706,7 +699,8 @@ cdfa {
 grammar {
     s |;
 }
-        ".to_string();
+        "
+        .to_string();
 
         //exercise
         let res = FormatJobRunner::build(&spec);
@@ -718,21 +712,21 @@ grammar {
         assert_eq!(
             format!("{}", err),
             "Failed to generate specification: ECDFA generation error: Failed to build CDFA: \
-            State \"A\" already has an acceptance destination from a specific state"
+             State \"A\" already has an acceptance destination from a specific state"
         );
 
         err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
             "ECDFA generation error: Failed to build CDFA: \
-            State \"A\" already has an acceptance destination from a specific state"
+             State \"A\" already has an acceptance destination from a specific state"
         );
 
         err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
             "Failed to build CDFA: \
-            State \"A\" already has an acceptance destination from a specific state"
+             State \"A\" already has an acceptance destination from a specific state"
         );
 
         assert!(err.source().is_none());
@@ -747,7 +741,8 @@ alphabet ''
 grammar {
     s |;
 }
-        ".to_string();
+        "
+        .to_string();
 
         //exercise
         let res = FormatJobRunner::build(&spec);
@@ -768,10 +763,7 @@ grammar {
         );
 
         err = err.source().unwrap();
-        assert_eq!(
-            format!("{}", err),
-            "Missing required region: 'CDFA'"
-        );
+        assert_eq!(format!("{}", err), "Missing required region: 'CDFA'");
 
         assert!(err.source().is_none());
     }
@@ -789,7 +781,8 @@ cdfa {
 grammar {
     s | `{`;
 }
-        ".to_string();
+        "
+        .to_string();
 
         //exercise
         let res = FormatJobRunner::build(&spec);
@@ -801,14 +794,14 @@ grammar {
         assert_eq!(
             format!("{}", err),
             "Failed to generate specification: Formatter build error: Pattern parse error: \
-            Recognition failed after consuming all tokens"
+             Recognition failed after consuming all tokens"
         );
 
         err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
             "Formatter build error: Pattern parse error: \
-            Recognition failed after consuming all tokens"
+             Recognition failed after consuming all tokens"
         );
 
         err = err.source().unwrap();
@@ -839,7 +832,8 @@ cdfa {
 grammar {
     s | `{4}`;
 }
-        ".to_string();
+        "
+        .to_string();
 
         //exercise
         let res = FormatJobRunner::build(&spec);
@@ -851,21 +845,21 @@ grammar {
         assert_eq!(
             format!("{}", err),
             "Failed to generate specification: Formatter build error: Pattern capture error: \
-            Capture index 4 out of bounds for production \'s\' with 0 children"
+             Capture index 4 out of bounds for production \'s\' with 0 children"
         );
 
         err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
             "Formatter build error: Pattern capture error: \
-            Capture index 4 out of bounds for production \'s\' with 0 children"
+             Capture index 4 out of bounds for production \'s\' with 0 children"
         );
 
         err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
             "Pattern capture error: \
-            Capture index 4 out of bounds for production \'s\' with 0 children"
+             Capture index 4 out of bounds for production \'s\' with 0 children"
         );
 
         assert!(err.source().is_none());

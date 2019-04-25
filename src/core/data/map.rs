@@ -1,13 +1,11 @@
 pub struct CEHashMap<V: Default> {
-    vector: Vec<Option<V>>
+    vector: Vec<Option<V>>,
 }
 
 #[allow(dead_code)]
 impl<V: Default> CEHashMap<V> {
     pub fn new() -> CEHashMap<V> {
-        CEHashMap {
-            vector: Vec::new()
-        }
+        CEHashMap { vector: Vec::new() }
     }
 
     pub fn insert(&mut self, key: usize, value: V) {
@@ -20,14 +18,14 @@ impl<V: Default> CEHashMap<V> {
     pub fn get(&self, key: usize) -> Option<&V> {
         match self.vector.get(key) {
             None => None,
-            Some(opt) => opt.as_ref()
+            Some(opt) => opt.as_ref(),
         }
     }
 
     pub fn get_mut(&mut self, key: usize) -> Option<&mut V> {
         match self.vector.get_mut(key) {
             None => None,
-            Some(opt) => opt.as_mut()
+            Some(opt) => opt.as_mut(),
         }
     }
 

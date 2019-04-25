@@ -1,9 +1,5 @@
 use {
-    core::{
-        data::Data,
-        parse::grammar::Grammar,
-        scan::Token,
-    },
+    core::{data::Data, parse::grammar::Grammar, scan::Token},
     std::{error, fmt},
 };
 
@@ -55,11 +51,17 @@ impl<Symbol: Data + Default> Tree<Symbol> {
     fn to_string_internal(&self, prefix: String, is_tail: bool) -> String {
         if self.children.is_empty() {
             format!(
-                "{}{}{}", prefix, if is_tail { "└── " } else { "├── " }, self.lhs.to_string()
+                "{}{}{}",
+                prefix,
+                if is_tail { "└── " } else { "├── " },
+                self.lhs.to_string()
             )
         } else {
             let mut builder = format!(
-                "{}{}{}", prefix, if is_tail { "└── " } else { "├── " }, self.lhs.kind().to_string()
+                "{}{}{}",
+                prefix,
+                if is_tail { "└── " } else { "├── " },
+                self.lhs.kind().to_string()
             );
             let len = self.children.len();
             for (i, child) in self.children.iter().enumerate() {
@@ -118,10 +120,7 @@ pub struct Production<Symbol: Data + Default> {
 
 impl<Symbol: Data + Default> Production<Symbol> {
     pub fn from(lhs: Symbol, rhs: Vec<Symbol>) -> Self {
-        Production {
-            lhs,
-            rhs,
-        }
+        Production { lhs, rhs }
     }
 
     pub fn epsilon(lhs: Symbol) -> Self {
@@ -154,7 +153,7 @@ mod tests {
         grammar_builder.add_productions(build_prods_from_strings(&[
             "Sentence Noun Verb",
             "Noun mary",
-            "Verb runs"
+            "Verb runs",
         ]));
         grammar_builder.try_mark_start(&"Sentence".to_string());
         let grammar = grammar_builder.build();
@@ -170,8 +169,9 @@ mod tests {
         let tree = parser.parse(scan, &grammar);
 
         //verify
-        assert_eq!(tree.unwrap().to_string(),
-                   "└── Sentence
+        assert_eq!(
+            tree.unwrap().to_string(),
+            "└── Sentence
     ├── Noun
     │   └── mary <- 'Hello'
     └── Verb
@@ -183,11 +183,7 @@ mod tests {
     fn parse_simple() {
         //setup
         let mut grammar_builder = GrammarBuilder::new();
-        grammar_builder.add_productions(build_prods_from_strings(&[
-            "S BOF A EOF",
-            "A x",
-            "A A x"
-        ]));
+        grammar_builder.add_productions(build_prods_from_strings(&["S BOF A EOF", "A x", "A A x"]));
         grammar_builder.try_mark_start(&"S".to_string());
         let grammar = grammar_builder.build();
 
@@ -203,8 +199,9 @@ mod tests {
         let tree = parser.parse(scan, &grammar);
 
         //verify
-        assert_eq!(tree.unwrap().to_string(),
-                   "└── S
+        assert_eq!(
+            tree.unwrap().to_string(),
+            "└── S
     ├── BOF <- 'a'
     ├── A
     │   └── x <- 'b'
@@ -225,7 +222,8 @@ mod tests {
         grammar_builder.try_mark_start(&"S".to_string());
         let grammar = grammar_builder.build();
 
-        let scan = "( ID OP ID ) OP ID OP ( ID )".split_whitespace()
+        let scan = "( ID OP ID ) OP ID OP ( ID )"
+            .split_whitespace()
             .map(|kind| Token::leaf(kind.to_string(), "xy".to_string()))
             .collect();
 
@@ -235,8 +233,9 @@ mod tests {
         let tree = parser.parse(scan, &grammar);
 
         //verify
-        assert_eq!(tree.unwrap().to_string(),
-                   "└── S
+        assert_eq!(
+            tree.unwrap().to_string(),
+            "└── S
     ├── S
     │   ├── S
     │   │   └── expr
@@ -278,7 +277,8 @@ mod tests {
         grammar_builder.try_mark_start(&"Sum".to_string());
         let grammar = grammar_builder.build();
 
-        let scan = "NUM AS LPAREN NUM MD NUM AS NUM RPAREN".split_whitespace()
+        let scan = "NUM AS LPAREN NUM MD NUM AS NUM RPAREN"
+            .split_whitespace()
             .map(|kind| Token::leaf(kind.to_string(), "xy".to_string()))
             .collect();
 
@@ -288,8 +288,9 @@ mod tests {
         let tree = parser.parse(scan, &grammar);
 
         //verify
-        assert_eq!(tree.unwrap().to_string(),
-                   "└── Sum
+        assert_eq!(
+            tree.unwrap().to_string(),
+            "└── Sum
     ├── Sum
     │   └── Product
     │       └── Factor
@@ -343,8 +344,9 @@ mod tests {
         let tree = parser.parse(scan, &grammar);
 
         //verify
-        assert_eq!(tree.unwrap().to_string(),
-                   "└── s
+        assert_eq!(
+            tree.unwrap().to_string(),
+            "└── s
     ├── s
     │   ├── s
     │   │   ├── s
@@ -399,7 +401,8 @@ mod tests {
         grammar_builder.try_mark_start(&"s".to_string());
         let grammar = grammar_builder.build();
 
-        let scan = "WHITESPACE".split_whitespace()
+        let scan = "WHITESPACE"
+            .split_whitespace()
             .map(|kind| Token::leaf(kind.to_string(), "xy".to_string()))
             .collect();
 
@@ -409,8 +412,9 @@ mod tests {
         let tree = parser.parse(scan, &grammar);
 
         //verify
-        assert_eq!(tree.unwrap().to_string(),
-                   "└── s
+        assert_eq!(
+            tree.unwrap().to_string(),
+            "└── s
     ├── w
     │   └──  <- 'NULL'
     ├── w
@@ -457,8 +461,9 @@ mod tests {
         let tree = parser.parse(scan, &grammar);
 
         //verify
-        assert_eq!(tree.unwrap().to_string(),
-                   "└── sum
+        assert_eq!(
+            tree.unwrap().to_string(),
+            "└── sum
     ├── sum
     │   └── prod
     │       └── fac
@@ -505,11 +510,14 @@ mod tests {
 
         //verify
         assert!(res.is_err());
-        assert_eq!(format!("{}", res.err().unwrap()), "Largest parse did not consume all tokens: 0 of 1")
+        assert_eq!(
+            format!("{}", res.err().unwrap()),
+            "Largest parse did not consume all tokens: 0 of 1"
+        )
     }
 
     pub fn build_prods_from_strings<'scope>(
-        strings: &'scope [&'scope str]
+        strings: &'scope [&'scope str],
     ) -> Vec<Production<String>> {
         let mut productions: Vec<Production<String>> = vec![];
         for string in strings {
@@ -532,9 +540,6 @@ mod tests {
             i += 1;
         }
 
-        Production {
-            lhs,
-            rhs,
-        }
+        Production { lhs, rhs }
     }
 }
