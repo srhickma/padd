@@ -1,9 +1,3 @@
-extern crate clap;
-extern crate colored;
-extern crate crypto;
-extern crate regex;
-extern crate stopwatch;
-
 use {
     cli::logger,
     std::{

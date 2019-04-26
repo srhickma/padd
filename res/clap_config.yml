@@ -1,0 +1,62 @@
+name: padd
+version: 0.1.0
+about: Text formatter for context-free languages
+author: Shane Hickman <srhickma@edu.uwaterloo.ca>
+
+settings:
+  - SubcommandRequired
+  - VersionlessSubcommands
+
+subcommands:
+  - fmt:
+      about: Formatter
+      args:
+        - spec:
+            help: Specification file path
+            takes_value: true
+            value_name: SPECIFICATION
+            required: true
+        - target:
+            short: t
+            long: target
+            help: Sets a the path to format files under
+            takes_value: true
+            value_name: PATH
+            required: true
+        - matching:
+            short: m
+            long: matching
+            help: Sets the regex for file names to format
+            takes_value: true
+            value_name: REGEX
+        - threads:
+            long: threads
+            help: Sets the number of worker threads
+            takes_value: true
+            value_name: NUM
+        - no-skip:
+            long: no-skip
+            help: Do not skip files which haven't changed since they were last formatted
+        - no-track:
+            long: no-track
+            help: Do not track file changes
+        - no-write:
+            long: no-write
+            help: Do not write changes to files
+  - forget:
+      about: Clears all file tracking data
+      args:
+        - target:
+            help: Sets the target directory to clear tracking data under
+            takes_value: true
+            value_name: PATH
+            required: true
+  - daemon:
+      about: Daemon specific commands
+      subcommands:
+        - start:
+            about: Start padd server in daemon mode
+        - kill:
+            about: Stop the padd daemon
+  - start-server:
+      about: Start a padd server

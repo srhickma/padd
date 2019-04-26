@@ -1,6 +1,5 @@
 extern crate clap;
 extern crate colored;
-extern crate crypto;
 extern crate regex;
 extern crate stopwatch;
 
@@ -10,7 +9,7 @@ use {
 };
 
 use self::{
-    clap::{App, AppSettings, Arg, ArgMatches, SubCommand},
+    clap::{App, ArgMatches},
     colored::{ColoredString, Colorize},
     regex::Regex,
     stopwatch::Stopwatch,
@@ -23,7 +22,8 @@ mod thread_pool;
 mod tracker;
 
 pub fn run() {
-    let matches = build_app();
+    let yaml = load_yaml!("../../res/clap_config.yml");
+    let matches = App::from_yaml(yaml).get_matches();
 
     if let Some(matches) = matches.subcommand_matches("fmt") {
         if server::running() {
@@ -49,87 +49,6 @@ pub fn run() {
     if matches.subcommand_matches("start-server").is_some() {
         server::start();
     }
-}
-
-fn build_app<'a>() -> ArgMatches<'a> {
-    App::new("padd")
-        .version("0.1.0")
-        .author("Shane Hickman <srhickma@edu.uwaterloo.ca>")
-        .about("Text formatter for context-free languages")
-        .setting(AppSettings::SubcommandRequired)
-        .setting(AppSettings::VersionlessSubcommands)
-        .subcommand(
-            SubCommand::with_name("fmt")
-                .about("Formatter")
-                .arg(
-                    Arg::with_name("spec")
-                        .help("Specification file path")
-                        .takes_value(true)
-                        .value_name("SPECIFICATION")
-                        .required(true),
-                )
-                .arg(
-                    Arg::with_name("target")
-                        .short("t")
-                        .long("target")
-                        .help("Sets a the path to format files under")
-                        .takes_value(true)
-                        .value_name("PATH")
-                        .required(true),
-                )
-                .arg(
-                    Arg::with_name("matching")
-                        .short("m")
-                        .long("matching")
-                        .help("Sets the regex for file names to format")
-                        .takes_value(true)
-                        .value_name("REGEX")
-                        .requires("target"),
-                )
-                .arg(
-                    Arg::with_name("threads")
-                        .long("threads")
-                        .help("Sets the number of worker threads")
-                        .takes_value(true)
-                        .value_name("NUM"),
-                )
-                .arg(
-                    Arg::with_name("no-skip").long("no-skip").help(
-                        "Do not skip files which haven't changed since they were last formatted",
-                    ),
-                )
-                .arg(
-                    Arg::with_name("no-track")
-                        .long("no-track")
-                        .help("Do not track file changes"),
-                )
-                .arg(
-                    Arg::with_name("no-write")
-                        .long("no-write")
-                        .help("Do not write changes to files"),
-                ),
-        )
-        .subcommand(
-            SubCommand::with_name("forget")
-                .about("Clears all file tracking data")
-                .arg(
-                    Arg::with_name("target")
-                        .help("Sets the target directory to clear tracking data under")
-                        .takes_value(true)
-                        .value_name("PATH")
-                        .required(true),
-                ),
-        )
-        .subcommand(
-            SubCommand::with_name("daemon")
-                .about("Daemon specific commands")
-                .subcommand(
-                    SubCommand::with_name("start").about("Start padd server in daemon mode"),
-                )
-                .subcommand(SubCommand::with_name("kill").about("Stop the padd daemon")),
-        )
-        .subcommand(SubCommand::with_name("start-server").about("Start a padd server"))
-        .get_matches()
 }
 
 fn fmt(matches: &ArgMatches) {
