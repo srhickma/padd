@@ -15,7 +15,7 @@ pub enum RegionType {
 
 lazy_static! {
     static ref REQUIRED_REGIONS: Vec<RegionType> =
-        vec![RegionType::Alphabet, RegionType::CDFA, RegionType::Grammar,];
+        vec![RegionType::Alphabet, RegionType::CDFA, RegionType::Grammar];
 }
 
 pub fn traverse(

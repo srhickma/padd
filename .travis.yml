@@ -13,11 +13,14 @@ notifications:
     on_failure: always
 
 before_script:
+- rustup toolchain install nightly
 - rustup component add clippy
+- rustup component add rustfmt --toolchain nightly
 script:
 - cargo clean
 - cargo build
 - cargo clippy -- -D warnings
+- cargo +nightly fmt --all -- --check
 - cargo test
 
 env:
