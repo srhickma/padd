@@ -125,7 +125,7 @@ pub fn forget(matches: &ArgMatches) {
 pub fn daemon(matches: &ArgMatches) {
     if matches.subcommand_matches("start").is_some() {
         if server::running() {
-            logger::info(&format!("Daemon already running"));
+            logger::info(&"Daemon already running".to_string());
         } else {
             let child = Command::new(&env::args().next().unwrap()[..])
                 .arg("start-server")

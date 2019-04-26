@@ -12,27 +12,27 @@ lazy_static! {
     static ref PREFIX_FMT_ERR: ColoredString = "ERROR".bright_red();
 }
 
-pub fn info(string: &String) {
+pub fn info(string: &str) {
     println!("{}", string);
 }
 
-pub fn err(string: &String) {
+pub fn err(string: &str) {
     println!("{}: {}", *PREFIX_ERR, string);
 }
 
-pub fn fatal(string: &String) {
+pub fn fatal(string: &str) {
     println!("{}: {}", *PREFIX_FATAL, string);
     process::exit(1);
 }
 
-pub fn fmt(string: &String) {
+pub fn fmt(string: &str) {
     println!("{}| {}", *PREFIX_FMT, string);
 }
 
-pub fn fmt_ok(string: &String) {
+pub fn fmt_ok(string: &str) {
     println!("{}| {}", *PREFIX_FMT_OK, string);
 }
 
-pub fn fmt_err(string: &String) {
+pub fn fmt_err(string: &str) {
     println!("{}| {}", *PREFIX_FMT_ERR, string);
 }
