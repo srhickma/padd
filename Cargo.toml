@@ -12,6 +12,7 @@ stopwatch = "0.0.7"
 regex = "0.2"
 colored = "1.6.1"
 rust-crypto = "0.2.36"
+yaml-rust = "0.3.5"
 
 [dependencies.clap]
 version = "2.32.0"
