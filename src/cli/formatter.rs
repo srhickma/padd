@@ -9,6 +9,7 @@ use {
     },
     padd::{self, FormatJob, FormatJobRunner},
     std::{
+        collections::HashMap,
         error, fmt,
         fs::{self, File, OpenOptions},
         io::{Read, Seek, SeekFrom, Write},
@@ -23,6 +24,11 @@ use self::{
 };
 
 const THREAD_POOL_QUEUE_LENGTH_PER_WORKER: usize = 2;
+
+lazy_static! {
+    static ref FJR_CACHE: Arc<Mutex<HashMap<String, Arc<FormatJobRunner>>>> =
+        Arc::new(Mutex::new(HashMap::new()));
+}
 
 #[derive(Clone)]
 pub struct Formatter {
@@ -133,20 +139,33 @@ pub fn generate_formatter(spec_path: &str) -> Result<Formatter, GenerationError>
         }
     }
 
-    let fjr = FormatJobRunner::build(&spec)?;
-
     let mut sha = Sha256::new();
     sha.input_str(&spec[..]);
+    let spec_sha = sha.result_str().to_string();
+
+    let fjr_arc = {
+        let mut fjr_cache = FJR_CACHE.lock().unwrap();
+
+        if fjr_cache.contains_key(&spec_sha) {
+            logger::info(&format!(
+                "Loading cached specification: sha256: {}",
+                &spec_sha
+            ));
+        }
+
+        #[allow(clippy::or_fun_call)]
+        fjr_cache
+            .entry(spec_sha.clone())
+            .or_insert(Arc::new(FormatJobRunner::build(&spec)?))
+            .clone()
+    };
 
     logger::info(&format!(
         "Successfully loaded specification: sha256: {}",
-        &sha.result_str()
+        &spec_sha
     ));
 
-    Ok(Formatter {
-        fjr_arc: Arc::new(fjr),
-        spec_sha: sha.result_str().to_string(),
-    })
+    Ok(Formatter { fjr_arc, spec_sha })
 }
 
 #[derive(Debug)]

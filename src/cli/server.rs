@@ -138,7 +138,6 @@ fn execute_command(mut command: String, clap_config: Arc<&Yaml>) {
     let matches = App::from_yaml(&clap_config).get_matches_from(args);
 
     if let Some(matches) = matches.subcommand_matches("fmt") {
-        println!("Formatting!");
         cmd::fmt(&matches);
     }
 }
