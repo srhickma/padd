@@ -44,6 +44,7 @@ pub struct FormatCommand<'path> {
     pub no_skip: bool,
     pub no_track: bool,
     pub no_write: bool,
+    pub check: bool,
 }
 
 struct FormatInstance<'outer> {
@@ -58,6 +59,7 @@ struct FormatCriteria<'outer> {
     no_skip: bool,
     no_track: bool,
     no_write: bool,
+    check: bool,
 }
 
 pub struct FormatMetrics {
@@ -101,6 +103,7 @@ struct FormatPayload {
     file_path: PathBuf,
     no_track: bool,
     no_write: bool,
+    check: bool,
     metrics: Arc<Mutex<FormatMetrics>>,
 }
 
@@ -111,6 +114,7 @@ impl FormatPayload {
             formatter: instance.formatter.clone(),
             no_track: instance.criteria.no_track,
             no_write: instance.criteria.no_write,
+            check: instance.criteria.check,
             metrics: instance.metrics.clone(),
         }
     }
@@ -208,7 +212,13 @@ pub fn format(cmd: FormatCommand) -> FormatMetrics {
 
             logger::fmt(&file_path_string);
 
-            match format_file(file_path, &payload.formatter.fjr_arc, payload.no_write) {
+            let result = if payload.check {
+                check_file(file_path, &payload.formatter.fjr_arc)
+            } else {
+                format_file(file_path, &payload.formatter.fjr_arc, payload.no_write)
+            };
+
+            match result {
                 Ok(_) => {
                     logger::fmt_ok(&file_path_string);
                     payload.metrics.lock().unwrap().inc_formatted();
@@ -238,6 +248,7 @@ pub fn format(cmd: FormatCommand) -> FormatMetrics {
             no_skip: cmd.no_skip,
             no_track: cmd.no_track,
             no_write: cmd.no_write,
+            check: cmd.check,
         },
         metrics: Arc::new(Mutex::new(FormatMetrics::new())),
     };
@@ -271,6 +282,7 @@ fn format_target(target_path: &Path, instance: &mut FormatInstance) {
         instance.metrics.lock().unwrap().inc_total();
 
         if instance.criteria.no_skip
+            || instance.criteria.check
             || tracker::needs_formatting(target_path, &instance.formatter.spec_sha)
         {
             let payload = FormatPayload::from(target_path, instance);
@@ -340,10 +352,48 @@ fn format_file(
     }
 }
 
+fn check_file(target_path: &Path, fjr: &FormatJobRunner) -> Result<(), FormattingError> {
+    let target_file = OpenOptions::new().read(true).write(true).open(&target_path);
+    let target_path_string = target_path.to_string_lossy().to_string();
+    match target_file {
+        Ok(_) => {
+            let mut target = target_file.unwrap();
+
+            let mut text = String::new();
+
+            if let Err(err) = target.read_to_string(&mut text) {
+                return Err(FormattingError::FileErr(format!(
+                    "Could not read target file \"{}\": {}",
+                    target_path_string, err
+                )));
+            }
+
+            let result = fjr.format(FormatJob::from_text(text.clone()));
+
+            match result {
+                Ok(res) => {
+                    if res == text {
+                        Ok(())
+                    } else {
+                        // TODO(shane) give a more useful error
+                        Err(FormattingError::CheckErr(target_path_string))
+                    }
+                }
+                Err(err) => Err(FormattingError::FormatErr(err, target_path_string)),
+            }
+        }
+        Err(err) => Err(FormattingError::FileErr(format!(
+            "Could not find target file \"{}\": {}",
+            target_path_string, err
+        ))),
+    }
+}
+
 #[derive(Debug)]
 pub enum FormattingError {
     FileErr(String),
     FormatErr(padd::FormatError, String),
+    CheckErr(String),
 }
 
 impl fmt::Display for FormattingError {
@@ -352,6 +402,9 @@ impl fmt::Display for FormattingError {
             FormattingError::FileErr(ref err) => write!(f, "{}", err),
             FormattingError::FormatErr(ref err, ref target) => {
                 write!(f, "Error formatting {}: {}", target, err)
+            }
+            FormattingError::CheckErr(ref target) => {
+                write!(f, "Formatting check failed for {}", target)
             }
         }
     }
@@ -362,6 +415,7 @@ impl error::Error for FormattingError {
         match *self {
             FormattingError::FileErr(_) => None,
             FormattingError::FormatErr(ref err, _) => Some(err),
+            FormattingError::CheckErr(_) => None,
         }
     }
 }

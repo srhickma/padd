@@ -43,6 +43,9 @@ subcommands:
         - no-write:
             long: no-write
             help: Do not write changes to files
+        - check:
+            long: check
+            help: Return an error if a file is not already formatted
   - forget:
       about: Clears all file tracking data
       args:

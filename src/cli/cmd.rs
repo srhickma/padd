@@ -75,6 +75,7 @@ pub fn fmt(matches: &ArgMatches) {
     let no_skip = matches.is_present("no-skip");
     let no_track = matches.is_present("no-track");
     let no_write = matches.is_present("no-write");
+    let check = matches.is_present("check");
 
     println!();
 
@@ -86,13 +87,18 @@ pub fn fmt(matches: &ArgMatches) {
         no_skip,
         no_track,
         no_write,
+        check,
     });
 
     sw.stop();
-    print_final_status(sw.elapsed_ms(), metrics);
+    print_final_status(sw.elapsed_ms(), &metrics);
+
+    if check && metrics.failed > 0 {
+        logger::fatal("Some checks failed")
+    }
 }
 
-pub fn print_final_status(elapsed_ms: i64, metrics: FormatMetrics) {
+pub fn print_final_status(elapsed_ms: i64, metrics: &FormatMetrics) {
     let unchanged = metrics.total - metrics.failed - metrics.formatted;
 
     let mut unchanged_msg = format!("{} unchanged", unchanged).normal();
