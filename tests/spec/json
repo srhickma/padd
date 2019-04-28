@@ -1,0 +1,64 @@
+alphabet '<>=+-*/\\%(){}[],.;:#!?^$@&|"\'`~ \t\n_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789' #TODO(shane) support full alphabet
+
+cdfa {
+    start #TODO(shane) need to support carriage return
+        ' ' | '\t' | '\n' -> ^_
+        ',' -> ^COMMA
+        ':' -> ^COLON
+        '{' -> ^LBRACKET
+        '}' -> ^RBRACKET
+        '[' -> ^LARRI
+        ']' -> ^RARRI
+        '"' -> string
+        '0' .. '9' -> int
+        '-' -> minus
+        'true' | 'false' | 'null' -> ^LITERAL;
+
+    string
+        '"' -> ^STRING
+        '\\' -> string_esc
+        _ -> string;
+    string_esc
+        _ -> string;
+
+    minus
+        '0' .. '9' -> int;
+
+    int ^NUMBER
+        '0' .. '9' | '.' -> int
+        'E' | 'e' -> int_exp;
+
+    int_exp
+        '+' | '-' | '0' .. '9' -> int;
+}
+
+grammar {
+    json
+        | element `{;indent=    }\n`;
+
+    value
+        | object
+        | array
+        | STRING
+        | NUMBER
+        | LITERAL;
+
+    object
+        | LBRACKET RBRACKET
+        | LBRACKET members RBRACKET `{}\n{;prefix=[prefix][indent]}\n[prefix]{}`;
+
+    members
+        | member `[prefix]{}`
+        | members COMMA member `{}{}\n[prefix]{}`;
+    member
+        | STRING COLON element `{}{} {}`;
+
+    array
+        | LARRI [elements] RARRI;
+
+    elements
+        | element
+        | elements COMMA element `{}{} {}`;
+    element
+        | value;
+}
