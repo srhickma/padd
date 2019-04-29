@@ -71,6 +71,116 @@ mod tests {
         fs::remove_dir_all(temp_dir).unwrap();
     }
 
+    #[test]
+    fn test_format_directory() {
+        //TODO(shane)
+    }
+
+    #[test]
+    fn test_missing_spec() {
+        //TODO(shane)
+    }
+
+    #[test]
+    fn test_missing_target() {
+        //TODO(shane)
+    }
+
+    #[test]
+    fn test_many_threads() {
+        //TODO(shane)
+    }
+
+    #[test]
+    fn test_invalid_threads() {
+        //TODO(shane)
+    }
+
+    #[test]
+    fn test_file_regex() {
+        //TODO(shane)
+    }
+
+    #[test]
+    fn test_no_skip() {
+        //TODO(shane)
+    }
+
+    #[test]
+    fn test_no_track() {
+        //TODO(shane)
+    }
+
+    #[test]
+    fn test_no_write() {
+        //TODO(shane)
+    }
+
+    #[test]
+    fn test_diff_tracking() {
+        //TODO(shane)
+    }
+
+    #[test]
+    fn test_clear_tracking() {
+        //TODO(shane)
+    }
+
+    #[test]
+    fn test_clear_tracking_without_target() {
+        //TODO(shane)
+    }
+
+    #[test]
+    fn test_tracking_files_skipped() {
+        //TODO(shane)
+    }
+
+    #[test]
+    fn test_check_formatting_passed() {
+        //TODO(shane)
+    }
+
+    #[test]
+    fn test_check_formatting_failed() {
+        //TODO(shane)
+    }
+
+    #[test]
+    fn test_start_server() {
+        //TODO(shane)
+    }
+
+    #[test]
+    fn test_start_daemon() {
+        //TODO(shane)
+    }
+
+    #[test]
+    fn test_start_daemon_already_running() {
+        //TODO(shane)
+    }
+
+    #[test]
+    fn test_kill_daemon() {
+        //TODO(shane)
+    }
+
+    #[test]
+    fn test_kill_daemon_not_running() {
+        //TODO(shane)
+    }
+
+    #[test]
+    fn test_format_via_daemon() {
+        //TODO(shane)
+    }
+
+    #[test]
+    fn test_cache_fjr() {
+        //TODO(shane)
+    }
+
     fn read_to_string(path: &Path) -> String {
         let mut contents = String::new();
 
