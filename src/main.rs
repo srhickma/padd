@@ -34,41 +34,100 @@ mod tests {
         static ref OUTPUT_DIR: &'static Path = Path::new("tests/output");
     }
 
+    struct TestableFile {
+        file_name: String,
+    }
+
+    impl TestableFile {
+        fn new(file_name: String) -> Self {
+            TestableFile { file_name }
+        }
+
+        fn copy_to_temp(&self) -> String {
+            let input_path = path_from_name(&INPUT_DIR, &self.file_name);
+            let temp_path = path_from_name(&TEMP_DIR, &self.file_name);
+
+            fs::copy(input_path, &temp_path).unwrap();
+
+            temp_path.as_path().to_string_lossy().to_string()
+        }
+
+        fn assert_matches_output(&self) {
+            let output_path = path_from_name(&OUTPUT_DIR, &self.file_name);
+            let temp_path = path_from_name(&TEMP_DIR, &self.file_name);
+
+            let expected = read_to_string(output_path.as_path());
+            let actual = read_to_string(temp_path.as_path());
+            if expected != actual {
+                println!("EXPECTED:\n{}\nBUT FOUND:\n{}", expected, actual);
+                panic!("Temp file did not match output file")
+            }
+        }
+    }
+
     #[test]
     fn test_fmt_all_java8() {
+        //setup
         let _ = fs::remove_dir_all(&*TEMP_DIR);
         fs::create_dir(&*TEMP_DIR).unwrap();
 
-        fs::read_dir(&*INPUT_DIR)
-            .unwrap()
-            .map(|entry| entry.unwrap())
-            .filter(|entry| !entry.path().is_dir())
-            .filter(|entry| entry.file_name().to_string_lossy().starts_with("java8"))
-            .for_each(|entry| {
-                let file_name = entry.file_name().to_string_lossy().to_string();
-                let file = TestableFile::new(&file_name);
-                let temp_file = file.copy_to_temp();
+        for file_name in files_with_prefix("java8") {
+            let file = TestableFile::new(file_name);
+            let temp_file = file.copy_to_temp();
 
-                cli::run(vec!["padd", "fmt", "tests/spec/java8", "-t", &temp_file]);
+            //exercise
+            cli::run(vec!["padd", "fmt", "tests/spec/java8", "-t", &temp_file]);
 
-                file.assert_matches_output();
-            });
+            //verify
+            file.assert_matches_output();
+        }
 
+        //teardown
         fs::remove_dir_all(&*TEMP_DIR).unwrap();
     }
 
     #[test]
     fn test_format_directory() {
-        //TODO(shane)
+        //setup
+        let _ = fs::remove_dir_all(&*TEMP_DIR);
+        fs::create_dir(&*TEMP_DIR).unwrap();
+
+        let mut testable_files: Vec<TestableFile> = Vec::new();
+
+        for file_name in files_with_prefix("json") {
+            let file = TestableFile::new(file_name);
+            file.copy_to_temp();
+            testable_files.push(file);
+        }
+
+        //exercise
+        cli::run(vec![
+            "padd",
+            "fmt",
+            "tests/spec/json",
+            "-t",
+            &TEMP_DIR.to_string_lossy().to_string(),
+        ]);
+
+        //verify
+        assert!(testable_files.len() > 1);
+        for file in testable_files {
+            file.assert_matches_output();
+        }
+
+        //teardown
+        fs::remove_dir_all(&*TEMP_DIR).unwrap();
     }
 
     #[test]
     fn test_missing_spec() {
+        //exercise
         let output = Command::new(EXECUTABLE)
             .args(&["fmt", "-t", "tests/output"])
             .output()
             .unwrap();
 
+        //verify
         let code = output.status.code().unwrap();
         assert_eq!(code, 1);
 
@@ -78,11 +137,13 @@ mod tests {
 
     #[test]
     fn test_missing_target() {
+        //exercise
         let output = Command::new(EXECUTABLE)
             .args(&["fmt", "test/spec/java8"])
             .output()
             .unwrap();
 
+        //verify
         let code = output.status.code().unwrap();
         assert_eq!(code, 1);
 
@@ -132,8 +193,10 @@ mod tests {
 
     #[test]
     fn test_clear_tracking_without_target() {
+        //exercise
         let output = Command::new(EXECUTABLE).args(&["forget"]).output().unwrap();
 
+        //verify
         let code = output.status.code().unwrap();
         assert_eq!(code, 1);
 
@@ -209,35 +272,14 @@ mod tests {
         )
     }
 
-    struct TestableFile<'scope> {
-        file_name: &'scope str,
-    }
-
-    impl<'scope> TestableFile<'scope> {
-        fn new(file_name: &'scope str) -> Self {
-            TestableFile { file_name }
-        }
-
-        fn copy_to_temp(&self) -> String {
-            let input_path = path_from_name(&INPUT_DIR, self.file_name);
-            let temp_path = path_from_name(&TEMP_DIR, self.file_name);
-
-            fs::copy(input_path, &temp_path).unwrap();
-
-            temp_path.as_path().to_string_lossy().to_string()
-        }
-
-        fn assert_matches_output(&self) {
-            let output_path = path_from_name(&OUTPUT_DIR, self.file_name);
-            let temp_path = path_from_name(&TEMP_DIR, self.file_name);
-
-            let expected = read_to_string(output_path.as_path());
-            let actual = read_to_string(temp_path.as_path());
-            if expected != actual {
-                println!("EXPECTED:\n{}\nBUT FOUND:\n{}", expected, actual);
-                panic!("Temp file did not match output file")
-            }
-        }
+    fn files_with_prefix(prefix: &str) -> Vec<String> {
+        fs::read_dir(&*INPUT_DIR)
+            .unwrap()
+            .map(|entry| entry.unwrap())
+            .filter(|entry| !entry.path().is_dir())
+            .map(|entry| entry.file_name().to_string_lossy().to_string())
+            .filter(|file_name| file_name.starts_with(prefix))
+            .collect()
     }
 
     fn path_from_name(dir: &Path, file_name: &str) -> PathBuf {
