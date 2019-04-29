@@ -23,6 +23,7 @@ mod tests {
         fs::{self, File},
         io::Read,
         path::Path,
+        process::Command,
     };
 
     #[test]
@@ -78,12 +79,30 @@ mod tests {
 
     #[test]
     fn test_missing_spec() {
-        //TODO(shane)
+        let output = Command::new("target/debug/padd")
+            .args(&["fmt", "-t", "tests/output"])
+            .output()
+            .unwrap();
+
+        let code = output.status.code().unwrap();
+        assert_eq!(code, 1);
+
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(stderr.contains(&not_provided_matcher("<SPECIFICATION>")));
     }
 
     #[test]
     fn test_missing_target() {
-        //TODO(shane)
+        let output = Command::new("target/debug/padd")
+            .args(&["fmt", "test/spec/java8"])
+            .output()
+            .unwrap();
+
+        let code = output.status.code().unwrap();
+        assert_eq!(code, 1);
+
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(stderr.contains(&not_provided_matcher("--target <PATH>")));
     }
 
     #[test]
@@ -128,7 +147,16 @@ mod tests {
 
     #[test]
     fn test_clear_tracking_without_target() {
-        //TODO(shane)
+        let output = Command::new("target/debug/padd")
+            .args(&["forget"])
+            .output()
+            .unwrap();
+
+        let code = output.status.code().unwrap();
+        assert_eq!(code, 1);
+
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(stderr.contains(&not_provided_matcher("<PATH>")));
     }
 
     #[test]
@@ -190,5 +218,9 @@ mod tests {
             .unwrap();
 
         contents
+    }
+
+    fn not_provided_matcher(argument: &str) -> String {
+        format!("error: The following required arguments were not provided:\n    {}", argument)
     }
 }
