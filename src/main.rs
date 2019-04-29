@@ -22,54 +22,39 @@ mod tests {
     use std::{
         fs::{self, File},
         io::Read,
-        path::Path,
+        path::{Path, PathBuf},
         process::Command,
     };
 
+    static EXECUTABLE: &'static str = "target/debug/padd";
+
+    lazy_static! {
+        static ref TEMP_DIR: &'static Path = Path::new("tests/temp");
+        static ref INPUT_DIR: &'static Path = Path::new("tests/input");
+        static ref OUTPUT_DIR: &'static Path = Path::new("tests/output");
+    }
+
     #[test]
     fn test_fmt_all_java8() {
-        let temp_dir = Path::new("tests/temp");
-        let input_dir = Path::new("tests/input");
-        let output_dir = Path::new("tests/output");
+        let _ = fs::remove_dir_all(&*TEMP_DIR);
+        fs::create_dir(&*TEMP_DIR).unwrap();
 
-        let _ = fs::remove_dir_all(temp_dir);
-        fs::create_dir(temp_dir).unwrap();
-
-        fs::read_dir(input_dir)
+        fs::read_dir(&*INPUT_DIR)
             .unwrap()
             .map(|entry| entry.unwrap())
             .filter(|entry| !entry.path().is_dir())
             .filter(|entry| entry.file_name().to_string_lossy().starts_with("java8"))
             .for_each(|entry| {
-                let file_name = entry.file_name();
+                let file_name = entry.file_name().to_string_lossy().to_string();
+                let file = TestableFile::new(&file_name);
+                let temp_file = file.copy_to_temp();
 
-                let mut temp_path_buf = temp_dir.to_path_buf();
-                temp_path_buf.push(&file_name);
-                let temp_path = temp_path_buf.as_path();
+                cli::run(vec!["padd", "fmt", "tests/spec/java8", "-t", &temp_file]);
 
-                let mut expected_path_buf = output_dir.to_path_buf();
-                expected_path_buf.push(&file_name);
-                let expected_path = expected_path_buf.as_path();
-
-                fs::copy(entry.path(), temp_path).unwrap();
-
-                cli::run(vec![
-                    "padd",
-                    "fmt",
-                    "tests/spec/java8",
-                    "-t",
-                    &temp_path.to_string_lossy().to_string(),
-                ]);
-
-                let expected = read_to_string(expected_path);
-                let actual = read_to_string(temp_path);
-                if expected != actual {
-                    println!("EXPECTED:\n{}\nBUT FOUND:\n{}", expected, actual);
-                    panic!("Temp file did not match real file")
-                }
+                file.assert_matches_output();
             });
 
-        fs::remove_dir_all(temp_dir).unwrap();
+        fs::remove_dir_all(&*TEMP_DIR).unwrap();
     }
 
     #[test]
@@ -79,7 +64,7 @@ mod tests {
 
     #[test]
     fn test_missing_spec() {
-        let output = Command::new("target/debug/padd")
+        let output = Command::new(EXECUTABLE)
             .args(&["fmt", "-t", "tests/output"])
             .output()
             .unwrap();
@@ -93,7 +78,7 @@ mod tests {
 
     #[test]
     fn test_missing_target() {
-        let output = Command::new("target/debug/padd")
+        let output = Command::new(EXECUTABLE)
             .args(&["fmt", "test/spec/java8"])
             .output()
             .unwrap();
@@ -147,10 +132,7 @@ mod tests {
 
     #[test]
     fn test_clear_tracking_without_target() {
-        let output = Command::new("target/debug/padd")
-            .args(&["forget"])
-            .output()
-            .unwrap();
+        let output = Command::new(EXECUTABLE).args(&["forget"]).output().unwrap();
 
         let code = output.status.code().unwrap();
         assert_eq!(code, 1);
@@ -221,6 +203,46 @@ mod tests {
     }
 
     fn not_provided_matcher(argument: &str) -> String {
-        format!("error: The following required arguments were not provided:\n    {}", argument)
+        format!(
+            "error: The following required arguments were not provided:\n    {}",
+            argument
+        )
+    }
+
+    struct TestableFile<'scope> {
+        file_name: &'scope str,
+    }
+
+    impl<'scope> TestableFile<'scope> {
+        fn new(file_name: &'scope str) -> Self {
+            TestableFile { file_name }
+        }
+
+        fn copy_to_temp(&self) -> String {
+            let input_path = path_from_name(&INPUT_DIR, self.file_name);
+            let temp_path = path_from_name(&TEMP_DIR, self.file_name);
+
+            fs::copy(input_path, &temp_path).unwrap();
+
+            temp_path.as_path().to_string_lossy().to_string()
+        }
+
+        fn assert_matches_output(&self) {
+            let output_path = path_from_name(&OUTPUT_DIR, self.file_name);
+            let temp_path = path_from_name(&TEMP_DIR, self.file_name);
+
+            let expected = read_to_string(output_path.as_path());
+            let actual = read_to_string(temp_path.as_path());
+            if expected != actual {
+                println!("EXPECTED:\n{}\nBUT FOUND:\n{}", expected, actual);
+                panic!("Temp file did not match output file")
+            }
+        }
+    }
+
+    fn path_from_name(dir: &Path, file_name: &str) -> PathBuf {
+        let mut path_buf = dir.to_path_buf();
+        path_buf.push(&file_name);
+        path_buf
     }
 }
