@@ -470,7 +470,26 @@ mod tests {
 
     #[test]
     fn test_no_write() {
-        //TODO(shane)
+        //setup
+        let temp_dir = create_temp_dir();
+
+        let file = TestableFile::new("json_simple".to_string(), &temp_dir);
+        let temp_path = file.copy_to_temp();
+
+        //exercise/verify
+        assert_does_not_modify_file(&temp_path, &|| {
+            cli::run(vec![
+                "padd",
+                "fmt",
+                "tests/spec/json",
+                "-t",
+                &temp_path,
+                "--no-write",
+            ]);
+        });
+
+        //teardown
+        fs::remove_dir_all(&temp_dir).unwrap();
     }
 
     #[test]
