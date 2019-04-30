@@ -272,23 +272,10 @@ mod tests {
 
         cli::run(vec!["padd", "fmt", "tests/spec/json", "-t", &temp_path]);
 
-        let initially_modified_at = Path::new(&temp_path)
-            .metadata()
-            .unwrap()
-            .modified()
-            .unwrap();
-
-        //exercise
-        cli::run(vec!["padd", "fmt", "tests/spec/json", "-t", &temp_path]);
-
-        //verify
-        let finally_modified_at = Path::new(&temp_path)
-            .metadata()
-            .unwrap()
-            .modified()
-            .unwrap();
-
-        assert_eq!(initially_modified_at, finally_modified_at);
+        //exercise/verify
+        assert_does_not_modify_file(&temp_path, &|| {
+            cli::run(vec!["padd", "fmt", "tests/spec/json", "-t", &temp_path]);
+        });
 
         file.assert_matches_output();
 
@@ -310,23 +297,10 @@ mod tests {
         thread::sleep(Duration::from_millis(10));
         fs::write(&temp_path, "{\"modified\":\"value\"}").unwrap();
 
-        let initially_modified_at = Path::new(&temp_path)
-            .metadata()
-            .unwrap()
-            .modified()
-            .unwrap();
-
-        //exercise
-        cli::run(vec!["padd", "fmt", "tests/spec/json", "-t", &temp_path]);
-
-        //verify
-        let finally_modified_at = Path::new(&temp_path)
-            .metadata()
-            .unwrap()
-            .modified()
-            .unwrap();
-
-        assert_ne!(initially_modified_at, finally_modified_at);
+        //exercise/verify
+        assert_modifies_file(&temp_path, &|| {
+            cli::run(vec!["padd", "fmt", "tests/spec/json", "-t", &temp_path]);
+        });
 
         let result = fs::read_to_string(&temp_path).unwrap();
         assert_eq!(result, "{\n    \"modified\": \"value\"\n}\n");
@@ -359,29 +333,16 @@ mod tests {
         // Trivially modify the specification
         writeln!(spec_file, " ").unwrap();
 
-        let initially_modified_at = Path::new(&temp_path)
-            .metadata()
-            .unwrap()
-            .modified()
-            .unwrap();
-
-        //exercise
-        cli::run(vec![
-            "padd",
-            "fmt",
-            &new_spec_path.to_string_lossy().to_string(),
-            "-t",
-            &temp_path,
-        ]);
-
-        //verify
-        let finally_modified_at = Path::new(&temp_path)
-            .metadata()
-            .unwrap()
-            .modified()
-            .unwrap();
-
-        assert_ne!(initially_modified_at, finally_modified_at);
+        //exercise/verify
+        assert_modifies_file(&temp_path, &|| {
+            cli::run(vec![
+                "padd",
+                "fmt",
+                &new_spec_path.to_string_lossy().to_string(),
+                "-t",
+                &temp_path,
+            ]);
+        });
 
         file.assert_matches_output();
 
@@ -399,25 +360,13 @@ mod tests {
 
         cli::run(vec!["padd", "fmt", "tests/spec/json", "-t", &temp_path]);
 
-        let initially_modified_at = Path::new(&temp_path)
-            .metadata()
-            .unwrap()
-            .modified()
-            .unwrap();
-
         //exercise
         cli::run(vec!["padd", "forget", &temp_path]);
 
         //verify
-        cli::run(vec!["padd", "fmt", "tests/spec/json", "-t", &temp_path]);
-
-        let finally_modified_at = Path::new(&temp_path)
-            .metadata()
-            .unwrap()
-            .modified()
-            .unwrap();
-
-        assert_ne!(initially_modified_at, finally_modified_at);
+        assert_modifies_file(&temp_path, &|| {
+            cli::run(vec!["padd", "fmt", "tests/spec/json", "-t", &temp_path]);
+        });
 
         file.assert_matches_output();
 
@@ -435,81 +384,18 @@ mod tests {
 
         cli::run(vec!["padd", "fmt", "tests/spec/json", "-t", &temp_path]);
 
-        let initially_modified_at = Path::new(&temp_path)
-            .metadata()
-            .unwrap()
-            .modified()
-            .unwrap();
-
         //exercise
         cli::run(vec!["padd", "forget", &temp_dir]);
 
         //verify
-        cli::run(vec!["padd", "fmt", "tests/spec/json", "-t", &temp_path]);
-
-        let finally_modified_at = Path::new(&temp_path)
-            .metadata()
-            .unwrap()
-            .modified()
-            .unwrap();
-
-        assert_ne!(initially_modified_at, finally_modified_at);
+        assert_modifies_file(&temp_path, &|| {
+            cli::run(vec!["padd", "fmt", "tests/spec/json", "-t", &temp_path]);
+        });
 
         file.assert_matches_output();
 
         //teardown
         fs::remove_dir_all(&temp_dir).unwrap();
-    }
-
-    #[test]
-    fn test_no_skip() {
-        //setup
-        let temp_dir = create_temp_dir();
-
-        let file = TestableFile::new("json_simple".to_string(), &temp_dir);
-        let temp_path = file.copy_to_temp();
-
-        cli::run(vec!["padd", "fmt", "tests/spec/json", "-t", &temp_path]);
-
-        let initially_modified_at = Path::new(&temp_path)
-            .metadata()
-            .unwrap()
-            .modified()
-            .unwrap();
-
-        //exercise
-        cli::run(vec![
-            "padd",
-            "fmt",
-            "tests/spec/json",
-            "-t",
-            &temp_path,
-            "--no-skip",
-        ]);
-
-        //verify
-        let finally_modified_at = Path::new(&temp_path)
-            .metadata()
-            .unwrap()
-            .modified()
-            .unwrap();
-
-        assert_ne!(initially_modified_at, finally_modified_at);
-
-        file.assert_matches_output();
-
-        //teardown
-        fs::remove_dir_all(&temp_dir).unwrap();
-    }
-
-    #[test]
-    fn test_no_track() {
-        //TODO(shane)
-    }
-
-    #[test]
-    fn test_no_write() {
-        //TODO(shane)
     }
 
     #[test]
@@ -526,7 +412,64 @@ mod tests {
     }
 
     #[test]
-    fn test_tracking_files_skipped() {
+    fn test_no_skip() {
+        //setup
+        let temp_dir = create_temp_dir();
+
+        let file = TestableFile::new("json_simple".to_string(), &temp_dir);
+        let temp_path = file.copy_to_temp();
+
+        cli::run(vec!["padd", "fmt", "tests/spec/json", "-t", &temp_path]);
+
+        //exercise/verify
+        assert_modifies_file(&temp_path, &|| {
+            cli::run(vec![
+                "padd",
+                "fmt",
+                "tests/spec/json",
+                "-t",
+                &temp_path,
+                "--no-skip",
+            ]);
+        });
+
+        file.assert_matches_output();
+
+        //teardown
+        fs::remove_dir_all(&temp_dir).unwrap();
+    }
+
+    #[test]
+    fn test_no_track() {
+        //setup
+        let temp_dir = create_temp_dir();
+
+        let file = TestableFile::new("json_simple".to_string(), &temp_dir);
+        let temp_path = file.copy_to_temp();
+
+        //exercise
+        cli::run(vec![
+            "padd",
+            "fmt",
+            "tests/spec/json",
+            "-t",
+            &temp_path,
+            "--no-track",
+        ]);
+
+        //verify
+        assert_modifies_file(&temp_path, &|| {
+            cli::run(vec!["padd", "fmt", "tests/spec/json", "-t", &temp_path]);
+        });
+
+        file.assert_matches_output();
+
+        //teardown
+        fs::remove_dir_all(&temp_dir).unwrap();
+    }
+
+    #[test]
+    fn test_no_write() {
         //TODO(shane)
     }
 
@@ -573,6 +516,24 @@ mod tests {
     #[test]
     fn test_cache_fjr() {
         //TODO(shane)
+    }
+
+    fn assert_modifies_file(file_path: &str, modifier: &Fn()) {
+        assert!(modifies_file(file_path, modifier));
+    }
+
+    fn assert_does_not_modify_file(file_path: &str, modifier: &Fn()) {
+        assert!(!modifies_file(file_path, modifier));
+    }
+
+    fn modifies_file(file_path: &str, modifier: &Fn()) -> bool {
+        let initially_modified_at = Path::new(file_path).metadata().unwrap().modified().unwrap();
+
+        modifier();
+
+        let finally_modified_at = Path::new(file_path).metadata().unwrap().modified().unwrap();
+
+        initially_modified_at != finally_modified_at
     }
 
     fn create_temp_dir() -> String {
