@@ -17,13 +17,18 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
+    extern crate uuid;
+
     use super::*;
 
-    use std::{
-        fs::{self, File},
-        io::Read,
-        path::{Path, PathBuf},
-        process::Command,
+    use {
+        self::uuid::Uuid,
+        std::{
+            fs::{self, File},
+            io::Read,
+            path::{Path, PathBuf},
+            process::Command,
+        },
     };
 
     static EXECUTABLE: &'static str = "target/debug/padd";
@@ -34,18 +39,22 @@ mod tests {
         static ref OUTPUT_DIR: &'static Path = Path::new("tests/output");
     }
 
-    struct TestableFile {
+    struct TestableFile<'scope> {
         file_name: String,
+        temp_dir: &'scope Path,
     }
 
-    impl TestableFile {
-        fn new(file_name: String) -> Self {
-            TestableFile { file_name }
+    impl<'scope> TestableFile<'scope> {
+        fn new(file_name: String, temp_dir: &'scope str) -> Self {
+            TestableFile {
+                file_name,
+                temp_dir: Path::new(temp_dir),
+            }
         }
 
         fn copy_to_temp(&self) -> String {
             let input_path = path_from_name(&INPUT_DIR, &self.file_name);
-            let temp_path = path_from_name(&TEMP_DIR, &self.file_name);
+            let temp_path = path_from_name(self.temp_dir, &self.file_name);
 
             fs::copy(input_path, &temp_path).unwrap();
 
@@ -54,7 +63,7 @@ mod tests {
 
         fn assert_matches_output(&self) {
             let output_path = path_from_name(&OUTPUT_DIR, &self.file_name);
-            let temp_path = path_from_name(&TEMP_DIR, &self.file_name);
+            let temp_path = path_from_name(self.temp_dir, &self.file_name);
 
             let expected = read_to_string(output_path.as_path());
             let actual = read_to_string(temp_path.as_path());
@@ -68,11 +77,10 @@ mod tests {
     #[test]
     fn test_fmt_all_java8() {
         //setup
-        let _ = fs::remove_dir_all(&*TEMP_DIR);
-        fs::create_dir(&*TEMP_DIR).unwrap();
+        let temp_dir = create_temp_dir();
 
         for file_name in files_with_prefix("java8") {
-            let file = TestableFile::new(file_name);
+            let file = TestableFile::new(file_name, &temp_dir);
             let temp_file = file.copy_to_temp();
 
             //exercise
@@ -83,19 +91,18 @@ mod tests {
         }
 
         //teardown
-        fs::remove_dir_all(&*TEMP_DIR).unwrap();
+        fs::remove_dir_all(&temp_dir).unwrap();
     }
 
     #[test]
     fn test_format_directory() {
         //setup
-        let _ = fs::remove_dir_all(&*TEMP_DIR);
-        fs::create_dir(&*TEMP_DIR).unwrap();
+        let temp_dir = create_temp_dir();
 
         let mut testable_files: Vec<TestableFile> = Vec::new();
 
         for file_name in files_with_prefix("json") {
-            let file = TestableFile::new(file_name);
+            let file = TestableFile::new(file_name, &temp_dir);
             file.copy_to_temp();
             testable_files.push(file);
         }
@@ -106,7 +113,7 @@ mod tests {
             "fmt",
             "tests/spec/json",
             "-t",
-            &TEMP_DIR.to_string_lossy().to_string(),
+            &temp_dir,
         ]);
 
         //verify
@@ -116,7 +123,7 @@ mod tests {
         }
 
         //teardown
-        fs::remove_dir_all(&*TEMP_DIR).unwrap();
+        fs::remove_dir_all(&temp_dir).unwrap();
     }
 
     #[test]
@@ -154,13 +161,12 @@ mod tests {
     #[test]
     fn test_many_threads() {
         //setup
-        let _ = fs::remove_dir_all(&*TEMP_DIR);
-        fs::create_dir(&*TEMP_DIR).unwrap();
+        let temp_dir = create_temp_dir();
 
         let mut testable_files: Vec<TestableFile> = Vec::new();
 
         for file_name in files_with_prefix("java8") {
-            let file = TestableFile::new(file_name);
+            let file = TestableFile::new(file_name, &temp_dir);
             file.copy_to_temp();
             testable_files.push(file);
         }
@@ -171,7 +177,7 @@ mod tests {
             "fmt",
             "tests/spec/java8",
             "-t",
-            &TEMP_DIR.to_string_lossy().to_string(),
+            &temp_dir,
             "--threads",
             "16",
         ]);
@@ -183,19 +189,18 @@ mod tests {
         }
 
         //teardown
-        fs::remove_dir_all(&*TEMP_DIR).unwrap();
+        fs::remove_dir_all(&temp_dir).unwrap();
     }
 
     #[test]
     fn test_invalid_threads() {
         //setup
-        let _ = fs::remove_dir_all(&*TEMP_DIR);
-        fs::create_dir(&*TEMP_DIR).unwrap();
+        let temp_dir = create_temp_dir();
 
         let mut testable_files: Vec<TestableFile> = Vec::new();
 
         for file_name in files_with_prefix("json") {
-            let file = TestableFile::new(file_name);
+            let file = TestableFile::new(file_name, &temp_dir);
             file.copy_to_temp();
             testable_files.push(file);
         }
@@ -206,7 +211,7 @@ mod tests {
             "fmt",
             "tests/spec/json",
             "-t",
-            &TEMP_DIR.to_string_lossy().to_string(),
+            &temp_dir,
             "--threads",
             "0",
         ]);
@@ -218,19 +223,18 @@ mod tests {
         }
 
         //teardown
-        fs::remove_dir_all(&*TEMP_DIR).unwrap();
+        fs::remove_dir_all(&temp_dir).unwrap();
     }
 
     #[test]
     fn test_file_regex() {
         //setup
-        let _ = fs::remove_dir_all(&*TEMP_DIR);
-        fs::create_dir(&*TEMP_DIR).unwrap();
+        let temp_dir = create_temp_dir();
 
         let mut testable_files: Vec<TestableFile> = Vec::new();
 
         for file_name in files_with_prefix("") {
-            let file = TestableFile::new(file_name);
+            let file = TestableFile::new(file_name, &temp_dir);
             file.copy_to_temp();
             testable_files.push(file);
         }
@@ -241,7 +245,7 @@ mod tests {
             "fmt",
             "tests/spec/lacs",
             "-t",
-            &TEMP_DIR.to_string_lossy().to_string(),
+            &temp_dir,
             "-m",
             "lacs_.*",
         ]);
@@ -259,7 +263,27 @@ mod tests {
         assert_eq!(formatted, 3);
 
         //teardown
-        fs::remove_dir_all(&*TEMP_DIR).unwrap();
+        fs::remove_dir_all(&temp_dir).unwrap();
+    }
+
+    #[test]
+    fn test_diff_tracking_unchanged() {
+        //TODO(shane)
+    }
+
+    #[test]
+    fn test_diff_tracking_file_modified() {
+        //TODO(shane)
+    }
+
+    #[test]
+    fn test_diff_tracking_spec_modified() {
+        //TODO(shane)
+    }
+
+    #[test]
+    fn test_clear_tracking() {
+        //TODO(shane)
     }
 
     #[test]
@@ -274,16 +298,6 @@ mod tests {
 
     #[test]
     fn test_no_write() {
-        //TODO(shane)
-    }
-
-    #[test]
-    fn test_diff_tracking() {
-        //TODO(shane)
-    }
-
-    #[test]
-    fn test_clear_tracking() {
         //TODO(shane)
     }
 
@@ -348,6 +362,12 @@ mod tests {
     #[test]
     fn test_cache_fjr() {
         //TODO(shane)
+    }
+
+    fn create_temp_dir() -> String {
+        let temp_dir = format!("tests/temp-{}", Uuid::new_v4().to_string());
+        fs::create_dir(&temp_dir).unwrap();
+        temp_dir
     }
 
     fn read_to_string(path: &Path) -> String {
