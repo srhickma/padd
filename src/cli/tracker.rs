@@ -1,9 +1,9 @@
 use {
     cli::logger,
     std::{
-        cmp,
         fs::{self, File},
         io::{self, BufRead, BufReader, Write},
+        ops::Sub,
         path::{Path, PathBuf},
         str::FromStr,
         time::{Duration, SystemTime, UNIX_EPOCH},
@@ -12,6 +12,10 @@ use {
 
 pub const TRACKER_DIR: &str = ".padd";
 const TRACKER_EXTENSION: &str = ".trk";
+
+lazy_static! {
+    static ref FLUX_THRESHOLD: Duration = Duration::from_millis(1);
+}
 
 pub fn track_file(file_path: &Path, spec_sha: &str) {
     let tracker_path_buf = tracker_for(file_path);
@@ -55,7 +59,7 @@ pub fn needs_formatting(file_path: &Path, spec_sha: &str) -> bool {
             let formatted_dur = formatted_at.duration_since(UNIX_EPOCH).unwrap();
             let modified_dur = modified_at.duration_since(UNIX_EPOCH).unwrap();
 
-            if modified_dur.cmp(&formatted_dur) != cmp::Ordering::Greater {
+            if formatted_dur.ge(&modified_dur.sub(*FLUX_THRESHOLD)) {
                 return false;
             }
         }
