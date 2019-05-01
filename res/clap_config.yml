@@ -7,6 +7,19 @@ settings:
   - SubcommandRequired
   - VersionlessSubcommands
 
+args:
+  - logfile:
+      long: log
+      help: File to log append logs to
+      takes_value: true
+      value_name: LOGFILE
+  - loglevel:
+      long: level
+      help: Log level
+      takes_value: true
+      possible_values: [error, warn, info, debug, trace]
+      value_name: LEVEL
+
 subcommands:
   - fmt:
       about: Formatter
