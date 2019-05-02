@@ -10,7 +10,7 @@ settings:
 args:
   - logfile:
       long: log
-      help: File to log append logs to
+      help: File to append logs to
       takes_value: true
       value_name: LOGFILE
   - loglevel:
@@ -19,6 +19,7 @@ args:
       takes_value: true
       possible_values: [error, warn, info, debug, trace]
       value_name: LEVEL
+      requires: logfile
 
 subcommands:
   - fmt:

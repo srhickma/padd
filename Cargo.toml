@@ -13,10 +13,16 @@ regex = "0.2"
 colored = "1.6.1"
 rust-crypto = "0.2.36"
 yaml-rust = "0.3.5"
+log = "0.4.6"
+strip-ansi-escapes = "0.1.0"
 
 [dependencies.clap]
 version = "2.32.0"
 features = ["yaml"]
+
+[dependencies.log4rs]
+version = "0.8.3"
+features = ["pattern_encoder"]
 
 [profile.dev]
 opt-level = 0

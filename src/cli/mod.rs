@@ -21,6 +21,8 @@ pub fn run() {
     let args: Vec<String> = env::args().collect();
     let command = args.join(" ");
 
+    logger::init(&matches);
+
     if let Some(matches) = matches.subcommand_matches("fmt") {
         if server::running() {
             server::send_command(command);
