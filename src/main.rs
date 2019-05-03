@@ -17,19 +17,21 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
+    extern crate log;
+    extern crate regex;
     extern crate uuid;
 
     use super::*;
 
     use {
-        self::uuid::Uuid,
+        self::{log::LevelFilter, regex::Regex, uuid::Uuid},
         std::{
             fs::{self, File, OpenOptions},
             io::{prelude::*, Read},
             panic,
             path::{Path, PathBuf},
             process::Command,
-            sync::Mutex,
+            sync::RwLock,
             thread,
             time::Duration,
         },
@@ -41,21 +43,34 @@ mod tests {
         static ref TEMP_DIR: &'static Path = Path::new("tests/temp");
         static ref INPUT_DIR: &'static Path = Path::new("tests/input");
         static ref OUTPUT_DIR: &'static Path = Path::new("tests/output");
-        static ref SERIAL_TEST_MUTEX: Mutex<()> = Mutex::new(());
+
+        static ref LOG_PATH: String = String::from("tests/test.log");
+
+        static ref SERIALIZATION_LOCK: RwLock<()> = RwLock::new(());
+
+        static ref COMPLETION_REGEX: Regex = Regex::new(r"INFO - COMPLETE: \d*ms : (\d*) processed, (\d*) unchanged, (\d*) formatted, (\d*) failed").unwrap();
+        static ref FORMATTED_REGEX: Regex = Regex::new(r"DEBUG - Finished formatting ([^\n]*)").unwrap();
+        static ref FAILED_REGEX: Regex = Regex::new(r"WARN - Error formatting ([^\n:]*): ([^\n]*)").unwrap();
     }
 
-    /// All tests wrapped in this macro will be executed serially
-    /// Adapted from Thomasdezeeuw/std-logger
-    macro_rules! serial_test {
-        (fn $name: ident() $body: block) => {
-            #[test]
-            fn $name() {
-                let guard = SERIAL_TEST_MUTEX.lock().unwrap();
+    macro_rules! serial {
+        ($body: block) => {
+            let guard = SERIALIZATION_LOCK.write().unwrap();
 
-                if let Err(err) = panic::catch_unwind(|| $body) {
-                    drop(guard);
-                    panic::resume_unwind(err);
-                }
+            if let Err(err) = panic::catch_unwind(|| $body) {
+                drop(guard);
+                panic::resume_unwind(err);
+            }
+        };
+    }
+
+    macro_rules! parallel {
+        ($body: block) => {
+            let guard = SERIALIZATION_LOCK.read().unwrap();
+
+            if let Err(err) = panic::catch_unwind(|| $body) {
+                drop(guard);
+                panic::resume_unwind(err);
             }
         };
     }
@@ -95,6 +110,56 @@ mod tests {
         }
     }
 
+    #[derive(PartialEq)]
+    struct FormattedFJ {
+        file_name: String,
+    }
+
+    #[derive(PartialEq)]
+    struct FailedFJ {
+        file_name: String,
+        error_message: String,
+    }
+
+    struct LoggedResults {
+        num_processed: usize,
+        num_unchanged: usize,
+        num_formatted: usize,
+        num_failed: usize,
+        formatted: Vec<FormattedFJ>,
+        failed: Vec<FailedFJ>,
+    }
+
+    impl LoggedResults {
+        fn parse(logs: &str) -> Self {
+            let completion_captures = COMPLETION_REGEX.captures(logs).unwrap();
+
+            let formatted: Vec<FormattedFJ> = FORMATTED_REGEX
+                .captures_iter(logs)
+                .map(|capture| FormattedFJ {
+                    file_name: capture[1].to_string(),
+                })
+                .collect();
+
+            let failed: Vec<FailedFJ> = FAILED_REGEX
+                .captures_iter(logs)
+                .map(|capture| FailedFJ {
+                    file_name: capture[1].to_string(),
+                    error_message: capture[2].to_string(),
+                })
+                .collect();
+
+            LoggedResults {
+                num_processed: completion_captures[1].parse::<usize>().unwrap(),
+                num_unchanged: completion_captures[2].parse::<usize>().unwrap(),
+                num_formatted: completion_captures[3].parse::<usize>().unwrap(),
+                num_failed: completion_captures[4].parse::<usize>().unwrap(),
+                formatted,
+                failed,
+            }
+        }
+    }
+
     #[test]
     fn test_fmt_all_java8() {
         //setup
@@ -105,7 +170,9 @@ mod tests {
             let temp_file = file.copy_to_temp();
 
             //exercise
-            cli::run(vec!["padd", "fmt", "tests/spec/java8", "-t", &temp_file]);
+            parallel!({
+                cli::run(vec!["padd", "fmt", "tests/spec/java8", "-t", &temp_file]);
+            });
 
             //verify
             file.assert_matches_output();
@@ -129,7 +196,9 @@ mod tests {
         }
 
         //exercise
-        cli::run(vec!["padd", "fmt", "tests/spec/json", "-t", &temp_dir]);
+        parallel!({
+            cli::run(vec!["padd", "fmt", "tests/spec/json", "-t", &temp_dir]);
+        });
 
         //verify
         assert!(testable_files.len() > 1);
@@ -187,15 +256,17 @@ mod tests {
         }
 
         //exercise
-        cli::run(vec![
-            "padd",
-            "fmt",
-            "tests/spec/java8",
-            "-t",
-            &temp_dir,
-            "--threads",
-            "16",
-        ]);
+        parallel!({
+            cli::run(vec![
+                "padd",
+                "fmt",
+                "tests/spec/java8",
+                "-t",
+                &temp_dir,
+                "--threads",
+                "16",
+            ]);
+        });
 
         //verify
         assert!(testable_files.len() > 1);
@@ -221,15 +292,17 @@ mod tests {
         }
 
         //exercise
-        cli::run(vec![
-            "padd",
-            "fmt",
-            "tests/spec/json",
-            "-t",
-            &temp_dir,
-            "--threads",
-            "0",
-        ]);
+        parallel!({
+            cli::run(vec![
+                "padd",
+                "fmt",
+                "tests/spec/json",
+                "-t",
+                &temp_dir,
+                "--threads",
+                "0",
+            ]);
+        });
 
         //verify
         assert!(testable_files.len() > 1);
@@ -255,15 +328,17 @@ mod tests {
         }
 
         //exercise
-        cli::run(vec![
-            "padd",
-            "fmt",
-            "tests/spec/lacs",
-            "-t",
-            &temp_dir,
-            "-m",
-            "lacs_.*",
-        ]);
+        parallel!({
+            cli::run(vec![
+                "padd",
+                "fmt",
+                "tests/spec/lacs",
+                "-t",
+                &temp_dir,
+                "-m",
+                "lacs_.*",
+            ]);
+        });
 
         //verify
         let mut formatted: usize = 0;
@@ -289,11 +364,15 @@ mod tests {
         let file = TestableFile::new("json_simple".to_string(), &temp_dir);
         let temp_path = file.copy_to_temp();
 
-        cli::run(vec!["padd", "fmt", "tests/spec/json", "-t", &temp_path]);
+        parallel!({
+            cli::run(vec!["padd", "fmt", "tests/spec/json", "-t", &temp_path]);
+        });
 
         //exercise/verify
         assert_does_not_modify_file(&temp_path, &|| {
-            cli::run(vec!["padd", "fmt", "tests/spec/json", "-t", &temp_path]);
+            parallel!({
+                cli::run(vec!["padd", "fmt", "tests/spec/json", "-t", &temp_path]);
+            });
         });
 
         file.assert_matches_output();
@@ -310,7 +389,9 @@ mod tests {
         let file = TestableFile::new("json_simple".to_string(), &temp_dir);
         let temp_path = file.copy_to_temp();
 
-        cli::run(vec!["padd", "fmt", "tests/spec/json", "-t", &temp_path]);
+        parallel!({
+            cli::run(vec!["padd", "fmt", "tests/spec/json", "-t", &temp_path]);
+        });
 
         // Modify the file at a strictly later system time (allowing for fluctuation)
         thread::sleep(Duration::from_millis(10));
@@ -318,7 +399,9 @@ mod tests {
 
         //exercise/verify
         assert_modifies_file(&temp_path, &|| {
-            cli::run(vec!["padd", "fmt", "tests/spec/json", "-t", &temp_path]);
+            parallel!({
+                cli::run(vec!["padd", "fmt", "tests/spec/json", "-t", &temp_path]);
+            });
         });
 
         let result = fs::read_to_string(&temp_path).unwrap();
@@ -336,7 +419,9 @@ mod tests {
         let file = TestableFile::new("json_simple".to_string(), &temp_dir);
         let temp_path = file.copy_to_temp();
 
-        cli::run(vec!["padd", "fmt", "tests/spec/json", "-t", &temp_path]);
+        parallel!({
+            cli::run(vec!["padd", "fmt", "tests/spec/json", "-t", &temp_path]);
+        });
 
         // Sleep to allow for SystemTime fluctuations
         thread::sleep(Duration::from_millis(10));
@@ -354,13 +439,15 @@ mod tests {
 
         //exercise/verify
         assert_modifies_file(&temp_path, &|| {
-            cli::run(vec![
-                "padd",
-                "fmt",
-                &new_spec_path.to_string_lossy().to_string(),
-                "-t",
-                &temp_path,
-            ]);
+            parallel!({
+                cli::run(vec![
+                    "padd",
+                    "fmt",
+                    &new_spec_path.to_string_lossy().to_string(),
+                    "-t",
+                    &temp_path,
+                ]);
+            });
         });
 
         file.assert_matches_output();
@@ -377,14 +464,20 @@ mod tests {
         let file = TestableFile::new("json_simple".to_string(), &temp_dir);
         let temp_path = file.copy_to_temp();
 
-        cli::run(vec!["padd", "fmt", "tests/spec/json", "-t", &temp_path]);
+        parallel!({
+            cli::run(vec!["padd", "fmt", "tests/spec/json", "-t", &temp_path]);
+        });
 
         //exercise
-        cli::run(vec!["padd", "forget", &temp_path]);
+        parallel!({
+            cli::run(vec!["padd", "forget", &temp_path]);
+        });
 
         //verify
         assert_modifies_file(&temp_path, &|| {
-            cli::run(vec!["padd", "fmt", "tests/spec/json", "-t", &temp_path]);
+            parallel!({
+                cli::run(vec!["padd", "fmt", "tests/spec/json", "-t", &temp_path]);
+            });
         });
 
         file.assert_matches_output();
@@ -401,14 +494,20 @@ mod tests {
         let file = TestableFile::new("json_simple".to_string(), &temp_dir);
         let temp_path = file.copy_to_temp();
 
-        cli::run(vec!["padd", "fmt", "tests/spec/json", "-t", &temp_path]);
+        parallel!({
+            cli::run(vec!["padd", "fmt", "tests/spec/json", "-t", &temp_path]);
+        });
 
         //exercise
-        cli::run(vec!["padd", "forget", &temp_dir]);
+        parallel!({
+            cli::run(vec!["padd", "forget", &temp_dir]);
+        });
 
         //verify
         assert_modifies_file(&temp_path, &|| {
-            cli::run(vec!["padd", "fmt", "tests/spec/json", "-t", &temp_path]);
+            parallel!({
+                cli::run(vec!["padd", "fmt", "tests/spec/json", "-t", &temp_path]);
+            });
         });
 
         file.assert_matches_output();
@@ -438,18 +537,22 @@ mod tests {
         let file = TestableFile::new("json_simple".to_string(), &temp_dir);
         let temp_path = file.copy_to_temp();
 
-        cli::run(vec!["padd", "fmt", "tests/spec/json", "-t", &temp_path]);
+        parallel!({
+            cli::run(vec!["padd", "fmt", "tests/spec/json", "-t", &temp_path]);
+        });
 
         //exercise/verify
         assert_modifies_file(&temp_path, &|| {
-            cli::run(vec![
-                "padd",
-                "fmt",
-                "tests/spec/json",
-                "-t",
-                &temp_path,
-                "--no-skip",
-            ]);
+            parallel!({
+                cli::run(vec![
+                    "padd",
+                    "fmt",
+                    "tests/spec/json",
+                    "-t",
+                    &temp_path,
+                    "--no-skip",
+                ]);
+            });
         });
 
         file.assert_matches_output();
@@ -467,18 +570,22 @@ mod tests {
         let temp_path = file.copy_to_temp();
 
         //exercise
-        cli::run(vec![
-            "padd",
-            "fmt",
-            "tests/spec/json",
-            "-t",
-            &temp_path,
-            "--no-track",
-        ]);
+        parallel!({
+            cli::run(vec![
+                "padd",
+                "fmt",
+                "tests/spec/json",
+                "-t",
+                &temp_path,
+                "--no-track",
+            ]);
+        });
 
         //verify
         assert_modifies_file(&temp_path, &|| {
-            cli::run(vec!["padd", "fmt", "tests/spec/json", "-t", &temp_path]);
+            parallel!({
+                cli::run(vec!["padd", "fmt", "tests/spec/json", "-t", &temp_path]);
+            });
         });
 
         file.assert_matches_output();
@@ -497,54 +604,199 @@ mod tests {
 
         //exercise/verify
         assert_does_not_modify_file(&temp_path, &|| {
-            cli::run(vec![
-                "padd",
-                "fmt",
-                "tests/spec/json",
-                "-t",
-                &temp_path,
-                "--no-write",
-            ]);
+            parallel!({
+                cli::run(vec![
+                    "padd",
+                    "fmt",
+                    "tests/spec/json",
+                    "-t",
+                    &temp_path,
+                    "--no-write",
+                ]);
+            });
         });
 
         //teardown
         fs::remove_dir_all(&temp_dir).unwrap();
     }
 
-    serial_test! {
-        fn test_check_formatting_passed() {
-            //TODO(shane)
-        }
+    #[test]
+    fn test_log_to_file() {
+        //TODO(shane)
     }
 
-    serial_test! {
-        fn test_check_formatting_failed() {
-            //TODO(shane)
-        }
+    #[test]
+    fn test_set_log_level() {
+        //TODO(shane)
     }
 
-    serial_test! {
-        fn test_start_daemon() {
-            //TODO(shane)
-        }
+    #[test]
+    fn test_invalid_log_level() {
+        //TODO(shane)
     }
 
-    serial_test! {
-        fn test_start_daemon_already_running() {
-            //TODO(shane)
-        }
+    #[test]
+    fn test_check_formatting_passed() {
+        //setup
+        let temp_dir = create_temp_dir();
+
+        let file = TestableFile::new("json_simple".to_string(), &temp_dir);
+        let temp_path = file.copy_to_temp();
+
+        serial!({
+            let _ = fs::remove_file(&&*LOG_PATH);
+
+            //exercise
+            cli::run(vec![
+                "padd",
+                "--log",
+                &&*LOG_PATH,
+                "--level",
+                "debug",
+                "fmt",
+                "tests/spec/json",
+                "-t",
+                &temp_path,
+            ]);
+
+            //verify
+            let logs = fs::read_to_string(&&*LOG_PATH).unwrap();
+            let logged_results = LoggedResults::parse(&logs);
+
+            assert_eq!(logged_results.num_processed, 1);
+            assert_eq!(logged_results.num_formatted, 1);
+            assert_eq!(logged_results.num_failed, 0);
+            assert_eq!(logged_results.num_unchanged, 0);
+
+            assert!(logged_results.failed.is_empty());
+
+            assert!(logged_results.formatted.contains(&FormattedFJ {
+                file_name: temp_path,
+            }));
+
+            //teardown
+            log::set_max_level(LevelFilter::Off);
+            let _ = fs::remove_file(&&*LOG_PATH);
+        });
+
+        fs::remove_dir_all(&temp_dir).unwrap();
     }
 
-    serial_test! {
-        fn test_kill_daemon() {
-            //TODO(shane)
-        }
+    #[test]
+    fn test_check_formatting_failed() {
+        //setup
+        let temp_dir = create_temp_dir();
+        let _ = fs::remove_file(&&*LOG_PATH);
+
+        let file = TestableFile::new("java8_simple".to_string(), &temp_dir);
+        let temp_path = file.copy_to_temp();
+
+        serial!({
+            let _ = fs::remove_file(&&*LOG_PATH);
+
+            //exercise
+            cli::run(vec![
+                "padd",
+                "--log",
+                &&*LOG_PATH,
+                "--level",
+                "debug",
+                "fmt",
+                "tests/spec/json",
+                "-t",
+                &temp_path,
+            ]);
+
+            //verify
+            let logs = fs::read_to_string(&&*LOG_PATH).unwrap();
+            let logged_results = LoggedResults::parse(&logs);
+
+            assert_eq!(logged_results.num_processed, 1);
+            assert_eq!(logged_results.num_formatted, 0);
+            assert_eq!(logged_results.num_failed, 1);
+            assert_eq!(logged_results.num_unchanged, 0);
+
+            assert!(logged_results.formatted.is_empty());
+
+            assert!(logged_results.failed.contains(&FailedFJ {
+                file_name: temp_path,
+                error_message: String::from(
+                    "Failed to scan input: No accepting scans after (1,1): class Simp..."
+                )
+            }));
+
+            //teardown
+            log::set_max_level(LevelFilter::Off);
+            let _ = fs::remove_file(&&*LOG_PATH);
+        });
+
+        fs::remove_dir_all(&temp_dir).unwrap();
     }
 
-    serial_test! {
-        fn test_kill_daemon_not_running() {
-            //TODO(shane)
-        }
+    #[test]
+    fn test_check_formatting_unchanged() {
+        //setup
+        let temp_dir = create_temp_dir();
+
+        let file = TestableFile::new("json_simple".to_string(), &temp_dir);
+        let temp_path = file.copy_to_temp();
+
+        cli::run(vec!["padd", "fmt", "tests/spec/json", "-t", &temp_path]);
+
+        serial!({
+            let _ = fs::remove_file(&&*LOG_PATH);
+
+            //exercise
+            cli::run(vec![
+                "padd",
+                "--log",
+                &&*LOG_PATH,
+                "--level",
+                "debug",
+                "fmt",
+                "tests/spec/json",
+                "-t",
+                &temp_path,
+            ]);
+
+            //verify
+            let logs = fs::read_to_string(&&*LOG_PATH).unwrap();
+            let logged_results = LoggedResults::parse(&logs);
+
+            assert_eq!(logged_results.num_processed, 1);
+            assert_eq!(logged_results.num_formatted, 0);
+            assert_eq!(logged_results.num_failed, 0);
+            assert_eq!(logged_results.num_unchanged, 1);
+
+            assert!(logged_results.formatted.is_empty());
+            assert!(logged_results.failed.is_empty());
+
+            //teardown
+            log::set_max_level(LevelFilter::Off);
+            let _ = fs::remove_file(&&*LOG_PATH);
+        });
+
+        fs::remove_dir_all(&temp_dir).unwrap();
+    }
+
+    #[test]
+    fn test_start_daemon() {
+        //TODO(shane)
+    }
+
+    #[test]
+    fn test_start_daemon_already_running() {
+        //TODO(shane)
+    }
+
+    #[test]
+    fn test_kill_daemon() {
+        //TODO(shane)
+    }
+
+    #[test]
+    fn test_kill_daemon_not_running() {
+        //TODO(shane)
     }
 
     #[test]
@@ -552,10 +804,9 @@ mod tests {
         //TODO(shane)
     }
 
-    serial_test! {
-        fn test_cache_fjr() {
-            //TODO(shane)
-        }
+    #[test]
+    fn test_cache_fjr() {
+        //TODO(shane)
     }
 
     fn assert_modifies_file(file_path: &str, modifier: &Fn()) {

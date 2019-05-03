@@ -8,6 +8,7 @@ use std::{
     error::Error,
     io::{self, Cursor, Read, Seek, SeekFrom, Write},
     process,
+    sync::{Arc, Mutex},
 };
 
 use self::{
@@ -18,6 +19,7 @@ use self::{
         append::file::FileAppender,
         config::{Appender, Config, Root},
         encode::{pattern::PatternEncoder, Encode, Write as LogWrite},
+        Handle,
     },
 };
 
@@ -29,6 +31,7 @@ lazy_static! {
     static ref PREFIX_FMT: ColoredString = "  FMT".bright_blue();
     static ref PREFIX_FMT_OK: ColoredString = "   OK".bright_green();
     static ref PREFIX_FMT_ERR: ColoredString = "ERROR".bright_red();
+    static ref LOGGER_HANDLE: Arc<Mutex<Option<Handle>>> = Arc::new(Mutex::new(None));
 }
 
 pub fn init(matches: &ArgMatches) {
@@ -69,8 +72,19 @@ pub fn init(matches: &ArgMatches) {
             }
         };
 
-        if let Err(err) = log4rs::init_config(config) {
-            self::err(&format!("Failed to initialize logger: {}", err));
+        let mut handle_opt = LOGGER_HANDLE.lock().unwrap();
+
+        if handle_opt.is_none() {
+            match log4rs::init_config(config) {
+                Ok(handle) => {
+                    *handle_opt = Some(handle);
+                }
+                Err(err) => {
+                    self::err(&format!("Failed to initialize logger: {}", err));
+                }
+            }
+        } else if let Some(ref handle) = *handle_opt {
+            handle.set_config(config);
         }
     }
 
