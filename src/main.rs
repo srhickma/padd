@@ -26,8 +26,10 @@ mod tests {
         std::{
             fs::{self, File, OpenOptions},
             io::{prelude::*, Read},
+            panic,
             path::{Path, PathBuf},
             process::Command,
+            sync::Mutex,
             thread,
             time::Duration,
         },
@@ -39,6 +41,23 @@ mod tests {
         static ref TEMP_DIR: &'static Path = Path::new("tests/temp");
         static ref INPUT_DIR: &'static Path = Path::new("tests/input");
         static ref OUTPUT_DIR: &'static Path = Path::new("tests/output");
+        static ref SERIAL_TEST_MUTEX: Mutex<()> = Mutex::new(());
+    }
+
+    /// All tests wrapped in this macro will be executed serially
+    /// Adapted from Thomasdezeeuw/std-logger
+    macro_rules! serial_test {
+        (fn $name: ident() $body: block) => {
+            #[test]
+            fn $name() {
+                let guard = SERIAL_TEST_MUTEX.lock().unwrap();
+
+                if let Err(err) = panic::catch_unwind(|| $body) {
+                    drop(guard);
+                    panic::resume_unwind(err);
+                }
+            }
+        };
     }
 
     struct TestableFile<'scope> {
@@ -492,39 +511,40 @@ mod tests {
         fs::remove_dir_all(&temp_dir).unwrap();
     }
 
-    #[test]
-    fn test_check_formatting_passed() {
-        //TODO(shane)
+    serial_test! {
+        fn test_check_formatting_passed() {
+            //TODO(shane)
+        }
     }
 
-    #[test]
-    fn test_check_formatting_failed() {
-        //TODO(shane)
+    serial_test! {
+        fn test_check_formatting_failed() {
+            //TODO(shane)
+        }
     }
 
-    #[test]
-    fn test_start_server() {
-        //TODO(shane)
+    serial_test! {
+        fn test_start_daemon() {
+            //TODO(shane)
+        }
     }
 
-    #[test]
-    fn test_start_daemon() {
-        //TODO(shane)
+    serial_test! {
+        fn test_start_daemon_already_running() {
+            //TODO(shane)
+        }
     }
 
-    #[test]
-    fn test_start_daemon_already_running() {
-        //TODO(shane)
+    serial_test! {
+        fn test_kill_daemon() {
+            //TODO(shane)
+        }
     }
 
-    #[test]
-    fn test_kill_daemon() {
-        //TODO(shane)
-    }
-
-    #[test]
-    fn test_kill_daemon_not_running() {
-        //TODO(shane)
+    serial_test! {
+        fn test_kill_daemon_not_running() {
+            //TODO(shane)
+        }
     }
 
     #[test]
@@ -532,9 +552,10 @@ mod tests {
         //TODO(shane)
     }
 
-    #[test]
-    fn test_cache_fjr() {
-        //TODO(shane)
+    serial_test! {
+        fn test_cache_fjr() {
+            //TODO(shane)
+        }
     }
 
     fn assert_modifies_file(file_path: &str, modifier: &Fn()) {
