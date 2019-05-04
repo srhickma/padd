@@ -21,7 +21,7 @@ impl<V: Default> CEHashMap<V> {
 
     /// Inserts a value into the map at the given key.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `key` - the key at which to insert the value in the map.
     /// * `value` - the value to be inserted into the map.
@@ -50,7 +50,7 @@ impl<V: Default> CEHashMap<V> {
 
     /// Returns a reference to the value stored in the map at the given key, or `None` if no such value is stored.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `key` - the key to look up in the map.
     pub fn get(&self, key: usize) -> Option<&V> {
@@ -62,7 +62,7 @@ impl<V: Default> CEHashMap<V> {
 
     /// Returns a _mutable_ reference to the value stored in the map at the given key, or `None` if no such value is stored.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `key` - the key to look up in the map.
     pub fn get_mut(&mut self, key: usize) -> Option<&mut V> {
@@ -74,7 +74,7 @@ impl<V: Default> CEHashMap<V> {
 
     /// Returns `true` if there is a value stored in the map under the given key, and `false` otherwise.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `key` - the key to look up in the map.
     pub fn contains(&self, key: usize) -> bool {
