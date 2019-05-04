@@ -304,6 +304,7 @@ pub struct Declaration {
 ///
 /// * `input` - the pattern string from the specification.
 /// * `prod` - the grammar production this pattern is associated with.
+/// * `string_prod` - the string representation of `prod`, useful for building errors.
 pub fn generate_pattern<Symbol: GrammarSymbol>(
     input: &str,
     prod: &Production<Symbol>,
@@ -500,9 +501,9 @@ fn parse_pattern(input: &str) -> Result<Tree<PatternSymbol>, BuildError> {
 ///
 /// # Types
 ///
-/// * `ScanErr` - Stores an error that occurred while lexing a pattern.
-/// * `ParseErr` - Stores an error that occurred while parsing a pattern.
-/// * `CaptureErr` - Stores an error caused by an invalid pattern capture (e.g. out-of-bounds).
+/// * `ScanErr` - Indicates that an error that occurred while lexing a pattern.
+/// * `ParseErr` - Indicates that an error that occurred while parsing a pattern.
+/// * `CaptureErr` - Indicates that an invalid pattern capture is present (e.g. out-of-bounds).
 #[derive(Debug)]
 pub enum BuildError {
     ScanErr(scan::Error),
