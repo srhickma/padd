@@ -7,6 +7,7 @@ pub fn replace_escapes(input: &str) -> String {
             res.push(match c {
                 'n' => '\n',
                 't' => '\t',
+                'r' => '\r',
                 '\'' => '\'',
                 '\\' => {
                     last_char = ' '; //Stop \\\\ -> \\\ rather than \\
@@ -32,12 +33,12 @@ mod tests {
     #[test]
     fn replace_escapes_full() {
         //setup
-        let input = "ffffnt\'ff\\n\\t\\\\\\\\ffff\\ff\'\\f\\\'fff";
+        let input = "ffffnt\'ff\\n\\t\\\\\\\\ffff\\ff\'\\f\\\'fff\\r";
 
         //exercise
         let res = replace_escapes(input);
 
         //verify
-        assert_eq!(res, "ffffnt\'ff\n\t\\\\ffffff\'f\'fff");
+        assert_eq!(res, "ffffnt\'ff\n\t\\\\ffffff\'f\'fff\r");
     }
 }

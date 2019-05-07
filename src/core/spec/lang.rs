@@ -13,7 +13,7 @@ use core::{
     spec,
 };
 
-static SPEC_ALPHABET: &'static str = "`-=~!@#$%^&*()+{}|[]\\;':\"<>?,./_0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ \n\t";
+static SPEC_ALPHABET: &'static str = "`-=~!@#$%^&*()+{}|[]\\;':\"<>?,./_0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ \n\t\r";
 
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
 enum S {
@@ -70,7 +70,8 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<Symbol>, scan::CDFAError> {
         .mark_trans(&S::Comment, '#')?
         .mark_trans(&S::Whitespace, ' ')?
         .mark_trans(&S::Whitespace, '\t')?
-        .mark_trans(&S::Whitespace, '\n')?;
+        .mark_trans(&S::Whitespace, '\n')?
+        .mark_trans(&S::Whitespace, '\r')?;
 
     // Alphabet
 
@@ -85,7 +86,8 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<Symbol>, scan::CDFAError> {
         .mark_trans(&S::Comment, '#')?
         .mark_trans(&S::Whitespace, ' ')?
         .mark_trans(&S::Whitespace, '\t')?
-        .mark_trans(&S::Whitespace, '\n')?;
+        .mark_trans(&S::Whitespace, '\n')?
+        .mark_trans(&S::Whitespace, '\r')?;
 
     builder
         .state(&S::AlphabetStringPartial)
@@ -115,7 +117,8 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<Symbol>, scan::CDFAError> {
         .mark_trans(&S::Comment, '#')?
         .mark_trans(&S::Whitespace, ' ')?
         .mark_trans(&S::Whitespace, '\t')?
-        .mark_trans(&S::Whitespace, '\n')?;
+        .mark_trans(&S::Whitespace, '\n')?
+        .mark_trans(&S::Whitespace, '\r')?;
 
     builder
         .state(&S::CDFAEntryBrace)
@@ -136,7 +139,8 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<Symbol>, scan::CDFAError> {
         .mark_trans(&S::Comment, '#')?
         .mark_trans(&S::Whitespace, ' ')?
         .mark_trans(&S::Whitespace, '\t')?
-        .mark_trans(&S::Whitespace, '\n')?;
+        .mark_trans(&S::Whitespace, '\n')?
+        .mark_trans(&S::Whitespace, '\r')?;
 
     builder.state(&S::Hat).accept().tokenize(&Symbol::THat);
 
@@ -159,7 +163,8 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<Symbol>, scan::CDFAError> {
         .mark_trans(&S::Comment, '#')?
         .mark_trans(&S::Whitespace, ' ')?
         .mark_trans(&S::Whitespace, '\t')?
-        .mark_trans(&S::Whitespace, '\n')?;
+        .mark_trans(&S::Whitespace, '\n')?
+        .mark_trans(&S::Whitespace, '\r')?;
 
     builder
         .state(&S::GrammarEntryBrace)
@@ -177,7 +182,8 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<Symbol>, scan::CDFAError> {
         .mark_trans(&S::Comment, '#')?
         .mark_trans(&S::Whitespace, ' ')?
         .mark_trans(&S::Whitespace, '\t')?
-        .mark_trans(&S::Whitespace, '\n')?;
+        .mark_trans(&S::Whitespace, '\n')?
+        .mark_trans(&S::Whitespace, '\r')?;
 
     builder
         .state(&S::OptIdPartial)

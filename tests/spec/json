@@ -1,8 +1,8 @@
-alphabet '<>=+-*/\\%(){}[],.;:#!?^$@&|"\'`~ \t\n_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789' #TODO(shane) support full alphabet
+alphabet '<>=+-*/\\%(){}[],.;:#!?^$@&|"\'`~ \t\n\r_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789' #TODO(shane) support full alphabet
 
 cdfa {
-    start #TODO(shane) need to support carriage return
-        ' ' | '\t' | '\n' -> ^_
+    start
+        ' ' | '\t' | '\n' | '\r' -> ^_
         ',' -> ^COMMA
         ':' -> ^COLON
         '{' -> ^LBRACKET

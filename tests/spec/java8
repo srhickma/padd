@@ -1,4 +1,4 @@
-alphabet '<>=+-*/\\%(){}[],.;:#!?^$@&|"\'`~ \t\n_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+alphabet '<>=+-*/\\%(){}[],.;:#!?^$@&|"\'`~ \t\n\r_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
 
 cdfa {
     start
@@ -86,7 +86,7 @@ cdfa {
         'while' -> ^WHILE
 
         # MISC
-        ' ' | '\t' | '\n' -> ws
+        ' ' | '\t' | '\n' | '\r' -> ws
         '#' | '$' | '`' -> fail
         _ -> id;
 
@@ -230,7 +230,7 @@ cdfa {
         ':' -> ^M_REF;
 
     ws      ^_
-        ' ' | '\t' | '\n' -> ws;
+        ' ' | '\t' | '\n' | '\r' -> ws;
 
     lcom    ^_
         '\n' -> fail
