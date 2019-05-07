@@ -162,7 +162,10 @@ impl<Symbol: Data> Data for Token<Symbol> {
     fn to_string(&self) -> String {
         let lexeme_string = format!(
             " <- '{}'",
-            self.lexeme.replace('\n', "\\n").replace('\t', "\\t")
+            self.lexeme
+                .replace('\n', "\\n")
+                .replace('\t', "\\t")
+                .replace('\r', "\\r")
         );
 
         match &self.kind {

@@ -627,16 +627,16 @@ grammar {
     fn generate_spec_simple() {
         //setup
         let spec = "
-alphabet ' \\t\\n{}'
+alphabet ' \\t\\n\\r{}'
 
 cdfa {
     start
-        ' ' | '\\t' | '\\n' -> ws
+        ' ' | '\\t' | '\\n' | '\\r' -> ws
         '{' -> lbr
         '}' -> rbr;
 
     ws  ^WHITESPACE
-        ' ' | '\\t' | '\\n' -> ws;
+        ' ' | '\\t' | '\\n' | '\\r' -> ws;
 
     lbr ^LBRACKET;
 
@@ -656,7 +656,7 @@ grammar {
 }
         ";
 
-        let input = "  {  {  {{{\t}}}\n {} }  }   { {}\n } ".to_string();
+        let input = "  {  {  {{{\t}}}\n\r {} } \r }   { {}\n } ".to_string();
         let chars: Vec<char> = input.chars().collect();
 
         let scanner = scan::def_scanner();

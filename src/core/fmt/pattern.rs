@@ -17,7 +17,7 @@ use {
 };
 
 static PATTERN_ALPHABET: &'static str =
-    "{}[];=0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ \n\t`~!@#$%^&*()_-+:'\"<>,.?/\\|";
+    "{}[];=0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ \n\t\r`~!@#$%^&*()_-+:'\"<>,.?/\\|";
 
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
 enum S {
@@ -387,7 +387,7 @@ mod tests {
     #[test]
     fn parse_pattern_simple() {
         //setup
-        let input = "\t \n\n\n\n{1}  {2}  {45;something=\n\n \t} {46;somethinelse=\n\n \t;some=}";
+        let input = "\t \n\n\n\r\n{1}  {2}  {45;something=\n\n \t} {46;somethinelse=\n\n \t;some=}";
 
         //exercise
         let tree = parse_pattern(input);
@@ -398,7 +398,7 @@ mod tests {
     └── Segments
         ├── Segment
         │   └── Filler
-        │       └── TFiller <- '\\t \\n\\n\\n\\n'
+        │       └── TFiller <- '\\t \\n\\n\\n\\r\\n'
         └── Segments
             ├── Segment
             │   └── Capture
@@ -608,7 +608,7 @@ mod tests {
     #[test]
     fn generate_pattern_substitutions() {
         //setup
-        let input = "\t \n[a]{1}  {} [prefix] ";
+        let input = "\t \n\r[a]{1}  {} [prefix] ";
         let prod = Production {
             lhs: Symbol::Pattern,
             rhs: vec![Symbol::Pattern, Symbol::Pattern],
@@ -620,7 +620,7 @@ mod tests {
         //verify
         assert_eq!(pattern.segments.len(), 8);
         assert!(match pattern.segments.get(0).unwrap() {
-            &Segment::Filler(ref s) => "\t \n" == *s,
+            &Segment::Filler(ref s) => "\t \n\r" == *s,
             &Segment::Substitution(_) => false,
             &Segment::Capture(_) => false,
         });
