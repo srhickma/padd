@@ -149,53 +149,74 @@ lazy_static! {
 }
 
 fn build_pattern_grammar() -> Grammar<Symbol> {
-    //TODO create macros to make this declaration simpler
     //TODO optimize for left recursion
-    let productions: Vec<Production<Symbol>> = vec![
-        Production::from(Symbol::Pattern, vec![Symbol::Segments]),
-        Production::from(Symbol::Segments, vec![Symbol::Segment, Symbol::Segments]),
-        Production::epsilon(Symbol::Segments),
-        Production::from(Symbol::Segment, vec![Symbol::Filler]),
-        Production::from(Symbol::Segment, vec![Symbol::Substitution]),
-        Production::from(Symbol::Segment, vec![Symbol::Capture]),
-        Production::from(Symbol::Filler, vec![Symbol::TFiller]),
-        Production::from(Symbol::Filler, vec![Symbol::TAlpha]),
-        Production::from(Symbol::Filler, vec![Symbol::TNumber]),
-        Production::from(
-            Symbol::Substitution,
-            vec![Symbol::TLeftBracket, Symbol::TAlpha, Symbol::TRightBracket],
-        ),
-        Production::from(
-            Symbol::Capture,
-            vec![
-                Symbol::TLeftBrace,
-                Symbol::CaptureDescriptor,
-                Symbol::TRightBrace,
-            ],
-        ),
-        Production::from(Symbol::CaptureDescriptor, vec![Symbol::CaptureIndex]),
-        Production::from(
-            Symbol::CaptureDescriptor,
-            vec![Symbol::CaptureIndex, Symbol::TSemi, Symbol::Declarations],
-        ),
-        Production::from(Symbol::CaptureIndex, vec![Symbol::TNumber]),
-        Production::epsilon(Symbol::CaptureIndex),
-        Production::from(
-            Symbol::Declarations,
-            vec![Symbol::Declarations, Symbol::TSemi, Symbol::Declaration],
-        ),
-        Production::from(Symbol::Declarations, vec![Symbol::Declaration]),
-        Production::from(
-            Symbol::Declaration,
-            vec![Symbol::TAlpha, Symbol::TEquals, Symbol::Value],
-        ),
-        Production::from(Symbol::Value, vec![Symbol::Pattern]),
-        Production::epsilon(Symbol::Value),
-    ];
 
     let mut builder = GrammarBuilder::new();
-    builder.try_mark_start(&productions.first().unwrap().lhs);
-    builder.add_productions(productions.clone());
+    builder.try_mark_start(&Symbol::Pattern);
+
+    builder.from(Symbol::Pattern).to(vec![Symbol::Segments]);
+
+    builder
+        .from(Symbol::Segments)
+        .to(vec![Symbol::Segment, Symbol::Segments])
+        .epsilon();
+
+    builder
+        .from(Symbol::Segment)
+        .to(vec![Symbol::Filler])
+        .to(vec![Symbol::Substitution])
+        .to(vec![Symbol::Capture]);
+
+    builder
+        .from(Symbol::Filler)
+        .to(vec![Symbol::TFiller])
+        .to(vec![Symbol::TAlpha])
+        .to(vec![Symbol::TNumber]);
+
+    builder.from(Symbol::Substitution).to(vec![
+        Symbol::TLeftBracket,
+        Symbol::TAlpha,
+        Symbol::TRightBracket,
+    ]);
+
+    builder.from(Symbol::Capture).to(vec![
+        Symbol::TLeftBrace,
+        Symbol::CaptureDescriptor,
+        Symbol::TRightBrace,
+    ]);
+
+    builder
+        .from(Symbol::CaptureDescriptor)
+        .to(vec![Symbol::CaptureIndex])
+        .to(vec![
+            Symbol::CaptureIndex,
+            Symbol::TSemi,
+            Symbol::Declarations,
+        ]);
+
+    builder
+        .from(Symbol::CaptureIndex)
+        .to(vec![Symbol::TNumber])
+        .epsilon();
+
+    builder
+        .from(Symbol::Declarations)
+        .to(vec![
+            Symbol::Declarations,
+            Symbol::TSemi,
+            Symbol::Declaration,
+        ])
+        .to(vec![Symbol::Declaration]);
+
+    builder
+        .from(Symbol::Declaration)
+        .to(vec![Symbol::TAlpha, Symbol::TEquals, Symbol::Value]);
+
+    builder
+        .from(Symbol::Value)
+        .to(vec![Symbol::Pattern])
+        .epsilon();
+
     builder.build()
 }
 

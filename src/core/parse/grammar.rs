@@ -66,6 +66,10 @@ impl<Symbol: Data + Default> GrammarBuilder<Symbol> {
         }
     }
 
+    pub fn from(&mut self, lhs: Symbol) -> NonTerminalBuilder<Symbol> {
+        NonTerminalBuilder::new(self, lhs)
+    }
+
     pub fn add_production(&mut self, production: Production<Symbol>) {
         if let Some(vec) = self.prods_by_lhs.get_mut(&production.lhs) {
             vec.push(production);
@@ -76,6 +80,7 @@ impl<Symbol: Data + Default> GrammarBuilder<Symbol> {
             .insert(production.lhs.clone(), vec![production]);
     }
 
+    #[allow(unused)]
     pub fn add_productions(&mut self, productions: Vec<Production<Symbol>>) {
         for prod in productions {
             self.add_production(prod);
@@ -165,5 +170,33 @@ impl<Symbol: Data + Default> GrammarBuilder<Symbol> {
         }
 
         nss
+    }
+}
+
+pub struct NonTerminalBuilder<'builder, Symbol: Data + Default> {
+    grammar_builder: &'builder mut GrammarBuilder<Symbol>,
+    lhs: Symbol,
+}
+
+impl<'builder, Symbol: Data + Default> NonTerminalBuilder<'builder, Symbol> {
+    fn new(grammar_builder: &'builder mut GrammarBuilder<Symbol>, lhs: Symbol) -> Self {
+        NonTerminalBuilder {
+            grammar_builder,
+            lhs,
+        }
+    }
+
+    pub fn to(&mut self, rhs: Vec<Symbol>) -> &mut Self {
+        self.grammar_builder
+            .add_production(Production::from(self.lhs.clone(), rhs));
+
+        self
+    }
+
+    pub fn epsilon(&mut self) -> &mut Self {
+        self.grammar_builder
+            .add_production(Production::epsilon(self.lhs.clone()));
+
+        self
     }
 }

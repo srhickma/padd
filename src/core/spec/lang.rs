@@ -3,7 +3,7 @@ use core::{
     parse::{
         self,
         grammar::{Grammar, GrammarBuilder},
-        Production, Tree,
+        Tree,
     },
     scan::{
         self,
@@ -301,132 +301,148 @@ lazy_static! {
 }
 
 fn build_spec_grammar() -> Grammar<Symbol> {
-    //TODO create macros to make this declaration simpler
-    let productions: Vec<Production<Symbol>> = vec![
-        Production::from(Symbol::Spec, vec![Symbol::Regions]),
-        Production::from(Symbol::Regions, vec![Symbol::Regions, Symbol::Region]),
-        Production::from(Symbol::Regions, vec![Symbol::Region]),
-        Production::from(Symbol::Region, vec![Symbol::Alphabet]),
-        Production::from(Symbol::Region, vec![Symbol::CDFA]),
-        Production::from(Symbol::Region, vec![Symbol::Grammar]),
-        Production::from(Symbol::Alphabet, vec![Symbol::TAlphabet, Symbol::TCil]),
-        Production::from(
-            Symbol::CDFA,
-            vec![
-                Symbol::TCDFA,
-                Symbol::TLeftBrace,
-                Symbol::States,
-                Symbol::TRightBrace,
-            ],
-        ),
-        Production::from(Symbol::States, vec![Symbol::States, Symbol::State]),
-        Production::from(Symbol::States, vec![Symbol::State]),
-        Production::from(
-            Symbol::State,
-            vec![
-                Symbol::StateDeclarator,
-                Symbol::TransitionsOpt,
-                Symbol::TSemi,
-            ],
-        ),
-        Production::from(Symbol::StateDeclarator, vec![Symbol::Targets]),
-        Production::from(
-            Symbol::StateDeclarator,
-            vec![Symbol::Targets, Symbol::Acceptor],
-        ),
-        Production::from(
-            Symbol::Acceptor,
-            vec![
-                Symbol::THat,
-                Symbol::IdOrDef,
-                Symbol::AcceptorDestinationOpt,
-            ],
-        ),
-        Production::from(
-            Symbol::AcceptorDestinationOpt,
-            vec![Symbol::TArrow, Symbol::TId],
-        ),
-        Production::epsilon(Symbol::AcceptorDestinationOpt),
-        Production::from(Symbol::Targets, vec![Symbol::TId]),
-        Production::from(
-            Symbol::Targets,
-            vec![Symbol::Targets, Symbol::TOr, Symbol::TId],
-        ),
-        Production::from(Symbol::TransitionsOpt, vec![Symbol::Transitions]),
-        Production::epsilon(Symbol::TransitionsOpt),
-        Production::from(
-            Symbol::Transitions,
-            vec![Symbol::Transitions, Symbol::Transition],
-        ),
-        Production::from(Symbol::Transitions, vec![Symbol::Transition]),
-        Production::from(
-            Symbol::Transition,
-            vec![
-                Symbol::Matchers,
-                Symbol::TArrow,
-                Symbol::TransitionDestination,
-            ],
-        ),
-        Production::from(
-            Symbol::Transition,
-            vec![Symbol::TDef, Symbol::TArrow, Symbol::TransitionDestination],
-        ),
-        Production::from(Symbol::TransitionDestination, vec![Symbol::TId]),
-        Production::from(Symbol::TransitionDestination, vec![Symbol::Acceptor]),
-        Production::from(
-            Symbol::Matchers,
-            vec![Symbol::Matchers, Symbol::TOr, Symbol::Matcher],
-        ),
-        Production::from(Symbol::Matchers, vec![Symbol::Matcher]),
-        Production::from(Symbol::Matcher, vec![Symbol::TCil]),
-        Production::from(
-            Symbol::Matcher,
-            vec![Symbol::TCil, Symbol::TRange, Symbol::TCil],
-        ),
-        Production::from(
-            Symbol::Grammar,
-            vec![
-                Symbol::TGrammar,
-                Symbol::TLeftBrace,
-                Symbol::Productions,
-                Symbol::TRightBrace,
-            ],
-        ),
-        Production::from(
-            Symbol::Productions,
-            vec![Symbol::Productions, Symbol::Production],
-        ),
-        Production::from(Symbol::Productions, vec![Symbol::Production]),
-        Production::from(
-            Symbol::Production,
-            vec![
-                Symbol::TId,
-                Symbol::PatternOpt,
-                Symbol::RightHandSides,
-                Symbol::TSemi,
-            ],
-        ),
-        Production::from(
-            Symbol::RightHandSides,
-            vec![Symbol::RightHandSides, Symbol::RightHandSide],
-        ),
-        Production::from(Symbol::RightHandSides, vec![Symbol::RightHandSide]),
-        Production::from(
-            Symbol::RightHandSide,
-            vec![Symbol::TOr, Symbol::Ids, Symbol::PatternOpt],
-        ),
-        Production::from(Symbol::PatternOpt, vec![Symbol::TPattern]),
-        Production::epsilon(Symbol::PatternOpt),
-        Production::from(Symbol::Ids, vec![Symbol::Ids, Symbol::TId]),
-        Production::from(Symbol::Ids, vec![Symbol::Ids, Symbol::TOptId]),
-        Production::epsilon(Symbol::Ids),
-        Production::from(Symbol::IdOrDef, vec![Symbol::TId]),
-        Production::from(Symbol::IdOrDef, vec![Symbol::TDef]),
-    ];
-
     let mut builder = GrammarBuilder::new();
-    builder.try_mark_start(&productions.first().unwrap().lhs);
-    builder.add_productions(productions.clone());
+    builder.try_mark_start(&Symbol::Spec);
+
+    builder.from(Symbol::Spec).to(vec![Symbol::Regions]);
+
+    builder
+        .from(Symbol::Regions)
+        .to(vec![Symbol::Regions, Symbol::Region])
+        .to(vec![Symbol::Region]);
+
+    builder
+        .from(Symbol::Region)
+        .to(vec![Symbol::Alphabet])
+        .to(vec![Symbol::CDFA])
+        .to(vec![Symbol::Grammar]);
+
+    builder
+        .from(Symbol::Alphabet)
+        .to(vec![Symbol::TAlphabet, Symbol::TCil]);
+
+    builder.from(Symbol::CDFA).to(vec![
+        Symbol::TCDFA,
+        Symbol::TLeftBrace,
+        Symbol::States,
+        Symbol::TRightBrace,
+    ]);
+
+    builder
+        .from(Symbol::States)
+        .to(vec![Symbol::States, Symbol::State])
+        .to(vec![Symbol::State]);
+
+    builder.from(Symbol::State).to(vec![
+        Symbol::StateDeclarator,
+        Symbol::TransitionsOpt,
+        Symbol::TSemi,
+    ]);
+
+    builder
+        .from(Symbol::StateDeclarator)
+        .to(vec![Symbol::Targets])
+        .to(vec![Symbol::Targets, Symbol::Acceptor]);
+
+    builder.from(Symbol::Acceptor).to(vec![
+        Symbol::THat,
+        Symbol::IdOrDef,
+        Symbol::AcceptorDestinationOpt,
+    ]);
+
+    builder
+        .from(Symbol::AcceptorDestinationOpt)
+        .to(vec![Symbol::TArrow, Symbol::TId])
+        .epsilon();
+
+    builder.from(Symbol::Targets).to(vec![Symbol::TId]).to(vec![
+        Symbol::Targets,
+        Symbol::TOr,
+        Symbol::TId,
+    ]);
+
+    builder
+        .from(Symbol::TransitionsOpt)
+        .to(vec![Symbol::Transitions])
+        .epsilon();
+
+    builder
+        .from(Symbol::Transitions)
+        .to(vec![Symbol::Transitions, Symbol::Transition])
+        .to(vec![Symbol::Transition]);
+
+    builder
+        .from(Symbol::Transition)
+        .to(vec![
+            Symbol::Matchers,
+            Symbol::TArrow,
+            Symbol::TransitionDestination,
+        ])
+        .to(vec![
+            Symbol::TDef,
+            Symbol::TArrow,
+            Symbol::TransitionDestination,
+        ]);
+
+    builder
+        .from(Symbol::TransitionDestination)
+        .to(vec![Symbol::TId])
+        .to(vec![Symbol::Acceptor]);
+
+    builder
+        .from(Symbol::Matchers)
+        .to(vec![Symbol::Matchers, Symbol::TOr, Symbol::Matcher])
+        .to(vec![Symbol::Matcher]);
+
+    builder
+        .from(Symbol::Matcher)
+        .to(vec![Symbol::TCil])
+        .to(vec![Symbol::TCil, Symbol::TRange, Symbol::TCil]);
+
+    builder.from(Symbol::Grammar).to(vec![
+        Symbol::TGrammar,
+        Symbol::TLeftBrace,
+        Symbol::Productions,
+        Symbol::TRightBrace,
+    ]);
+
+    builder
+        .from(Symbol::Productions)
+        .to(vec![Symbol::Productions, Symbol::Production])
+        .to(vec![Symbol::Production]);
+
+    builder.from(Symbol::Production).to(vec![
+        Symbol::TId,
+        Symbol::PatternOpt,
+        Symbol::RightHandSides,
+        Symbol::TSemi,
+    ]);
+
+    builder
+        .from(Symbol::RightHandSides)
+        .to(vec![Symbol::RightHandSides, Symbol::RightHandSide])
+        .to(vec![Symbol::RightHandSide]);
+
+    builder
+        .from(Symbol::RightHandSide)
+        .to(vec![Symbol::TOr, Symbol::Ids, Symbol::PatternOpt]);
+
+    builder
+        .from(Symbol::PatternOpt)
+        .to(vec![Symbol::TPattern])
+        .epsilon();
+
+    builder
+        .from(Symbol::Ids)
+        .to(vec![Symbol::Ids, Symbol::TId])
+        .to(vec![Symbol::Ids, Symbol::TOptId])
+        .epsilon();
+
+    builder
+        .from(Symbol::IdOrDef)
+        .to(vec![Symbol::TId])
+        .to(vec![Symbol::TDef]);
+
     builder.build()
 }
 
