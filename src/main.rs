@@ -997,6 +997,51 @@ mod tests {
     }
 
     #[test]
+    fn test_execute_on_server() {
+        //setup
+        let temp_dir = create_temp_dir();
+
+        let file = TestableFile::new("json_simple".to_string(), &temp_dir);
+        let temp_path = file.copy_to_temp();
+
+        serial!({
+            server::kill();
+            assert!(!server::running());
+
+            thread::spawn(move || {
+                // Allow time for the server to start
+                thread::sleep(Duration::from_millis(20));
+
+                assert!(server::running());
+
+                //exercise/verify
+                assert_does_not_modify_file(&temp_path, &|| {
+                    cli::run(vec![EXECUTABLE, "fmt", "tests/spec/json", "-t", &temp_path]);
+                });
+
+                assert_modifies_file(&temp_path, &|| {
+                    // Wait long enough for server to format file
+                    thread::sleep(Duration::from_millis(500));
+                });
+
+                //teardown
+                server::kill();
+            });
+
+            cli::run(vec![EXECUTABLE, "start-server"]);
+
+            //verify
+            assert!(!server::running());
+        });
+
+        //verify
+        file.assert_matches_output();
+
+        //teardown
+        fs::remove_dir_all(&temp_dir).unwrap();
+    }
+
+    #[test]
     fn test_start_daemon() {
         serial!({
             //setup
