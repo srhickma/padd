@@ -6,6 +6,10 @@ use self::{clap::App, yaml_rust::yaml::Yaml};
 mod cmd;
 mod formatter;
 mod logger;
+#[cfg(test)]
+pub mod server;
+//#[cfg(ccstop)]
+#[cfg(not(test))]
 mod server;
 mod thread_pool;
 mod tracker;
@@ -33,7 +37,7 @@ pub fn run(args: Vec<&str>) {
     }
 
     if let Some(matches) = matches.subcommand_matches("daemon") {
-        cmd::daemon(&matches);
+        cmd::daemon(&matches, &args);
     }
 
     if matches.subcommand_matches("start-server").is_some() {

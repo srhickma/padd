@@ -8,7 +8,7 @@ use {
         formatter::{self, FormatCommand, FormatMetrics},
         logger, server, tracker,
     },
-    std::{env, path::Path, process::Command},
+    std::{path::Path, process::Command},
 };
 
 use self::{
@@ -128,15 +128,12 @@ pub fn forget(matches: &ArgMatches) {
     tracker::clear_tracking(target);
 }
 
-pub fn daemon(matches: &ArgMatches) {
+pub fn daemon(matches: &ArgMatches, args: &[&str]) {
     if matches.subcommand_matches("start").is_some() {
         if server::running() {
             logger::info(&"Daemon already running".to_string());
         } else {
-            let child = Command::new(&env::args().next().unwrap()[..])
-                .arg("start-server")
-                .spawn()
-                .unwrap();
+            let child = Command::new(args[0]).arg("start-server").spawn().unwrap();
 
             logger::info(&format!("Starting padd daemon with pid {}", child.id()));
         }

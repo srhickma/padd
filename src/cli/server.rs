@@ -6,7 +6,6 @@ use {
     std::{
         io::{Read, Write},
         net::{TcpListener, TcpStream},
-        process,
         sync::Arc,
         thread,
     },
@@ -29,10 +28,9 @@ pub fn start(clap_config: &'static Yaml) {
             for stream in listener.incoming() {
                 match stream {
                     Ok(stream) => {
-                        let config = clap_config_arc.clone();
-                        thread::spawn(move || {
-                            handle_stream(stream, config);
-                        });
+                        if handle_stream(stream, clap_config_arc.clone()) {
+                            break;
+                        }
                     }
                     Err(err) => {
                         logger::err(&format!("Failed to read incoming tcp stream: {}", err))
@@ -44,7 +42,7 @@ pub fn start(clap_config: &'static Yaml) {
     };
 }
 
-fn handle_stream(stream: TcpStream, clap_config: Arc<&Yaml>) {
+fn handle_stream(stream: TcpStream, clap_config: Arc<&'static Yaml>) -> bool {
     match stream.try_clone() {
         Ok(mut stream_writer) => {
             let mut buf: Vec<u8> = Vec::new();
@@ -59,14 +57,14 @@ fn handle_stream(stream: TcpStream, clap_config: Arc<&Yaml>) {
                     }
                     Err(err) => {
                         logger::err(&format!("Failed to read byte from stream: {}", err));
-                        return;
+                        return false;
                     }
                 }
             }
 
             match String::from_utf8(buf) {
                 Ok(string) => match &string[..] {
-                    SIG_KILL => process::exit(0),
+                    SIG_KILL => return true,
                     SIG_CHALLENGE => {
                         if let Err(err) = stream_writer.write_all(SIG_RESPONSE.as_bytes()) {
                             logger::err(&format!("Failed to write challenge response: {}", err));
@@ -82,6 +80,8 @@ fn handle_stream(stream: TcpStream, clap_config: Arc<&Yaml>) {
         }
         Err(err) => logger::err(&format!("Failed to clone read stream for writing: {}", err)),
     }
+
+    false
 }
 
 pub fn kill() {
@@ -128,16 +128,19 @@ pub fn send_command(mut command: String) {
     }
 }
 
-fn execute_command(mut command: String, clap_config: Arc<&Yaml>) {
-    logger::info(&format!("Executing command: {}", &command));
+fn execute_command(mut command: String, outer_clap_config: Arc<&'static Yaml>) {
+    let clap_config = outer_clap_config.clone();
+    thread::spawn(move || {
+        logger::info(&format!("Executing command: {}", &command));
 
-    // Remove terminal character
-    command.pop();
+        // Remove terminal character
+        command.pop();
 
-    let args = command.split_whitespace();
-    let matches = App::from_yaml(&clap_config).get_matches_from(args);
+        let args = command.split_whitespace();
+        let matches = App::from_yaml(&clap_config).get_matches_from(args);
 
-    if let Some(matches) = matches.subcommand_matches("fmt") {
-        cmd::fmt(&matches);
-    }
+        if let Some(matches) = matches.subcommand_matches("fmt") {
+            cmd::fmt(&matches);
+        }
+    });
 }
