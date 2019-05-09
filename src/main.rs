@@ -621,18 +621,202 @@ mod tests {
     }
 
     #[test]
-    fn test_log_to_file() {
-        //TODO(shane)
+    fn test_log_to_file_new() {
+        //setup
+        let temp_dir = create_temp_dir();
+
+        let file = TestableFile::new("json_simple".to_string(), &temp_dir);
+        let temp_path = file.copy_to_temp();
+
+        serial!({
+            let _ = fs::remove_file(&&*LOG_PATH);
+
+            //exercise
+            cli::run(vec![
+                "padd",
+                "--log",
+                &&*LOG_PATH,
+                "--level",
+                "debug",
+                "fmt",
+                "tests/spec/json",
+                "-t",
+                &temp_path,
+            ]);
+
+            //verify
+            let logs = fs::read_to_string(&&*LOG_PATH).unwrap();
+            assert!(logs.contains("INFO - Loading specification tests/spec/json ..."));
+            assert!(logs.contains("INFO - COMPLETE:"));
+
+            //teardown
+            log::set_max_level(LevelFilter::Off);
+            let _ = fs::remove_file(&&*LOG_PATH);
+        });
+
+        fs::remove_dir_all(&temp_dir).unwrap();
+    }
+
+    #[test]
+    fn test_log_to_file_existing() {
+        //setup
+        let temp_dir = create_temp_dir();
+
+        let file = TestableFile::new("json_simple".to_string(), &temp_dir);
+        let temp_path = file.copy_to_temp();
+
+        serial!({
+            let _ = fs::remove_file(&&*LOG_PATH);
+
+            //exercise
+            for _ in 1..4 {
+                cli::run(vec![
+                    "padd",
+                    "--log",
+                    &&*LOG_PATH,
+                    "--level",
+                    "debug",
+                    "fmt",
+                    "tests/spec/json",
+                    "-t",
+                    &temp_path,
+                ]);
+            }
+
+            //verify
+            let logs = fs::read_to_string(&&*LOG_PATH).unwrap();
+            assert_eq!(logs.matches(r"INFO - COMPLETE:").count(), 3);
+
+            //teardown
+            log::set_max_level(LevelFilter::Off);
+            let _ = fs::remove_file(&&*LOG_PATH);
+        });
+
+        fs::remove_dir_all(&temp_dir).unwrap();
     }
 
     #[test]
     fn test_set_log_level() {
-        //TODO(shane)
+        //setup
+        let temp_dir = create_temp_dir();
+
+        let levels = vec!["trace", "debug", "info", "warn", "error"];
+
+        serial!({
+            for level in levels {
+                let _ = fs::remove_file(&&*LOG_PATH);
+
+                //exercise
+                cli::run(vec![
+                    "padd",
+                    "--log",
+                    &&*LOG_PATH,
+                    "--level",
+                    level,
+                    "fmt",
+                    "tests/spec/json",
+                    "-t",
+                    &temp_dir,
+                ]);
+
+                trace!("");
+                debug!("");
+                info!("");
+                warn!("");
+                error!("");
+
+                //verify
+                let logs = fs::read_to_string(&&*LOG_PATH).unwrap();
+
+                match level {
+                    "trace" => assert!(logs.contains("TRACE - ")),
+                    "debug" => {
+                        assert!(!logs.contains("TRACE - "));
+                        assert!(logs.contains("DEBUG - "))
+                    }
+                    "info" => {
+                        assert!(!logs.contains("DEBUG - "));
+                        assert!(logs.contains("INFO - "));
+                    }
+                    "warn" => {
+                        assert!(!logs.contains("INFO - "));
+                        assert!(logs.contains("WARN - "));
+                    }
+                    "error" => {
+                        assert!(!logs.contains("WARN - "));
+                        assert!(logs.contains("ERROR - "));
+                    }
+                    &_ => panic!(),
+                }
+            }
+
+            //teardown
+            log::set_max_level(LevelFilter::Off);
+            let _ = fs::remove_file(&&*LOG_PATH);
+        });
+
+        fs::remove_dir_all(&temp_dir).unwrap();
+    }
+
+    #[test]
+    fn test_default_log_level() {
+        //setup
+        let temp_dir = create_temp_dir();
+
+        serial!({
+            let _ = fs::remove_file(&&*LOG_PATH);
+
+            //exercise
+            cli::run(vec![
+                "padd",
+                "--log",
+                &&*LOG_PATH,
+                "fmt",
+                "tests/spec/json",
+                "-t",
+                &temp_dir,
+            ]);
+
+            trace!("");
+            debug!("");
+            info!("");
+            warn!("");
+            error!("");
+
+            //verify
+            let logs = fs::read_to_string(&&*LOG_PATH).unwrap();
+            assert!(!logs.contains("DEBUG - "));
+            assert!(logs.contains("INFO - "));
+
+            //teardown
+            log::set_max_level(LevelFilter::Off);
+            let _ = fs::remove_file(&&*LOG_PATH);
+        });
+
+        fs::remove_dir_all(&temp_dir).unwrap();
     }
 
     #[test]
     fn test_invalid_log_level() {
-        //TODO(shane)
+        //exercise
+        let output = Command::new(EXECUTABLE)
+            .args(&[
+                "--log",
+                &&*LOG_PATH,
+                "--level",
+                "invalid",
+                "forget",
+                "some/path",
+            ])
+            .output()
+            .unwrap();
+
+        //verify
+        let code = output.status.code().unwrap();
+        assert_eq!(code, 1);
+
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(stderr.contains("error: 'invalid' isn't a valid value for '--level <LEVEL>'"));
     }
 
     #[test]
