@@ -6,13 +6,22 @@ extern crate clap;
 extern crate log;
 extern crate padd;
 
-use std::env;
+use {
+    cli::logger::{Fatal},
+    std::{env, panic, process}
+};
 
+#[macro_use]
 mod cli;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    cli::run(args.iter().map(|s| &**s).collect());
+
+    catch_fatal!({
+        cli::run(args.iter().map(|s| &**s).collect());
+    }, {
+        process::exit(1);
+    });
 }
 
 #[cfg(test)]
@@ -29,7 +38,6 @@ mod tests {
         std::{
             fs::{self, File, OpenOptions},
             io::{prelude::*, Read},
-            panic,
             path::{Path, PathBuf},
             process::Command,
             sync::RwLock,
@@ -52,6 +60,7 @@ mod tests {
         static ref COMPLETION_REGEX: Regex = Regex::new(r"INFO - COMPLETE: \d*ms : (\d*) processed, (\d*) unchanged, (\d*) formatted, (\d*) failed").unwrap();
         static ref FORMATTED_REGEX: Regex = Regex::new(r"DEBUG - Finished formatting ([^\n]*)").unwrap();
         static ref FAILED_REGEX: Regex = Regex::new(r"WARN - Error formatting ([^\n:]*): ([^\n]*)").unwrap();
+        static ref CHECK_FAILED_REGEX: Regex = Regex::new(r"ERROR - Formatting check failed for ([^\n:]*)").unwrap();
     }
 
     macro_rules! serial {
@@ -122,6 +131,11 @@ mod tests {
         error_message: String,
     }
 
+    #[derive(PartialEq)]
+    struct CheckFailedFJ {
+        file_name: String,
+    }
+
     struct LoggedResults {
         num_processed: usize,
         num_unchanged: usize,
@@ -129,6 +143,7 @@ mod tests {
         num_failed: usize,
         formatted: Vec<FormattedFJ>,
         failed: Vec<FailedFJ>,
+        check_failed: Vec<CheckFailedFJ>,
     }
 
     impl LoggedResults {
@@ -150,6 +165,13 @@ mod tests {
                 })
                 .collect();
 
+            let check_failed: Vec<CheckFailedFJ> = CHECK_FAILED_REGEX
+                .captures_iter(logs)
+                .map(|capture| CheckFailedFJ {
+                    file_name: capture[1].to_string(),
+                })
+                .collect();
+
             LoggedResults {
                 num_processed: completion_captures[1].parse::<usize>().unwrap(),
                 num_unchanged: completion_captures[2].parse::<usize>().unwrap(),
@@ -157,6 +179,7 @@ mod tests {
                 num_failed: completion_captures[4].parse::<usize>().unwrap(),
                 formatted,
                 failed,
+                check_failed,
             }
         }
     }
@@ -827,7 +850,7 @@ mod tests {
     }
 
     #[test]
-    fn test_check_formatting_passed() {
+    fn test_formatting_passed() {
         //setup
         let temp_dir = create_temp_dir();
 
@@ -874,7 +897,7 @@ mod tests {
     }
 
     #[test]
-    fn test_check_formatting_failed() {
+    fn test_formatting_failed() {
         //setup
         let temp_dir = create_temp_dir();
         let _ = fs::remove_file(&&*LOG_PATH);
@@ -925,16 +948,16 @@ mod tests {
     }
 
     #[test]
-    fn test_check_formatting_unchanged() {
+    fn test_formatting_unchanged() {
         //setup
         let temp_dir = create_temp_dir();
 
         let file = TestableFile::new("json_simple".to_string(), &temp_dir);
         let temp_path = file.copy_to_temp();
 
-        cli::run(vec![EXECUTABLE, "fmt", "tests/spec/json", "-t", &temp_path]);
-
         serial!({
+            cli::run(vec![EXECUTABLE, "fmt", "tests/spec/json", "-t", &temp_path]);
+
             let _ = fs::remove_file(&&*LOG_PATH);
 
             //exercise
@@ -961,6 +984,106 @@ mod tests {
 
             assert!(logged_results.formatted.is_empty());
             assert!(logged_results.failed.is_empty());
+
+            //teardown
+            log::set_max_level(LevelFilter::Off);
+            let _ = fs::remove_file(&&*LOG_PATH);
+        });
+
+        fs::remove_dir_all(&temp_dir).unwrap();
+    }
+
+    #[test]
+    fn test_check_formatting_ok() {
+        //setup
+        let temp_dir = create_temp_dir();
+
+        let file = TestableFile::new("json_simple".to_string(), &temp_dir);
+        let temp_path = file.copy_to_temp();
+
+        serial!({
+            cli::run(vec![EXECUTABLE, "fmt", "tests/spec/json", "-t", &temp_path]);
+
+            let _ = fs::remove_file(&&*LOG_PATH);
+
+            //exercise
+            cli::run(vec![
+                EXECUTABLE,
+                "--log",
+                &&*LOG_PATH,
+                "--level",
+                "debug",
+                "fmt",
+                "tests/spec/json",
+                "-t",
+                &temp_path,
+                "--check",
+            ]);
+
+            //verify
+            let logs = fs::read_to_string(&&*LOG_PATH).unwrap();
+            let logged_results = LoggedResults::parse(&logs);
+
+            assert_eq!(logged_results.num_processed, 1);
+            assert_eq!(logged_results.num_formatted, 1);
+            assert_eq!(logged_results.num_failed, 0);
+            assert_eq!(logged_results.num_unchanged, 0);
+
+            assert!(logged_results.check_failed.is_empty());
+
+            //teardown
+            log::set_max_level(LevelFilter::Off);
+            let _ = fs::remove_file(&&*LOG_PATH);
+        });
+
+        fs::remove_dir_all(&temp_dir).unwrap();
+    }
+
+    #[test]
+    fn test_check_formatting_failed() {
+        //setup
+        let temp_dir = create_temp_dir();
+
+        let file = TestableFile::new("json_simple".to_string(), &temp_dir);
+        let temp_path = file.copy_to_temp();
+
+        serial!({
+            let _ = fs::remove_file(&&*LOG_PATH);
+
+            //exercise
+            let mut failed = false;
+
+            catch_fatal!({
+                cli::run(vec![
+                    EXECUTABLE,
+                    "--log",
+                    &&*LOG_PATH,
+                    "--level",
+                    "debug",
+                    "fmt",
+                    "tests/spec/json",
+                    "-t",
+                    &temp_path,
+                    "--check",
+                ]);
+            }, {
+                failed = true;
+            });
+
+            //verify
+            assert!(failed);
+
+            let logs = fs::read_to_string(&&*LOG_PATH).unwrap();
+            let logged_results = LoggedResults::parse(&logs);
+
+            assert_eq!(logged_results.num_processed, 1);
+            assert_eq!(logged_results.num_formatted, 0);
+            assert_eq!(logged_results.num_failed, 1);
+            assert_eq!(logged_results.num_unchanged, 0);
+
+            assert!(logged_results.check_failed.contains(&CheckFailedFJ {
+                file_name: temp_path,
+            }));
 
             //teardown
             log::set_max_level(LevelFilter::Off);

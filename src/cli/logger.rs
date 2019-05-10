@@ -4,11 +4,14 @@ extern crate log;
 extern crate log4rs;
 extern crate strip_ansi_escapes;
 
-use std::{
-    error::Error,
-    io::{self, Cursor, Read, Seek, SeekFrom, Write},
-    process,
-    sync::{Arc, Mutex},
+use {
+    std::{
+        fmt,
+        error::Error,
+        panic,
+        io::{self, Cursor, Read, Seek, SeekFrom, Write},
+        sync::{Arc, Mutex},
+    }
 };
 
 use self::{
@@ -32,6 +35,44 @@ lazy_static! {
     static ref PREFIX_FMT_OK: ColoredString = "   OK".bright_green();
     static ref PREFIX_FMT_ERR: ColoredString = "ERROR".bright_red();
     static ref LOGGER_HANDLE: Arc<Mutex<Option<Handle>>> = Arc::new(Mutex::new(None));
+}
+
+macro_rules! catch_fatal {
+    ($body: block, $catch: block) => {
+        panic::set_hook(Box::new(|info| {
+            if !info.payload().is::<Fatal>() {
+                println!("{}", info);
+                error!("{}", info);
+                println!("Something terrible has happened, please file an issue at https://github.com/srhickma/padd/issues");
+                error!("Something terrible has happened, please file an issue at https://github.com/srhickma/padd/issues");
+            }
+        }));
+
+        if let Err(err) = panic::catch_unwind(|| $body) {
+            if err.is::<Fatal>() {
+                $catch
+            } else {
+                panic::resume_unwind(err)
+            }
+        }
+    };
+}
+
+#[derive(Debug)]
+pub enum Fatal {
+    Error
+}
+
+impl fmt::Display for Fatal {
+    fn fmt(&self, _: &mut fmt::Formatter) -> fmt::Result {
+        Ok(())
+    }
+}
+
+impl Error for Fatal {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        None
+    }
 }
 
 pub fn init(matches: &ArgMatches) {
@@ -112,7 +153,7 @@ pub fn err(string: &str) {
 pub fn fatal(string: &str) {
     println!("{}: {}", *PREFIX_FATAL, string);
     error!("{}", string);
-    process::exit(1);
+    panic!(Fatal::Error);
 }
 
 pub fn fmt(string: &str) {
@@ -128,6 +169,11 @@ pub fn fmt_ok(string: &str) {
 pub fn fmt_err(string: &str) {
     println!("{}| {}", *PREFIX_FMT_ERR, string);
     warn!("{}", string);
+}
+
+pub fn fmt_check_err(string: &str) {
+    println!("{}| {}", *PREFIX_FMT_ERR, string);
+    error!("{}", string);
 }
 
 #[derive(Debug)]

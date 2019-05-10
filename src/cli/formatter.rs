@@ -224,7 +224,11 @@ pub fn format(cmd: FormatCommand) -> FormatMetrics {
                     payload.metrics.lock().unwrap().inc_formatted();
                 }
                 Err(err) => {
-                    logger::fmt_err(&format!("{}", err));
+                    if payload.check {
+                        logger::fmt_check_err(&format!("{}", err));
+                    } else {
+                        logger::fmt_err(&format!("{}", err));
+                    }
                     payload.metrics.lock().unwrap().inc_failed();
                 }
             }
@@ -375,7 +379,6 @@ fn check_file(target_path: &Path, fjr: &FormatJobRunner) -> Result<(), Formattin
                     if res == text {
                         Ok(())
                     } else {
-                        // TODO(shane) give a more useful error
                         Err(FormattingError::CheckErr(target_path_string))
                     }
                 }

@@ -5,7 +5,8 @@ use self::{clap::App, yaml_rust::yaml::Yaml};
 
 mod cmd;
 mod formatter;
-mod logger;
+#[macro_use]
+pub mod logger;
 #[cfg(test)]
 pub mod server;
 //#[cfg(ccstop)]
