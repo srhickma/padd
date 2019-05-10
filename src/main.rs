@@ -4,11 +4,12 @@ extern crate lazy_static;
 extern crate clap;
 #[macro_use]
 extern crate log;
+extern crate backtrace;
 extern crate padd;
 
 use {
-    cli::logger::{Fatal},
-    std::{env, panic, process}
+    cli::logger::Fatal,
+    std::{env, panic, process},
 };
 
 #[macro_use]
@@ -17,11 +18,14 @@ mod cli;
 fn main() {
     let args: Vec<String> = env::args().collect();
 
-    catch_fatal!({
-        cli::run(args.iter().map(|s| &**s).collect());
-    }, {
-        process::exit(1);
-    });
+    catch_fatal!(
+        {
+            cli::run(args.iter().map(|s| &**s).collect());
+        },
+        {
+            process::exit(1);
+        }
+    );
 }
 
 #[cfg(test)]
@@ -1049,26 +1053,28 @@ mod tests {
 
         serial!({
             let _ = fs::remove_file(&&*LOG_PATH);
-
-            //exercise
             let mut failed = false;
 
-            catch_fatal!({
-                cli::run(vec![
-                    EXECUTABLE,
-                    "--log",
-                    &&*LOG_PATH,
-                    "--level",
-                    "debug",
-                    "fmt",
-                    "tests/spec/json",
-                    "-t",
-                    &temp_path,
-                    "--check",
-                ]);
-            }, {
-                failed = true;
-            });
+            //exercise
+            catch_fatal!(
+                {
+                    cli::run(vec![
+                        EXECUTABLE,
+                        "--log",
+                        &&*LOG_PATH,
+                        "--level",
+                        "debug",
+                        "fmt",
+                        "tests/spec/json",
+                        "-t",
+                        &temp_path,
+                        "--check",
+                    ]);
+                },
+                {
+                    failed = true;
+                }
+            );
 
             //verify
             assert!(failed);
@@ -1091,6 +1097,49 @@ mod tests {
         });
 
         fs::remove_dir_all(&temp_dir).unwrap();
+    }
+
+    #[test]
+    fn test_specification_not_found() {
+        serial!({
+            //setup
+            let _ = fs::remove_file(&&*LOG_PATH);
+            let mut failed = false;
+
+            //exercise
+            catch_fatal!(
+                {
+                    cli::run(vec![
+                        EXECUTABLE,
+                        "--log",
+                        &&*LOG_PATH,
+                        "--level",
+                        "debug",
+                        "fmt",
+                        "tests/spec/non-existant-specification",
+                        "-t",
+                        "some/path",
+                    ]);
+                },
+                {
+                    failed = true;
+                }
+            );
+
+            //verify
+            assert!(failed);
+
+            let logs = fs::read_to_string(&&*LOG_PATH).unwrap();
+            assert!(logs.contains(
+                "ERROR - Error loading specification \
+                 tests/spec/non-existant-specification: Could not find specification file \
+                 \"tests/spec/non-existant-specification\""
+            ));
+
+            //teardown
+            log::set_max_level(LevelFilter::Off);
+            let _ = fs::remove_file(&&*LOG_PATH);
+        });
     }
 
     #[test]

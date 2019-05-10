@@ -4,14 +4,12 @@ extern crate log;
 extern crate log4rs;
 extern crate strip_ansi_escapes;
 
-use {
-    std::{
-        fmt,
-        error::Error,
-        panic,
-        io::{self, Cursor, Read, Seek, SeekFrom, Write},
-        sync::{Arc, Mutex},
-    }
+use std::{
+    error::Error,
+    fmt,
+    io::{self, Cursor, Read, Seek, SeekFrom, Write},
+    panic,
+    sync::{Arc, Mutex},
 };
 
 use self::{
@@ -41,8 +39,13 @@ macro_rules! catch_fatal {
     ($body: block, $catch: block) => {
         panic::set_hook(Box::new(|info| {
             if !info.payload().is::<Fatal>() {
+                use backtrace::Backtrace;
+                let backtrace = Backtrace::new();
+
                 println!("{}", info);
                 error!("{}", info);
+                println!("{:?}", backtrace);
+                error!("{:?}", backtrace);
                 println!("Something terrible has happened, please file an issue at https://github.com/srhickma/padd/issues");
                 error!("Something terrible has happened, please file an issue at https://github.com/srhickma/padd/issues");
             }
@@ -60,7 +63,7 @@ macro_rules! catch_fatal {
 
 #[derive(Debug)]
 pub enum Fatal {
-    Error
+    Error,
 }
 
 impl fmt::Display for Fatal {
