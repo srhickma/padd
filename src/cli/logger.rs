@@ -39,6 +39,7 @@ macro_rules! catch_fatal {
     ($body: block, $catch: block) => {
         panic::set_hook(Box::new(|info| {
             if !info.payload().is::<Fatal>() {
+                //#ccstart
                 use backtrace::Backtrace;
                 let backtrace = Backtrace::new();
 
@@ -48,12 +49,17 @@ macro_rules! catch_fatal {
                 error!("{:?}", backtrace);
                 println!("Something terrible has happened, please file an issue at https://github.com/srhickma/padd/issues");
                 error!("Something terrible has happened, please file an issue at https://github.com/srhickma/padd/issues");
+                //#ccstop
             }
         }));
 
         if let Err(err) = panic::catch_unwind(|| $body) {
             if err.is::<Fatal>() {
                 $catch
+
+                #[allow(unreachable_code)] {
+                    panic::take_hook();
+                }
             } else {
                 panic::resume_unwind(err)
             }
@@ -98,10 +104,7 @@ pub fn init(matches: &ArgMatches) {
 
         let file_appender = match file_appender_res {
             Ok(file_appender) => file_appender,
-            Err(err) => {
-                self::err(&format!("Failed to build log file appender: {}", err));
-                return;
-            }
+            Err(err) => panic!("Failed to build log file appender: {}", err),
         };
 
         let config_res = Config::builder()
@@ -110,10 +113,7 @@ pub fn init(matches: &ArgMatches) {
 
         let config = match config_res {
             Ok(config) => config,
-            Err(err) => {
-                self::err(&format!("Failed to build logger configuration: {}", err));
-                return;
-            }
+            Err(err) => panic!("Failed to build logger configuration: {}", err),
         };
 
         let mut handle_opt = LOGGER_HANDLE.lock().unwrap();
@@ -123,9 +123,7 @@ pub fn init(matches: &ArgMatches) {
                 Ok(handle) => {
                     *handle_opt = Some(handle);
                 }
-                Err(err) => {
-                    self::err(&format!("Failed to initialize logger: {}", err));
-                }
+                Err(err) => panic!("Failed to initialize logger: {}", err),
             }
         } else if let Some(ref handle) = *handle_opt {
             handle.set_config(config);

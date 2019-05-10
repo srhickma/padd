@@ -9,7 +9,7 @@ mod formatter;
 pub mod logger;
 #[cfg(test)]
 pub mod server;
-//#[cfg(ccstop)]
+//#ccstop
 #[cfg(not(test))]
 mod server;
 mod thread_pool;

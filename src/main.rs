@@ -63,7 +63,7 @@ mod tests {
 
         static ref COMPLETION_REGEX: Regex = Regex::new(r"INFO - COMPLETE: \d*ms : (\d*) processed, (\d*) unchanged, (\d*) formatted, (\d*) failed").unwrap();
         static ref FORMATTED_REGEX: Regex = Regex::new(r"DEBUG - Finished formatting ([^\n]*)").unwrap();
-        static ref FAILED_REGEX: Regex = Regex::new(r"WARN - Error formatting ([^\n:]*): ([^\n]*)").unwrap();
+        static ref FAILED_REGEX: Regex = Regex::new(r"(WARN|ERROR) - Error formatting ([^\n:]*): ([^\n]*)").unwrap();
         static ref CHECK_FAILED_REGEX: Regex = Regex::new(r"ERROR - Formatting check failed for ([^\n:]*)").unwrap();
     }
 
@@ -164,8 +164,8 @@ mod tests {
             let failed: Vec<FailedFJ> = FAILED_REGEX
                 .captures_iter(logs)
                 .map(|capture| FailedFJ {
-                    file_name: capture[1].to_string(),
-                    error_message: capture[2].to_string(),
+                    file_name: capture[2].to_string(),
+                    error_message: capture[3].to_string(),
                 })
                 .collect();
 
@@ -313,7 +313,7 @@ mod tests {
     }
 
     #[test]
-    fn test_invalid_threads() {
+    fn test_invalid_threads_zero() {
         //setup
         let temp_dir = create_temp_dir();
 
@@ -335,6 +335,42 @@ mod tests {
                 &temp_dir,
                 "--threads",
                 "0",
+            ]);
+        });
+
+        //verify
+        assert!(testable_files.len() > 1);
+        for file in testable_files {
+            file.assert_matches_output();
+        }
+
+        //teardown
+        fs::remove_dir_all(&temp_dir).unwrap();
+    }
+
+    #[test]
+    fn test_invalid_threads_character() {
+        //setup
+        let temp_dir = create_temp_dir();
+
+        let mut testable_files: Vec<TestableFile> = Vec::new();
+
+        for file_name in files_with_prefix("json") {
+            let file = TestableFile::new(file_name, &temp_dir);
+            file.copy_to_temp();
+            testable_files.push(file);
+        }
+
+        //exercise
+        parallel!({
+            cli::run(vec![
+                EXECUTABLE,
+                "fmt",
+                "tests/spec/json",
+                "-t",
+                &temp_dir,
+                "--threads",
+                "a",
             ]);
         });
 
@@ -1100,6 +1136,67 @@ mod tests {
     }
 
     #[test]
+    fn test_check_formatting_error() {
+        //setup
+        let temp_dir = create_temp_dir();
+
+        let file = TestableFile::new("java8_simple".to_string(), &temp_dir);
+        let temp_path = file.copy_to_temp();
+
+        serial!({
+            let _ = fs::remove_file(&&*LOG_PATH);
+            let mut failed = false;
+
+            //exercise
+            catch_fatal!(
+                {
+                    cli::run(vec![
+                        EXECUTABLE,
+                        "--log",
+                        &&*LOG_PATH,
+                        "--level",
+                        "debug",
+                        "fmt",
+                        "tests/spec/json",
+                        "-t",
+                        &temp_path,
+                        "--check",
+                    ]);
+                },
+                {
+                    failed = true;
+                }
+            );
+
+            //verify
+            assert!(failed);
+
+            let logs = fs::read_to_string(&&*LOG_PATH).unwrap();
+            let logged_results = LoggedResults::parse(&logs);
+
+            assert_eq!(logged_results.num_processed, 1);
+            assert_eq!(logged_results.num_formatted, 0);
+            assert_eq!(logged_results.num_failed, 1);
+            assert_eq!(logged_results.num_unchanged, 0);
+
+            println!("{}", logged_results.failed[0].error_message);
+
+            assert!(logged_results.failed.contains(&FailedFJ {
+                file_name: temp_path,
+                error_message: String::from(
+                    "Failed to scan input: No accepting scans after (1,1): class Simp..."
+                )
+            }));
+
+            //teardown
+            log::set_max_level(LevelFilter::Off);
+            let _ = fs::remove_file(&&*LOG_PATH);
+        });
+
+        fs::remove_dir_all(&temp_dir).unwrap();
+    }
+
+    #[test]
     fn test_specification_not_found() {
         serial!({
             //setup
@@ -1135,6 +1232,45 @@ mod tests {
                  tests/spec/non-existant-specification: Could not find specification file \
                  \"tests/spec/non-existant-specification\""
             ));
+
+            //teardown
+            log::set_max_level(LevelFilter::Off);
+            let _ = fs::remove_file(&&*LOG_PATH);
+        });
+    }
+
+    #[test]
+    fn test_invalid_specification() {
+        serial!({
+            //setup
+            let _ = fs::remove_file(&&*LOG_PATH);
+            let mut failed = false;
+
+            //exercise
+            catch_fatal!(
+                {
+                    cli::run(vec![
+                        EXECUTABLE,
+                        "--log",
+                        &&*LOG_PATH,
+                        "--level",
+                        "debug",
+                        "fmt",
+                        "tests/output/json_simple",
+                        "-t",
+                        "some/path",
+                    ]);
+                },
+                {
+                    failed = true;
+                }
+            );
+
+            //verify
+            assert!(failed);
+
+            let logs = fs::read_to_string(&&*LOG_PATH).unwrap();
+            assert!(logs.contains("ERROR - Error loading specification tests/output/json_simple"));
 
             //teardown
             log::set_max_level(LevelFilter::Off);
