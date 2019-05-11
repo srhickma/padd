@@ -157,7 +157,12 @@ pub fn clear_tracking(target_path: &Path) {
         target_path.to_string_lossy().to_string()
     );
 
-    let cleared = clear_directory_tracking(target_path);
+    let cleared = if target_path.is_dir() {
+        clear_directory_tracking(target_path)
+    } else {
+        clear_directory_tracking(target_path.parent().unwrap())
+    };
+
     match cleared {
         1 => println!("Removed 1 tracking directory"),
         _ => println!("Removed {} tracking directories", cleared),

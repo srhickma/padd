@@ -6,8 +6,10 @@ extern crate strip_ansi_escapes;
 
 use std::{
     error::Error,
+    fmt,
     io::{self, Cursor, Read, Seek, SeekFrom, Write},
-    process,
+    panic,
+    sync::Mutex,
 };
 
 use self::{
@@ -18,6 +20,7 @@ use self::{
         append::file::FileAppender,
         config::{Appender, Config, Root},
         encode::{pattern::PatternEncoder, Encode, Write as LogWrite},
+        Handle,
     },
 };
 
@@ -29,6 +32,56 @@ lazy_static! {
     static ref PREFIX_FMT: ColoredString = "  FMT".bright_blue();
     static ref PREFIX_FMT_OK: ColoredString = "   OK".bright_green();
     static ref PREFIX_FMT_ERR: ColoredString = "ERROR".bright_red();
+    static ref LOGGER_HANDLE: Mutex<Option<Handle>> = Mutex::new(None);
+}
+
+macro_rules! catch_fatal {
+    ($body: block, $catch: block) => {
+        panic::set_hook(Box::new(|info| {
+            if !info.payload().is::<Fatal>() {
+                //#ccstart
+                use backtrace::Backtrace;
+                let backtrace = Backtrace::new();
+
+                println!("{}", info);
+                error!("{}", info);
+                println!("{:?}", backtrace);
+                error!("{:?}", backtrace);
+                println!("Something terrible has happened, please file an issue at https://github.com/srhickma/padd/issues");
+                error!("Something terrible has happened, please file an issue at https://github.com/srhickma/padd/issues");
+                //#ccstop
+            }
+        }));
+
+        if let Err(err) = panic::catch_unwind(|| $body) {
+            if err.is::<Fatal>() {
+                $catch
+
+                #[allow(unreachable_code)] {
+                    panic::take_hook();
+                }
+            } else {
+                panic::resume_unwind(err)
+            }
+        }
+    };
+}
+
+#[derive(Debug)]
+pub enum Fatal {
+    Error,
+}
+
+impl fmt::Display for Fatal {
+    fn fmt(&self, _: &mut fmt::Formatter) -> fmt::Result {
+        Ok(())
+    }
+}
+
+impl Error for Fatal {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        None
+    }
 }
 
 pub fn init(matches: &ArgMatches) {
@@ -51,10 +104,7 @@ pub fn init(matches: &ArgMatches) {
 
         let file_appender = match file_appender_res {
             Ok(file_appender) => file_appender,
-            Err(err) => {
-                self::err(&format!("Failed to build log file appender: {}", err));
-                return;
-            }
+            Err(err) => panic!("Failed to build log file appender: {}", err),
         };
 
         let config_res = Config::builder()
@@ -63,14 +113,20 @@ pub fn init(matches: &ArgMatches) {
 
         let config = match config_res {
             Ok(config) => config,
-            Err(err) => {
-                self::err(&format!("Failed to build logger configuration: {}", err));
-                return;
-            }
+            Err(err) => panic!("Failed to build logger configuration: {}", err),
         };
 
-        if let Err(err) = log4rs::init_config(config) {
-            self::err(&format!("Failed to initialize logger: {}", err));
+        let mut handle_opt = LOGGER_HANDLE.lock().unwrap();
+
+        if handle_opt.is_none() {
+            match log4rs::init_config(config) {
+                Ok(handle) => {
+                    *handle_opt = Some(handle);
+                }
+                Err(err) => panic!("Failed to initialize logger: {}", err),
+            }
+        } else if let Some(ref handle) = *handle_opt {
+            handle.set_config(config);
         }
     }
 
@@ -98,7 +154,7 @@ pub fn err(string: &str) {
 pub fn fatal(string: &str) {
     println!("{}: {}", *PREFIX_FATAL, string);
     error!("{}", string);
-    process::exit(1);
+    panic!(Fatal::Error);
 }
 
 pub fn fmt(string: &str) {
@@ -114,6 +170,11 @@ pub fn fmt_ok(string: &str) {
 pub fn fmt_err(string: &str) {
     println!("{}| {}", *PREFIX_FMT_ERR, string);
     warn!("{}", string);
+}
+
+pub fn fmt_check_err(string: &str) {
+    println!("{}| {}", *PREFIX_FMT_ERR, string);
+    error!("{}", string);
 }
 
 #[derive(Debug)]

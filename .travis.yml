@@ -37,9 +37,7 @@ after_success: |
     for file in $(find target/debug/ -regextype posix-extended -iregex '^target/debug/(padd|concept|scope)-[^\.]+$'); do
       mkdir -p "target/cov/$(basename $file)";
       kcov --include-path=src \
-        --exclude-path=src/cli/mod.rs \
-        --exclude-path=src/cli/logger.rs \
-        --exclude-region='#[cfg(test)]:#[cfg(ccstop)]' \
+        --exclude-region='//#ccstart://#ccstop','#[cfg(test)]://#ccstop' \
         --exclude-line='panic!' \
         "target/cov/$(basename $file)" "$file";
     done &&

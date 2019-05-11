@@ -26,8 +26,7 @@ use self::{
 const THREAD_POOL_QUEUE_LENGTH_PER_WORKER: usize = 2;
 
 lazy_static! {
-    static ref FJR_CACHE: Arc<Mutex<HashMap<String, Arc<FormatJobRunner>>>> =
-        Arc::new(Mutex::new(HashMap::new()));
+    static ref FJR_CACHE: Mutex<HashMap<String, Arc<FormatJobRunner>>> = Mutex::new(HashMap::new());
 }
 
 #[derive(Clone)]
@@ -224,7 +223,11 @@ pub fn format(cmd: FormatCommand) -> FormatMetrics {
                     payload.metrics.lock().unwrap().inc_formatted();
                 }
                 Err(err) => {
-                    logger::fmt_err(&format!("{}", err));
+                    if payload.check {
+                        logger::fmt_check_err(&format!("{}", err));
+                    } else {
+                        logger::fmt_err(&format!("{}", err));
+                    }
                     payload.metrics.lock().unwrap().inc_failed();
                 }
             }
@@ -375,7 +378,6 @@ fn check_file(target_path: &Path, fjr: &FormatJobRunner) -> Result<(), Formattin
                     if res == text {
                         Ok(())
                     } else {
-                        // TODO(shane) give a more useful error
                         Err(FormattingError::CheckErr(target_path_string))
                     }
                 }
