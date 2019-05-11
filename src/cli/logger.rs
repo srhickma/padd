@@ -9,7 +9,7 @@ use std::{
     fmt,
     io::{self, Cursor, Read, Seek, SeekFrom, Write},
     panic,
-    sync::{Arc, Mutex},
+    sync::Mutex,
 };
 
 use self::{
@@ -32,7 +32,7 @@ lazy_static! {
     static ref PREFIX_FMT: ColoredString = "  FMT".bright_blue();
     static ref PREFIX_FMT_OK: ColoredString = "   OK".bright_green();
     static ref PREFIX_FMT_ERR: ColoredString = "ERROR".bright_red();
-    static ref LOGGER_HANDLE: Arc<Mutex<Option<Handle>>> = Arc::new(Mutex::new(None));
+    static ref LOGGER_HANDLE: Mutex<Option<Handle>> = Mutex::new(None);
 }
 
 macro_rules! catch_fatal {

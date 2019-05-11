@@ -26,8 +26,7 @@ use self::{
 const THREAD_POOL_QUEUE_LENGTH_PER_WORKER: usize = 2;
 
 lazy_static! {
-    static ref FJR_CACHE: Arc<Mutex<HashMap<String, Arc<FormatJobRunner>>>> =
-        Arc::new(Mutex::new(HashMap::new()));
+    static ref FJR_CACHE: Mutex<HashMap<String, Arc<FormatJobRunner>>> = Mutex::new(HashMap::new());
 }
 
 #[derive(Clone)]
