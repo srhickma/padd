@@ -12,6 +12,7 @@ pub struct Grammar<Symbol: Data + Default> {
     #[allow(dead_code)]
     non_terminals: HashSet<Symbol>,
     terminals: HashSet<Symbol>,
+    ignorable: HashSet<Symbol>,
     start: Symbol,
 }
 
@@ -22,6 +23,10 @@ impl<Symbol: Data + Default> Grammar<Symbol> {
 
     pub fn is_terminal(&self, symbol: &Symbol) -> bool {
         self.terminals.contains(symbol)
+    }
+
+    pub fn is_ignorable(&self, symbol: &Symbol) -> bool {
+        self.ignorable.contains(symbol)
     }
 
     pub fn terminals(&self) -> &HashSet<Symbol> {
@@ -143,6 +148,7 @@ impl<Symbol: Data + Default> GrammarBuilder<Symbol> {
             nss,
             non_terminals,
             terminals,
+            ignorable: self.ignorable,
             start,
         })
     }
