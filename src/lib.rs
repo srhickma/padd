@@ -864,4 +864,51 @@ grammar {
 
         assert!(err.source().is_none());
     }
+
+    #[test]
+    fn failed_ignorable_terminal_error() {
+        //setup
+        let spec = "
+alphabet 's'
+
+cdfa {
+    start
+        's' -> S;
+}
+
+ignore s
+
+grammar {
+    s | S;
+}
+        "
+        .to_string();
+
+        //exercise
+        let res = FormatJobRunner::build(&spec);
+
+        //verify
+        assert!(res.is_err());
+
+        let mut err: &Error = &res.err().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "Failed to generate specification: Grammar build error: Ignored symbol 's' is \
+             not a terminal symbol"
+        );
+
+        err = err.source().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "Grammar build error: Ignored symbol 's' is not a terminal symbol"
+        );
+
+        err = err.source().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "Ignored symbol 's' is not a terminal symbol"
+        );
+
+        assert!(err.source().is_none());
+    }
 }

@@ -276,7 +276,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
             parse_chart: &mut PChart<'grammar, Symbol>,
         ) {
             parse_chart.row_mut(item.start).add_edge(Edge {
-                rule: Some(&item.rule),
+                rule: Some(item.rule),
                 shadow: item.shadow.clone(),
                 shadow_top: item.shadow_top,
                 finish,
@@ -337,7 +337,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
                 scan: &'scope [Token<Symbol>],
                 chart: &PChart<Symbol>,
             ) -> Tree<Symbol> {
-                match &edge.rule {
+                match edge.rule {
                     None => Tree {
                         //Non-empty rhs
                         lhs: scan[start].clone(),

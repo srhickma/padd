@@ -516,6 +516,64 @@ mod tests {
         )
     }
 
+    #[test]
+    fn ignorable_terminal() {
+        //setup
+        let mut grammar_builder = GrammarBuilder::new();
+        grammar_builder.add_productions(build_prods_from_strings(&["s A s B", "s C"]));
+        grammar_builder.try_mark_start(&"s".to_string());
+        grammar_builder.mark_ignorable(&"C".to_string());
+        let grammar = grammar_builder.build().unwrap();
+
+        let scan = vec![
+            Token::leaf("A".to_string(), "a".to_string()),
+            Token::leaf("C".to_string(), "c".to_string()),
+            Token::leaf("C".to_string(), "c".to_string()),
+            Token::leaf("B".to_string(), "b".to_string()),
+        ];
+
+        let parser = def_parser();
+
+        //exercise
+        let tree = parser.parse(scan, &grammar);
+
+        //verify
+        assert_eq!(
+            tree.unwrap().to_string(),
+            "└── s
+    ├── A <- 'a'
+    ├── s
+    │   └── C <- 'c'
+    └── B <- 'b'"
+        );
+    }
+
+    #[test]
+    fn ignorable_terminal_only() {
+        //setup
+        let mut grammar_builder = GrammarBuilder::new();
+        grammar_builder.add_productions(build_prods_from_strings(&["s ", "b C"]));
+        grammar_builder.try_mark_start(&"s".to_string());
+        grammar_builder.mark_ignorable(&"C".to_string());
+        let grammar = grammar_builder.build().unwrap();
+
+        let scan = vec![
+            Token::leaf("C".to_string(), "c".to_string()),
+            Token::leaf("C".to_string(), "c".to_string()),
+        ];
+
+        let parser = def_parser();
+
+        //exercise
+        let tree = parser.parse(scan, &grammar);
+
+        //verify
+        assert_eq!(
+            tree.unwrap().to_string(),
+            "└── s\n    └──  <- \'NULL\'"
+        );
+    }
+
     pub fn build_prods_from_strings<'scope>(
         strings: &'scope [&'scope str],
     ) -> Vec<Production<String>> {

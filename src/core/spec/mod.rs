@@ -36,7 +36,6 @@ pub enum GenError {
     CDFAErr(scan::CDFAError),
     FormatterErr(fmt::BuildError),
     GrammarBuildErr(grammar::BuildError),
-    PatternErr(fmt::BuildError),
     RegionErr(region::Error),
 }
 
@@ -48,7 +47,6 @@ impl std::fmt::Display for GenError {
             GenError::CDFAErr(ref err) => write!(f, "ECDFA generation error: {}", err),
             GenError::FormatterErr(ref err) => write!(f, "Formatter build error: {}", err),
             GenError::GrammarBuildErr(ref err) => write!(f, "Grammar build error: {}", err),
-            GenError::PatternErr(ref err) => write!(f, "Pattern build error: {}", err),
             GenError::RegionErr(ref err) => write!(f, "Region error: {}", err),
         }
     }
@@ -62,7 +60,6 @@ impl error::Error for GenError {
             GenError::CDFAErr(ref err) => Some(err),
             GenError::FormatterErr(ref err) => Some(err),
             GenError::GrammarBuildErr(ref err) => Some(err),
-            GenError::PatternErr(ref err) => Some(err),
             GenError::RegionErr(ref err) => Some(err),
         }
     }

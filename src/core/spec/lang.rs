@@ -55,10 +55,10 @@ enum S {
 }
 
 thread_local! {
-    static SPEC_ECDFA: EncodedCDFA<Symbol> = build_ecdfa().unwrap();
+    static SPEC_ECDFA: EncodedCDFA<Symbol> = build_spec_ecdfa().unwrap();
 }
 
-fn build_ecdfa() -> Result<EncodedCDFA<Symbol>, scan::CDFAError> {
+fn build_spec_ecdfa() -> Result<EncodedCDFA<Symbol>, scan::CDFAError> {
     let mut builder: EncodedCDFABuilder<S, Symbol> = EncodedCDFABuilder::new();
 
     builder

@@ -231,7 +231,7 @@ impl fmt::Display for BuildError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             BuildError::NonTerminalIgnoredErr(ref symbol) => {
-                write!(f, "Ignored symbol '{}' is non-terminal", symbol)
+                write!(f, "Ignored symbol '{}' is not a terminal symbol", symbol)
             }
         }
     }
