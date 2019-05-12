@@ -552,7 +552,7 @@ mod tests {
     fn ignorable_terminal_only() {
         //setup
         let mut grammar_builder = GrammarBuilder::new();
-        grammar_builder.add_productions(build_prods_from_strings(&["s ", "b C"]));
+        grammar_builder.add_productions(build_prods_from_strings(&["s "]));
         grammar_builder.try_mark_start(&"s".to_string());
         grammar_builder.mark_ignorable(&"C".to_string());
         let grammar = grammar_builder.build().unwrap();

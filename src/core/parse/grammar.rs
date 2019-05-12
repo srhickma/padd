@@ -9,7 +9,6 @@ use {
 pub struct Grammar<Symbol: Data + Default> {
     prods_by_lhs: HashMap<Symbol, Vec<Production<Symbol>>>,
     nss: HashSet<Symbol>,
-    #[allow(dead_code)]
     non_terminals: HashSet<Symbol>,
     terminals: HashSet<Symbol>,
     ignorable: HashSet<Symbol>,
@@ -21,8 +20,8 @@ impl<Symbol: Data + Default> Grammar<Symbol> {
         self.nss.contains(lhs)
     }
 
-    pub fn is_terminal(&self, symbol: &Symbol) -> bool {
-        self.terminals.contains(symbol)
+    pub fn is_non_terminal(&self, symbol: &Symbol) -> bool {
+        self.non_terminals.contains(symbol)
     }
 
     pub fn is_ignorable(&self, symbol: &Symbol) -> bool {
@@ -138,7 +137,7 @@ impl<Symbol: Data + Default> GrammarBuilder<Symbol> {
             .collect();
 
         for ignored in &self.ignorable {
-            if !terminals.contains(ignored) {
+            if non_terminals.contains(ignored) {
                 return Err(BuildError::NonTerminalIgnoredErr(ignored.to_string()));
             }
         }
@@ -231,7 +230,7 @@ impl fmt::Display for BuildError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             BuildError::NonTerminalIgnoredErr(ref symbol) => {
-                write!(f, "Ignored symbol '{}' is not a terminal symbol", symbol)
+                write!(f, "Ignored symbol '{}' is non-terminal", symbol)
             }
         }
     }
