@@ -894,20 +894,17 @@ grammar {
         assert_eq!(
             format!("{}", err),
             "Failed to generate specification: Grammar build error: Ignored symbol 's' is \
-             not a terminal symbol"
+             non-terminal"
         );
 
         err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
-            "Grammar build error: Ignored symbol 's' is not a terminal symbol"
+            "Grammar build error: Ignored symbol 's' is non-terminal"
         );
 
         err = err.source().unwrap();
-        assert_eq!(
-            format!("{}", err),
-            "Ignored symbol 's' is not a terminal symbol"
-        );
+        assert_eq!(format!("{}", err), "Ignored symbol 's' is non-terminal");
 
         assert!(err.source().is_none());
     }

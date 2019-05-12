@@ -83,7 +83,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
                 let item = chart.row(cursor).incomplete().item(i).clone();
                 let symbol = (&item).next_symbol().unwrap();
 
-                if !grammar.is_terminal(symbol) {
+                if grammar.is_non_terminal(symbol) {
                     if grammar.is_nullable_nt(symbol) {
                         let new_item = Item {
                             rule: item.rule,
@@ -388,7 +388,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
             let edges = |depth: usize, node: Node| -> Vec<Edge<Symbol>> {
                 if depth < bottom {
                     let (symbol, spm) = edge.symbol_at(depth);
-                    if grammar.is_terminal(symbol) {
+                    if !grammar.is_non_terminal(symbol) {
                         return vec![Edge {
                             rule: None,
                             shadow: None,
