@@ -274,7 +274,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
                         lhs: Token::interior(rule.lhs.clone()),
                         children: {
                             let mut children: Vec<Tree<Symbol>> =
-                                top_list(start, edge, grammar, scan, chart)
+                                top_list(start, edge, grammar, chart)
                                     .iter()
                                     .rev()
                                     .map(|&(node, ref edge)| {
@@ -307,7 +307,6 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
             start: Node,
             edge: &Edge<Symbol>,
             grammar: &'scope Grammar<Symbol>,
-            scan: &'scope [Token<Symbol>],
             chart: &'scope PChart<'scope, Symbol>,
         ) -> Vec<(Node, Edge<'scope, Symbol>)> {
             let symbols: &Vec<Symbol> = &edge.rule.unwrap().rhs;
@@ -317,12 +316,10 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
                 if depth < bottom {
                     let symbol = &symbols[depth];
                     if grammar.is_terminal(symbol) {
-                        if *scan[node].kind() == *symbol {
-                            return vec![Edge {
-                                rule: None,
-                                finish: node + 1,
-                            }];
-                        }
+                        return vec![Edge {
+                            rule: None,
+                            finish: node + 1,
+                        }];
                     } else {
                         return chart
                             .row(node)
