@@ -3,7 +3,7 @@ use {
         data::Data,
         parse::{
             self,
-            grammar::{Grammar, GrammarBuilder},
+            grammar::{self, Grammar, GrammarBuilder},
             Production, Tree,
         },
         scan::{
@@ -145,10 +145,10 @@ impl Data for Symbol {
 }
 
 lazy_static! {
-    static ref PATTERN_GRAMMAR: Grammar<Symbol> = build_pattern_grammar();
+    static ref PATTERN_GRAMMAR: Grammar<Symbol> = build_pattern_grammar().unwrap();
 }
 
-fn build_pattern_grammar() -> Grammar<Symbol> {
+fn build_pattern_grammar() -> Result<Grammar<Symbol>, grammar::BuildError> {
     //TODO optimize for left recursion
 
     let mut builder = GrammarBuilder::new();

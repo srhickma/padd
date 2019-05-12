@@ -1,7 +1,11 @@
 use {
     core::{
         fmt::{self, Formatter},
-        parse::{self, grammar::Grammar, Tree},
+        parse::{
+            self,
+            grammar::{self, Grammar},
+            Tree,
+        },
         scan::{self, ecdfa::EncodedCDFA},
     },
     std::{self, error},
@@ -31,6 +35,7 @@ pub enum GenError {
     MappingErr(String),
     CDFAErr(scan::CDFAError),
     FormatterErr(fmt::BuildError),
+    GrammarBuildErr(grammar::BuildError),
     RegionErr(region::Error),
 }
 
@@ -41,6 +46,7 @@ impl std::fmt::Display for GenError {
             GenError::MappingErr(ref err) => write!(f, "ECDFA to grammar mapping error: {}", err),
             GenError::CDFAErr(ref err) => write!(f, "ECDFA generation error: {}", err),
             GenError::FormatterErr(ref err) => write!(f, "Formatter build error: {}", err),
+            GenError::GrammarBuildErr(ref err) => write!(f, "Grammar build error: {}", err),
             GenError::RegionErr(ref err) => write!(f, "Region error: {}", err),
         }
     }
@@ -53,6 +59,7 @@ impl error::Error for GenError {
             GenError::MappingErr(_) => None,
             GenError::CDFAErr(ref err) => Some(err),
             GenError::FormatterErr(ref err) => Some(err),
+            GenError::GrammarBuildErr(ref err) => Some(err),
             GenError::RegionErr(ref err) => Some(err),
         }
     }
@@ -61,6 +68,12 @@ impl error::Error for GenError {
 impl From<scan::CDFAError> for GenError {
     fn from(err: scan::CDFAError) -> GenError {
         GenError::CDFAErr(err)
+    }
+}
+
+impl From<grammar::BuildError> for GenError {
+    fn from(err: grammar::BuildError) -> GenError {
+        GenError::GrammarBuildErr(err)
     }
 }
 

@@ -501,3 +501,72 @@ alphabet 'inj '
     //verify
     assert_eq!(res, "iijijjjijijijiinjiii");
 }
+
+#[test]
+fn test_ignorable_terminals() {
+    //setup
+    let spec = "
+alphabet 'abc'
+
+cdfa {
+    start
+        'a' -> ^A
+        'b' -> ^B
+        'c' -> ^C;
+}
+
+ignore C
+
+grammar {
+    s
+        | A s B `{} {} {}`
+        | C;
+}
+    "
+    .to_string();
+
+    let input = "caacaccccbccbcbc".to_string();
+
+    let fjr = FormatJobRunner::build(&spec).unwrap();
+
+    //exercise
+    let res = fjr.format(FormatJob::from_text(input)).unwrap();
+
+    //verify
+    assert_eq!(res, "a a a c b b b");
+}
+
+#[test]
+fn test_multiple_ignorable_terminals() {
+    //setup
+    let spec = "
+alphabet 'abc'
+
+cdfa {
+    start
+        'a' -> ^A
+        'b' -> ^B
+        'c' -> ^C;
+}
+
+ignore B
+ignore C
+
+grammar {
+    s
+        | A s B `{} {} {}`
+        | C;
+}
+    "
+    .to_string();
+
+    let input = "bcababcacbcbcbcbcbcbbcbcb".to_string();
+
+    let fjr = FormatJobRunner::build(&spec).unwrap();
+
+    //exercise
+    let res = fjr.format(FormatJob::from_text(input)).unwrap();
+
+    //verify
+    assert_eq!(res, "a a a c b b b");
+}
