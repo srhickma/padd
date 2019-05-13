@@ -4,7 +4,7 @@ use {
         parse::{self, grammar::Grammar, Parser, Production, Tree},
         scan::Token,
     },
-    std::collections::HashSet,
+    std::{collections::HashSet, usize},
 };
 
 pub struct EarleyParser;
@@ -275,12 +275,18 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
             finish: usize,
             parse_chart: &mut PChart<'grammar, Symbol>,
         ) {
+            let weight = match item.shadow {
+                None => 0,
+                Some(ref shadow_vec) => shadow_vec.len() - item.shadow_top + 1,
+            };
+
             parse_chart.row_mut(item.start).add_edge(Edge {
                 rule: Some(item.rule),
                 shadow: item.shadow.clone(),
                 shadow_top: item.shadow_top,
                 finish,
                 spm: SymbolParseMethod::Standard,
+                weight,
             });
         }
 
@@ -367,11 +373,15 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
 
             let finish: Node = chart.len() - 1;
 
-            let first_edge = chart
+            let mut candidate_root_edges: Vec<&Edge<Symbol>> = chart
                 .row(0)
                 .edges()
-                .find(|edge| edge.finish == finish && edge.rule.unwrap().lhs == *grammar.start());
-            match first_edge {
+                .filter(|edge| edge.finish == finish && edge.rule.unwrap().lhs == *grammar.start())
+                .collect();
+
+            candidate_root_edges.sort_by_key(|edge| edge.weight);
+
+            match candidate_root_edges.first() {
                 None => panic!("Failed to find start item to begin parse"),
                 Some(edge) => recur(0, edge, grammar, scan, &chart),
             }
@@ -395,8 +405,9 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
                             shadow_top: 0,
                             finish: node + 1,
                             spm,
+                            weight: 0,
                         }];
-                    } else {
+                    } else if node < chart.len() {
                         return chart
                             .row(node)
                             .edges()
@@ -413,23 +424,30 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
                 leaf: &Fn(usize, Node) -> bool,
                 depth: usize,
                 root: Node,
-            ) -> Option<Vec<(Node, Edge<'scope, Symbol>)>> {
+            ) -> Option<WeightedParsePath<'scope, Symbol>> {
                 if leaf(depth, root) {
-                    Some(Vec::new())
+                    Some(WeightedParsePath::empty())
                 } else {
+                    let mut best_path: Option<WeightedParsePath<'scope, Symbol>> = None;
+
                     for edge in edges(depth, root) {
                         if let Some(mut path) = df_search(edges, leaf, depth + 1, edge.finish) {
-                            path.push((root, edge));
-                            return Some(path);
+                            if best_path.is_none()
+                                || path.weight + edge.weight < best_path.as_ref().unwrap().weight
+                            {
+                                path.append(root, edge);
+                                best_path = Some(path);
+                            }
                         }
                     }
-                    None
+
+                    best_path
                 }
             }
 
             match df_search(&edges, &leaf, 0, start) {
                 None => panic!("Failed to decompose parse edge of recognized scan"),
-                Some(path) => path,
+                Some(weighted_path) => weighted_path.path,
             }
         }
     }
@@ -702,6 +720,7 @@ struct Edge<'prod, Symbol: Data + Default + 'prod> {
     shadow_top: usize,
     finish: usize,
     spm: SymbolParseMethod,
+    weight: usize,
 }
 
 impl<'prod, Symbol: Data + Default + 'prod> Edge<'prod, Symbol> {
@@ -737,7 +756,7 @@ impl<'prod, Symbol: Data + Default + 'prod> Data for Edge<'prod, Symbol> {
         match self.rule {
             None => format!("NONE ({})", self.finish),
             Some(rule) => {
-                let mut rule_string = format!("{:?} -> ", rule.lhs);
+                let mut rule_string = format!("{:?} -{}-> ", rule.lhs, self.weight);
                 for i in 0..rule.rhs.len() {
                     rule_string = format!("{}{:?} ", rule_string, rule.rhs[i]);
                 }
@@ -763,3 +782,22 @@ enum SymbolParseMethod {
 }
 
 type Node = usize;
+
+struct WeightedParsePath<'rule, Symbol: Data + Default> {
+    path: Vec<(Node, Edge<'rule, Symbol>)>,
+    weight: usize,
+}
+
+impl<'rule, Symbol: Data + Default> WeightedParsePath<'rule, Symbol> {
+    fn empty() -> Self {
+        WeightedParsePath {
+            path: Vec::new(),
+            weight: 0,
+        }
+    }
+
+    fn append(&mut self, node: Node, edge: Edge<'rule, Symbol>) {
+        self.weight += edge.weight;
+        self.path.push((node, edge));
+    }
+}

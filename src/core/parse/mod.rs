@@ -570,7 +570,38 @@ mod tests {
         //verify
         assert_eq!(
             tree.unwrap().to_string(),
-            "└── s\n    └──  <- \'NULL\'"
+            "└── s\n    └──  <- 'NULL'"
+        );
+    }
+
+    #[test]
+    fn favour_non_ignored_terminals() {
+        //setup
+        let mut grammar_builder = GrammarBuilder::new();
+        grammar_builder.add_productions(build_prods_from_strings(&["s A s A", "s C", "s "]));
+        grammar_builder.try_mark_start(&"s".to_string());
+        grammar_builder.mark_ignorable(&"C".to_string());
+        let grammar = grammar_builder.build().unwrap();
+
+        let scan = vec![
+            Token::leaf("A".to_string(), "a".to_string()),
+            Token::leaf("C".to_string(), "c".to_string()),
+            Token::leaf("A".to_string(), "a".to_string()),
+        ];
+
+        let parser = def_parser();
+
+        //exercise
+        let tree = parser.parse(scan, &grammar);
+
+        //verify
+        assert_eq!(
+            tree.unwrap().to_string(),
+            "└── s
+    ├── A <- 'a'
+    ├── s
+    │   └── C <- 'c'
+    └── A <- 'a'"
         );
     }
 
