@@ -4,7 +4,14 @@ use {
         parse::{self, grammar::Grammar, Parser, Production, Tree},
         scan::Token,
     },
-    std::{collections::HashSet, usize},
+    std::{
+        collections::{
+            HashSet,
+            HashMap,
+        },
+        usize,
+        cmp::Ordering
+    },
 };
 
 pub struct EarleyParser;
@@ -267,6 +274,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
                 rule: Some(item.rule),
                 shadow: item.shadow.clone(),
                 shadow_top: item.shadow_top,
+                start: item.start,
                 finish,
                 spm: SymbolParseMethod::Standard,
                 weight,
@@ -320,6 +328,108 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
             scan: &'scope [Token<Symbol>],
             chart: PChart<'scope, Symbol>,
         ) -> Tree<Symbol> {
+            //TODO(shane) can we make a better size prediction here?
+            let mut ordered_edges: Vec<&Edge<Symbol>> = Vec::with_capacity(chart.len());
+
+            for row in 0..chart.len() {
+                for edge in chart.row(row).edges() {
+                    ordered_edges.push(edge);
+                }
+            }
+
+            ordered_edges.sort_unstable_by(|ref e1, ref e2| {
+                // Order by increasing width, then decreasing depth
+                (e1.finish - e1.start).partial_cmp(&(e2.finish - e2.start))
+                    .or(e2.depth.partial_cmp(&e1.depth))
+                    .unwrap_or(Ordering::Equal)
+            });
+
+            let mut weight_map: HashMap<&Edge<Symbol>, usize> = HashMap::new();
+            let mut nlp_map: HashMap<&Edge<Symbol>, Vec<(Node, Edge<Symbol>)>> = HashMap::new();
+
+            for edge in &ordered_edges {
+                let weighted_path = optimal_nlp(&edge, grammar, &chart, &weight_map);
+
+                weight_map.insert(edge, weighted_path.weight);
+                nlp_map.insert(edge, weighted_path.path);
+            }
+
+            fn optimal_nlp<'scope, Symbol: Data + Default>(
+                edge: &Edge<Symbol>,
+                grammar: &'scope Grammar<Symbol>,
+                chart: &'scope PChart<'scope, Symbol>,
+                weight_map: &HashMap<&'scope Edge<Symbol>, usize>,
+            ) -> WeightedParsePath<'scope, Symbol> {
+                let bottom: usize = edge.symbols_len();
+                let leaf = |depth: usize, node: Node| depth == bottom && node == edge.finish;
+                let edges = |depth: usize, node: Node| -> Vec<Edge<Symbol>> {
+                    if depth < bottom {
+                        let (symbol, spm) = edge.symbol_at(depth);
+                        if !grammar.is_non_terminal(symbol) {
+                            return vec![Edge {
+                                rule: None,
+                                shadow: None,
+                                shadow_top: 0,
+                                start: node,
+                                finish: node + 1,
+                                spm,
+                                weight: 0,
+                                depth: 0,
+                            }];
+                        } else if node < chart.len() {
+                            return chart
+                                .row(node)
+                                .edges()
+                                .filter(|edge| edge.rule.unwrap().lhs == *symbol)
+                                .cloned()
+                                .collect();
+                        }
+                    }
+                    Vec::new()
+                };
+
+                fn df_search<'scope, Symbol: Data + Default>(
+                    edges: &Fn(usize, Node) -> Vec<Edge<'scope, Symbol>>,
+                    leaf: &Fn(usize, Node) -> bool,
+                    depth: usize,
+                    root: Node,
+                    weight_map: &HashMap<&'scope Edge<Symbol>, usize>,
+                ) -> Option<WeightedParsePath<'scope, Symbol>> {
+                    if leaf(depth, root) {
+                        Some(WeightedParsePath::empty())
+                    } else {
+                        let mut best_path: Option<WeightedParsePath<'scope, Symbol>> = None;
+
+                        for edge in edges(depth, root) {
+                            if let Some(mut path) = df_search(edges, leaf, depth + 1, edge.finish, weight_map) {
+                                let tree_weight = match weight_map.get(&edge) {
+                                    Some(weight) => *weight,
+                                    None => edge.weight,
+                                };
+
+                                if best_path.is_none()
+                                    || path.weight + tree_weight < best_path.as_ref().unwrap().weight
+                                    {
+                                        path.append(root, edge, tree_weight);
+                                        best_path = Some(path);
+                                    }
+                            }
+                        }
+
+                        best_path
+                    }
+                }
+
+                match df_search(&edges, &leaf, 0, edge.start, weight_map) {
+                    None => panic!("Failed to decompose parse edge of recognized scan"),
+                    Some(mut path) => {
+                        path.weight += edge.weight;
+                        path
+                    },
+                }
+            }
+
+
             fn recur<'scope, Symbol: Data + Default>(
                 start: Node,
                 edge: &Edge<Symbol>,
@@ -387,6 +497,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
                             rule: None,
                             shadow: None,
                             shadow_top: 0,
+                            start: node,
                             finish: node + 1,
                             spm,
                             weight: 0,
@@ -420,7 +531,8 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
                             if best_path.is_none()
                                 || path.weight + edge.weight < best_path.as_ref().unwrap().weight
                             {
-                                path.append(root, edge);
+                                let edge_weight = edge.weight;
+                                path.append(root, edge, edge_weight);
                                 best_path = Some(path);
                             }
                         }
@@ -647,11 +759,11 @@ impl<'rule, Symbol: Data + Default> Data for Item<'rule, Symbol> {
     }
 }
 
-struct PChart<'edge, Symbol: Data + Default + 'edge> {
-    rows: Vec<PChartRow<'edge, Symbol>>,
+struct PChart<'rule, Symbol: Data + Default + 'rule> {
+    rows: Vec<PChartRow<'rule, Symbol>>,
 }
 
-impl<'edge, Symbol: Data + Default + 'edge> PChart<'edge, Symbol> {
+impl<'rule, Symbol: Data + Default + 'rule> PChart<'rule, Symbol> {
     fn new() -> Self {
         PChart {
             rows: vec![PChartRow::new()],
@@ -670,7 +782,7 @@ impl<'edge, Symbol: Data + Default + 'edge> PChart<'edge, Symbol> {
         &self.rows[i]
     }
 
-    fn row_mut(&mut self, i: usize) -> &mut PChartRow<'edge, Symbol> {
+    fn row_mut(&mut self, i: usize) -> &mut PChartRow<'rule, Symbol> {
         &mut self.rows[i]
     }
 
@@ -685,16 +797,16 @@ impl<'edge, Symbol: Data + Default + 'edge> PChart<'edge, Symbol> {
     }
 }
 
-struct PChartRow<'edge, Symbol: Data + Default + 'edge> {
-    edges: Vec<Edge<'edge, Symbol>>,
+struct PChartRow<'rule, Symbol: Data + Default + 'rule> {
+    edges: Vec<Edge<'rule, Symbol>>,
 }
 
-impl<'edge, Symbol: Data + Default + 'edge> PChartRow<'edge, Symbol> {
+impl<'rule, Symbol: Data + Default + 'rule> PChartRow<'rule, Symbol> {
     fn new() -> Self {
         PChartRow { edges: Vec::new() }
     }
 
-    fn add_edge(&mut self, edge: Edge<'edge, Symbol>) {
+    fn add_edge(&mut self, edge: Edge<'rule, Symbol>) {
         self.edges.push(edge);
     }
 
@@ -730,6 +842,7 @@ struct Edge<'prod, Symbol: Data + Default + 'prod> {
     rule: Option<&'prod Production<Symbol>>,
     shadow: Option<Vec<ShadowSymbol<Symbol>>>,
     shadow_top: usize,
+    start: usize,
     finish: usize,
     spm: SymbolParseMethod,
     weight: usize,
@@ -809,8 +922,8 @@ impl<'rule, Symbol: Data + Default> WeightedParsePath<'rule, Symbol> {
         }
     }
 
-    fn append(&mut self, node: Node, edge: Edge<'rule, Symbol>) {
-        self.weight += edge.weight;
+    fn append(&mut self, node: Node, edge: Edge<'rule, Symbol>, weight: usize) {
+        self.weight += weight;
         self.path.push((node, edge));
     }
 }
