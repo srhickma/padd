@@ -22,15 +22,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
             .productions_for_lhs(grammar.start())
             .unwrap()
             .iter()
-            .for_each(|prod| {
-                chart.row_mut(0).unsafe_append(Item {
-                    rule: prod,
-                    shadow: None,
-                    shadow_top: 0,
-                    start: 0,
-                    next: 0,
-                });
-            });
+            .for_each(|prod| chart.row_mut(0).unsafe_append(Item::start(prod)));
 
         let mut cursor = 0;
         while cursor < chart.len() {
@@ -85,13 +77,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
 
                 if grammar.is_non_terminal(symbol) {
                     if grammar.is_nullable_nt(symbol) {
-                        let new_item = Item {
-                            rule: item.rule,
-                            shadow: item.shadow.clone(),
-                            shadow_top: item.shadow_top,
-                            start: item.start,
-                            next: item.next + 1,
-                        };
+                        let new_item = item.advance_new();
 
                         if !chart.row(cursor).contains(&new_item) {
                             chart.row_mut(cursor).unsafe_append(new_item);
@@ -99,7 +85,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
                     }
 
                     if !symbols.contains(symbol) {
-                        predict_op(cursor, symbol, grammar, chart);
+                        predict_op(cursor, item.depth + 1, symbol, grammar, chart);
                         symbols.insert(symbol.clone());
                     }
                 }
@@ -146,6 +132,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
 
         fn predict_op<'inner, 'grammar, Symbol: Data + Default>(
             cursor: usize,
+            depth: usize,
             symbol: &Symbol,
             grammar: &'grammar Grammar<Symbol>,
             chart: &'inner mut RChart<'grammar, Symbol>,
@@ -159,6 +146,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
                     shadow_top: 0,
                     start: cursor,
                     next: 0,
+                    depth,
                 };
 
                 if symbol != grammar.start() || !chart.row(cursor).contains(&new_item) {
@@ -219,13 +207,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
             let mut last_item = item.clone();
 
             loop {
-                last_item = Item {
-                    rule: last_item.rule,
-                    shadow: last_item.shadow.clone(),
-                    shadow_top: last_item.shadow_top,
-                    start: last_item.start,
-                    next: last_item.next + 1,
-                };
+                last_item.advance();
 
                 dest.push(last_item.clone());
 
@@ -267,6 +249,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
                 shadow_top: item.next,
                 start: item.start,
                 next: item.next,
+                depth: item.depth,
             }
         }
 
@@ -287,6 +270,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
                 finish,
                 spm: SymbolParseMethod::Standard,
                 weight,
+                depth: item.depth,
             });
         }
 
@@ -406,6 +390,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
                             finish: node + 1,
                             spm,
                             weight: 0,
+                            depth: 0,
                         }];
                     } else if node < chart.len() {
                         return chart
@@ -600,9 +585,36 @@ struct Item<'rule, Symbol: Data + Default + 'rule> {
     shadow_top: usize,
     start: usize,
     next: usize,
+    depth: usize,
 }
 
 impl<'rule, Symbol: Data + Default + 'rule> Item<'rule, Symbol> {
+    fn start(rule: &'rule Production<Symbol>) -> Self {
+        Item {
+            rule,
+            shadow: None,
+            shadow_top: 0,
+            start: 0,
+            next: 0,
+            depth: 0,
+        }
+    }
+
+    fn advance(&mut self) {
+        self.next += 1;
+    }
+
+    fn advance_new(&self) -> Self {
+        Item {
+            rule: self.rule,
+            shadow: self.shadow.clone(),
+            shadow_top: self.shadow_top,
+            start: self.start,
+            next: self.next + 1,
+            depth: self.depth,
+        }
+    }
+
     fn next_symbol<'scope>(&'scope self) -> Option<&'rule Symbol> {
         if self.next < self.rule.rhs.len() {
             Some(&self.rule.rhs[self.next])
@@ -721,6 +733,7 @@ struct Edge<'prod, Symbol: Data + Default + 'prod> {
     finish: usize,
     spm: SymbolParseMethod,
     weight: usize,
+    depth: usize,
 }
 
 impl<'prod, Symbol: Data + Default + 'prod> Edge<'prod, Symbol> {
