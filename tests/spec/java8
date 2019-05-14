@@ -232,12 +232,12 @@ cdfa {
     ws      ^_
         ' ' | '\t' | '\n' | '\r' -> ws;
 
-    lcom    ^LCOM
+    lcom    ^_
         '\n' -> fail
         _ -> lcom;
 
     bcom
-        '*/' -> bcomm
+        '*/' -> bcomm # TODO get rid of this after introducing comments
         _ -> bcom;
 
     bcomm   ^_; # TODO get rid of this after introducing comments
@@ -251,8 +251,6 @@ cdfa {
     id      ^ID
         '_' .. '9' | '$' -> id;
 }
-
-ignore LCOM
 
 grammar {
     cmp_unit
@@ -612,17 +610,17 @@ grammar {
         | inline_isolated_block_statement
         | grouped_statements;
 
-    isolated_block_statement `{}{}\n`
-        | [comment] class_dec
-        | [comment] block
-        | [comment] lvar_dec_statement `{}{}`
-        | [comment] isolated_statement;
+    isolated_block_statement `{}\n`
+        | class_dec
+        | block
+        | lvar_dec_statement `{}`
+        | isolated_statement;
 
     inline_isolated_block_statement
-        | [comment] class_dec
-        | [comment] block
-        | [comment] lvar_dec_statement
-        | [comment] isolated_statement;
+        | class_dec
+        | block
+        | lvar_dec_statement
+        | isolated_statement;
 
     lvar_dec_statement
         | lvar_dec SEMI;
@@ -646,8 +644,8 @@ grammar {
         | isolated_statement_no_if;
 
     grouped_statements
-        | [comment] grouped_statement grouped_statements `{}{}\n[prefix]{}`
-        | [comment] grouped_statement;
+        | grouped_statement grouped_statements `{}\n[prefix]{}`
+        | grouped_statement;
     grouped_statement
         | labeled_statement
         | SEMI
@@ -1031,11 +1029,4 @@ grammar {
         | STAR
         | PCT
         | SLASH;
-
-    #
-    # OPERATORS
-    #
-
-    comment
-        | LCOM `{}\n[prefix]`;
 }
