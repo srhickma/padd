@@ -350,11 +350,15 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
 
             let mut ordered_edges: Vec<&Edge<Symbol>> = Vec::new();
             for row in 0..chart.len() {
-                for edge in &chart.row(row).edges {
-                    if !edge.rule.unwrap().rhs.is_empty() {
+                chart
+                    .row(row)
+                    .edges
+                    .iter()
+                    .filter(|edge| !edge.rule.unwrap().rhs.is_empty())
+                    .filter(|edge| !edge.is_terminal(grammar))
+                    .for_each(|edge| {
                         ordered_edges.push(edge);
-                    }
-                }
+                    })
             }
 
             ordered_edges.sort_unstable_by(|ref e1, ref e2| {
@@ -367,14 +371,25 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
             });
 
             for edge in &ordered_edges {
-                let weighted_path = optimal_next_level_path(&edge, grammar, &chart, &weight_map);
+                let weighted_path = optimal_next_level_path(&edge, &weight_map, grammar, &chart);
 
                 weight_map.insert(edge, weighted_path.weight);
                 nlp_map.insert(edge, weighted_path.path);
             }
 
-            let mut best_root_edge: &Edge<Symbol> = ordered_edges.last().unwrap();
-            let mut best_root_weight = *weight_map.get(best_root_edge)
+            let mut best_root_edge: &Edge<Symbol> = if ordered_edges.is_empty() {
+                chart
+                    .row(0)
+                    .edges
+                    .iter()
+                    .find(|edge| edge.depth == 0)
+                    .unwrap()
+            } else {
+                ordered_edges.last().unwrap()
+            };
+
+            let mut best_root_weight = *weight_map
+                .get(best_root_edge)
                 .unwrap_or(&best_root_edge.weight);
 
             let finish: Node = chart.len() - 1;
@@ -400,7 +415,6 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
             ) -> Tree<Symbol> {
                 match edge.rule {
                     None => Tree {
-                        //Non-empty rhs
                         lhs: scan[edge.start].clone(),
                         children: Vec::new(),
                     },
@@ -409,16 +423,19 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
                         children: {
                             if edge.rule.unwrap().rhs.is_empty() {
                                 vec![Tree::null()]
+                            } else if edge.is_terminal(grammar) {
+                                vec![Tree {
+                                    lhs: scan[edge.start].clone(),
+                                    children: Vec::new(),
+                                }]
                             } else {
                                 nlp_map
                                     .get(edge)
                                     .unwrap()
                                     .iter()
-                                    .filter(|&(_, ref edge)| edge.spm != SymbolParseMethod::Ignored)
+                                    .filter(|ref edge| edge.spm != SymbolParseMethod::Ignored)
                                     .rev()
-                                    .map(|&(_, ref edge)| {
-                                        link_shallow_paths(&edge, grammar, scan, nlp_map)
-                                    })
+                                    .map(|edge| link_shallow_paths(edge, grammar, scan, nlp_map))
                                     .collect()
                             }
                         },
@@ -427,73 +444,95 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
             }
 
             fn optimal_next_level_path<'scope, Symbol: Data + Default>(
-                edge: &Edge<Symbol>,
+                edge: &Edge<'scope, Symbol>,
+                weight_map: &HashMap<&'scope Edge<Symbol>, usize>,
                 grammar: &'scope Grammar<Symbol>,
                 chart: &'scope PChart<'scope, Symbol>,
-                weight_map: &HashMap<&'scope Edge<Symbol>, usize>,
             ) -> WeightedParsePath<'scope, Symbol> {
-                let bottom: usize = edge.symbols_len();
-                let leaf = |depth: usize, node: Node| depth == bottom && node == edge.finish;
-                let edges = |depth: usize, node: Node| -> Vec<Edge<Symbol>> {
-                    if depth < bottom {
-                        let (symbol, spm) = edge.symbol_at(depth);
+                fn df_search<'scope, Symbol: Data + Default>(
+                    depth: usize,
+                    root: Node,
+                    bottom: usize,
+                    root_edge: &Edge<'scope, Symbol>,
+                    weight_map: &HashMap<&'scope Edge<Symbol>, usize>,
+                    grammar: &'scope Grammar<Symbol>,
+                    chart: &'scope PChart<'scope, Symbol>,
+                ) -> Option<WeightedParsePath<'scope, Symbol>> {
+                    if depth == bottom {
+                        if root == root_edge.finish {
+                            Some(WeightedParsePath::empty())
+                        } else {
+                            None
+                        }
+                    } else {
+                        let (symbol, spm) = root_edge.symbol_at(depth);
+
                         if !grammar.is_non_terminal(symbol) {
-                            return vec![Edge {
+                            let edge = Edge {
                                 rule: None,
                                 shadow: None,
                                 shadow_top: 0,
-                                start: node,
-                                finish: node + 1,
+                                start: root,
+                                finish: root + 1,
                                 spm,
                                 weight: 0,
                                 depth: 0,
-                            }];
-                        } else if node < chart.len() {
-                            return chart
-                                .row(node)
+                            };
+
+                            if let Some(mut path) = df_search(
+                                depth + 1,
+                                edge.finish,
+                                bottom,
+                                root_edge,
+                                weight_map,
+                                grammar,
+                                chart,
+                            ) {
+                                path.append(edge, 0);
+                                Some(path)
+                            } else {
+                                None
+                            }
+                        } else if root < chart.len() {
+                            let mut best_path: Option<WeightedParsePath<'scope, Symbol>> = None;
+
+                            chart
+                                .row(root)
                                 .edges
                                 .iter()
                                 .filter(|edge| edge.rule.unwrap().lhs == *symbol)
-                                .cloned()
-                                .collect();
+                                .for_each(|edge| {
+                                    if let Some(mut path) = df_search(
+                                        depth + 1,
+                                        edge.finish,
+                                        bottom,
+                                        root_edge,
+                                        weight_map,
+                                        grammar,
+                                        chart,
+                                    ) {
+                                        let tree_weight =
+                                            *weight_map.get(&edge).unwrap_or(&edge.weight);
+
+                                        if best_path.is_none()
+                                            || path.weight + tree_weight
+                                                < best_path.as_ref().unwrap().weight
+                                        {
+                                            path.append(edge.clone(), tree_weight);
+                                            best_path = Some(path);
+                                        }
+                                    }
+                                });
+
+                            best_path
+                        } else {
+                            None
                         }
-                    }
-                    Vec::new()
-                };
-
-                fn df_search<'scope, Symbol: Data + Default>(
-                    edges: &Fn(usize, Node) -> Vec<Edge<'scope, Symbol>>,
-                    leaf: &Fn(usize, Node) -> bool,
-                    depth: usize,
-                    root: Node,
-                    weight_map: &HashMap<&'scope Edge<Symbol>, usize>,
-                ) -> Option<WeightedParsePath<'scope, Symbol>> {
-                    if leaf(depth, root) {
-                        Some(WeightedParsePath::empty())
-                    } else {
-                        let mut best_path: Option<WeightedParsePath<'scope, Symbol>> = None;
-
-                        for edge in edges(depth, root) {
-                            if let Some(mut path) =
-                                df_search(edges, leaf, depth + 1, edge.finish, weight_map)
-                            {
-                                let tree_weight = *weight_map.get(edge).unwrap_or(&edge.weight);
-
-                                if best_path.is_none()
-                                    || path.weight + tree_weight
-                                        < best_path.as_ref().unwrap().weight
-                                {
-                                    path.append(root, edge, tree_weight);
-                                    best_path = Some(path);
-                                }
-                            }
-                        }
-
-                        best_path
                     }
                 }
 
-                match df_search(&edges, &leaf, 0, edge.start, weight_map) {
+                let bottom = edge.symbols_len();
+                match df_search(0, edge.start, bottom, edge, weight_map, grammar, chart) {
                     None => panic!("Failed to decompose parse edge of recognized scan"),
                     Some(mut path) => {
                         path.weight += edge.weight;
@@ -788,6 +827,10 @@ impl<'prod, Symbol: Data + Default + 'prod> Edge<'prod, Symbol> {
             (&self.rule.unwrap().rhs[index], SymbolParseMethod::Standard)
         }
     }
+
+    fn is_terminal(&self, grammar: &Grammar<Symbol>) -> bool {
+        self.rule.unwrap().rhs.len() == 1 && !grammar.is_non_terminal(&self.rule.unwrap().rhs[0])
+    }
 }
 
 impl<'prod, Symbol: Data + Default + 'prod> Data for Edge<'prod, Symbol> {
@@ -821,7 +864,7 @@ enum SymbolParseMethod {
 }
 
 type Node = usize;
-type ParsePath<'rule, Symbol> = Vec<(Node, Edge<'rule, Symbol>)>;
+type ParsePath<'rule, Symbol> = Vec<Edge<'rule, Symbol>>;
 
 struct WeightedParsePath<'rule, Symbol: Data + Default> {
     path: ParsePath<'rule, Symbol>,
@@ -836,8 +879,8 @@ impl<'rule, Symbol: Data + Default> WeightedParsePath<'rule, Symbol> {
         }
     }
 
-    fn append(&mut self, node: Node, edge: Edge<'rule, Symbol>, weight: usize) {
+    fn append(&mut self, edge: Edge<'rule, Symbol>, weight: usize) {
         self.weight += weight;
-        self.path.push((node, edge));
+        self.path.push(edge);
     }
 }
