@@ -45,13 +45,20 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
         ) {
             let mut i = 0;
             while i < chart.row(cursor).complete().len() {
-                let item = chart.row(cursor).complete().item(i).clone();
+                let accumulator = {
+                    let item = chart.row(cursor).complete().item(i);
 
-                let accumulator = cross(
-                    chart.row(item.start).incomplete().items(),
-                    &item.rule.lhs,
-                    grammar,
-                );
+                    if item.ignore_next {
+                        i += 1;
+                        continue;
+                    }
+
+                    cross(
+                        chart.row(item.start).incomplete().items(),
+                        &item.rule.lhs,
+                        grammar,
+                    )
+                };
 
                 let mut items_to_add = Vec::new();
                 for completed_item in accumulator {
@@ -76,8 +83,16 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
 
             let mut i = 0;
             while i < chart.row(cursor).incomplete().len() {
-                let item = chart.row(cursor).incomplete().item(i).clone();
-                let symbol = (&item).next_symbol().unwrap();
+                let item = {
+                    let item = chart.row(cursor).incomplete().item(i);
+                    if item.ignore_next {
+                        i += 1;
+                        continue;
+                    }
+                    item.clone()
+                };
+
+                let symbol = item.next_symbol().unwrap();
 
                 if grammar.is_non_terminal(symbol) {
                     if grammar.is_nullable_nt(symbol) {
@@ -103,7 +118,9 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
             parse_chart: &mut PChart<'grammar, Symbol>,
         ) {
             for item in chart.row(cursor).complete().items() {
-                mark_completed_item(&item, cursor, parse_chart);
+                if !item.ignore_next {
+                    mark_completed_item(&item, cursor, parse_chart);
+                }
             }
         }
 
@@ -151,6 +168,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
                     start: cursor,
                     next: 0,
                     depth,
+                    ignore_next: false,
                 };
 
                 if symbol != grammar.start() || !chart.row(cursor).contains(&new_item) {
@@ -254,6 +272,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
                 start: item.start,
                 next: item.next,
                 depth: item.depth,
+                ignore_next: true,
             }
         }
 
@@ -634,6 +653,7 @@ struct Item<'rule, Symbol: Data + Default + 'rule> {
     start: usize,
     next: usize,
     depth: usize,
+    ignore_next: bool,
 }
 
 impl<'rule, Symbol: Data + Default + 'rule> Item<'rule, Symbol> {
@@ -645,11 +665,13 @@ impl<'rule, Symbol: Data + Default + 'rule> Item<'rule, Symbol> {
             start: 0,
             next: 0,
             depth: 0,
+            ignore_next: false,
         }
     }
 
     fn advance(&mut self) {
         self.next += 1;
+        self.ignore_next = false;
     }
 
     fn advance_new(&self) -> Self {
@@ -660,6 +682,7 @@ impl<'rule, Symbol: Data + Default + 'rule> Item<'rule, Symbol> {
             start: self.start,
             next: self.next + 1,
             depth: self.depth,
+            ignore_next: false,
         }
     }
 
