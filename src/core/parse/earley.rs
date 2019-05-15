@@ -345,10 +345,15 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
             scan: &'scope [Token<Symbol>],
             chart: PChart<'scope, Symbol>,
         ) -> Tree<Symbol> {
+            let mut weight_map: HashMap<&Edge<Symbol>, usize> = HashMap::new();
+            let mut nlp_map: HashMap<&Edge<Symbol>, ParsePath<Symbol>> = HashMap::new();
+
             let mut ordered_edges: Vec<&Edge<Symbol>> = Vec::new();
             for row in 0..chart.len() {
                 for edge in &chart.row(row).edges {
-                    ordered_edges.push(edge);
+                    if !edge.rule.unwrap().rhs.is_empty() {
+                        ordered_edges.push(edge);
+                    }
                 }
             }
 
@@ -361,9 +366,6 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
                 .unwrap()
             });
 
-            let mut weight_map: HashMap<&Edge<Symbol>, usize> = HashMap::new();
-            let mut nlp_map: HashMap<&Edge<Symbol>, ParsePath<Symbol>> = HashMap::new();
-
             for edge in &ordered_edges {
                 let weighted_path = optimal_next_level_path(&edge, grammar, &chart, &weight_map);
 
@@ -372,7 +374,8 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
             }
 
             let mut best_root_edge: &Edge<Symbol> = ordered_edges.last().unwrap();
-            let mut best_root_weight = weight_map[best_root_edge];
+            let mut best_root_weight = *weight_map.get(best_root_edge)
+                .unwrap_or(&best_root_edge.weight);
 
             let finish: Node = chart.len() - 1;
 
@@ -381,7 +384,8 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
                     break;
                 }
 
-                let minimal_tree_weight = weight_map[edge];
+                let minimal_tree_weight = *weight_map.get(edge).unwrap_or(&edge.weight);
+
                 if minimal_tree_weight < best_root_weight {
                     best_root_edge = edge;
                     best_root_weight = minimal_tree_weight;
@@ -403,21 +407,20 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
                     Some(rule) => Tree {
                         lhs: Token::interior(rule.lhs.clone()),
                         children: {
-                            let mut children: Vec<Tree<Symbol>> = nlp_map
-                                .get(edge)
-                                .unwrap()
-                                .iter()
-                                .filter(|&(_, ref edge)| edge.spm != SymbolParseMethod::Ignored)
-                                .rev()
-                                .map(|&(_, ref edge)| {
-                                    link_shallow_paths(&edge, grammar, scan, nlp_map)
-                                })
-                                .collect();
-                            if children.is_empty() {
-                                //Empty rhs
-                                children.push(Tree::null());
+                            if edge.rule.unwrap().rhs.is_empty() {
+                                vec![Tree::null()]
+                            } else {
+                                nlp_map
+                                    .get(edge)
+                                    .unwrap()
+                                    .iter()
+                                    .filter(|&(_, ref edge)| edge.spm != SymbolParseMethod::Ignored)
+                                    .rev()
+                                    .map(|&(_, ref edge)| {
+                                        link_shallow_paths(&edge, grammar, scan, nlp_map)
+                                    })
+                                    .collect()
                             }
-                            children
                         },
                     },
                 }
@@ -474,10 +477,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
                             if let Some(mut path) =
                                 df_search(edges, leaf, depth + 1, edge.finish, weight_map)
                             {
-                                let tree_weight = match weight_map.get(&edge) {
-                                    Some(weight) => *weight,
-                                    None => edge.weight,
-                                };
+                                let tree_weight = *weight_map.get(edge).unwrap_or(&edge.weight);
 
                                 if best_path.is_none()
                                     || path.weight + tree_weight
