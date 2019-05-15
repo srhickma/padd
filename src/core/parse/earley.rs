@@ -54,7 +54,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
                     }
 
                     cross(
-                        chart.row(item.start).incomplete().items(),
+                        chart.row(item.start).incomplete().items.iter(),
                         &item.rule.lhs,
                         grammar,
                     )
@@ -117,7 +117,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
             chart: &'inner RChart<'grammar, Symbol>,
             parse_chart: &mut PChart<'grammar, Symbol>,
         ) {
-            for item in chart.row(cursor).complete().items() {
+            for item in &chart.row(cursor).complete().items {
                 if !item.ignore_next {
                     mark_completed_item(&item, cursor, parse_chart);
                 }
@@ -140,7 +140,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
             let next_row = if grammar.is_ignorable(symbol) {
                 cross_ignorable(chart.row(cursor), symbol, grammar)
             } else {
-                cross(chart.row(cursor).incomplete().items(), symbol, grammar)
+                cross(chart.row(cursor).incomplete().items.iter(), symbol, grammar)
             };
 
             if next_row.is_empty() {
@@ -206,7 +206,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
         ) -> Vec<Item<'grammar, Symbol>> {
             let mut dest: Vec<Item<Symbol>> = Vec::new();
 
-            for item in src.incomplete.items() {
+            for item in &src.incomplete.items {
                 if item.next_symbol().unwrap() == symbol {
                     advance_past_symbol(item, &mut dest, grammar);
                 } else {
@@ -214,7 +214,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
                 }
             }
 
-            for item in src.complete.items() {
+            for item in &src.complete.items {
                 dest.push(ignore_next_symbol(item, symbol));
             }
 
@@ -305,7 +305,8 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
             chart
                 .row(chart.len() - 1)
                 .complete()
-                .items()
+                .items
+                .iter()
                 .any(|item| item.rule.lhs == *grammar.start() && item.start == 0)
         }
 
@@ -346,7 +347,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
         ) -> Tree<Symbol> {
             let mut ordered_edges: Vec<&Edge<Symbol>> = Vec::new();
             for row in 0..chart.len() {
-                for edge in chart.row(row).edges() {
+                for edge in &chart.row(row).edges {
                     ordered_edges.push(edge);
                 }
             }
@@ -447,7 +448,8 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
                         } else if node < chart.len() {
                             return chart
                                 .row(node)
-                                .edges()
+                                .edges
+                                .iter()
                                 .filter(|edge| edge.rule.unwrap().lhs == *symbol)
                                 .cloned()
                                 .collect();
@@ -537,11 +539,11 @@ impl<'item, Symbol: Data + Default + 'item> RChart<'item, Symbol> {
         for i in 0..self.rows.len() {
             println!("ROW {}", i);
             println!("\tINCOMPLETE");
-            for item in self.rows[i].incomplete().items() {
+            for item in &self.rows[i].incomplete().items {
                 println!("\t\t{}", item.to_string());
             }
             println!("\tCOMPLETE");
-            for item in self.rows[i].complete().items() {
+            for item in &self.rows[i].complete().items {
                 println!("\t\t{}", item.to_string());
             }
         }
@@ -620,28 +622,6 @@ impl<'item, Symbol: Data + Default + 'item> Items<'item, Symbol> {
 
     fn contains(&self, item: &Item<'item, Symbol>) -> bool {
         self.items.contains(item)
-    }
-
-    fn items<'scope>(&'scope self) -> ItemsIterator<'scope, 'item, Symbol> {
-        ItemsIterator {
-            items: &self.items,
-            index: 0,
-        }
-    }
-}
-
-struct ItemsIterator<'scope, 'item: 'scope, Symbol: Data + Default + 'item> {
-    items: &'scope Vec<Item<'item, Symbol>>,
-    index: usize,
-}
-
-impl<'scope, 'item: 'scope, Symbol: Data + Default + 'item> Iterator
-    for ItemsIterator<'scope, 'item, Symbol>
-{
-    type Item = &'scope Item<'item, Symbol>;
-    fn next(&mut self) -> Option<&'scope Item<'item, Symbol>> {
-        self.index += 1;
-        self.items.get(self.index - 1)
     }
 }
 
@@ -749,7 +729,7 @@ impl<'rule, Symbol: Data + Default + 'rule> PChart<'rule, Symbol> {
     fn print(&self) {
         for i in 0..self.rows.len() {
             println!("ROW {}", i);
-            for edge in self.rows[i].edges() {
+            for edge in &self.rows[i].edges {
                 println!("\t{}", edge.to_string());
             }
         }
@@ -767,32 +747,6 @@ impl<'rule, Symbol: Data + Default + 'rule> PChartRow<'rule, Symbol> {
 
     fn add_edge(&mut self, edge: Edge<'rule, Symbol>) {
         self.edges.push(edge);
-    }
-
-    fn edge(&self, i: usize) -> Option<&Edge<Symbol>> {
-        self.edges.get(i)
-    }
-
-    fn edges(&self) -> PChartRowIterator<Symbol> {
-        PChartRowIterator {
-            row: self,
-            index: 0,
-        }
-    }
-}
-
-struct PChartRowIterator<'row, 'edge: 'row, Symbol: Data + Default + 'edge> {
-    row: &'row PChartRow<'edge, Symbol>,
-    index: usize,
-}
-
-impl<'row, 'edge: 'row, Symbol: Data + Default + 'edge> Iterator
-    for PChartRowIterator<'row, 'edge, Symbol>
-{
-    type Item = &'row Edge<'row, Symbol>;
-    fn next(&mut self) -> Option<&'edge Edge<'row, Symbol>> {
-        self.index += 1;
-        self.row.edge(self.index - 1)
     }
 }
 
