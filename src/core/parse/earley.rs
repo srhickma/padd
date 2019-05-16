@@ -4,7 +4,11 @@ use {
         parse::{self, grammar::Grammar, Parser, Production, Tree},
         scan::Token,
     },
-    std::{collections::HashSet, usize},
+    std::{
+        cmp::Ordering,
+        collections::{HashMap, HashSet},
+        usize,
+    },
 };
 
 pub struct EarleyParser;
@@ -22,15 +26,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
             .productions_for_lhs(grammar.start())
             .unwrap()
             .iter()
-            .for_each(|prod| {
-                chart.row_mut(0).unsafe_append(Item {
-                    rule: prod,
-                    shadow: None,
-                    shadow_top: 0,
-                    start: 0,
-                    next: 0,
-                });
-            });
+            .for_each(|prod| chart.row_mut(0).unsafe_append(Item::start(prod)));
 
         let mut cursor = 0;
         while cursor < chart.len() {
@@ -49,13 +45,20 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
         ) {
             let mut i = 0;
             while i < chart.row(cursor).complete().len() {
-                let item = chart.row(cursor).complete().item(i).clone();
+                let accumulator = {
+                    let item = chart.row(cursor).complete().item(i);
 
-                let accumulator = cross(
-                    chart.row(item.start).incomplete().items(),
-                    &item.rule.lhs,
-                    grammar,
-                );
+                    if item.ignore_next {
+                        i += 1;
+                        continue;
+                    }
+
+                    cross(
+                        chart.row(item.start).incomplete().items.iter(),
+                        &item.rule.lhs,
+                        grammar,
+                    )
+                };
 
                 let mut items_to_add = Vec::new();
                 for completed_item in accumulator {
@@ -80,18 +83,20 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
 
             let mut i = 0;
             while i < chart.row(cursor).incomplete().len() {
-                let item = chart.row(cursor).incomplete().item(i).clone();
-                let symbol = (&item).next_symbol().unwrap();
+                let item = {
+                    let item = chart.row(cursor).incomplete().item(i);
+                    if item.ignore_next {
+                        i += 1;
+                        continue;
+                    }
+                    item.clone()
+                };
+
+                let symbol = item.next_symbol().unwrap();
 
                 if grammar.is_non_terminal(symbol) {
                     if grammar.is_nullable_nt(symbol) {
-                        let new_item = Item {
-                            rule: item.rule,
-                            shadow: item.shadow.clone(),
-                            shadow_top: item.shadow_top,
-                            start: item.start,
-                            next: item.next + 1,
-                        };
+                        let new_item = item.advance_new();
 
                         if !chart.row(cursor).contains(&new_item) {
                             chart.row_mut(cursor).unsafe_append(new_item);
@@ -99,7 +104,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
                     }
 
                     if !symbols.contains(symbol) {
-                        predict_op(cursor, symbol, grammar, chart);
+                        predict_op(cursor, item.depth + 1, symbol, grammar, chart);
                         symbols.insert(symbol.clone());
                     }
                 }
@@ -112,8 +117,10 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
             chart: &'inner RChart<'grammar, Symbol>,
             parse_chart: &mut PChart<'grammar, Symbol>,
         ) {
-            for item in chart.row(cursor).complete().items() {
-                mark_completed_item(&item, cursor, parse_chart);
+            for item in &chart.row(cursor).complete().items {
+                if !item.ignore_next {
+                    mark_completed_item(&item, cursor, parse_chart);
+                }
             }
         }
 
@@ -133,7 +140,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
             let next_row = if grammar.is_ignorable(symbol) {
                 cross_ignorable(chart.row(cursor), symbol, grammar)
             } else {
-                cross(chart.row(cursor).incomplete().items(), symbol, grammar)
+                cross(chart.row(cursor).incomplete().items.iter(), symbol, grammar)
             };
 
             if next_row.is_empty() {
@@ -146,6 +153,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
 
         fn predict_op<'inner, 'grammar, Symbol: Data + Default>(
             cursor: usize,
+            depth: usize,
             symbol: &Symbol,
             grammar: &'grammar Grammar<Symbol>,
             chart: &'inner mut RChart<'grammar, Symbol>,
@@ -159,6 +167,8 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
                     shadow_top: 0,
                     start: cursor,
                     next: 0,
+                    depth,
+                    ignore_next: false,
                 };
 
                 if symbol != grammar.start() || !chart.row(cursor).contains(&new_item) {
@@ -196,7 +206,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
         ) -> Vec<Item<'grammar, Symbol>> {
             let mut dest: Vec<Item<Symbol>> = Vec::new();
 
-            for item in src.incomplete.items() {
+            for item in &src.incomplete.items {
                 if item.next_symbol().unwrap() == symbol {
                     advance_past_symbol(item, &mut dest, grammar);
                 } else {
@@ -204,7 +214,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
                 }
             }
 
-            for item in src.complete.items() {
+            for item in &src.complete.items {
                 dest.push(ignore_next_symbol(item, symbol));
             }
 
@@ -219,13 +229,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
             let mut last_item = item.clone();
 
             loop {
-                last_item = Item {
-                    rule: last_item.rule,
-                    shadow: last_item.shadow.clone(),
-                    shadow_top: last_item.shadow_top,
-                    start: last_item.start,
-                    next: last_item.next + 1,
-                };
+                last_item.advance();
 
                 dest.push(last_item.clone());
 
@@ -267,6 +271,8 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
                 shadow_top: item.next,
                 start: item.start,
                 next: item.next,
+                depth: item.depth,
+                ignore_next: true,
             }
         }
 
@@ -284,9 +290,11 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
                 rule: Some(item.rule),
                 shadow: item.shadow.clone(),
                 shadow_top: item.shadow_top,
+                start: item.start,
                 finish,
                 spm: SymbolParseMethod::Standard,
                 weight,
+                depth: item.depth,
             });
         }
 
@@ -297,7 +305,8 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
             chart
                 .row(chart.len() - 1)
                 .complete()
-                .items()
+                .items
+                .iter()
                 .any(|item| item.rule.lhs == *grammar.start() && item.start == 0)
         }
 
@@ -336,8 +345,223 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
             scan: &'scope [Token<Symbol>],
             chart: PChart<'scope, Symbol>,
         ) -> Tree<Symbol> {
+            if grammar.weighted_parse() {
+                parse_bottom_up(grammar, scan, chart)
+            } else {
+                parse_top_down(grammar, scan, chart)
+            }
+        }
+
+        fn parse_bottom_up<'scope, Symbol: Data + Default>(
+            grammar: &'scope Grammar<Symbol>,
+            scan: &'scope [Token<Symbol>],
+            chart: PChart<'scope, Symbol>,
+        ) -> Tree<Symbol> {
+            let mut weight_map: HashMap<&Edge<Symbol>, usize> = HashMap::new();
+            let mut nlp_map: HashMap<&Edge<Symbol>, ParsePath<Symbol>> = HashMap::new();
+
+            let mut ordered_edges: Vec<&Edge<Symbol>> = Vec::new();
+            for row in 0..chart.len() {
+                chart
+                    .row(row)
+                    .edges
+                    .iter()
+                    .filter(|edge| !edge.rule.unwrap().rhs.is_empty())
+                    .filter(|edge| !edge.is_terminal(grammar))
+                    .for_each(|edge| {
+                        ordered_edges.push(edge);
+                    })
+            }
+
+            ordered_edges.sort_unstable_by(|ref e1, ref e2| {
+                // Order by increasing width, then decreasing depth
+                match (e1.finish - e1.start).partial_cmp(&(e2.finish - e2.start)) {
+                    Some(Ordering::Equal) => e2.depth.partial_cmp(&e1.depth),
+                    x => x,
+                }
+                .unwrap()
+            });
+
+            for edge in &ordered_edges {
+                let weighted_path = optimal_next_level_path(&edge, &weight_map, grammar, &chart);
+
+                weight_map.insert(edge, weighted_path.weight);
+                nlp_map.insert(edge, weighted_path.path);
+            }
+
+            let mut best_root_edge: &Edge<Symbol> = if ordered_edges.is_empty() {
+                chart
+                    .row(0)
+                    .edges
+                    .iter()
+                    .find(|edge| edge.depth == 0)
+                    .unwrap()
+            } else {
+                ordered_edges.last().unwrap()
+            };
+
+            let mut best_root_weight = *weight_map
+                .get(best_root_edge)
+                .unwrap_or(&best_root_edge.weight);
+
+            let finish: Node = chart.len() - 1;
+
+            for edge in ordered_edges.iter().rev().skip(1) {
+                if edge.finish != finish || edge.rule.unwrap().lhs != *grammar.start() {
+                    break;
+                }
+
+                let minimal_tree_weight = *weight_map.get(edge).unwrap_or(&edge.weight);
+
+                if minimal_tree_weight < best_root_weight {
+                    best_root_edge = edge;
+                    best_root_weight = minimal_tree_weight;
+                }
+            }
+
+            fn link_shallow_paths<'scope, Symbol: Data + Default>(
+                edge: &Edge<Symbol>,
+                grammar: &'scope Grammar<Symbol>,
+                scan: &'scope [Token<Symbol>],
+                nlp_map: &HashMap<&Edge<Symbol>, ParsePath<Symbol>>,
+            ) -> Tree<Symbol> {
+                match edge.rule {
+                    None => Tree {
+                        lhs: scan[edge.start].clone(),
+                        children: Vec::new(),
+                    },
+                    Some(rule) => Tree {
+                        lhs: Token::interior(rule.lhs.clone()),
+                        children: {
+                            if edge.rule.unwrap().rhs.is_empty() {
+                                vec![Tree::null()]
+                            } else if edge.is_terminal(grammar) {
+                                vec![Tree {
+                                    lhs: scan[edge.start].clone(),
+                                    children: Vec::new(),
+                                }]
+                            } else {
+                                nlp_map
+                                    .get(edge)
+                                    .unwrap()
+                                    .iter()
+                                    .filter(|ref edge| edge.spm != SymbolParseMethod::Ignored)
+                                    .rev()
+                                    .map(|edge| link_shallow_paths(edge, grammar, scan, nlp_map))
+                                    .collect()
+                            }
+                        },
+                    },
+                }
+            }
+
+            fn optimal_next_level_path<'scope, Symbol: Data + Default>(
+                edge: &Edge<'scope, Symbol>,
+                weight_map: &HashMap<&'scope Edge<Symbol>, usize>,
+                grammar: &'scope Grammar<Symbol>,
+                chart: &'scope PChart<'scope, Symbol>,
+            ) -> WeightedParsePath<'scope, Symbol> {
+                fn df_search<'scope, Symbol: Data + Default>(
+                    depth: usize,
+                    root: Node,
+                    bottom: usize,
+                    root_edge: &Edge<'scope, Symbol>,
+                    weight_map: &HashMap<&'scope Edge<Symbol>, usize>,
+                    grammar: &'scope Grammar<Symbol>,
+                    chart: &'scope PChart<'scope, Symbol>,
+                ) -> Option<WeightedParsePath<'scope, Symbol>> {
+                    if depth == bottom {
+                        if root == root_edge.finish {
+                            Some(WeightedParsePath::empty())
+                        } else {
+                            None
+                        }
+                    } else {
+                        let (symbol, spm) = root_edge.symbol_at(depth);
+
+                        if !grammar.is_non_terminal(symbol) {
+                            let edge = Edge {
+                                rule: None,
+                                shadow: None,
+                                shadow_top: 0,
+                                start: root,
+                                finish: root + 1,
+                                spm,
+                                weight: 0,
+                                depth: 0,
+                            };
+
+                            if let Some(mut path) = df_search(
+                                depth + 1,
+                                edge.finish,
+                                bottom,
+                                root_edge,
+                                weight_map,
+                                grammar,
+                                chart,
+                            ) {
+                                path.append(edge, 0);
+                                Some(path)
+                            } else {
+                                None
+                            }
+                        } else if root < chart.len() {
+                            let mut best_path: Option<WeightedParsePath<'scope, Symbol>> = None;
+
+                            chart
+                                .row(root)
+                                .edges
+                                .iter()
+                                .filter(|edge| edge.rule.unwrap().lhs == *symbol)
+                                .for_each(|edge| {
+                                    if let Some(mut path) = df_search(
+                                        depth + 1,
+                                        edge.finish,
+                                        bottom,
+                                        root_edge,
+                                        weight_map,
+                                        grammar,
+                                        chart,
+                                    ) {
+                                        let tree_weight =
+                                            *weight_map.get(&edge).unwrap_or(&edge.weight);
+
+                                        if best_path.is_none()
+                                            || path.weight + tree_weight
+                                                < best_path.as_ref().unwrap().weight
+                                        {
+                                            path.append(edge.clone(), tree_weight);
+                                            best_path = Some(path);
+                                        }
+                                    }
+                                });
+
+                            best_path
+                        } else {
+                            None
+                        }
+                    }
+                }
+
+                let bottom = edge.symbols_len();
+                match df_search(0, edge.start, bottom, edge, weight_map, grammar, chart) {
+                    None => panic!("Failed to decompose parse edge of recognized scan"),
+                    Some(mut path) => {
+                        path.weight += edge.weight;
+                        path
+                    }
+                }
+            }
+
+            link_shallow_paths(best_root_edge, grammar, scan, &nlp_map)
+        }
+
+        fn parse_top_down<'scope, Symbol: Data + Default>(
+            grammar: &'scope Grammar<Symbol>,
+            scan: &'scope [Token<Symbol>],
+            chart: PChart<'scope, Symbol>,
+        ) -> Tree<Symbol> {
             fn recur<'scope, Symbol: Data + Default>(
-                start: Node,
                 edge: &Edge<Symbol>,
                 grammar: &'scope Grammar<Symbol>,
                 scan: &'scope [Token<Symbol>],
@@ -346,21 +570,18 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
                 match edge.rule {
                     None => Tree {
                         //Non-empty rhs
-                        lhs: scan[start].clone(),
+                        lhs: scan[edge.start].clone(),
                         children: Vec::new(),
                     },
                     Some(rule) => Tree {
                         lhs: Token::interior(rule.lhs.clone()),
                         children: {
-                            let mut children: Vec<Tree<Symbol>> =
-                                top_list(start, edge, grammar, chart)
-                                    .iter()
-                                    .filter(|&(_, ref edge)| edge.spm != SymbolParseMethod::Ignored)
-                                    .rev()
-                                    .map(|&(node, ref edge)| {
-                                        recur(node, &edge, grammar, scan, chart)
-                                    })
-                                    .collect();
+                            let mut children: Vec<Tree<Symbol>> = top_list(edge, grammar, chart)
+                                .iter()
+                                .filter(|ref edge| edge.spm != SymbolParseMethod::Ignored)
+                                .rev()
+                                .map(|ref edge| recur(&edge, grammar, scan, chart))
+                                .collect();
                             if children.is_empty() {
                                 //Empty rhs
                                 children.push(Tree::null());
@@ -371,83 +592,75 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
                 }
             }
 
-            let finish: Node = chart.len() - 1;
-
-            let mut candidate_root_edges: Vec<&Edge<Symbol>> = chart
-                .row(0)
-                .edges()
-                .filter(|edge| edge.finish == finish && edge.rule.unwrap().lhs == *grammar.start())
-                .collect();
-
-            candidate_root_edges.sort_by_key(|edge| edge.weight);
-
-            match candidate_root_edges.first() {
-                None => panic!("Failed to find start item to begin parse"),
-                Some(edge) => recur(0, edge, grammar, scan, &chart),
-            }
-        }
-
-        fn top_list<'scope, Symbol: Data + Default>(
-            start: Node,
-            edge: &Edge<Symbol>,
-            grammar: &'scope Grammar<Symbol>,
-            chart: &'scope PChart<'scope, Symbol>,
-        ) -> Vec<(Node, Edge<'scope, Symbol>)> {
-            let bottom: usize = edge.symbols_len();
-            let leaf = |depth: usize, node: Node| depth == bottom && node == edge.finish;
-            let edges = |depth: usize, node: Node| -> Vec<Edge<Symbol>> {
-                if depth < bottom {
-                    let (symbol, spm) = edge.symbol_at(depth);
-                    if !grammar.is_non_terminal(symbol) {
-                        return vec![Edge {
-                            rule: None,
-                            shadow: None,
-                            shadow_top: 0,
-                            finish: node + 1,
-                            spm,
-                            weight: 0,
-                        }];
-                    } else if node < chart.len() {
-                        return chart
-                            .row(node)
-                            .edges()
-                            .filter(|edge| edge.rule.unwrap().lhs == *symbol)
-                            .cloned()
-                            .collect();
-                    }
-                }
-                Vec::new()
-            };
-
-            fn df_search<'scope, Symbol: Data + Default>(
-                edges: &Fn(usize, Node) -> Vec<Edge<'scope, Symbol>>,
-                leaf: &Fn(usize, Node) -> bool,
-                depth: usize,
-                root: Node,
-            ) -> Option<WeightedParsePath<'scope, Symbol>> {
-                if leaf(depth, root) {
-                    Some(WeightedParsePath::empty())
-                } else {
-                    let mut best_path: Option<WeightedParsePath<'scope, Symbol>> = None;
-
-                    for edge in edges(depth, root) {
-                        if let Some(mut path) = df_search(edges, leaf, depth + 1, edge.finish) {
-                            if best_path.is_none()
-                                || path.weight + edge.weight < best_path.as_ref().unwrap().weight
-                            {
-                                path.append(root, edge);
-                                best_path = Some(path);
-                            }
+            fn top_list<'scope, Symbol: Data + Default>(
+                edge: &Edge<Symbol>,
+                grammar: &'scope Grammar<Symbol>,
+                chart: &'scope PChart<'scope, Symbol>,
+            ) -> ParsePath<'scope, Symbol> {
+                let bottom: usize = edge.symbols_len();
+                let leaf = |depth: usize, node: Node| depth == bottom && node == edge.finish;
+                let edges = |depth: usize, node: Node| -> Vec<Edge<Symbol>> {
+                    if depth < bottom {
+                        let (symbol, spm) = edge.symbol_at(depth);
+                        if !grammar.is_non_terminal(symbol) {
+                            return vec![Edge {
+                                rule: None,
+                                shadow: None,
+                                shadow_top: 0,
+                                start: node,
+                                finish: node + 1,
+                                spm,
+                                weight: 0,
+                                depth: 0,
+                            }];
+                        } else if node < chart.len() {
+                            return chart
+                                .row(node)
+                                .edges
+                                .iter()
+                                .filter(|edge| edge.rule.unwrap().lhs == *symbol)
+                                .cloned()
+                                .collect();
                         }
                     }
+                    Vec::new()
+                };
 
-                    best_path
+                fn df_search<'scope, Symbol: Data + Default>(
+                    edges: &Fn(usize, Node) -> Vec<Edge<'scope, Symbol>>,
+                    leaf: &Fn(usize, Node) -> bool,
+                    depth: usize,
+                    root: Node,
+                ) -> Option<ParsePath<'scope, Symbol>> {
+                    if leaf(depth, root) {
+                        Some(ParsePath::new())
+                    } else {
+                        for edge in edges(depth, root) {
+                            if let Some(mut path) = df_search(edges, leaf, depth + 1, edge.finish) {
+                                path.push(edge);
+                                return Some(path);
+                            }
+                        }
+                        None
+                    }
+                }
+
+                match df_search(&edges, &leaf, 0, edge.start) {
+                    None => panic!("Failed to decompose parse edge of recognized scan"),
+                    Some(path) => path,
                 }
             }
 
-            match df_search(&edges, &leaf, 0, start) {
-                None => panic!("Failed to decompose parse edge of recognized scan"),
-                Some(weighted_path) => weighted_path.path,
+            let finish: Node = chart.len() - 1;
+
+            let root_edge =
+                chart.row(0).edges.iter().find(|edge| {
+                    edge.finish == finish && edge.rule.unwrap().lhs == *grammar.start()
+                });
+
+            match root_edge {
+                None => panic!("Failed to find start item to begin parse"),
+                Some(edge) => recur(edge, grammar, scan, &chart),
             }
         }
     }
@@ -485,11 +698,11 @@ impl<'item, Symbol: Data + Default + 'item> RChart<'item, Symbol> {
         for i in 0..self.rows.len() {
             println!("ROW {}", i);
             println!("\tINCOMPLETE");
-            for item in self.rows[i].incomplete().items() {
+            for item in &self.rows[i].incomplete().items {
                 println!("\t\t{}", item.to_string());
             }
             println!("\tCOMPLETE");
-            for item in self.rows[i].complete().items() {
+            for item in &self.rows[i].complete().items {
                 println!("\t\t{}", item.to_string());
             }
         }
@@ -569,28 +782,6 @@ impl<'item, Symbol: Data + Default + 'item> Items<'item, Symbol> {
     fn contains(&self, item: &Item<'item, Symbol>) -> bool {
         self.items.contains(item)
     }
-
-    fn items<'scope>(&'scope self) -> ItemsIterator<'scope, 'item, Symbol> {
-        ItemsIterator {
-            items: &self.items,
-            index: 0,
-        }
-    }
-}
-
-struct ItemsIterator<'scope, 'item: 'scope, Symbol: Data + Default + 'item> {
-    items: &'scope Vec<Item<'item, Symbol>>,
-    index: usize,
-}
-
-impl<'scope, 'item: 'scope, Symbol: Data + Default + 'item> Iterator
-    for ItemsIterator<'scope, 'item, Symbol>
-{
-    type Item = &'scope Item<'item, Symbol>;
-    fn next(&mut self) -> Option<&'scope Item<'item, Symbol>> {
-        self.index += 1;
-        self.items.get(self.index - 1)
-    }
 }
 
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
@@ -600,9 +791,40 @@ struct Item<'rule, Symbol: Data + Default + 'rule> {
     shadow_top: usize,
     start: usize,
     next: usize,
+    depth: usize,
+    ignore_next: bool,
 }
 
 impl<'rule, Symbol: Data + Default + 'rule> Item<'rule, Symbol> {
+    fn start(rule: &'rule Production<Symbol>) -> Self {
+        Item {
+            rule,
+            shadow: None,
+            shadow_top: 0,
+            start: 0,
+            next: 0,
+            depth: 0,
+            ignore_next: false,
+        }
+    }
+
+    fn advance(&mut self) {
+        self.next += 1;
+        self.ignore_next = false;
+    }
+
+    fn advance_new(&self) -> Self {
+        Item {
+            rule: self.rule,
+            shadow: self.shadow.clone(),
+            shadow_top: self.shadow_top,
+            start: self.start,
+            next: self.next + 1,
+            depth: self.depth,
+            ignore_next: false,
+        }
+    }
+
     fn next_symbol<'scope>(&'scope self) -> Option<&'rule Symbol> {
         if self.next < self.rule.rhs.len() {
             Some(&self.rule.rhs[self.next])
@@ -635,11 +857,11 @@ impl<'rule, Symbol: Data + Default> Data for Item<'rule, Symbol> {
     }
 }
 
-struct PChart<'edge, Symbol: Data + Default + 'edge> {
-    rows: Vec<PChartRow<'edge, Symbol>>,
+struct PChart<'rule, Symbol: Data + Default + 'rule> {
+    rows: Vec<PChartRow<'rule, Symbol>>,
 }
 
-impl<'edge, Symbol: Data + Default + 'edge> PChart<'edge, Symbol> {
+impl<'rule, Symbol: Data + Default + 'rule> PChart<'rule, Symbol> {
     fn new() -> Self {
         PChart {
             rows: vec![PChartRow::new()],
@@ -658,7 +880,7 @@ impl<'edge, Symbol: Data + Default + 'edge> PChart<'edge, Symbol> {
         &self.rows[i]
     }
 
-    fn row_mut(&mut self, i: usize) -> &mut PChartRow<'edge, Symbol> {
+    fn row_mut(&mut self, i: usize) -> &mut PChartRow<'rule, Symbol> {
         &mut self.rows[i]
     }
 
@@ -666,50 +888,24 @@ impl<'edge, Symbol: Data + Default + 'edge> PChart<'edge, Symbol> {
     fn print(&self) {
         for i in 0..self.rows.len() {
             println!("ROW {}", i);
-            for edge in self.rows[i].edges() {
+            for edge in &self.rows[i].edges {
                 println!("\t{}", edge.to_string());
             }
         }
     }
 }
 
-struct PChartRow<'edge, Symbol: Data + Default + 'edge> {
-    edges: Vec<Edge<'edge, Symbol>>,
+struct PChartRow<'rule, Symbol: Data + Default + 'rule> {
+    edges: Vec<Edge<'rule, Symbol>>,
 }
 
-impl<'edge, Symbol: Data + Default + 'edge> PChartRow<'edge, Symbol> {
+impl<'rule, Symbol: Data + Default + 'rule> PChartRow<'rule, Symbol> {
     fn new() -> Self {
         PChartRow { edges: Vec::new() }
     }
 
-    fn add_edge(&mut self, edge: Edge<'edge, Symbol>) {
+    fn add_edge(&mut self, edge: Edge<'rule, Symbol>) {
         self.edges.push(edge);
-    }
-
-    fn edge(&self, i: usize) -> Option<&Edge<Symbol>> {
-        self.edges.get(i)
-    }
-
-    fn edges(&self) -> PChartRowIterator<Symbol> {
-        PChartRowIterator {
-            row: self,
-            index: 0,
-        }
-    }
-}
-
-struct PChartRowIterator<'row, 'edge: 'row, Symbol: Data + Default + 'edge> {
-    row: &'row PChartRow<'edge, Symbol>,
-    index: usize,
-}
-
-impl<'row, 'edge: 'row, Symbol: Data + Default + 'edge> Iterator
-    for PChartRowIterator<'row, 'edge, Symbol>
-{
-    type Item = &'row Edge<'row, Symbol>;
-    fn next(&mut self) -> Option<&'edge Edge<'row, Symbol>> {
-        self.index += 1;
-        self.row.edge(self.index - 1)
     }
 }
 
@@ -718,9 +914,11 @@ struct Edge<'prod, Symbol: Data + Default + 'prod> {
     rule: Option<&'prod Production<Symbol>>,
     shadow: Option<Vec<ShadowSymbol<Symbol>>>,
     shadow_top: usize,
+    start: usize,
     finish: usize,
     spm: SymbolParseMethod,
     weight: usize,
+    depth: usize,
 }
 
 impl<'prod, Symbol: Data + Default + 'prod> Edge<'prod, Symbol> {
@@ -748,6 +946,10 @@ impl<'prod, Symbol: Data + Default + 'prod> Edge<'prod, Symbol> {
         } else {
             (&self.rule.unwrap().rhs[index], SymbolParseMethod::Standard)
         }
+    }
+
+    fn is_terminal(&self, grammar: &Grammar<Symbol>) -> bool {
+        self.rule.unwrap().rhs.len() == 1 && !grammar.is_non_terminal(&self.rule.unwrap().rhs[0])
     }
 }
 
@@ -782,9 +984,10 @@ enum SymbolParseMethod {
 }
 
 type Node = usize;
+type ParsePath<'rule, Symbol> = Vec<Edge<'rule, Symbol>>;
 
 struct WeightedParsePath<'rule, Symbol: Data + Default> {
-    path: Vec<(Node, Edge<'rule, Symbol>)>,
+    path: ParsePath<'rule, Symbol>,
     weight: usize,
 }
 
@@ -796,8 +999,8 @@ impl<'rule, Symbol: Data + Default> WeightedParsePath<'rule, Symbol> {
         }
     }
 
-    fn append(&mut self, node: Node, edge: Edge<'rule, Symbol>) {
-        self.weight += edge.weight;
-        self.path.push((node, edge));
+    fn append(&mut self, edge: Edge<'rule, Symbol>, weight: usize) {
+        self.weight += weight;
+        self.path.push(edge);
     }
 }
