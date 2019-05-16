@@ -1,9 +1,10 @@
 use {
     core::{
+        data::Data,
         fmt::{self, Formatter},
         parse::{
             self,
-            grammar::{self, Grammar},
+            grammar::{self, Grammar, GrammarBuilder},
             Tree,
         },
         scan::{self, ecdfa::EncodedCDFA},
@@ -17,16 +18,20 @@ mod region;
 
 pub type Symbol = lang::Symbol;
 
-pub static DEF_MATCHER: &'static str = "_";
+lazy_static! {
+    pub static ref DEF_MATCHER: String = String::from("_");
+}
+
 
 pub fn parse_spec(input: &str) -> Result<Tree<Symbol>, ParseError> {
     lang::parse_spec(input)
 }
 
-pub fn generate_spec(
+pub fn generate_spec<Kind: Default + Data>(
     parse: &Tree<Symbol>,
-) -> Result<(EncodedCDFA<String>, Grammar<String>, Formatter), GenError> {
-    gen::generate_spec(parse)
+    grammar_builder: impl GrammarBuilder<String, Kind>,
+) -> Result<(EncodedCDFA<Kind>, Grammar<Kind>, Formatter<Kind>), GenError> {
+    gen::generate_spec(parse, grammar_builder)
 }
 
 #[derive(Debug)]
@@ -127,7 +132,7 @@ impl From<parse::Error> for ParseError {
 
 #[cfg(test)]
 mod tests {
-    use core::{data::Data, scan::Token};
+    use core::{data::Data, scan::Token, parse::grammar::SimpleGrammarBuilder};
 
     use super::*;
 
@@ -672,13 +677,13 @@ grammar {
         let input = "  {  {  {{{\t}}}\n\r {} } \r }   { {}\n } ".to_string();
         let chars: Vec<char> = input.chars().collect();
 
-        let scanner = scan::def_scanner();
+        let scanner = scan::def_scanner::<usize, String>();
         let parser = parse::def_parser();
 
         //specification
         let tree = lang::parse_spec(spec);
         let parse = tree.unwrap();
-        let (cdfa, grammar, formatter) = generate_spec(&parse).unwrap();
+        let (cdfa, grammar, formatter) = generate_spec(&parse, SimpleGrammarBuilder::new()).unwrap();
 
         //input
         let tokens = scanner.scan(&chars[..], &cdfa);
@@ -750,11 +755,11 @@ grammar {
         let input = "i ij ijjjijijiji inj in iii".to_string();
         let chars: Vec<char> = input.chars().collect();
 
-        let scanner = scan::def_scanner();
+        let scanner = scan::def_scanner::<usize, String>();
 
         let tree = lang::parse_spec(spec);
         let parse = tree.unwrap();
-        let (cdfa, _, _) = generate_spec(&parse).unwrap();
+        let (cdfa, _, _) = generate_spec(&parse, SimpleGrammarBuilder::new()).unwrap();
 
         //exercise
         let tokens = scanner.scan(&chars[..], &cdfa).unwrap();
@@ -802,11 +807,11 @@ grammar {
         let input = "c c".to_string();
         let chars: Vec<char> = input.chars().collect();
 
-        let scanner = scan::def_scanner();
+        let scanner = scan::def_scanner::<usize, String>();
 
         let tree = lang::parse_spec(spec);
         let parse = tree.unwrap();
-        let (cdfa, _, _) = generate_spec(&parse).unwrap();
+        let (cdfa, _, _) = generate_spec(&parse, SimpleGrammarBuilder::new()).unwrap();
 
         //exercise
         let tokens = scanner.scan(&chars[..], &cdfa).unwrap();
@@ -852,7 +857,7 @@ grammar {
 
         let tree = lang::parse_spec(spec);
         let parse = tree.unwrap();
-        let (cdfa, _, _) = generate_spec(&parse).unwrap();
+        let (cdfa, _, _) = generate_spec(&parse, SimpleGrammarBuilder::new()).unwrap();
 
         //exercise
         let tokens = scanner.scan(&chars[..], &cdfa).unwrap();
@@ -888,7 +893,7 @@ grammar {
         ";
         let tree = lang::parse_spec(spec);
         let parse = tree.unwrap();
-        let (cdfa, _, _) = generate_spec(&parse).unwrap();
+        let (cdfa, _, _) = generate_spec(&parse, SimpleGrammarBuilder::new()).unwrap();
 
         let input = "fdkgdfjgdjglkdjglkdjgljbnhbduhoifjeoigjeoghknhkjdfjgoirjt for if endif elseif somethign eldsfnj hi bob joe here final for fob else if id idhere fobre f ".to_string();
         let chars: Vec<char> = input.chars().collect();
@@ -948,7 +953,7 @@ grammar {
 
         let tree = lang::parse_spec(spec);
         let parse = tree.unwrap();
-        let (cdfa, grammar, _) = generate_spec(&parse).unwrap();
+        let (cdfa, grammar, _) = generate_spec(&parse, SimpleGrammarBuilder::new()).unwrap();
 
         let input = "ababaaaba".to_string();
         let chars: Vec<char> = input.chars().collect();
@@ -1014,7 +1019,7 @@ grammar {
 
         let tree = lang::parse_spec(spec);
         let parse = tree.unwrap();
-        let (cdfa, grammar, formatter) = generate_spec(&parse).unwrap();
+        let (cdfa, grammar, formatter) = generate_spec(&parse, SimpleGrammarBuilder::new()).unwrap();
 
         let input = "abaa".to_string();
         let chars: Vec<char> = input.chars().collect();
@@ -1060,7 +1065,7 @@ grammar {
         let scanner = scan::def_scanner();
         let tree = lang::parse_spec(spec);
         let parse = tree.unwrap();
-        let (cdfa, _, _) = generate_spec(&parse).unwrap();
+        let (cdfa, _, _) = generate_spec(&parse, SimpleGrammarBuilder::new()).unwrap();
 
         //exercise
         let tokens = scanner.scan(&chars[..], &cdfa).unwrap();
@@ -1122,7 +1127,7 @@ grammar {
         let scanner = scan::def_scanner();
         let tree = lang::parse_spec(spec);
         let parse = tree.unwrap();
-        let (cdfa, _, _) = generate_spec(&parse).unwrap();
+        let (cdfa, _, _) = generate_spec(&parse, SimpleGrammarBuilder::new()).unwrap();
 
         //exercise
         let tokens = scanner.scan(&chars[..], &cdfa).unwrap();

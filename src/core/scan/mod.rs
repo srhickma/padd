@@ -156,17 +156,18 @@ impl<Symbol: Data> Token<Symbol> {
     pub fn lexeme(&self) -> &String {
         &self.lexeme
     }
+
+    pub fn lexeme_escaped(&self) -> String {
+        self.lexeme
+            .replace('\n', "\\n")
+            .replace('\t', "\\t")
+            .replace('\r', "\\r")
+    }
 }
 
 impl<Symbol: Data> Data for Token<Symbol> {
     fn to_string(&self) -> String {
-        let lexeme_string = format!(
-            " <- '{}'",
-            self.lexeme
-                .replace('\n', "\\n")
-                .replace('\t', "\\t")
-                .replace('\r', "\\r")
-        );
+        let lexeme_string = format!(" <- '{}'", self.lexeme_escaped());
 
         match &self.kind {
             None => lexeme_string,
@@ -199,4 +200,3 @@ impl error::Error for Error {
 }
 
 pub type State = String;
-pub type Kind = String;

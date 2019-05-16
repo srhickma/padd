@@ -142,19 +142,19 @@ impl<Symbol: Data + Default> Data for Production<Symbol> {
 
 #[cfg(test)]
 mod tests {
-    use core::parse::grammar::GrammarBuilder;
+    use core::parse::grammar::{GrammarBuilder, SimpleGrammarBuilder};
 
     use super::*;
 
     #[test]
     fn parse_example() {
         //setup
-        let mut grammar_builder = GrammarBuilder::new();
-        grammar_builder.add_productions(build_prods_from_strings(&[
+        let mut grammar_builder = SimpleGrammarBuilder::new();
+        add_productions(&[
             "Sentence Noun Verb",
             "Noun mary",
             "Verb runs",
-        ]));
+        ], &mut grammar_builder);
         grammar_builder.try_mark_start(&"Sentence".to_string());
         let grammar = grammar_builder.build().unwrap();
 
@@ -182,8 +182,8 @@ mod tests {
     #[test]
     fn parse_simple() {
         //setup
-        let mut grammar_builder = GrammarBuilder::new();
-        grammar_builder.add_productions(build_prods_from_strings(&["S BOF A EOF", "A x", "A A x"]));
+        let mut grammar_builder = SimpleGrammarBuilder::new();
+        add_productions(&["S BOF A EOF", "A x", "A A x"], &mut grammar_builder);
         grammar_builder.try_mark_start(&"S".to_string());
         let grammar = grammar_builder.build().unwrap();
 
@@ -212,13 +212,13 @@ mod tests {
     #[test]
     fn parse_expressions() {
         //setup
-        let mut grammar_builder = GrammarBuilder::new();
-        grammar_builder.add_productions(build_prods_from_strings(&[
+        let mut grammar_builder = SimpleGrammarBuilder::new();
+        add_productions(&[
             "S expr",
             "S S OP expr",
             "expr ( S )",
             "expr ID",
-        ]));
+        ], &mut grammar_builder);
         grammar_builder.try_mark_start(&"S".to_string());
         let grammar = grammar_builder.build().unwrap();
 
@@ -264,8 +264,8 @@ mod tests {
     #[test]
     fn parse_lacs_math() {
         //setup
-        let mut grammar_builder = GrammarBuilder::new();
-        grammar_builder.add_productions(build_prods_from_strings(&[
+        let mut grammar_builder = SimpleGrammarBuilder::new();
+        add_productions(&[
             "Sum Sum AS Product",
             "Sum Product",
             "Product Product MD Factor",
@@ -273,7 +273,7 @@ mod tests {
             "Factor LPAREN Sum RPAREN",
             "Factor Number",
             "Number NUM",
-        ]));
+        ], &mut grammar_builder);
         grammar_builder.try_mark_start(&"Sum".to_string());
         let grammar = grammar_builder.build().unwrap();
 
@@ -323,14 +323,14 @@ mod tests {
     #[test]
     fn parse_brackets() {
         //setup
-        let mut grammar_builder = GrammarBuilder::new();
-        grammar_builder.add_productions(build_prods_from_strings(&[
+        let mut grammar_builder = SimpleGrammarBuilder::new();
+        add_productions(&[
             "s s b",
             "s ",
             "b LBRACKET s RBRACKET",
             "b w",
             "w WHITESPACE",
-        ]));
+        ], &mut grammar_builder);
         grammar_builder.try_mark_start(&"s".to_string());
         let grammar = grammar_builder.build().unwrap();
 
@@ -392,12 +392,12 @@ mod tests {
     #[test]
     fn parse_deep_epsilon() {
         //setup
-        let mut grammar_builder = GrammarBuilder::new();
-        grammar_builder.add_productions(build_prods_from_strings(&[
+        let mut grammar_builder = SimpleGrammarBuilder::new();
+        add_productions(&[
             "s w w w w",
             "w WHITESPACE",
             "w ",
-        ]));
+        ], &mut grammar_builder);
         grammar_builder.try_mark_start(&"s".to_string());
         let grammar = grammar_builder.build().unwrap();
 
@@ -429,8 +429,8 @@ mod tests {
     #[test]
     fn advanced_parse_build() {
         //setup
-        let mut grammar_builder = GrammarBuilder::new();
-        grammar_builder.add_productions(build_prods_from_strings(&[
+        let mut grammar_builder = SimpleGrammarBuilder::new();
+        add_productions(&[
             "sum sum PM prod",
             "sum prod",
             "prod prod MD fac",
@@ -439,7 +439,7 @@ mod tests {
             "fac num",
             "num DIGIT num",
             "num DIGIT",
-        ]));
+        ], &mut grammar_builder);
         grammar_builder.try_mark_start(&"sum".to_string());
         let grammar = grammar_builder.build().unwrap();
 
@@ -496,8 +496,8 @@ mod tests {
     #[test]
     fn parse_must_consume() {
         //setup
-        let mut grammar_builder = GrammarBuilder::new();
-        grammar_builder.add_productions(build_prods_from_strings(&["s "]));
+        let mut grammar_builder = SimpleGrammarBuilder::new();
+        add_productions(&["s "], &mut grammar_builder);
         grammar_builder.try_mark_start(&"s".to_string());
         let grammar = grammar_builder.build().unwrap();
 
@@ -519,8 +519,8 @@ mod tests {
     #[test]
     fn ignorable_terminal() {
         //setup
-        let mut grammar_builder = GrammarBuilder::new();
-        grammar_builder.add_productions(build_prods_from_strings(&["s A s B", "s C"]));
+        let mut grammar_builder = SimpleGrammarBuilder::new();
+        add_productions(&["s A s B", "s C"], &mut grammar_builder);
         grammar_builder.try_mark_start(&"s".to_string());
         grammar_builder.mark_ignorable(&"C".to_string());
         let grammar = grammar_builder.build().unwrap();
@@ -551,8 +551,8 @@ mod tests {
     #[test]
     fn ignorable_terminal_only() {
         //setup
-        let mut grammar_builder = GrammarBuilder::new();
-        grammar_builder.add_productions(build_prods_from_strings(&["s "]));
+        let mut grammar_builder = SimpleGrammarBuilder::new();
+        add_productions(&["s "], &mut grammar_builder);
         grammar_builder.try_mark_start(&"s".to_string());
         grammar_builder.mark_ignorable(&"C".to_string());
         let grammar = grammar_builder.build().unwrap();
@@ -577,8 +577,8 @@ mod tests {
     #[test]
     fn favour_non_ignored_terminals() {
         //setup
-        let mut grammar_builder = GrammarBuilder::new();
-        grammar_builder.add_productions(build_prods_from_strings(&["s A s A", "s C", "s "]));
+        let mut grammar_builder = SimpleGrammarBuilder::new();
+        add_productions(&["s A s A", "s C", "s "], &mut grammar_builder);
         grammar_builder.try_mark_start(&"s".to_string());
         grammar_builder.mark_ignorable(&"C".to_string());
         let grammar = grammar_builder.build().unwrap();
@@ -605,17 +605,16 @@ mod tests {
         );
     }
 
-    pub fn build_prods_from_strings<'scope>(
+    pub fn add_productions<'scope>(
         strings: &'scope [&'scope str],
-    ) -> Vec<Production<String>> {
-        let mut productions: Vec<Production<String>> = vec![];
+        grammar_builder: &mut SimpleGrammarBuilder<String>
+    ) {
         for string in strings {
-            productions.push(prod_from_string(string));
+            grammar_builder.add_production(production_from_string(string));
         }
-        productions
     }
 
-    fn prod_from_string(string: &str) -> Production<String> {
+    fn production_from_string(string: &str) -> Production<String> {
         let mut i = 0;
         let mut lhs = String::new();
         let mut rhs: Vec<String> = vec![];

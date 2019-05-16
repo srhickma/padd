@@ -2,7 +2,7 @@ use std::{fmt, hash::Hash};
 
 pub mod map;
 
-pub trait Data: PartialEq + Eq + Hash + Clone + fmt::Debug {
+pub trait Data: PartialEq + Eq + Hash + Clone + fmt::Debug + Send + Sync {
     fn to_string(&self) -> String;
 }
 

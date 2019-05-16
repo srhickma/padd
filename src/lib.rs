@@ -5,7 +5,11 @@ extern crate stopwatch;
 use {
     core::{
         fmt::Formatter,
-        parse::{self, grammar::Grammar, Parser},
+        parse::{
+            self,
+            grammar::{Grammar, EncodedGrammarBuilder},
+            Parser
+        },
         scan::{self, ecdfa::EncodedCDFA, Scanner},
         spec,
     },
@@ -24,18 +28,21 @@ impl FormatJob {
     }
 }
 
+type Kind = usize;
+
 pub struct FormatJobRunner {
-    cdfa: EncodedCDFA<String>,
-    grammar: Grammar<String>,
-    formatter: Formatter,
-    scanner: Box<Scanner<usize, String>>,
-    parser: Box<Parser<String>>,
+    cdfa: EncodedCDFA<Kind>,
+    grammar: Grammar<Kind>,
+    formatter: Formatter<Kind>,
+    scanner: Box<Scanner<usize, Kind>>,
+    parser: Box<Parser<Kind>>,
 }
 
 impl FormatJobRunner {
     pub fn build(spec: &str) -> Result<FormatJobRunner, BuildError> {
         let parse = spec::parse_spec(spec)?;
-        let (cdfa, grammar, formatter) = spec::generate_spec(&parse)?;
+        let grammar_builder = EncodedGrammarBuilder::new();
+        let (cdfa, grammar, formatter) = spec::generate_spec(&parse, grammar_builder)?;
         Ok(FormatJobRunner {
             cdfa,
             grammar,

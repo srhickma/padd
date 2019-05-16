@@ -331,11 +331,13 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
                 message: "Recognition failed after consuming all tokens".to_string(),
             })
         } else {
+            let token = &scan[cursor - 1];
             Err(parse::Error {
                 message: format!(
-                    "Recognition failed at token {}: {}",
+                    "Recognition failed at token {}: {} <- '{}'",
                     cursor,
-                    scan[cursor - 1].to_string()
+                    grammar.symbol_string(token.kind()),
+                    token.lexeme_escaped(),
                 ),
             })
         };

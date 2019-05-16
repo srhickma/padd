@@ -9,12 +9,12 @@ use {
 
 mod pattern;
 
-pub struct Formatter {
-    pattern_map: HashMap<String, Pattern>,
+pub struct Formatter<Symbol: Data + Default> {
+    pattern_map: HashMap<Production<Symbol>, Pattern>,
 }
 
-impl Formatter {
-    pub fn format<Symbol: Data + Default>(&self, parse: &Tree<Symbol>) -> String {
+impl<Symbol: Data + Default> Formatter<Symbol> {
+    pub fn format(&self, parse: &Tree<Symbol>) -> String {
         let format_job = FormatJob {
             parse,
             pattern_map: &self.pattern_map,
@@ -23,39 +23,37 @@ impl Formatter {
     }
 }
 
-pub struct FormatterBuilder {
-    pattern_map: HashMap<String, Pattern>,
+pub struct FormatterBuilder<Symbol: Data + Default> {
+    pattern_map: HashMap<Production<Symbol>, Pattern>,
     memory: HashMap<String, Pattern>,
 }
 
-impl FormatterBuilder {
-    pub fn new() -> FormatterBuilder {
+impl<Symbol: Data + Default> FormatterBuilder<Symbol> {
+    pub fn new() -> FormatterBuilder<Symbol> {
         FormatterBuilder {
             pattern_map: HashMap::new(),
             memory: HashMap::new(),
         }
     }
 
-    pub fn build(self) -> Formatter {
+    pub fn build(self) -> Formatter<Symbol> {
         Formatter {
             pattern_map: self.pattern_map,
         }
     }
 
-    pub fn add_pattern<Symbol: Data + Default>(
+    pub fn add_pattern(
         &mut self,
         pair: PatternPair<Symbol>,
     ) -> Result<(), BuildError> {
-        let key = pair.production.to_string();
-
         if let Some(pattern) = self.memory.get(&pair.pattern) {
-            self.pattern_map.insert(key, pattern.clone());
+            self.pattern_map.insert(pair.production, pattern.clone());
             return Ok(());
         }
 
         let pattern = pattern::generate_pattern(&pair.pattern[..], &pair.production)?;
         self.memory.insert(pair.pattern, pattern.clone());
-        self.pattern_map.insert(key, pattern);
+        self.pattern_map.insert(pair.production, pattern);
         Ok(())
     }
 }
@@ -64,7 +62,7 @@ pub type BuildError = pattern::BuildError;
 
 struct FormatJob<'parse, Symbol: Data + Default + 'parse> {
     parse: &'parse Tree<Symbol>,
-    pattern_map: &'parse HashMap<String, Pattern>,
+    pattern_map: &'parse HashMap<Production<Symbol>, Pattern>,
 }
 
 impl<'parse, Symbol: Data + Default + 'parse> FormatJob<'parse, Symbol> {
@@ -81,7 +79,7 @@ impl<'parse, Symbol: Data + Default + 'parse> FormatJob<'parse, Symbol> {
             return node.lhs.lexeme().clone();
         }
 
-        let pattern = self.pattern_map.get(&node.production().to_string());
+        let pattern = self.pattern_map.get(&node.production());
         match pattern {
             Some(ref p) => self.fill_pattern(p, &node.children, scope),
             None => {

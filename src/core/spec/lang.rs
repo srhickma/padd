@@ -2,7 +2,7 @@ use core::{
     data::Data,
     parse::{
         self,
-        grammar::{self, Grammar, GrammarBuilder},
+        grammar::{self, Grammar, GrammarBuilder, SimpleGrammarBuilder},
         Tree,
     },
     scan::{
@@ -345,7 +345,7 @@ lazy_static! {
 }
 
 fn build_spec_grammar() -> Result<Grammar<Symbol>, grammar::BuildError> {
-    let mut builder = GrammarBuilder::new();
+    let mut builder = SimpleGrammarBuilder::new();
     builder.try_mark_start(&Symbol::Spec);
 
     builder.from(Symbol::Spec).to(vec![Symbol::Regions]);

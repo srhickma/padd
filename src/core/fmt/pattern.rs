@@ -3,7 +3,7 @@ use {
         data::Data,
         parse::{
             self,
-            grammar::{self, Grammar, GrammarBuilder},
+            grammar::{self, Grammar, GrammarBuilder, SimpleGrammarBuilder},
             Production, Tree,
         },
         scan::{
@@ -151,7 +151,7 @@ lazy_static! {
 fn build_pattern_grammar() -> Result<Grammar<Symbol>, grammar::BuildError> {
     //TODO optimize for left recursion
 
-    let mut builder = GrammarBuilder::new();
+    let mut builder = SimpleGrammarBuilder::new();
     builder.try_mark_start(&Symbol::Pattern);
 
     builder.from(Symbol::Pattern).to(vec![Symbol::Segments]);
