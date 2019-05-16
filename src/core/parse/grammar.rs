@@ -39,6 +39,10 @@ impl<Symbol: Data + Default> Grammar<Symbol> {
     pub fn productions_for_lhs(&self, lhs: &Symbol) -> Option<&Vec<Production<Symbol>>> {
         self.prods_by_lhs.get(lhs)
     }
+
+    pub fn weighted_parse(&self) -> bool {
+        !self.ignorable.is_empty()
+    }
 }
 
 pub struct GrammarBuilder<Symbol: Data + Default> {
