@@ -140,7 +140,7 @@ impl From<parse::Error> for FormatError {
 
 #[cfg(test)]
 mod tests {
-    use std::error::Error;
+    use {core::parse::grammar::SimpleGrammarBuilder, std::error::Error};
 
     use super::*;
 
@@ -874,7 +874,7 @@ grammar {
     }
 
     #[test]
-    fn failed_ignorable_terminal_error() {
+    fn failed_ignorable_terminal_error_encoded() {
         //setup
         let spec = "
 alphabet 's'
@@ -909,6 +909,45 @@ grammar {
         assert_eq!(
             format!("{}", err),
             "Grammar build error: Ignored symbol 's' is non-terminal"
+        );
+
+        err = err.source().unwrap();
+        assert_eq!(format!("{}", err), "Ignored symbol 's' is non-terminal");
+
+        assert!(err.source().is_none());
+    }
+
+    #[test]
+    fn failed_ignorable_terminal_error_simple() {
+        //setup
+        let spec = "
+alphabet 's'
+
+cdfa {
+    start
+        's' -> S;
+}
+
+ignore s
+
+grammar {
+    s | S;
+}
+        ";
+
+        //exercise
+        let parse = spec::parse_spec(spec).unwrap();
+        let grammar_builder = SimpleGrammarBuilder::new();
+        let res = spec::generate_spec(&parse, grammar_builder);
+
+        //verify
+        assert!(res.is_err());
+
+        let mut err: &Error = &res.err().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "Grammar build error: Ignored symbol 's' is \
+             non-terminal"
         );
 
         err = err.source().unwrap();
