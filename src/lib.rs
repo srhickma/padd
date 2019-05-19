@@ -28,13 +28,15 @@ impl FormatJob {
     }
 }
 
-//TODO(shane) do we really need all these types??
+type StateType = usize;
+type SymbolType = usize;
+
 pub struct FormatJobRunner {
-    cdfa: Box<CDFA<usize, usize>>,
-    grammar: Box<Grammar<usize>>,
-    formatter: Formatter<usize>,
-    scanner: Box<Scanner<usize, usize>>,
-    parser: Box<Parser<usize>>,
+    cdfa: Box<CDFA<StateType, SymbolType>>,
+    grammar: Box<Grammar<SymbolType>>,
+    formatter: Formatter<SymbolType>,
+    scanner: Box<Scanner<StateType, SymbolType>>,
+    parser: Box<Parser<SymbolType>>,
 }
 
 impl FormatJobRunner {
