@@ -1,19 +1,18 @@
 use {
     core::{
-        data::Data,
         fmt::pattern::{Capture, Pattern, Segment},
-        parse::{Production, Tree},
+        parse::{Production, Tree, grammar::GrammarSymbol},
     },
     std::collections::HashMap,
 };
 
 mod pattern;
 
-pub struct Formatter<Symbol: Data + Default> {
+pub struct Formatter<Symbol: GrammarSymbol> {
     pattern_map: HashMap<Production<Symbol>, Pattern>,
 }
 
-impl<Symbol: Data + Default> Formatter<Symbol> {
+impl<Symbol: GrammarSymbol> Formatter<Symbol> {
     pub fn format(&self, parse: &Tree<Symbol>) -> String {
         let format_job = FormatJob {
             parse,
@@ -23,12 +22,12 @@ impl<Symbol: Data + Default> Formatter<Symbol> {
     }
 }
 
-pub struct FormatterBuilder<Symbol: Data + Default> {
+pub struct FormatterBuilder<Symbol: GrammarSymbol> {
     pattern_map: HashMap<Production<Symbol>, Pattern>,
     memory: HashMap<String, Pattern>,
 }
 
-impl<Symbol: Data + Default> FormatterBuilder<Symbol> {
+impl<Symbol: GrammarSymbol> FormatterBuilder<Symbol> {
     pub fn new() -> FormatterBuilder<Symbol> {
         FormatterBuilder {
             pattern_map: HashMap::new(),
@@ -60,12 +59,12 @@ impl<Symbol: Data + Default> FormatterBuilder<Symbol> {
 
 pub type BuildError = pattern::BuildError;
 
-struct FormatJob<'parse, Symbol: Data + Default + 'parse> {
+struct FormatJob<'parse, Symbol: GrammarSymbol + 'parse> {
     parse: &'parse Tree<Symbol>,
     pattern_map: &'parse HashMap<Production<Symbol>, Pattern>,
 }
 
-impl<'parse, Symbol: Data + Default + 'parse> FormatJob<'parse, Symbol> {
+impl<'parse, Symbol: GrammarSymbol + 'parse> FormatJob<'parse, Symbol> {
     fn run(&self) -> String {
         self.recur(self.parse, &HashMap::new())
     }
@@ -161,7 +160,7 @@ impl<'parse, Symbol: Data + Default + 'parse> FormatJob<'parse, Symbol> {
     }
 }
 
-pub struct PatternPair<Symbol: Data + Default> {
+pub struct PatternPair<Symbol: GrammarSymbol> {
     pub production: Production<Symbol>,
     pub pattern: String,
 }

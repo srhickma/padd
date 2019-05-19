@@ -10,7 +10,7 @@ use {
             grammar::{Grammar, EncodedGrammarBuilder},
             Parser
         },
-        scan::{self, ecdfa::EncodedCDFA, Scanner},
+        scan::{self, CDFA, Scanner},
         spec,
     },
     std::{error, fmt},
@@ -28,14 +28,13 @@ impl FormatJob {
     }
 }
 
-type Kind = usize;
-
+//TODO(shane) do we really need all these types??
 pub struct FormatJobRunner {
-    cdfa: EncodedCDFA<Kind>,
-    grammar: Grammar<Kind>,
-    formatter: Formatter<Kind>,
-    scanner: Box<Scanner<usize, Kind>>,
-    parser: Box<Parser<Kind>>,
+    cdfa: Box<CDFA<usize, usize>>,
+    grammar: Box<Grammar<usize>>,
+    formatter: Formatter<usize>,
+    scanner: Box<Scanner<usize, usize>>,
+    parser: Box<Parser<usize>>,
 }
 
 impl FormatJobRunner {
@@ -55,8 +54,8 @@ impl FormatJobRunner {
     pub fn format(&self, job: FormatJob) -> Result<String, FormatError> {
         let chars: Vec<char> = job.text.chars().collect();
 
-        let tokens = self.scanner.scan(&chars[..], &self.cdfa)?;
-        let parse = self.parser.parse(tokens, &self.grammar)?;
+        let tokens = self.scanner.scan(&chars[..], &*self.cdfa)?;
+        let parse = self.parser.parse(tokens, &*self.grammar)?;
         Ok(self.formatter.format(&parse))
     }
 }

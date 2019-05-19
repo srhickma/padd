@@ -1,6 +1,6 @@
 use {
     core::data::Data,
-    std::collections::HashMap,
+    std::{collections::HashMap, fmt},
 };
 
 pub struct Encoder<T: Default + Data> {
@@ -32,4 +32,11 @@ impl<T: Default + Data> Encoder<T> {
     }
 }
 
+impl<T: Default + Data> fmt::Debug for Encoder<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Encoder")
+    }
+}
+
+//TODO(shane) add tests here
 

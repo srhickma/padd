@@ -1,12 +1,16 @@
 use {
-    core::{data::Data, parse::grammar::Grammar, scan::Token},
+    core::{
+        data::Data,
+        parse::grammar::{Grammar, GrammarSymbol},
+        scan::Token
+    },
     std::{error, fmt},
 };
 
 mod earley;
 pub mod grammar;
 
-pub trait Parser<Symbol: Data + Default>: 'static + Send + Sync {
+pub trait Parser<Symbol: GrammarSymbol>: 'static + Send + Sync {
     fn parse(
         &self,
         scan: Vec<Token<Symbol>>,
@@ -14,17 +18,17 @@ pub trait Parser<Symbol: Data + Default>: 'static + Send + Sync {
     ) -> Result<Tree<Symbol>, Error>;
 }
 
-pub fn def_parser<Symbol: Data + Default>() -> Box<Parser<Symbol>> {
+pub fn def_parser<Symbol: GrammarSymbol>() -> Box<Parser<Symbol>> {
     Box::new(earley::EarleyParser)
 }
 
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
-pub struct Tree<Symbol: Data + Default> {
+pub struct Tree<Symbol: GrammarSymbol> {
     pub lhs: Token<Symbol>,
     pub children: Vec<Tree<Symbol>>,
 }
 
-impl<Symbol: Data + Default> Tree<Symbol> {
+impl<Symbol: GrammarSymbol> Tree<Symbol> {
     pub fn get_child(&self, i: usize) -> &Tree<Symbol> {
         &self.children[i]
     }
@@ -61,7 +65,7 @@ impl<Symbol: Data + Default> Tree<Symbol> {
                 "{}{}{}",
                 prefix,
                 if is_tail { "└── " } else { "├── " },
-                self.lhs.kind().to_string()
+                self.lhs.kind().to_string(),
             );
             let len = self.children.len();
             for (i, child) in self.children.iter().enumerate() {
@@ -89,7 +93,7 @@ impl<Symbol: Data + Default> Tree<Symbol> {
     }
 }
 
-impl<Symbol: Data + Default> Data for Tree<Symbol> {
+impl<Symbol: GrammarSymbol> Data for Tree<Symbol> {
     fn to_string(&self) -> String {
         self.to_string_internal("".to_string(), true)
     }
@@ -113,12 +117,12 @@ impl error::Error for Error {
 }
 
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
-pub struct Production<Symbol: Data + Default> {
+pub struct Production<Symbol: GrammarSymbol> {
     pub lhs: Symbol,
     pub rhs: Vec<Symbol>,
 }
 
-impl<Symbol: Data + Default> Production<Symbol> {
+impl<Symbol: GrammarSymbol> Production<Symbol> {
     pub fn from(lhs: Symbol, rhs: Vec<Symbol>) -> Self {
         Production { lhs, rhs }
     }
@@ -128,7 +132,7 @@ impl<Symbol: Data + Default> Production<Symbol> {
     }
 }
 
-impl<Symbol: Data + Default> Data for Production<Symbol> {
+impl<Symbol: GrammarSymbol> Data for Production<Symbol> {
     fn to_string(&self) -> String {
         let mut res_string = self.lhs.to_string();
 

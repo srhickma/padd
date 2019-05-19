@@ -1,11 +1,12 @@
 use core::{
     data::Data,
+    parse::grammar::GrammarSymbol,
     scan::{self, Scanner, Token, CDFA, FAIL_SEQUENCE_LENGTH},
 };
 
 pub struct MaximalMunchScanner;
 
-impl<State: Data, Symbol: Data> Scanner<State, Symbol> for MaximalMunchScanner {
+impl<State: Data, Symbol: GrammarSymbol> Scanner<State, Symbol> for MaximalMunchScanner {
     fn scan<'cdfa>(
         &self,
         input: &[char],
@@ -19,12 +20,12 @@ impl<State: Data, Symbol: Data> Scanner<State, Symbol> for MaximalMunchScanner {
             character: usize,
         }
 
-        fn scan_one<State: Data, Kind: Data>(
+        fn scan_one<State: Data, Symbol: GrammarSymbol>(
             input: &[char],
             start: State,
             line: usize,
             character: usize,
-            cdfa: &CDFA<State, Kind>,
+            cdfa: &CDFA<State, Symbol>,
         ) -> ScanOneResult<State> {
             let mut remaining = input;
             let mut state: State = start;

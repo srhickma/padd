@@ -1,9 +1,8 @@
 use {
     core::{
-        data::Data,
         fmt::{Formatter, FormatterBuilder, PatternPair},
         parse::{
-            grammar::{Grammar, GrammarBuilder},
+            grammar::{Grammar, GrammarBuilder, GrammarSymbol},
             Production, Tree,
         },
         scan::{
@@ -12,7 +11,7 @@ use {
         },
         spec::{
             self,
-            lang::Symbol,
+            lang::SpecSymbol,
             region::{self, RegionType},
         },
         util::string_utils,
@@ -20,11 +19,15 @@ use {
     std::collections::HashSet,
 };
 
-pub fn generate_spec<Kind: Default + Data>(
-    parse: &Tree<Symbol>,
-    mut grammar_builder: impl GrammarBuilder<String, Kind>,
-) -> Result<(EncodedCDFA<Kind>, Grammar<Kind>, Formatter<Kind>), spec::GenError> {
-    let mut ecdfa_builder: EncodedCDFABuilder<String, Kind> = EncodedCDFABuilder::new();
+pub fn generate_spec<Symbol: 'static + GrammarSymbol, GrammarType, GrammarBuilderType>(
+    parse: &Tree<SpecSymbol>,
+    mut grammar_builder: GrammarBuilderType,
+) -> Result<(Box<CDFA<usize, Symbol>>, Box<Grammar<Symbol>>, Formatter<Symbol>), spec::GenError>
+where
+    GrammarType: 'static + Grammar<Symbol>,
+    GrammarBuilderType: GrammarBuilder<String, Symbol, GrammarType>,
+{
+    let mut ecdfa_builder: EncodedCDFABuilder<String, Symbol> = EncodedCDFABuilder::new();
     let mut formatter_builder = FormatterBuilder::new();
 
     traverse_spec_regions(
@@ -39,20 +42,21 @@ pub fn generate_spec<Kind: Default + Data>(
 
     orphan_check(&ecdfa, &grammar)?;
 
-    Ok((ecdfa, grammar, formatter_builder.build()))
+    Ok((Box::new(ecdfa), Box::new(grammar), formatter_builder.build()))
 }
 
-fn traverse_spec_regions<CDFABuilderType, CDFAType, Kind: Default + Data>(
-    regions_node: &Tree<Symbol>,
+fn traverse_spec_regions<CDFABuilderType, CDFAType, Symbol: GrammarSymbol, GrammarType>(
+    regions_node: &Tree<SpecSymbol>,
     cdfa_builder: &mut CDFABuilderType,
-    grammar_builder: &mut GrammarBuilder<String, Kind>,
-    formatter_builder: &mut FormatterBuilder<Kind>,
+    grammar_builder: &mut GrammarBuilder<String, Symbol, GrammarType>,
+    formatter_builder: &mut FormatterBuilder<Symbol>,
 ) -> Result<(), spec::GenError>
 where
-    CDFAType: CDFA<usize, Kind>,
-    CDFABuilderType: CDFABuilder<String, Kind, CDFAType>,
+    CDFAType: CDFA<usize, Symbol>,
+    CDFABuilderType: CDFABuilder<String, Symbol, CDFAType>,
+    GrammarType: Grammar<Symbol>,
 {
-    let mut region_handler = |inner_node: &Tree<Symbol>, region_type: &RegionType| {
+    let mut region_handler = |inner_node: &Tree<SpecSymbol>, region_type: &RegionType| {
         match region_type {
             RegionType::Alphabet => traverse_alphabet_region(inner_node, cdfa_builder),
             RegionType::CDFA => traverse_cdfa_region(inner_node, cdfa_builder, grammar_builder)?,
@@ -68,20 +72,22 @@ where
     region::traverse(regions_node, &mut region_handler)
 }
 
-fn traverse_ignorable_region<Kind: Default + Data>(
-    ignorable_node: &Tree<Symbol>,
-    grammar_builder: &mut GrammarBuilder<String, Kind>,
-) {
+fn traverse_ignorable_region<Symbol: GrammarSymbol, GrammarType>(
+    ignorable_node: &Tree<SpecSymbol>,
+    grammar_builder: &mut GrammarBuilder<String, Symbol, GrammarType>,
+) where
+    GrammarType: Grammar<Symbol>,
+{
     let terminal = ignorable_node.get_child(1).lhs.lexeme();
     grammar_builder.mark_ignorable(terminal);
 }
 
-fn traverse_alphabet_region<CDFABuilderType, CDFAType, Kind: Default + Data>(
-    alphabet_node: &Tree<Symbol>,
+fn traverse_alphabet_region<CDFABuilderType, CDFAType, Symbol: GrammarSymbol>(
+    alphabet_node: &Tree<SpecSymbol>,
     cdfa_builder: &mut CDFABuilderType,
 ) where
-    CDFAType: CDFA<usize, Kind>,
-    CDFABuilderType: CDFABuilder<String, Kind, CDFAType>,
+    CDFAType: CDFA<usize, Symbol>,
+    CDFABuilderType: CDFABuilder<String, Symbol, CDFAType>,
 {
     let escaped_alphabet = alphabet_node.get_child(1).lhs.lexeme().trim_matches('\'');
     let alphabet = string_utils::replace_escapes(&escaped_alphabet);
@@ -89,23 +95,26 @@ fn traverse_alphabet_region<CDFABuilderType, CDFAType, Kind: Default + Data>(
     cdfa_builder.set_alphabet(alphabet.chars());
 }
 
-fn traverse_cdfa_region<CDFABuilderType, CDFAType, Kind: Default + Data>(
-    cdfa_node: &Tree<Symbol>,
+fn traverse_cdfa_region<CDFABuilderType, CDFAType, Symbol: GrammarSymbol, GrammarType>(
+    cdfa_node: &Tree<SpecSymbol>,
     cdfa_builder: &mut CDFABuilderType,
-    grammar_builder: &mut GrammarBuilder<String, Kind>,
+    grammar_builder: &mut GrammarBuilder<String, Symbol, GrammarType>,
 ) -> Result<(), spec::GenError>
 where
-    CDFAType: CDFA<usize, Kind>,
-    CDFABuilderType: CDFABuilder<String, Kind, CDFAType>,
+    CDFAType: CDFA<usize, Symbol>,
+    CDFABuilderType: CDFABuilder<String, Symbol, CDFAType>,
+    GrammarType: Grammar<Symbol>,
 {
     generate_cdfa_states(cdfa_node.get_child(2), cdfa_builder, grammar_builder)
 }
 
-fn traverse_grammar_region<Kind: Default + Data>(
-    grammar_node: &Tree<Symbol>,
-    grammar_builder: &mut GrammarBuilder<String, Kind>,
-    formatter_builder: &mut FormatterBuilder<Kind>,
-) -> Result<(), spec::GenError> {
+fn traverse_grammar_region<Symbol: GrammarSymbol, GrammarType>(
+    grammar_node: &Tree<SpecSymbol>,
+    grammar_builder: &mut GrammarBuilder<String, Symbol, GrammarType>,
+    formatter_builder: &mut FormatterBuilder<Symbol>,
+) -> Result<(), spec::GenError> where
+    GrammarType: Grammar<Symbol>,
+{
     generate_grammar_prods(
         grammar_node.get_child(2),
         grammar_builder,
@@ -113,14 +122,15 @@ fn traverse_grammar_region<Kind: Default + Data>(
     )
 }
 
-fn generate_cdfa_states<CDFABuilderType, CDFAType, Kind: Default + Data>(
-    states_node: &Tree<Symbol>,
+fn generate_cdfa_states<CDFABuilderType, CDFAType, Symbol: GrammarSymbol, GrammarType>(
+    states_node: &Tree<SpecSymbol>,
     builder: &mut CDFABuilderType,
-    grammar_builder: &mut GrammarBuilder<String, Kind>,
+    grammar_builder: &mut GrammarBuilder<String, Symbol, GrammarType>,
 ) -> Result<(), spec::GenError>
 where
-    CDFAType: CDFA<usize, Kind>,
-    CDFABuilderType: CDFABuilder<String, Kind, CDFAType>,
+    CDFAType: CDFA<usize, Symbol>,
+    CDFABuilderType: CDFABuilder<String, Symbol, CDFAType>,
+    GrammarType: Grammar<Symbol>,
 {
     let state_node = states_node.get_child(states_node.children.len() - 1);
 
@@ -162,7 +172,7 @@ where
 }
 
 fn generate_cdfa_targets<'tree>(
-    targets_node: &'tree Tree<Symbol>,
+    targets_node: &'tree Tree<SpecSymbol>,
     accumulator: &mut Vec<&'tree State>,
 ) {
     accumulator.push(
@@ -176,23 +186,24 @@ fn generate_cdfa_targets<'tree>(
     }
 }
 
-fn generate_cdfa_trans<CDFABuilderType, CDFAType, Kind: Default + Data>(
-    trans_node: &Tree<Symbol>,
+fn generate_cdfa_trans<CDFABuilderType, CDFAType, Symbol: GrammarSymbol, GrammarType>(
+    trans_node: &Tree<SpecSymbol>,
     sources: &[&State],
     builder: &mut CDFABuilderType,
-    grammar_builder: &mut GrammarBuilder<String, Kind>,
+    grammar_builder: &mut GrammarBuilder<String, Symbol, GrammarType>,
 ) -> Result<(), spec::GenError>
 where
-    CDFAType: CDFA<usize, Kind>,
-    CDFABuilderType: CDFABuilder<String, Kind, CDFAType>,
+    CDFAType: CDFA<usize, Symbol>,
+    CDFABuilderType: CDFABuilder<String, Symbol, CDFAType>,
+    GrammarType: Grammar<Symbol>,
 {
     let tran_node = trans_node.get_child(trans_node.children.len() - 1);
 
     let trand_node = tran_node.get_child(2);
 
     let dest = match trand_node.get_child(0).lhs.kind() {
-        &Symbol::TId => trand_node.get_child(0).lhs.lexeme(),
-        &Symbol::Acceptor => {
+        &SpecSymbol::TId => trand_node.get_child(0).lhs.lexeme(),
+        &SpecSymbol::Acceptor => {
             let acceptor_node = trand_node.get_child(0);
             let id_or_def_node = acceptor_node.get_child(1);
             let token = id_or_def_node.get_child(0).lhs.lexeme();
@@ -210,10 +221,10 @@ where
 
     let matcher = tran_node.get_child(0);
     match matcher.lhs.kind() {
-        Symbol::Matchers => {
+        SpecSymbol::Matchers => {
             generate_cdfa_mtcs(matcher, sources, dest, builder)?;
         }
-        Symbol::TDef => {
+        SpecSymbol::TDef => {
             for source in sources {
                 builder.default_to(source, dest)?;
             }
@@ -229,15 +240,15 @@ where
 }
 
 #[allow(clippy::ptr_arg)]
-fn generate_cdfa_mtcs<CDFABuilderType, CDFAType, Kind: Default + Data>(
-    mtcs_node: &Tree<Symbol>,
+fn generate_cdfa_mtcs<CDFABuilderType, CDFAType, Symbol: GrammarSymbol>(
+    mtcs_node: &Tree<SpecSymbol>,
     sources: &[&State],
     dest: &State,
     builder: &mut CDFABuilderType,
 ) -> Result<(), spec::GenError>
 where
-    CDFAType: CDFA<usize, Kind>,
-    CDFABuilderType: CDFABuilder<String, Kind, CDFAType>,
+    CDFAType: CDFA<usize, Symbol>,
+    CDFABuilderType: CDFABuilder<String, Symbol, CDFAType>,
 {
     let mtc_node = mtcs_node.children.last().unwrap();
 
@@ -310,17 +321,18 @@ where
 }
 
 #[allow(clippy::ptr_arg)]
-fn add_cdfa_tokenizer<CDFABuilderType, CDFAType, Symbol: Data + Default, Kind: Default + Data>(
-    acceptor_node: &Tree<Symbol>,
+fn add_cdfa_tokenizer<CDFABuilderType, CDFAType, Symbol: GrammarSymbol, GrammarType>(
+    acceptor_node: &Tree<SpecSymbol>,
     state: &State,
     from: Option<&State>,
-    kind: &Kind,
+    kind: &Symbol,
     builder: &mut CDFABuilderType,
-    grammar_builder: &mut GrammarBuilder<String, Kind>,
+    grammar_builder: &mut GrammarBuilder<String, Symbol, GrammarType>,
 ) -> Result<(), spec::GenError>
 where
-    CDFAType: CDFA<usize, Kind>,
-    CDFABuilderType: CDFABuilder<String, Kind, CDFAType>,
+    CDFAType: CDFA<usize, Symbol>,
+    CDFABuilderType: CDFABuilder<String, Symbol, CDFAType>,
+    GrammarType: Grammar<Symbol>,
 {
     let accd_opt_node = acceptor_node.get_child(2);
     if accd_opt_node.is_empty() {
@@ -339,11 +351,13 @@ where
     Ok(())
 }
 
-fn generate_grammar_prods<Kind: Default + Data>(
-    prods_node: &Tree<Symbol>,
-    grammar_builder: &mut GrammarBuilder<String, Kind>,
-    formatter_builder: &mut FormatterBuilder<Kind>,
-) -> Result<(), spec::GenError> {
+fn generate_grammar_prods<Symbol: GrammarSymbol, GrammarType>(
+    prods_node: &Tree<SpecSymbol>,
+    grammar_builder: &mut GrammarBuilder<String, Symbol, GrammarType>,
+    formatter_builder: &mut FormatterBuilder<Symbol>,
+) -> Result<(), spec::GenError> where
+    GrammarType: Grammar<Symbol>,
+{
     if prods_node.children.len() == 2 {
         generate_grammar_prods(prods_node.get_child(0), grammar_builder, formatter_builder)?;
     }
@@ -363,13 +377,15 @@ fn generate_grammar_prods<Kind: Default + Data>(
     )
 }
 
-fn generate_grammar_rhss<Kind: Default + Data>(
-    rhss_node: &Tree<Symbol>,
+fn generate_grammar_rhss<Symbol: GrammarSymbol, GrammarType>(
+    rhss_node: &Tree<SpecSymbol>,
     lhs: &String,
-    def_pattern_node: &Tree<Symbol>,
-    grammar_builder: &mut GrammarBuilder<String, Kind>,
-    formatter_builder: &mut FormatterBuilder<Kind>,
-) -> Result<(), spec::GenError> {
+    def_pattern_node: &Tree<SpecSymbol>,
+    grammar_builder: &mut GrammarBuilder<String, Symbol, GrammarType>,
+    formatter_builder: &mut FormatterBuilder<Symbol>,
+) -> Result<(), spec::GenError> where
+    GrammarType: Grammar<Symbol>,
+{
     let rhs_node = rhss_node.get_child(rhss_node.children.len() - 1);
 
     let mut ids: Vec<String> = Vec::new();
@@ -411,18 +427,20 @@ fn generate_grammar_rhss<Kind: Default + Data>(
     Ok(())
 }
 
-fn generate_grammar_ids<Kind: Default + Data>(
-    ids_node: &Tree<Symbol>,
+fn generate_grammar_ids<Symbol: GrammarSymbol, GrammarType>(
+    ids_node: &Tree<SpecSymbol>,
     ids_accumulator: &mut Vec<String>,
-    grammar_builder: &mut GrammarBuilder<String, Kind>,
-) {
+    grammar_builder: &mut GrammarBuilder<String, Symbol, GrammarType>,
+) where
+    GrammarType: Grammar<Symbol>,
+{
     if !ids_node.is_empty() {
         generate_grammar_ids(ids_node.get_child(0), ids_accumulator, grammar_builder);
 
         let id_node = ids_node.get_child(1);
         let id = match id_node.lhs.kind() {
-            Symbol::TId => id_node.lhs.lexeme().clone(),
-            Symbol::TOptId => {
+            SpecSymbol::TId => id_node.lhs.lexeme().clone(),
+            SpecSymbol::TOptId => {
                 let lex = &id_node.lhs.lexeme()[..];
                 let dest = &lex[1..lex.len() - 1].to_string();
                 let opt_state: String = format!("opt#{}", dest);
@@ -438,7 +456,7 @@ fn generate_grammar_ids<Kind: Default + Data>(
     }
 }
 
-fn orphan_check<Symbol: Data + Default>(
+fn orphan_check<Symbol: GrammarSymbol>(
     ecdfa: &EncodedCDFA<Symbol>,
     grammar: &Grammar<Symbol>,
 ) -> Result<(), spec::GenError> {

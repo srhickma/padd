@@ -1,15 +1,16 @@
 use {
     core::{
         data::{
-            map::{CEHashMap, CEHashMapIterator},
             Data,
+            map::{CEHashMap, CEHashMapIterator}
         },
+        parse::grammar::GrammarSymbol,
         scan::{alphabet::HashedAlphabet, CDFABuilder, CDFAError, TransitionResult, CDFA},
     },
-    std::{collections::HashMap, fmt::Debug, hash::Hash, usize},
+    std::{collections::HashMap, fmt::Debug, usize},
 };
 
-pub struct EncodedCDFABuilder<State: Eq + Hash + Clone + Debug, Symbol: Data + Default> {
+pub struct EncodedCDFABuilder<State: Data, Symbol: GrammarSymbol> {
     encoder: HashMap<State, usize>,
     decoder: Vec<State>,
     alphabet_str: String,
@@ -21,7 +22,7 @@ pub struct EncodedCDFABuilder<State: Eq + Hash + Clone + Debug, Symbol: Data + D
     start: usize,
 }
 
-impl<State: Eq + Hash + Clone + Debug, Symbol: Data + Default> EncodedCDFABuilder<State, Symbol> {
+impl<State: Data, Symbol: GrammarSymbol> EncodedCDFABuilder<State, Symbol> {
     fn encode(&mut self, val: &State) -> usize {
         if self.encoder.contains_key(val) {
             self.encoder[val]
@@ -69,7 +70,7 @@ impl<State: Eq + Hash + Clone + Debug, Symbol: Data + Default> EncodedCDFABuilde
     }
 }
 
-impl<State: Eq + Hash + Clone + Debug, Symbol: Data + Default>
+impl<State: Data, Symbol: GrammarSymbol>
     CDFABuilder<State, Symbol, EncodedCDFA<Symbol>> for EncodedCDFABuilder<State, Symbol>
 {
     fn new() -> Self {
@@ -249,8 +250,8 @@ impl<State: Eq + Hash + Clone + Debug, Symbol: Data + Default>
 pub struct EncodedCDFAStateBuilder<
     'scope,
     'state: 'scope,
-    State: 'state + Eq + Hash + Clone + Debug,
-    Symbol: 'scope + Data + Default,
+    State: 'state + Data,
+    Symbol: 'scope + GrammarSymbol,
 > {
     ecdfa_builder: &'scope mut EncodedCDFABuilder<State, Symbol>,
     state: &'state State,
@@ -259,8 +260,8 @@ pub struct EncodedCDFAStateBuilder<
 impl<
         'scope,
         'state: 'scope,
-        State: 'state + Eq + Hash + Clone + Debug,
-        Symbol: 'scope + Data + Default,
+        State: 'state + Data,
+        Symbol: 'scope + GrammarSymbol,
     > EncodedCDFAStateBuilder<'scope, 'state, State, Symbol>
 {
     pub fn accept(&mut self) -> &mut Self {
@@ -308,7 +309,7 @@ impl<
     }
 }
 
-pub struct EncodedCDFA<Symbol: Default + Clone> {
+pub struct EncodedCDFA<Symbol: GrammarSymbol> {
     //TODO add separate error message if character not in alphabet
     #[allow(dead_code)]
     alphabet: HashedAlphabet,
@@ -318,13 +319,13 @@ pub struct EncodedCDFA<Symbol: Default + Clone> {
     start: usize,
 }
 
-impl<Symbol: Default + Clone> EncodedCDFA<Symbol> {
+impl<Symbol: GrammarSymbol> EncodedCDFA<Symbol> {
     pub fn produces(&self) -> CEHashMapIterator<Symbol> {
         self.tokenizer.iter()
     }
 }
 
-impl<Symbol: Default + Clone> CDFA<usize, Symbol> for EncodedCDFA<Symbol> {
+impl<Symbol: GrammarSymbol> CDFA<usize, Symbol> for EncodedCDFA<Symbol> {
     fn transition(&self, state: &usize, input: &[char]) -> TransitionResult<usize> {
         match self.t_delta.get(*state) {
             None => TransitionResult::fail(),

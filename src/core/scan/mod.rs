@@ -1,5 +1,5 @@
 use {
-    core::data::Data,
+    core::{data::Data, parse::grammar::GrammarSymbol},
     std::{error, fmt},
 };
 
@@ -9,24 +9,25 @@ pub mod maximal_munch;
 
 static FAIL_SEQUENCE_LENGTH: usize = 10;
 
-pub trait Scanner<State: Data, Kind: Data>: 'static + Send + Sync {
-    fn scan(&self, input: &[char], cdfa: &CDFA<State, Kind>) -> Result<Vec<Token<Kind>>, Error>;
+//TODO(shane) change these types to Symbol
+pub trait Scanner<State: Data, Symbol: GrammarSymbol>: 'static + Send + Sync {
+    fn scan(&self, input: &[char], cdfa: &CDFA<State, Symbol>) -> Result<Vec<Token<Symbol>>, Error>;
 }
 
-pub fn def_scanner<State: Data, Kind: Data>() -> Box<Scanner<State, Kind>> {
+pub fn def_scanner<State: Data, Symbol: GrammarSymbol>() -> Box<Scanner<State, Symbol>> {
     Box::new(maximal_munch::MaximalMunchScanner)
 }
 
-pub trait CDFA<State, Kind> {
+pub trait CDFA<State: Data, Symbol: GrammarSymbol>: Send + Sync {
     fn transition(&self, state: &State, input: &[char]) -> TransitionResult<State>;
     fn has_transition(&self, state: &State, input: &[char]) -> bool;
     fn accepts(&self, state: &State) -> bool;
     fn acceptor_destination(&self, state: &State, from: &State) -> Option<State>;
-    fn tokenize(&self, state: &State) -> Option<Kind>;
+    fn tokenize(&self, state: &State) -> Option<Symbol>;
     fn start(&self) -> State;
 }
 
-pub trait CDFABuilder<State, Kind, CDFAType> {
+pub trait CDFABuilder<State: Data, Symbol: GrammarSymbol, CDFAType> {
     fn new() -> Self;
     fn build(self) -> Result<CDFAType, CDFAError>;
 
@@ -62,7 +63,7 @@ pub trait CDFABuilder<State, Kind, CDFAType> {
         end: char,
     ) -> Result<&mut Self, CDFAError>;
     fn default_to(&mut self, from: &State, to: &State) -> Result<&mut Self, CDFAError>;
-    fn tokenize(&mut self, state: &State, token: &Kind) -> &mut Self;
+    fn tokenize(&mut self, state: &State, token: &Symbol) -> &mut Self;
 }
 
 pub struct TransitionResult<State> {
