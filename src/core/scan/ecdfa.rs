@@ -6,13 +6,13 @@ use {
         },
         parse::grammar::GrammarSymbol,
         scan::{alphabet::HashedAlphabet, CDFABuilder, CDFAError, TransitionResult, CDFA},
+        util::encoder::Encoder,
     },
     std::{collections::HashMap, fmt::Debug, usize},
 };
 
 pub struct EncodedCDFABuilder<State: Data, Symbol: GrammarSymbol> {
-    encoder: HashMap<State, usize>,
-    decoder: Vec<State>,
+    encoder: Encoder<State>,
     alphabet_str: String,
 
     alphabet: HashedAlphabet,
@@ -23,17 +23,6 @@ pub struct EncodedCDFABuilder<State: Data, Symbol: GrammarSymbol> {
 }
 
 impl<State: Data, Symbol: GrammarSymbol> EncodedCDFABuilder<State, Symbol> {
-    fn encode(&mut self, val: &State) -> usize {
-        if self.encoder.contains_key(val) {
-            self.encoder[val]
-        } else {
-            let key = self.decoder.len();
-            self.decoder.push(val.clone());
-            self.encoder.insert(val.clone(), key);
-            key
-        }
-    }
-
     fn get_transition_trie(&mut self, from: usize) -> &mut TransitionTrie {
         if !self.t_delta.contains(from) {
             self.t_delta.insert(from, TransitionTrie::new());
@@ -75,8 +64,7 @@ impl<State: Data, Symbol: GrammarSymbol> CDFABuilder<State, Symbol, EncodedCDFA<
 {
     fn new() -> Self {
         EncodedCDFABuilder {
-            encoder: HashMap::new(),
-            decoder: Vec::new(),
+            encoder: Encoder::new(),
             alphabet_str: String::new(),
 
             alphabet: HashedAlphabet::new(),
@@ -112,7 +100,7 @@ impl<State: Data, Symbol: GrammarSymbol> CDFABuilder<State, Symbol, EncodedCDFA<
     }
 
     fn accept(&mut self, state: &State) -> &mut Self {
-        let state_encoded = self.encode(state);
+        let state_encoded = self.encoder.encode(state);
 
         if self.accepting.contains_key(&state_encoded) {
             return self;
@@ -129,9 +117,9 @@ impl<State: Data, Symbol: GrammarSymbol> CDFABuilder<State, Symbol, EncodedCDFA<
         from: &State,
         to: &State,
     ) -> Result<&mut Self, CDFAError> {
-        let state_encoded = self.encode(state);
-        let from_encoded = self.encode(from);
-        let to_encoded = self.encode(to);
+        let state_encoded = self.encoder.encode(state);
+        let from_encoded = self.encoder.encode(from);
+        let to_encoded = self.encoder.encode(to);
 
         self.accepting
             .entry(state_encoded)
@@ -142,8 +130,8 @@ impl<State: Data, Symbol: GrammarSymbol> CDFABuilder<State, Symbol, EncodedCDFA<
     }
 
     fn accept_to_from_all(&mut self, state: &State, to: &State) -> Result<&mut Self, CDFAError> {
-        let state_encoded = self.encode(state);
-        let to_encoded = self.encode(to);
+        let state_encoded = self.encoder.encode(state);
+        let to_encoded = self.encoder.encode(to);
 
         self.accepting
             .entry(state_encoded)
@@ -155,14 +143,14 @@ impl<State: Data, Symbol: GrammarSymbol> CDFABuilder<State, Symbol, EncodedCDFA<
 
     fn mark_start(&mut self, state: &State) -> &mut Self {
         if self.start == usize::max_value() {
-            self.start = self.encode(state);
+            self.start = self.encoder.encode(state);
         }
         self
     }
 
     fn mark_trans(&mut self, from: &State, to: &State, on: char) -> Result<&mut Self, CDFAError> {
-        let from_encoded = self.encode(from);
-        let to_encoded = self.encode(to);
+        let from_encoded = self.encoder.encode(from);
+        let to_encoded = self.encoder.encode(to);
 
         {
             let t_trie = self.get_transition_trie(from_encoded);
@@ -178,8 +166,8 @@ impl<State: Data, Symbol: GrammarSymbol> CDFABuilder<State, Symbol, EncodedCDFA<
         to: &State,
         on: impl Iterator<Item = char>,
     ) -> Result<&mut Self, CDFAError> {
-        let from_encoded = self.encode(from);
-        let to_encoded = self.encode(to);
+        let from_encoded = self.encoder.encode(from);
+        let to_encoded = self.encoder.encode(to);
 
         {
             let t_trie = self.get_transition_trie(from_encoded);
@@ -227,8 +215,8 @@ impl<State: Data, Symbol: GrammarSymbol> CDFABuilder<State, Symbol, EncodedCDFA<
     }
 
     fn default_to(&mut self, from: &State, to: &State) -> Result<&mut Self, CDFAError> {
-        let from_encoded = self.encode(from);
-        let to_encoded = self.encode(to);
+        let from_encoded = self.encoder.encode(from);
+        let to_encoded = self.encoder.encode(to);
 
         match {
             let t_trie = self.get_transition_trie(from_encoded);
@@ -241,7 +229,7 @@ impl<State: Data, Symbol: GrammarSymbol> CDFABuilder<State, Symbol, EncodedCDFA<
     }
 
     fn tokenize(&mut self, state: &State, token: &Symbol) -> &mut Self {
-        let state_encoded = self.encode(state);
+        let state_encoded = self.encoder.encode(state);
         self.tokenizer.insert(state_encoded, token.clone());
         self
     }

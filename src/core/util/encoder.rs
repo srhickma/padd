@@ -3,12 +3,12 @@ use {
     std::{collections::HashMap, fmt},
 };
 
-pub struct Encoder<T: Default + Data> {
+pub struct Encoder<T: Data> {
     encoder: HashMap<T, usize>,
     decoder: Vec<T>,
 }
 
-impl<T: Default + Data> Encoder<T> {
+impl<T: Data> Encoder<T> {
     pub fn new() -> Self {
         Encoder {
             encoder: HashMap::new(),
