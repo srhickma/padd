@@ -9,7 +9,6 @@ pub mod maximal_munch;
 
 static FAIL_SEQUENCE_LENGTH: usize = 10;
 
-//TODO(shane) change these types to Symbol
 pub trait Scanner<State: Data, Symbol: GrammarSymbol>: 'static + Send + Sync {
     fn scan(&self, input: &[char], cdfa: &CDFA<State, Symbol>)
         -> Result<Vec<Token<Symbol>>, Error>;

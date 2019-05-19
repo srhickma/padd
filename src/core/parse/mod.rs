@@ -134,7 +134,7 @@ impl<Symbol: GrammarSymbol> Production<Symbol> {
     pub fn string_production(&self) -> Production<String> {
         Production {
             lhs: self.lhs.to_string(),
-            rhs: self.rhs.iter().map(|symbol| symbol.to_string()).collect(),
+            rhs: self.rhs.iter().map(Data::to_string).collect(),
         }
     }
 }

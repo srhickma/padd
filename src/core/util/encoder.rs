@@ -38,4 +38,52 @@ impl<T: Default + Data> fmt::Debug for Encoder<T> {
     }
 }
 
-//TODO(shane) add tests here
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn encode_decode() {
+        //setup
+        let mut encoder: Encoder<usize> = Encoder::new();
+        let start = 10;
+        let numbers: Vec<usize> = (start..(start + 40)).collect();
+
+        //exercise/verify
+        for number in &numbers {
+            assert_eq!(encoder.encode(number), number - start);
+        }
+
+        for number in &numbers {
+            assert_eq!(encoder.encode(number), number - start);
+        }
+
+        for i in 0..30 {
+            assert_eq!(*encoder.decode(i).unwrap(), i + start);
+        }
+    }
+
+    #[test]
+    fn decode_non_existent() {
+        //setup
+        let encoder: Encoder<String> = Encoder::new();
+
+        //exercise
+        let res = encoder.decode(1);
+
+        //verify
+        assert_eq!(res, None);
+    }
+
+    #[test]
+    fn fmt() {
+        //setup
+        let encoder: Encoder<String> = Encoder::new();
+
+        //exercise
+        let res = format!("{:?}", encoder);
+
+        //verify
+        assert_eq!(res, "Encoder");
+    }
+}
