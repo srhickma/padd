@@ -3,7 +3,7 @@ use {
         data::Data,
         parse::{
             self,
-            grammar::{self, Grammar, GrammarBuilder},
+            grammar::{self, GrammarBuilder, GrammarSymbol, SimpleGrammar, SimpleGrammarBuilder},
             Production, Tree,
         },
         scan::{
@@ -36,12 +36,18 @@ enum S {
     Fail,
 }
 
-thread_local! {
-    static PATTERN_ECDFA: EncodedCDFA<Symbol> = build_pattern_ecdfa().unwrap();
+impl Data for S {
+    fn to_string(&self) -> String {
+        format!("{:?}", self)
+    }
 }
 
-fn build_pattern_ecdfa() -> Result<EncodedCDFA<Symbol>, scan::CDFAError> {
-    let mut builder: EncodedCDFABuilder<S, Symbol> = EncodedCDFABuilder::new();
+thread_local! {
+    static PATTERN_ECDFA: EncodedCDFA<PatternSymbol> = build_pattern_ecdfa().unwrap();
+}
+
+fn build_pattern_ecdfa() -> Result<EncodedCDFA<PatternSymbol>, scan::CDFAError> {
+    let mut builder: EncodedCDFABuilder<S, PatternSymbol> = EncodedCDFABuilder::new();
 
     builder
         .set_alphabet(PATTERN_ALPHABET.chars())
@@ -71,7 +77,7 @@ fn build_pattern_ecdfa() -> Result<EncodedCDFA<Symbol>, scan::CDFAError> {
         .mark_trans(&S::Fail, '=')?
         .default_to(&S::Filler)?
         .accept()
-        .tokenize(&Symbol::TFiller);
+        .tokenize(&PatternSymbol::TFiller);
 
     builder.default_to(&S::Escape, &S::Filler)?;
 
@@ -79,13 +85,13 @@ fn build_pattern_ecdfa() -> Result<EncodedCDFA<Symbol>, scan::CDFAError> {
         .state(&S::Number)
         .mark_range(&S::Number, '0', '9')?
         .accept()
-        .tokenize(&Symbol::TNumber);
+        .tokenize(&PatternSymbol::TNumber);
 
     builder
         .state(&S::Alpha)
         .mark_range(&S::Alpha, 'a', 'Z')?
         .accept()
-        .tokenize(&Symbol::TAlpha);
+        .tokenize(&PatternSymbol::TAlpha);
 
     builder
         .accept(&S::Semi)
@@ -97,19 +103,19 @@ fn build_pattern_ecdfa() -> Result<EncodedCDFA<Symbol>, scan::CDFAError> {
         .accept(&S::Zero);
 
     builder
-        .tokenize(&S::Semi, &Symbol::TSemi)
-        .tokenize(&S::Equals, &Symbol::TEquals)
-        .tokenize(&S::LeftBrace, &Symbol::TLeftBrace)
-        .tokenize(&S::RightBrace, &Symbol::TRightBrace)
-        .tokenize(&S::LeftBracket, &Symbol::TLeftBracket)
-        .tokenize(&S::RightBracket, &Symbol::TRightBracket)
-        .tokenize(&S::Zero, &Symbol::TNumber);
+        .tokenize(&S::Semi, &PatternSymbol::TSemi)
+        .tokenize(&S::Equals, &PatternSymbol::TEquals)
+        .tokenize(&S::LeftBrace, &PatternSymbol::TLeftBrace)
+        .tokenize(&S::RightBrace, &PatternSymbol::TRightBrace)
+        .tokenize(&S::LeftBracket, &PatternSymbol::TLeftBracket)
+        .tokenize(&S::RightBracket, &PatternSymbol::TRightBracket)
+        .tokenize(&S::Zero, &PatternSymbol::TNumber);
 
     builder.build()
 }
 
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
-pub enum Symbol {
+pub enum PatternSymbol {
     Pattern,
     Segments,
     Segment,
@@ -132,89 +138,95 @@ pub enum Symbol {
     TEquals,
 }
 
-impl Default for Symbol {
-    fn default() -> Symbol {
-        Symbol::Pattern
+impl Default for PatternSymbol {
+    fn default() -> PatternSymbol {
+        PatternSymbol::Pattern
     }
 }
 
-impl Data for Symbol {
+impl Data for PatternSymbol {
     fn to_string(&self) -> String {
         format!("{:?}", self)
     }
 }
 
+impl GrammarSymbol for PatternSymbol {}
+
 lazy_static! {
-    static ref PATTERN_GRAMMAR: Grammar<Symbol> = build_pattern_grammar().unwrap();
+    static ref PATTERN_GRAMMAR: SimpleGrammar<PatternSymbol> = build_pattern_grammar().unwrap();
 }
 
-fn build_pattern_grammar() -> Result<Grammar<Symbol>, grammar::BuildError> {
+fn build_pattern_grammar() -> Result<SimpleGrammar<PatternSymbol>, grammar::BuildError> {
     //TODO optimize for left recursion
 
-    let mut builder = GrammarBuilder::new();
-    builder.try_mark_start(&Symbol::Pattern);
-
-    builder.from(Symbol::Pattern).to(vec![Symbol::Segments]);
+    let mut builder = SimpleGrammarBuilder::new();
+    builder.try_mark_start(&PatternSymbol::Pattern);
 
     builder
-        .from(Symbol::Segments)
-        .to(vec![Symbol::Segment, Symbol::Segments])
+        .from(PatternSymbol::Pattern)
+        .to(vec![PatternSymbol::Segments]);
+
+    builder
+        .from(PatternSymbol::Segments)
+        .to(vec![PatternSymbol::Segment, PatternSymbol::Segments])
         .epsilon();
 
     builder
-        .from(Symbol::Segment)
-        .to(vec![Symbol::Filler])
-        .to(vec![Symbol::Substitution])
-        .to(vec![Symbol::Capture]);
+        .from(PatternSymbol::Segment)
+        .to(vec![PatternSymbol::Filler])
+        .to(vec![PatternSymbol::Substitution])
+        .to(vec![PatternSymbol::Capture]);
 
     builder
-        .from(Symbol::Filler)
-        .to(vec![Symbol::TFiller])
-        .to(vec![Symbol::TAlpha])
-        .to(vec![Symbol::TNumber]);
+        .from(PatternSymbol::Filler)
+        .to(vec![PatternSymbol::TFiller])
+        .to(vec![PatternSymbol::TAlpha])
+        .to(vec![PatternSymbol::TNumber]);
 
-    builder.from(Symbol::Substitution).to(vec![
-        Symbol::TLeftBracket,
-        Symbol::TAlpha,
-        Symbol::TRightBracket,
+    builder.from(PatternSymbol::Substitution).to(vec![
+        PatternSymbol::TLeftBracket,
+        PatternSymbol::TAlpha,
+        PatternSymbol::TRightBracket,
     ]);
 
-    builder.from(Symbol::Capture).to(vec![
-        Symbol::TLeftBrace,
-        Symbol::CaptureDescriptor,
-        Symbol::TRightBrace,
+    builder.from(PatternSymbol::Capture).to(vec![
+        PatternSymbol::TLeftBrace,
+        PatternSymbol::CaptureDescriptor,
+        PatternSymbol::TRightBrace,
     ]);
 
     builder
-        .from(Symbol::CaptureDescriptor)
-        .to(vec![Symbol::CaptureIndex])
+        .from(PatternSymbol::CaptureDescriptor)
+        .to(vec![PatternSymbol::CaptureIndex])
         .to(vec![
-            Symbol::CaptureIndex,
-            Symbol::TSemi,
-            Symbol::Declarations,
+            PatternSymbol::CaptureIndex,
+            PatternSymbol::TSemi,
+            PatternSymbol::Declarations,
         ]);
 
     builder
-        .from(Symbol::CaptureIndex)
-        .to(vec![Symbol::TNumber])
+        .from(PatternSymbol::CaptureIndex)
+        .to(vec![PatternSymbol::TNumber])
         .epsilon();
 
     builder
-        .from(Symbol::Declarations)
+        .from(PatternSymbol::Declarations)
         .to(vec![
-            Symbol::Declarations,
-            Symbol::TSemi,
-            Symbol::Declaration,
+            PatternSymbol::Declarations,
+            PatternSymbol::TSemi,
+            PatternSymbol::Declaration,
         ])
-        .to(vec![Symbol::Declaration]);
+        .to(vec![PatternSymbol::Declaration]);
+
+    builder.from(PatternSymbol::Declaration).to(vec![
+        PatternSymbol::TAlpha,
+        PatternSymbol::TEquals,
+        PatternSymbol::Value,
+    ]);
 
     builder
-        .from(Symbol::Declaration)
-        .to(vec![Symbol::TAlpha, Symbol::TEquals, Symbol::Value]);
-
-    builder
-        .from(Symbol::Value)
-        .to(vec![Symbol::Pattern])
+        .from(PatternSymbol::Value)
+        .to(vec![PatternSymbol::Pattern])
         .epsilon();
 
     builder.build()
@@ -244,27 +256,30 @@ pub struct Declaration {
     pub value: Option<Pattern>,
 }
 
-pub fn generate_pattern<SpecSymbol: Data + Default>(
+pub fn generate_pattern<Symbol: GrammarSymbol>(
     input: &str,
-    prod: &Production<SpecSymbol>,
+    prod: &Production<Symbol>,
+    string_prod: &Production<String>,
 ) -> Result<Pattern, BuildError> {
     let parse = parse_pattern(input)?;
-    generate_pattern_internal(&parse, prod)
+    generate_pattern_internal(&parse, prod, string_prod)
 }
 
-pub fn generate_pattern_internal<SpecSymbol: Data + Default>(
-    root: &Tree<Symbol>,
-    prod: &Production<SpecSymbol>,
+pub fn generate_pattern_internal<Symbol: GrammarSymbol>(
+    root: &Tree<PatternSymbol>,
+    prod: &Production<Symbol>,
+    string_prod: &Production<String>,
 ) -> Result<Pattern, BuildError> {
     let mut segments: Vec<Segment> = vec![];
-    generate_pattern_recursive(&root, &mut segments, prod, 0)?;
+    generate_pattern_recursive(&root, &mut segments, prod, string_prod, 0)?;
     Ok(Pattern { segments })
 }
 
-fn generate_pattern_recursive<'scope, SpecSymbol: Data + Default>(
-    node: &'scope Tree<Symbol>,
+fn generate_pattern_recursive<'scope, Symbol: GrammarSymbol>(
+    node: &'scope Tree<PatternSymbol>,
     accumulator: &'scope mut Vec<Segment>,
-    prod: &Production<SpecSymbol>,
+    prod: &Production<Symbol>,
+    string_prod: &Production<String>,
     captures: usize,
 ) -> Result<usize, BuildError> {
     if node.lhs.is_null() {
@@ -272,16 +287,16 @@ fn generate_pattern_recursive<'scope, SpecSymbol: Data + Default>(
     }
 
     match node.lhs.kind() {
-        Symbol::TFiller | Symbol::TAlpha | Symbol::TNumber => {
+        PatternSymbol::TFiller | PatternSymbol::TAlpha | PatternSymbol::TNumber => {
             let name = string_utils::replace_escapes(&node.lhs.lexeme()[..]);
             accumulator.push(Segment::Filler(name));
         }
-        Symbol::Substitution => {
+        PatternSymbol::Substitution => {
             accumulator.push(Segment::Substitution(
                 node.get_child(1).lhs.lexeme().clone(),
             ));
         }
-        Symbol::CaptureDescriptor => {
+        PatternSymbol::CaptureDescriptor => {
             let mut declarations: Vec<Declaration> = Vec::new();
             if node.children.len() == 3 {
                 parse_decls(&node.get_child(2), &mut declarations, prod)?
@@ -303,7 +318,7 @@ fn generate_pattern_recursive<'scope, SpecSymbol: Data + Default>(
                 return Err(BuildError::CaptureErr(format!(
                     "Capture index {} out of bounds for production '{}' with {} children",
                     child_index,
-                    prod.to_string(),
+                    string_prod.to_string(),
                     prod.rhs.len()
                 )));
             }
@@ -317,7 +332,13 @@ fn generate_pattern_recursive<'scope, SpecSymbol: Data + Default>(
         _ => {
             let mut new_captures = captures;
             for child in &node.children {
-                new_captures = generate_pattern_recursive(child, accumulator, prod, new_captures)?;
+                new_captures = generate_pattern_recursive(
+                    child,
+                    accumulator,
+                    prod,
+                    string_prod,
+                    new_captures,
+                )?;
             }
             return Ok(new_captures);
         }
@@ -325,10 +346,10 @@ fn generate_pattern_recursive<'scope, SpecSymbol: Data + Default>(
     Ok(captures)
 }
 
-fn parse_decls<'scope, SpecSymbol: Data + Default>(
-    decls_node: &'scope Tree<Symbol>,
+fn parse_decls<'scope, Symbol: GrammarSymbol>(
+    decls_node: &'scope Tree<PatternSymbol>,
     accumulator: &'scope mut Vec<Declaration>,
-    prod: &Production<SpecSymbol>,
+    prod: &Production<Symbol>,
 ) -> Result<(), BuildError> {
     accumulator.push(parse_decl(decls_node.children.last().unwrap(), prod)?);
     if decls_node.children.len() == 3 {
@@ -337,9 +358,9 @@ fn parse_decls<'scope, SpecSymbol: Data + Default>(
     Ok(())
 }
 
-fn parse_decl<SpecSymbol: Data + Default>(
-    decl: &Tree<Symbol>,
-    prod: &Production<SpecSymbol>,
+fn parse_decl<Symbol: GrammarSymbol>(
+    decl: &Tree<PatternSymbol>,
+    prod: &Production<Symbol>,
 ) -> Result<Declaration, BuildError> {
     let val_node = decl.get_child(2).get_child(0);
     Ok(Declaration {
@@ -347,17 +368,21 @@ fn parse_decl<SpecSymbol: Data + Default>(
         value: if val_node.is_null() {
             None
         } else {
-            Some(generate_pattern_internal(val_node.get_child(0), prod)?)
+            Some(generate_pattern_internal(
+                val_node.get_child(0),
+                prod,
+                &prod.string_production(),
+            )?)
         },
     })
 }
 
-fn parse_pattern(input: &str) -> Result<Tree<Symbol>, BuildError> {
-    PATTERN_ECDFA.with(|cdfa| -> Result<Tree<Symbol>, BuildError> {
+fn parse_pattern(input: &str) -> Result<Tree<PatternSymbol>, BuildError> {
+    PATTERN_ECDFA.with(|cdfa| -> Result<Tree<PatternSymbol>, BuildError> {
         let chars: Vec<char> = input.chars().collect();
 
         let tokens = scan::def_scanner().scan(&chars[..], cdfa)?;
-        let parse = parse::def_parser().parse(tokens, &PATTERN_GRAMMAR)?;
+        let parse = parse::def_parser().parse(tokens, &*PATTERN_GRAMMAR)?;
         Ok(parse)
     })
 }
@@ -507,18 +532,18 @@ mod tests {
         //setup
         let input = "\t \n\n\n\n{1}  {2}  {4;something=\n\n \t} {3;somethinelse=\n\n \t;some=}";
         let prod = Production {
-            lhs: Symbol::Pattern,
+            lhs: PatternSymbol::Pattern,
             rhs: vec![
-                Symbol::Pattern,
-                Symbol::Pattern,
-                Symbol::Pattern,
-                Symbol::Pattern,
-                Symbol::Pattern,
+                PatternSymbol::Pattern,
+                PatternSymbol::Pattern,
+                PatternSymbol::Pattern,
+                PatternSymbol::Pattern,
+                PatternSymbol::Pattern,
             ],
         };
 
         //exercise
-        let pattern = generate_pattern(input, &prod).unwrap();
+        let pattern = generate_pattern(input, &prod, &prod.string_production()).unwrap();
 
         //verify
         assert_eq!(pattern.segments.len(), 8);
@@ -569,18 +594,18 @@ mod tests {
         //setup
         let input = "\t \n\n\n\n{1}  {}  {;something=\n\n \t} {;somethinelse=\n\n \t;some=}";
         let prod = Production {
-            lhs: Symbol::Pattern,
+            lhs: PatternSymbol::Pattern,
             rhs: vec![
-                Symbol::Pattern,
-                Symbol::Pattern,
-                Symbol::Pattern,
-                Symbol::Pattern,
-                Symbol::Pattern,
+                PatternSymbol::Pattern,
+                PatternSymbol::Pattern,
+                PatternSymbol::Pattern,
+                PatternSymbol::Pattern,
+                PatternSymbol::Pattern,
             ],
         };
 
         //exercise
-        let pattern = generate_pattern(input, &prod).unwrap();
+        let pattern = generate_pattern(input, &prod, &prod.string_production()).unwrap();
 
         //verify
         assert_eq!(pattern.segments.len(), 8);
@@ -631,12 +656,12 @@ mod tests {
         //setup
         let input = "\t \n\r[a]{1}  {} [prefix] ";
         let prod = Production {
-            lhs: Symbol::Pattern,
-            rhs: vec![Symbol::Pattern, Symbol::Pattern],
+            lhs: PatternSymbol::Pattern,
+            rhs: vec![PatternSymbol::Pattern, PatternSymbol::Pattern],
         };
 
         //exercise
-        let pattern = generate_pattern(input, &prod).unwrap();
+        let pattern = generate_pattern(input, &prod, &prod.string_production()).unwrap();
 
         //verify
         assert_eq!(pattern.segments.len(), 8);
@@ -687,12 +712,12 @@ mod tests {
         //setup
         let input = "1234567890abcdefghijklmnopqrstuvwxyz \n\t`~!@#$%^&*()_-+:'\"<>,.?/|{}\\{\\}\\[\\]\\;\\=\\\\";
         let prod = Production {
-            lhs: Symbol::Pattern,
-            rhs: vec![Symbol::Pattern],
+            lhs: PatternSymbol::Pattern,
+            rhs: vec![PatternSymbol::Pattern],
         };
 
         //exercise
-        let pattern = generate_pattern(input, &prod).unwrap();
+        let pattern = generate_pattern(input, &prod, &prod.string_production()).unwrap();
 
         //verify
         assert_eq!(pattern.segments.len(), 5);
@@ -728,12 +753,12 @@ mod tests {
         //setup
         let input = "\\";
         let prod = Production {
-            lhs: Symbol::Pattern,
+            lhs: PatternSymbol::Pattern,
             rhs: vec![],
         };
 
         //exercise
-        let res = generate_pattern(input, &prod);
+        let res = generate_pattern(input, &prod, &prod.string_production());
 
         //verify
         assert!(res.is_err());
@@ -748,12 +773,12 @@ mod tests {
         //setup
         let input = "{";
         let prod = Production {
-            lhs: Symbol::Pattern,
+            lhs: PatternSymbol::Pattern,
             rhs: vec![],
         };
 
         //exercise
-        let res = generate_pattern(input, &prod);
+        let res = generate_pattern(input, &prod, &prod.string_production());
 
         //verify
         assert!(res.is_err());
@@ -768,12 +793,12 @@ mod tests {
         //setup
         let input = "{1}";
         let prod = Production {
-            lhs: Symbol::Pattern,
-            rhs: vec![Symbol::TSemi],
+            lhs: PatternSymbol::Pattern,
+            rhs: vec![PatternSymbol::TSemi],
         };
 
         //exercise
-        let res = generate_pattern(input, &prod);
+        let res = generate_pattern(input, &prod, &prod.string_production());
 
         //verify
         assert!(res.is_err());

@@ -2,7 +2,7 @@ use core::{
     data::Data,
     parse::{
         self,
-        grammar::{self, Grammar, GrammarBuilder},
+        grammar::{self, GrammarBuilder, GrammarSymbol, SimpleGrammar, SimpleGrammarBuilder},
         Tree,
     },
     scan::{
@@ -54,12 +54,18 @@ enum S {
     Fail,
 }
 
-thread_local! {
-    static SPEC_ECDFA: EncodedCDFA<Symbol> = build_spec_ecdfa().unwrap();
+impl Data for S {
+    fn to_string(&self) -> String {
+        format!("{:?}", self)
+    }
 }
 
-fn build_spec_ecdfa() -> Result<EncodedCDFA<Symbol>, scan::CDFAError> {
-    let mut builder: EncodedCDFABuilder<S, Symbol> = EncodedCDFABuilder::new();
+thread_local! {
+    static SPEC_ECDFA: EncodedCDFA<SpecSymbol> = build_spec_ecdfa().unwrap();
+}
+
+fn build_spec_ecdfa() -> Result<EncodedCDFA<SpecSymbol>, scan::CDFAError> {
+    let mut builder: EncodedCDFABuilder<S, SpecSymbol> = EncodedCDFABuilder::new();
 
     builder
         .set_alphabet(SPEC_ALPHABET.chars())
@@ -87,11 +93,14 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<Symbol>, scan::CDFAError> {
     builder
         .state(&S::RegionExitBrace)
         .accept_to_from_all(&S::Start)?
-        .tokenize(&Symbol::TRightBrace);
+        .tokenize(&SpecSymbol::TRightBrace);
 
-    builder.state(&S::Or).accept().tokenize(&Symbol::TOr);
+    builder.state(&S::Or).accept().tokenize(&SpecSymbol::TOr);
 
-    builder.state(&S::Semi).accept().tokenize(&Symbol::TSemi);
+    builder
+        .state(&S::Semi)
+        .accept()
+        .tokenize(&SpecSymbol::TSemi);
 
     builder
         .state(&S::CilPartial)
@@ -99,7 +108,7 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<Symbol>, scan::CDFAError> {
         .mark_trans(&S::CilEscaped, '\\')?
         .default_to(&S::CilPartial)?;
 
-    builder.state(&S::Cil).accept().tokenize(&Symbol::TCil);
+    builder.state(&S::Cil).accept().tokenize(&SpecSymbol::TCil);
 
     builder.state(&S::CilEscaped).default_to(&S::CilPartial)?;
 
@@ -107,7 +116,7 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<Symbol>, scan::CDFAError> {
         .state(&S::Id)
         .mark_range(&S::Id, '_', 'Z')?
         .accept()
-        .tokenize(&Symbol::TId);
+        .tokenize(&SpecSymbol::TId);
 
     builder
         .state(&S::Comment)
@@ -119,12 +128,12 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<Symbol>, scan::CDFAError> {
 }
 
 fn build_ignorable_region(
-    builder: &mut EncodedCDFABuilder<S, Symbol>,
+    builder: &mut EncodedCDFABuilder<S, SpecSymbol>,
 ) -> Result<(), scan::CDFAError> {
     builder
         .state(&S::IgnorableTag)
         .accept_to_from_all(&S::Ignorable)?
-        .tokenize(&Symbol::TIgnorable);
+        .tokenize(&SpecSymbol::TIgnorable);
 
     builder
         .state(&S::Ignorable)
@@ -138,18 +147,18 @@ fn build_ignorable_region(
         .state(&S::IgnorableId)
         .mark_range(&S::IgnorableId, '_', 'Z')?
         .accept_to_from_all(&S::Start)?
-        .tokenize(&Symbol::TId);
+        .tokenize(&SpecSymbol::TId);
 
     Ok(())
 }
 
 fn build_alphabet_region(
-    builder: &mut EncodedCDFABuilder<S, Symbol>,
+    builder: &mut EncodedCDFABuilder<S, SpecSymbol>,
 ) -> Result<(), scan::CDFAError> {
     builder
         .state(&S::AlphabetTag)
         .accept_to_from_all(&S::Alphabet)?
-        .tokenize(&Symbol::TAlphabet);
+        .tokenize(&SpecSymbol::TAlphabet);
 
     builder
         .state(&S::Alphabet)
@@ -169,7 +178,7 @@ fn build_alphabet_region(
     builder
         .state(&S::AlphabetString)
         .accept_to_from_all(&S::Start)?
-        .tokenize(&Symbol::TCil);
+        .tokenize(&SpecSymbol::TCil);
 
     builder
         .state(&S::AlphabetStringEscaped)
@@ -178,11 +187,13 @@ fn build_alphabet_region(
     Ok(())
 }
 
-fn build_cdfa_region(builder: &mut EncodedCDFABuilder<S, Symbol>) -> Result<(), scan::CDFAError> {
+fn build_cdfa_region(
+    builder: &mut EncodedCDFABuilder<S, SpecSymbol>,
+) -> Result<(), scan::CDFAError> {
     builder
         .state(&S::CDFATag)
         .accept_to_from_all(&S::CDFA)?
-        .tokenize(&Symbol::TCDFA);
+        .tokenize(&SpecSymbol::TCDFA);
 
     builder
         .state(&S::CDFA)
@@ -196,7 +207,7 @@ fn build_cdfa_region(builder: &mut EncodedCDFABuilder<S, Symbol>) -> Result<(), 
     builder
         .state(&S::CDFAEntryBrace)
         .accept_to_from_all(&S::CDFABody)?
-        .tokenize(&Symbol::TLeftBrace);
+        .tokenize(&SpecSymbol::TLeftBrace);
 
     builder
         .state(&S::CDFABody)
@@ -215,24 +226,30 @@ fn build_cdfa_region(builder: &mut EncodedCDFABuilder<S, Symbol>) -> Result<(), 
         .mark_trans(&S::Whitespace, '\n')?
         .mark_trans(&S::Whitespace, '\r')?;
 
-    builder.state(&S::Hat).accept().tokenize(&Symbol::THat);
+    builder.state(&S::Hat).accept().tokenize(&SpecSymbol::THat);
 
-    builder.state(&S::Arrow).accept().tokenize(&Symbol::TArrow);
+    builder
+        .state(&S::Arrow)
+        .accept()
+        .tokenize(&SpecSymbol::TArrow);
 
-    builder.state(&S::Range).accept().tokenize(&Symbol::TRange);
+    builder
+        .state(&S::Range)
+        .accept()
+        .tokenize(&SpecSymbol::TRange);
 
-    builder.state(&S::Def).accept().tokenize(&Symbol::TDef);
+    builder.state(&S::Def).accept().tokenize(&SpecSymbol::TDef);
 
     Ok(())
 }
 
 fn build_grammar_region(
-    builder: &mut EncodedCDFABuilder<S, Symbol>,
+    builder: &mut EncodedCDFABuilder<S, SpecSymbol>,
 ) -> Result<(), scan::CDFAError> {
     builder
         .state(&S::GrammarTag)
         .accept_to_from_all(&S::Grammar)?
-        .tokenize(&Symbol::TGrammar);
+        .tokenize(&SpecSymbol::TGrammar);
 
     builder
         .state(&S::Grammar)
@@ -246,7 +263,7 @@ fn build_grammar_region(
     builder
         .state(&S::GrammarEntryBrace)
         .accept_to_from_all(&S::GrammarBody)?
-        .tokenize(&Symbol::TLeftBrace);
+        .tokenize(&SpecSymbol::TLeftBrace);
 
     builder
         .state(&S::GrammarBody)
@@ -267,7 +284,10 @@ fn build_grammar_region(
         .mark_trans(&S::OptId, ']')?
         .mark_range(&S::OptIdPartial, '_', 'Z')?;
 
-    builder.state(&S::OptId).accept().tokenize(&Symbol::TOptId);
+    builder
+        .state(&S::OptId)
+        .accept()
+        .tokenize(&SpecSymbol::TOptId);
 
     builder
         .state(&S::PatternPartial)
@@ -277,13 +297,13 @@ fn build_grammar_region(
     builder
         .state(&S::Pattern)
         .accept()
-        .tokenize(&Symbol::TPattern);
+        .tokenize(&SpecSymbol::TPattern);
 
     Ok(())
 }
 
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
-pub enum Symbol {
+pub enum SpecSymbol {
     Spec,
     Regions,
     Region,
@@ -328,179 +348,186 @@ pub enum Symbol {
     TIgnorable,
 }
 
-impl Default for Symbol {
-    fn default() -> Symbol {
-        Symbol::Spec
+impl Default for SpecSymbol {
+    fn default() -> SpecSymbol {
+        SpecSymbol::Spec
     }
 }
 
-impl Data for Symbol {
+impl Data for SpecSymbol {
     fn to_string(&self) -> String {
         format!("{:?}", self)
     }
 }
 
+impl GrammarSymbol for SpecSymbol {}
+
 lazy_static! {
-    static ref SPEC_GRAMMAR: Grammar<Symbol> = build_spec_grammar().unwrap();
+    static ref SPEC_GRAMMAR: SimpleGrammar<SpecSymbol> = build_spec_grammar().unwrap();
 }
 
-fn build_spec_grammar() -> Result<Grammar<Symbol>, grammar::BuildError> {
-    let mut builder = GrammarBuilder::new();
-    builder.try_mark_start(&Symbol::Spec);
+fn build_spec_grammar() -> Result<SimpleGrammar<SpecSymbol>, grammar::BuildError> {
+    let mut builder = SimpleGrammarBuilder::new();
+    builder.try_mark_start(&SpecSymbol::Spec);
 
-    builder.from(Symbol::Spec).to(vec![Symbol::Regions]);
-
-    builder
-        .from(Symbol::Regions)
-        .to(vec![Symbol::Regions, Symbol::Region])
-        .to(vec![Symbol::Region]);
+    builder.from(SpecSymbol::Spec).to(vec![SpecSymbol::Regions]);
 
     builder
-        .from(Symbol::Region)
-        .to(vec![Symbol::Ignorable])
-        .to(vec![Symbol::Alphabet])
-        .to(vec![Symbol::CDFA])
-        .to(vec![Symbol::Grammar]);
+        .from(SpecSymbol::Regions)
+        .to(vec![SpecSymbol::Regions, SpecSymbol::Region])
+        .to(vec![SpecSymbol::Region]);
 
     builder
-        .from(Symbol::Ignorable)
-        .to(vec![Symbol::TIgnorable, Symbol::TId]);
+        .from(SpecSymbol::Region)
+        .to(vec![SpecSymbol::Ignorable])
+        .to(vec![SpecSymbol::Alphabet])
+        .to(vec![SpecSymbol::CDFA])
+        .to(vec![SpecSymbol::Grammar]);
 
     builder
-        .from(Symbol::Alphabet)
-        .to(vec![Symbol::TAlphabet, Symbol::TCil]);
+        .from(SpecSymbol::Ignorable)
+        .to(vec![SpecSymbol::TIgnorable, SpecSymbol::TId]);
 
-    builder.from(Symbol::CDFA).to(vec![
-        Symbol::TCDFA,
-        Symbol::TLeftBrace,
-        Symbol::States,
-        Symbol::TRightBrace,
+    builder
+        .from(SpecSymbol::Alphabet)
+        .to(vec![SpecSymbol::TAlphabet, SpecSymbol::TCil]);
+
+    builder.from(SpecSymbol::CDFA).to(vec![
+        SpecSymbol::TCDFA,
+        SpecSymbol::TLeftBrace,
+        SpecSymbol::States,
+        SpecSymbol::TRightBrace,
     ]);
 
     builder
-        .from(Symbol::States)
-        .to(vec![Symbol::States, Symbol::State])
-        .to(vec![Symbol::State]);
+        .from(SpecSymbol::States)
+        .to(vec![SpecSymbol::States, SpecSymbol::State])
+        .to(vec![SpecSymbol::State]);
 
-    builder.from(Symbol::State).to(vec![
-        Symbol::StateDeclarator,
-        Symbol::TransitionsOpt,
-        Symbol::TSemi,
+    builder.from(SpecSymbol::State).to(vec![
+        SpecSymbol::StateDeclarator,
+        SpecSymbol::TransitionsOpt,
+        SpecSymbol::TSemi,
     ]);
 
     builder
-        .from(Symbol::StateDeclarator)
-        .to(vec![Symbol::Targets])
-        .to(vec![Symbol::Targets, Symbol::Acceptor]);
+        .from(SpecSymbol::StateDeclarator)
+        .to(vec![SpecSymbol::Targets])
+        .to(vec![SpecSymbol::Targets, SpecSymbol::Acceptor]);
 
-    builder.from(Symbol::Acceptor).to(vec![
-        Symbol::THat,
-        Symbol::IdOrDef,
-        Symbol::AcceptorDestinationOpt,
+    builder.from(SpecSymbol::Acceptor).to(vec![
+        SpecSymbol::THat,
+        SpecSymbol::IdOrDef,
+        SpecSymbol::AcceptorDestinationOpt,
     ]);
 
     builder
-        .from(Symbol::AcceptorDestinationOpt)
-        .to(vec![Symbol::TArrow, Symbol::TId])
-        .epsilon();
-
-    builder.from(Symbol::Targets).to(vec![Symbol::TId]).to(vec![
-        Symbol::Targets,
-        Symbol::TOr,
-        Symbol::TId,
-    ]);
-
-    builder
-        .from(Symbol::TransitionsOpt)
-        .to(vec![Symbol::Transitions])
+        .from(SpecSymbol::AcceptorDestinationOpt)
+        .to(vec![SpecSymbol::TArrow, SpecSymbol::TId])
         .epsilon();
 
     builder
-        .from(Symbol::Transitions)
-        .to(vec![Symbol::Transitions, Symbol::Transition])
-        .to(vec![Symbol::Transition]);
+        .from(SpecSymbol::Targets)
+        .to(vec![SpecSymbol::TId])
+        .to(vec![SpecSymbol::Targets, SpecSymbol::TOr, SpecSymbol::TId]);
 
     builder
-        .from(Symbol::Transition)
+        .from(SpecSymbol::TransitionsOpt)
+        .to(vec![SpecSymbol::Transitions])
+        .epsilon();
+
+    builder
+        .from(SpecSymbol::Transitions)
+        .to(vec![SpecSymbol::Transitions, SpecSymbol::Transition])
+        .to(vec![SpecSymbol::Transition]);
+
+    builder
+        .from(SpecSymbol::Transition)
         .to(vec![
-            Symbol::Matchers,
-            Symbol::TArrow,
-            Symbol::TransitionDestination,
+            SpecSymbol::Matchers,
+            SpecSymbol::TArrow,
+            SpecSymbol::TransitionDestination,
         ])
         .to(vec![
-            Symbol::TDef,
-            Symbol::TArrow,
-            Symbol::TransitionDestination,
+            SpecSymbol::TDef,
+            SpecSymbol::TArrow,
+            SpecSymbol::TransitionDestination,
         ]);
 
     builder
-        .from(Symbol::TransitionDestination)
-        .to(vec![Symbol::TId])
-        .to(vec![Symbol::Acceptor]);
+        .from(SpecSymbol::TransitionDestination)
+        .to(vec![SpecSymbol::TId])
+        .to(vec![SpecSymbol::Acceptor]);
 
     builder
-        .from(Symbol::Matchers)
-        .to(vec![Symbol::Matchers, Symbol::TOr, Symbol::Matcher])
-        .to(vec![Symbol::Matcher]);
+        .from(SpecSymbol::Matchers)
+        .to(vec![
+            SpecSymbol::Matchers,
+            SpecSymbol::TOr,
+            SpecSymbol::Matcher,
+        ])
+        .to(vec![SpecSymbol::Matcher]);
 
     builder
-        .from(Symbol::Matcher)
-        .to(vec![Symbol::TCil])
-        .to(vec![Symbol::TCil, Symbol::TRange, Symbol::TCil]);
+        .from(SpecSymbol::Matcher)
+        .to(vec![SpecSymbol::TCil])
+        .to(vec![SpecSymbol::TCil, SpecSymbol::TRange, SpecSymbol::TCil]);
 
-    builder.from(Symbol::Grammar).to(vec![
-        Symbol::TGrammar,
-        Symbol::TLeftBrace,
-        Symbol::Productions,
-        Symbol::TRightBrace,
+    builder.from(SpecSymbol::Grammar).to(vec![
+        SpecSymbol::TGrammar,
+        SpecSymbol::TLeftBrace,
+        SpecSymbol::Productions,
+        SpecSymbol::TRightBrace,
     ]);
 
     builder
-        .from(Symbol::Productions)
-        .to(vec![Symbol::Productions, Symbol::Production])
-        .to(vec![Symbol::Production]);
+        .from(SpecSymbol::Productions)
+        .to(vec![SpecSymbol::Productions, SpecSymbol::Production])
+        .to(vec![SpecSymbol::Production]);
 
-    builder.from(Symbol::Production).to(vec![
-        Symbol::TId,
-        Symbol::PatternOpt,
-        Symbol::RightHandSides,
-        Symbol::TSemi,
+    builder.from(SpecSymbol::Production).to(vec![
+        SpecSymbol::TId,
+        SpecSymbol::PatternOpt,
+        SpecSymbol::RightHandSides,
+        SpecSymbol::TSemi,
     ]);
 
     builder
-        .from(Symbol::RightHandSides)
-        .to(vec![Symbol::RightHandSides, Symbol::RightHandSide])
-        .to(vec![Symbol::RightHandSide]);
+        .from(SpecSymbol::RightHandSides)
+        .to(vec![SpecSymbol::RightHandSides, SpecSymbol::RightHandSide])
+        .to(vec![SpecSymbol::RightHandSide]);
+
+    builder.from(SpecSymbol::RightHandSide).to(vec![
+        SpecSymbol::TOr,
+        SpecSymbol::Ids,
+        SpecSymbol::PatternOpt,
+    ]);
 
     builder
-        .from(Symbol::RightHandSide)
-        .to(vec![Symbol::TOr, Symbol::Ids, Symbol::PatternOpt]);
-
-    builder
-        .from(Symbol::PatternOpt)
-        .to(vec![Symbol::TPattern])
+        .from(SpecSymbol::PatternOpt)
+        .to(vec![SpecSymbol::TPattern])
         .epsilon();
 
     builder
-        .from(Symbol::Ids)
-        .to(vec![Symbol::Ids, Symbol::TId])
-        .to(vec![Symbol::Ids, Symbol::TOptId])
+        .from(SpecSymbol::Ids)
+        .to(vec![SpecSymbol::Ids, SpecSymbol::TId])
+        .to(vec![SpecSymbol::Ids, SpecSymbol::TOptId])
         .epsilon();
 
     builder
-        .from(Symbol::IdOrDef)
-        .to(vec![Symbol::TId])
-        .to(vec![Symbol::TDef]);
+        .from(SpecSymbol::IdOrDef)
+        .to(vec![SpecSymbol::TId])
+        .to(vec![SpecSymbol::TDef]);
 
     builder.build()
 }
 
-pub fn parse_spec(input: &str) -> Result<Tree<Symbol>, spec::ParseError> {
-    SPEC_ECDFA.with(|cdfa| -> Result<Tree<Symbol>, spec::ParseError> {
+pub fn parse_spec(input: &str) -> Result<Tree<SpecSymbol>, spec::ParseError> {
+    SPEC_ECDFA.with(|cdfa| -> Result<Tree<SpecSymbol>, spec::ParseError> {
         let chars: Vec<char> = input.chars().collect();
 
         let tokens = scan::def_scanner().scan(&chars[..], cdfa)?;
-        let parse = parse::def_parser().parse(tokens, &SPEC_GRAMMAR)?;
+        let parse = parse::def_parser().parse(tokens, &*SPEC_GRAMMAR)?;
         Ok(parse)
     })
 }

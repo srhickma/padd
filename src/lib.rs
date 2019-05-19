@@ -5,8 +5,12 @@ extern crate stopwatch;
 use {
     core::{
         fmt::Formatter,
-        parse::{self, grammar::Grammar, Parser},
-        scan::{self, ecdfa::EncodedCDFA, Scanner},
+        parse::{
+            self,
+            grammar::{EncodedGrammarBuilder, Grammar},
+            Parser,
+        },
+        scan::{self, Scanner, CDFA},
         spec,
     },
     std::{error, fmt},
@@ -24,18 +28,22 @@ impl FormatJob {
     }
 }
 
+type StateType = usize;
+type SymbolType = usize;
+
 pub struct FormatJobRunner {
-    cdfa: EncodedCDFA<String>,
-    grammar: Grammar<String>,
-    formatter: Formatter,
-    scanner: Box<Scanner<usize, String>>,
-    parser: Box<Parser<String>>,
+    cdfa: Box<CDFA<StateType, SymbolType>>,
+    grammar: Box<Grammar<SymbolType>>,
+    formatter: Formatter<SymbolType>,
+    scanner: Box<Scanner<StateType, SymbolType>>,
+    parser: Box<Parser<SymbolType>>,
 }
 
 impl FormatJobRunner {
     pub fn build(spec: &str) -> Result<FormatJobRunner, BuildError> {
         let parse = spec::parse_spec(spec)?;
-        let (cdfa, grammar, formatter) = spec::generate_spec(&parse)?;
+        let grammar_builder = EncodedGrammarBuilder::new();
+        let (cdfa, grammar, formatter) = spec::generate_spec(&parse, grammar_builder)?;
         Ok(FormatJobRunner {
             cdfa,
             grammar,
@@ -48,8 +56,8 @@ impl FormatJobRunner {
     pub fn format(&self, job: FormatJob) -> Result<String, FormatError> {
         let chars: Vec<char> = job.text.chars().collect();
 
-        let tokens = self.scanner.scan(&chars[..], &self.cdfa)?;
-        let parse = self.parser.parse(tokens, &self.grammar)?;
+        let tokens = self.scanner.scan(&chars[..], &*self.cdfa)?;
+        let parse = self.parser.parse(tokens, &*self.grammar)?;
         Ok(self.formatter.format(&parse))
     }
 }
@@ -132,7 +140,7 @@ impl From<parse::Error> for FormatError {
 
 #[cfg(test)]
 mod tests {
-    use std::error::Error;
+    use {core::parse::grammar::SimpleGrammarBuilder, std::error::Error};
 
     use super::*;
 
@@ -866,7 +874,7 @@ grammar {
     }
 
     #[test]
-    fn failed_ignorable_terminal_error() {
+    fn failed_ignorable_terminal_error_encoded() {
         //setup
         let spec = "
 alphabet 's'
@@ -901,6 +909,45 @@ grammar {
         assert_eq!(
             format!("{}", err),
             "Grammar build error: Ignored symbol 's' is non-terminal"
+        );
+
+        err = err.source().unwrap();
+        assert_eq!(format!("{}", err), "Ignored symbol 's' is non-terminal");
+
+        assert!(err.source().is_none());
+    }
+
+    #[test]
+    fn failed_ignorable_terminal_error_simple() {
+        //setup
+        let spec = "
+alphabet 's'
+
+cdfa {
+    start
+        's' -> S;
+}
+
+ignore s
+
+grammar {
+    s | S;
+}
+        ";
+
+        //exercise
+        let parse = spec::parse_spec(spec).unwrap();
+        let grammar_builder = SimpleGrammarBuilder::new();
+        let res = spec::generate_spec(&parse, grammar_builder);
+
+        //verify
+        assert!(res.is_err());
+
+        let mut err: &Error = &res.err().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "Grammar build error: Ignored symbol 's' is \
+             non-terminal"
         );
 
         err = err.source().unwrap();

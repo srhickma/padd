@@ -1,7 +1,11 @@
 use {
     core::{
         data::Data,
-        parse::{self, grammar::Grammar, Parser, Production, Tree},
+        parse::{
+            self,
+            grammar::{Grammar, GrammarSymbol},
+            Parser, Production, Tree,
+        },
         scan::Token,
     },
     std::{
@@ -13,7 +17,7 @@ use {
 
 pub struct EarleyParser;
 
-impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
+impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
     fn parse(
         &self,
         scan: Vec<Token<Symbol>>,
@@ -38,7 +42,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
             cursor += 1;
         }
 
-        fn complete_full<'inner, 'grammar: 'inner, Symbol: Data + Default>(
+        fn complete_full<'inner, 'grammar: 'inner, Symbol: GrammarSymbol>(
             cursor: usize,
             grammar: &'grammar Grammar<Symbol>,
             chart: &'inner mut RChart<'grammar, Symbol>,
@@ -74,7 +78,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
             }
         }
 
-        fn predict_full<'inner, 'grammar: 'inner, Symbol: Data + Default>(
+        fn predict_full<'inner, 'grammar: 'inner, Symbol: GrammarSymbol>(
             grammar: &'grammar Grammar<Symbol>,
             chart: &'inner mut RChart<'grammar, Symbol>,
         ) {
@@ -112,7 +116,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
             }
         }
 
-        fn parse_mark_full<'inner, 'grammar: 'inner, Symbol: Data + Default>(
+        fn parse_mark_full<'inner, 'grammar: 'inner, Symbol: GrammarSymbol>(
             cursor: usize,
             chart: &'inner RChart<'grammar, Symbol>,
             parse_chart: &mut PChart<'grammar, Symbol>,
@@ -124,7 +128,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
             }
         }
 
-        fn scan_full<'inner, 'grammar: 'inner, Symbol: Data + Default>(
+        fn scan_full<'inner, 'grammar: 'inner, Symbol: GrammarSymbol>(
             cursor: usize,
             scan: &[Token<Symbol>],
             grammar: &'grammar Grammar<Symbol>,
@@ -151,7 +155,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
             parse_chart.add_row();
         }
 
-        fn predict_op<'inner, 'grammar, Symbol: Data + Default>(
+        fn predict_op<'inner, 'grammar, Symbol: GrammarSymbol>(
             cursor: usize,
             depth: usize,
             symbol: &Symbol,
@@ -181,7 +185,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
             }
         }
 
-        fn cross<'inner, 'grammar: 'inner, Symbol: Data + Default>(
+        fn cross<'inner, 'grammar: 'inner, Symbol: GrammarSymbol>(
             src: impl Iterator<Item = &'inner Item<'grammar, Symbol>>,
             symbol: &Symbol,
             grammar: &'grammar Grammar<Symbol>,
@@ -199,7 +203,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
             dest
         }
 
-        fn cross_ignorable<'inner, 'grammar: 'inner, Symbol: Data + Default>(
+        fn cross_ignorable<'inner, 'grammar: 'inner, Symbol: GrammarSymbol>(
             src: &'inner RChartRow<'grammar, Symbol>,
             symbol: &Symbol,
             grammar: &'grammar Grammar<Symbol>,
@@ -221,7 +225,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
             dest
         }
 
-        fn advance_past_symbol<'inner, 'grammar: 'inner, Symbol: Data + Default>(
+        fn advance_past_symbol<'inner, 'grammar: 'inner, Symbol: GrammarSymbol>(
             item: &'inner Item<'grammar, Symbol>,
             dest: &mut Vec<Item<'grammar, Symbol>>,
             grammar: &'grammar Grammar<Symbol>,
@@ -244,7 +248,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
             }
         }
 
-        fn ignore_next_symbol<'inner, 'grammar: 'inner, Symbol: Data + Default>(
+        fn ignore_next_symbol<'inner, 'grammar: 'inner, Symbol: GrammarSymbol>(
             item: &'inner Item<'grammar, Symbol>,
             symbol: &Symbol,
         ) -> Item<'grammar, Symbol> {
@@ -276,7 +280,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
             }
         }
 
-        fn mark_completed_item<'inner, 'grammar: 'inner, Symbol: Data + Default>(
+        fn mark_completed_item<'inner, 'grammar: 'inner, Symbol: GrammarSymbol>(
             item: &'inner Item<'grammar, Symbol>,
             finish: usize,
             parse_chart: &mut PChart<'grammar, Symbol>,
@@ -298,7 +302,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
             });
         }
 
-        fn recognized<Symbol: Data + Default>(
+        fn recognized<Symbol: GrammarSymbol>(
             grammar: &Grammar<Symbol>,
             chart: &RChart<Symbol>,
         ) -> bool {
@@ -331,16 +335,18 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
                 message: "Recognition failed after consuming all tokens".to_string(),
             })
         } else {
+            let token = &scan[cursor - 1];
             Err(parse::Error {
                 message: format!(
-                    "Recognition failed at token {}: {}",
+                    "Recognition failed at token {}: {} <- '{}'",
                     cursor,
-                    scan[cursor - 1].to_string()
+                    grammar.symbol_string(token.kind()),
+                    token.lexeme_escaped(),
                 ),
             })
         };
 
-        fn parse_tree<'scope, Symbol: Data + Default>(
+        fn parse_tree<'scope, Symbol: GrammarSymbol>(
             grammar: &'scope Grammar<Symbol>,
             scan: &'scope [Token<Symbol>],
             chart: PChart<'scope, Symbol>,
@@ -352,7 +358,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
             }
         }
 
-        fn parse_bottom_up<'scope, Symbol: Data + Default>(
+        fn parse_bottom_up<'scope, Symbol: GrammarSymbol>(
             grammar: &'scope Grammar<Symbol>,
             scan: &'scope [Token<Symbol>],
             chart: PChart<'scope, Symbol>,
@@ -419,7 +425,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
                 }
             }
 
-            fn link_shallow_paths<'scope, Symbol: Data + Default>(
+            fn link_shallow_paths<'scope, Symbol: GrammarSymbol>(
                 edge: &Edge<Symbol>,
                 grammar: &'scope Grammar<Symbol>,
                 scan: &'scope [Token<Symbol>],
@@ -455,13 +461,13 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
                 }
             }
 
-            fn optimal_next_level_path<'scope, Symbol: Data + Default>(
+            fn optimal_next_level_path<'scope, Symbol: GrammarSymbol>(
                 edge: &Edge<'scope, Symbol>,
                 weight_map: &HashMap<&'scope Edge<Symbol>, usize>,
                 grammar: &'scope Grammar<Symbol>,
                 chart: &'scope PChart<'scope, Symbol>,
             ) -> WeightedParsePath<'scope, Symbol> {
-                fn df_search<'scope, Symbol: Data + Default>(
+                fn df_search<'scope, Symbol: GrammarSymbol>(
                     depth: usize,
                     root: Node,
                     bottom: usize,
@@ -556,12 +562,12 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
             link_shallow_paths(best_root_edge, grammar, scan, &nlp_map)
         }
 
-        fn parse_top_down<'scope, Symbol: Data + Default>(
+        fn parse_top_down<'scope, Symbol: GrammarSymbol>(
             grammar: &'scope Grammar<Symbol>,
             scan: &'scope [Token<Symbol>],
             chart: PChart<'scope, Symbol>,
         ) -> Tree<Symbol> {
-            fn recur<'scope, Symbol: Data + Default>(
+            fn recur<'scope, Symbol: GrammarSymbol>(
                 edge: &Edge<Symbol>,
                 grammar: &'scope Grammar<Symbol>,
                 scan: &'scope [Token<Symbol>],
@@ -592,7 +598,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
                 }
             }
 
-            fn top_list<'scope, Symbol: Data + Default>(
+            fn top_list<'scope, Symbol: GrammarSymbol>(
                 edge: &Edge<Symbol>,
                 grammar: &'scope Grammar<Symbol>,
                 chart: &'scope PChart<'scope, Symbol>,
@@ -626,7 +632,7 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
                     Vec::new()
                 };
 
-                fn df_search<'scope, Symbol: Data + Default>(
+                fn df_search<'scope, Symbol: GrammarSymbol>(
                     edges: &Fn(usize, Node) -> Vec<Edge<'scope, Symbol>>,
                     leaf: &Fn(usize, Node) -> bool,
                     depth: usize,
@@ -666,11 +672,11 @@ impl<Symbol: Data + Default> Parser<Symbol> for EarleyParser {
     }
 }
 
-struct RChart<'item, Symbol: Data + Default + 'item> {
+struct RChart<'item, Symbol: GrammarSymbol + 'item> {
     rows: Vec<RChartRow<'item, Symbol>>,
 }
 
-impl<'item, Symbol: Data + Default + 'item> RChart<'item, Symbol> {
+impl<'item, Symbol: GrammarSymbol + 'item> RChart<'item, Symbol> {
     fn new() -> Self {
         RChart {
             rows: vec![RChartRow::new(Vec::new())],
@@ -709,12 +715,12 @@ impl<'item, Symbol: Data + Default + 'item> RChart<'item, Symbol> {
     }
 }
 
-struct RChartRow<'item, Symbol: Data + Default + 'item> {
+struct RChartRow<'item, Symbol: GrammarSymbol + 'item> {
     incomplete: Items<'item, Symbol>,
     complete: Items<'item, Symbol>,
 }
 
-impl<'item, Symbol: Data + Default + 'item> RChartRow<'item, Symbol> {
+impl<'item, Symbol: GrammarSymbol + 'item> RChartRow<'item, Symbol> {
     fn new(scanned_items: Vec<Item<Symbol>>) -> RChartRow<Symbol> {
         let mut incomplete = Items::new();
         let mut complete = Items::new();
@@ -758,11 +764,11 @@ impl<'item, Symbol: Data + Default + 'item> RChartRow<'item, Symbol> {
     }
 }
 
-struct Items<'item, Symbol: Data + Default + 'item> {
+struct Items<'item, Symbol: GrammarSymbol + 'item> {
     items: Vec<Item<'item, Symbol>>,
 }
 
-impl<'item, Symbol: Data + Default + 'item> Items<'item, Symbol> {
+impl<'item, Symbol: GrammarSymbol + 'item> Items<'item, Symbol> {
     fn new() -> Items<'item, Symbol> {
         Items { items: Vec::new() }
     }
@@ -785,7 +791,7 @@ impl<'item, Symbol: Data + Default + 'item> Items<'item, Symbol> {
 }
 
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
-struct Item<'rule, Symbol: Data + Default + 'rule> {
+struct Item<'rule, Symbol: GrammarSymbol + 'rule> {
     rule: &'rule Production<Symbol>,
     shadow: Option<Vec<ShadowSymbol<Symbol>>>,
     shadow_top: usize,
@@ -795,7 +801,7 @@ struct Item<'rule, Symbol: Data + Default + 'rule> {
     ignore_next: bool,
 }
 
-impl<'rule, Symbol: Data + Default + 'rule> Item<'rule, Symbol> {
+impl<'rule, Symbol: GrammarSymbol + 'rule> Item<'rule, Symbol> {
     fn start(rule: &'rule Production<Symbol>) -> Self {
         Item {
             rule,
@@ -838,7 +844,7 @@ impl<'rule, Symbol: Data + Default + 'rule> Item<'rule, Symbol> {
     }
 }
 
-impl<'rule, Symbol: Data + Default> Data for Item<'rule, Symbol> {
+impl<'rule, Symbol: GrammarSymbol> Data for Item<'rule, Symbol> {
     fn to_string(&self) -> String {
         let mut rule_string = format!("{:?} -> ", self.rule.lhs);
         for i in 0..self.rule.rhs.len() {
@@ -857,11 +863,11 @@ impl<'rule, Symbol: Data + Default> Data for Item<'rule, Symbol> {
     }
 }
 
-struct PChart<'rule, Symbol: Data + Default + 'rule> {
+struct PChart<'rule, Symbol: GrammarSymbol + 'rule> {
     rows: Vec<PChartRow<'rule, Symbol>>,
 }
 
-impl<'rule, Symbol: Data + Default + 'rule> PChart<'rule, Symbol> {
+impl<'rule, Symbol: GrammarSymbol + 'rule> PChart<'rule, Symbol> {
     fn new() -> Self {
         PChart {
             rows: vec![PChartRow::new()],
@@ -895,11 +901,11 @@ impl<'rule, Symbol: Data + Default + 'rule> PChart<'rule, Symbol> {
     }
 }
 
-struct PChartRow<'rule, Symbol: Data + Default + 'rule> {
+struct PChartRow<'rule, Symbol: GrammarSymbol + 'rule> {
     edges: Vec<Edge<'rule, Symbol>>,
 }
 
-impl<'rule, Symbol: Data + Default + 'rule> PChartRow<'rule, Symbol> {
+impl<'rule, Symbol: GrammarSymbol + 'rule> PChartRow<'rule, Symbol> {
     fn new() -> Self {
         PChartRow { edges: Vec::new() }
     }
@@ -910,7 +916,7 @@ impl<'rule, Symbol: Data + Default + 'rule> PChartRow<'rule, Symbol> {
 }
 
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
-struct Edge<'prod, Symbol: Data + Default + 'prod> {
+struct Edge<'prod, Symbol: GrammarSymbol + 'prod> {
     rule: Option<&'prod Production<Symbol>>,
     shadow: Option<Vec<ShadowSymbol<Symbol>>>,
     shadow_top: usize,
@@ -921,7 +927,7 @@ struct Edge<'prod, Symbol: Data + Default + 'prod> {
     depth: usize,
 }
 
-impl<'prod, Symbol: Data + Default + 'prod> Edge<'prod, Symbol> {
+impl<'prod, Symbol: GrammarSymbol + 'prod> Edge<'prod, Symbol> {
     fn symbols_len(&self) -> usize {
         match self.rule {
             Some(rule) => match self.shadow {
@@ -953,7 +959,7 @@ impl<'prod, Symbol: Data + Default + 'prod> Edge<'prod, Symbol> {
     }
 }
 
-impl<'prod, Symbol: Data + Default + 'prod> Data for Edge<'prod, Symbol> {
+impl<'prod, Symbol: GrammarSymbol + 'prod> Data for Edge<'prod, Symbol> {
     fn to_string(&self) -> String {
         match self.rule {
             None => format!("NONE ({})", self.finish),
@@ -972,7 +978,7 @@ impl<'prod, Symbol: Data + Default + 'prod> Data for Edge<'prod, Symbol> {
 }
 
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
-struct ShadowSymbol<Symbol: Data + Default> {
+struct ShadowSymbol<Symbol: GrammarSymbol> {
     symbol: Symbol,
     spm: SymbolParseMethod,
 }
@@ -986,12 +992,12 @@ enum SymbolParseMethod {
 type Node = usize;
 type ParsePath<'rule, Symbol> = Vec<Edge<'rule, Symbol>>;
 
-struct WeightedParsePath<'rule, Symbol: Data + Default> {
+struct WeightedParsePath<'rule, Symbol: GrammarSymbol> {
     path: ParsePath<'rule, Symbol>,
     weight: usize,
 }
 
-impl<'rule, Symbol: Data + Default> WeightedParsePath<'rule, Symbol> {
+impl<'rule, Symbol: GrammarSymbol> WeightedParsePath<'rule, Symbol> {
     fn empty() -> Self {
         WeightedParsePath {
             path: Vec::new(),
