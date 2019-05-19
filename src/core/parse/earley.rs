@@ -4,9 +4,7 @@ use {
         parse::{
             self,
             grammar::{Grammar, GrammarSymbol},
-            Parser,
-            Production,
-            Tree
+            Parser, Production, Tree,
         },
         scan::Token,
     },

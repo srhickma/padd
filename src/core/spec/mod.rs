@@ -3,7 +3,7 @@ use {
         fmt::{self, Formatter},
         parse::{
             self,
-            grammar::{self, Grammar, GrammarSymbol, GrammarBuilder},
+            grammar::{self, Grammar, GrammarBuilder, GrammarSymbol},
             Tree,
         },
         scan::{self, CDFA},
@@ -20,6 +20,11 @@ lazy_static! {
     pub static ref DEF_MATCHER: String = String::from("_");
 }
 
+type SpecGenResult<Symbol> = (
+    Box<CDFA<usize, Symbol>>,
+    Box<Grammar<Symbol>>,
+    Formatter<Symbol>,
+);
 
 pub fn parse_spec(input: &str) -> Result<Tree<SpecSymbol>, ParseError> {
     lang::parse_spec(input)
@@ -28,7 +33,7 @@ pub fn parse_spec(input: &str) -> Result<Tree<SpecSymbol>, ParseError> {
 pub fn generate_spec<Symbol: 'static + GrammarSymbol, GrammarType, GrammarBuilderType>(
     parse: &Tree<SpecSymbol>,
     grammar_builder: GrammarBuilderType,
-) -> Result<(Box<CDFA<usize, Symbol>>, Box<Grammar<Symbol>>, Formatter<Symbol>), GenError>
+) -> Result<SpecGenResult<Symbol>, GenError>
 where
     GrammarType: 'static + Grammar<Symbol>,
     GrammarBuilderType: GrammarBuilder<String, Symbol, GrammarType>,
@@ -134,7 +139,7 @@ impl From<parse::Error> for ParseError {
 
 #[cfg(test)]
 mod tests {
-    use core::{data::Data, scan::Token, parse::grammar::SimpleGrammarBuilder};
+    use core::{data::Data, parse::grammar::SimpleGrammarBuilder, scan::Token};
 
     use super::*;
 
@@ -685,7 +690,8 @@ grammar {
         //specification
         let tree = lang::parse_spec(spec);
         let parse = tree.unwrap();
-        let (cdfa, grammar, formatter) = generate_spec(&parse, SimpleGrammarBuilder::new()).unwrap();
+        let (cdfa, grammar, formatter) =
+            generate_spec(&parse, SimpleGrammarBuilder::new()).unwrap();
 
         //input
         let tokens = scanner.scan(&chars[..], &*cdfa);
@@ -1021,7 +1027,8 @@ grammar {
 
         let tree = lang::parse_spec(spec);
         let parse = tree.unwrap();
-        let (cdfa, grammar, formatter) = generate_spec(&parse, SimpleGrammarBuilder::new()).unwrap();
+        let (cdfa, grammar, formatter) =
+            generate_spec(&parse, SimpleGrammarBuilder::new()).unwrap();
 
         let input = "abaa".to_string();
         let chars: Vec<char> = input.chars().collect();

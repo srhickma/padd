@@ -1,7 +1,7 @@
 use {
     core::{
         fmt::pattern::{Capture, Pattern, Segment},
-        parse::{Production, Tree, grammar::GrammarSymbol},
+        parse::{grammar::GrammarSymbol, Production, Tree},
     },
     std::collections::HashMap,
 };
@@ -41,16 +41,17 @@ impl<Symbol: GrammarSymbol> FormatterBuilder<Symbol> {
         }
     }
 
-    pub fn add_pattern(
-        &mut self,
-        pair: PatternPair<Symbol>,
-    ) -> Result<(), BuildError> {
+    pub fn add_pattern(&mut self, pair: PatternPair<Symbol>) -> Result<(), BuildError> {
         if let Some(pattern) = self.memory.get(&pair.pattern) {
             self.pattern_map.insert(pair.production, pattern.clone());
             return Ok(());
         }
 
-        let pattern = pattern::generate_pattern(&pair.pattern[..], &pair.production)?;
+        let pattern = pattern::generate_pattern(
+            &pair.pattern[..],
+            &pair.production,
+            &pair.string_production,
+        )?;
         self.memory.insert(pair.pattern, pattern.clone());
         self.pattern_map.insert(pair.production, pattern);
         Ok(())
@@ -162,5 +163,6 @@ impl<'parse, Symbol: GrammarSymbol + 'parse> FormatJob<'parse, Symbol> {
 
 pub struct PatternPair<Symbol: GrammarSymbol> {
     pub production: Production<Symbol>,
+    pub string_production: Production<String>,
     pub pattern: String,
 }

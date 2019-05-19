@@ -39,4 +39,3 @@ impl<T: Default + Data> fmt::Debug for Encoder<T> {
 }
 
 //TODO(shane) add tests here
-

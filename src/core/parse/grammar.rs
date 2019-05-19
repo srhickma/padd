@@ -1,23 +1,16 @@
 use {
-    core::{
-        data::{Data},
-        parse::Production,
-        util::encoder::Encoder
-    },
+    core::{data::Data, parse::Production, util::encoder::Encoder},
     std::{
-        collections::{HashSet, HashMap},
+        collections::{HashMap, HashSet},
         error, fmt,
     },
 };
 
-pub trait GrammarSymbol: Data + Default {
-}
+pub trait GrammarSymbol: Data + Default {}
 
-impl GrammarSymbol for usize {
-}
+impl GrammarSymbol for usize {}
 
-impl GrammarSymbol for String {
-}
+impl GrammarSymbol for String {}
 
 pub trait Grammar<Symbol: GrammarSymbol>: Send + Sync {
     fn is_nullable_nt(&self, lhs: &Symbol) -> bool;
@@ -97,25 +90,50 @@ impl<Symbol: GrammarSymbol> SimpleGrammarBuilder<Symbol> {
         }
     }
 
-    pub fn from(&mut self, lhs: Symbol) -> NonTerminalBuilder<Symbol, Symbol, SimpleGrammar<Symbol>> {
+    pub fn from(
+        &mut self,
+        lhs: Symbol,
+    ) -> NonTerminalBuilder<Symbol, Symbol, SimpleGrammar<Symbol>> {
         NonTerminalBuilder::new(self, lhs)
+    }
+
+    fn build_no_check(self) -> SimpleGrammar<Symbol> {
+        if self.start.is_none() {
+            panic!("No start state specified for grammar");
+        }
+        let start = self.start.unwrap();
+
+        if self.prods_by_lhs.get(&start).is_none() {
+            panic!("Start state has no productions");
+        }
+
+        let nss = build_nss(&self.prods_by_lhs);
+        let non_terminals = build_non_terminals(&self.prods_by_lhs);
+        let terminals = build_terminals(&self.prods_by_lhs, &non_terminals);
+
+        SimpleGrammar {
+            prods_by_lhs: self.prods_by_lhs,
+            nss,
+            non_terminals,
+            terminals,
+            ignorable: self.ignorable,
+            start,
+        }
     }
 }
 
-//TODO(shane) conglomerate this code with the encoded implementation
-impl<Symbol: GrammarSymbol> GrammarBuilder<Symbol, Symbol, SimpleGrammar<Symbol>> for SimpleGrammarBuilder<Symbol> {
+impl<Symbol: GrammarSymbol> GrammarBuilder<Symbol, Symbol, SimpleGrammar<Symbol>>
+    for SimpleGrammarBuilder<Symbol>
+{
     fn add_optional_state(&mut self, opt_state: &Symbol, dest_state: &Symbol) {
         if !self.prods_by_lhs.contains_key(&opt_state) {
-            self.prods_by_lhs.insert(opt_state.clone(), vec![
-                Production {
-                    lhs: opt_state.clone(),
-                    rhs: vec![dest_state.clone()],
-                },
-                Production {
-                    lhs: opt_state.clone(),
-                    rhs: Vec::new(),
-                },
-            ]);
+            self.prods_by_lhs.insert(
+                opt_state.clone(),
+                vec![
+                    Production::from(opt_state.clone(), vec![dest_state.clone()]),
+                    Production::epsilon(opt_state.clone()),
+                ],
+            );
         }
     }
 
@@ -148,87 +166,50 @@ impl<Symbol: GrammarSymbol> GrammarBuilder<Symbol, Symbol, SimpleGrammar<Symbol>
     }
 
     fn build(self) -> Result<SimpleGrammar<Symbol>, BuildError> {
-        if self.start.is_none() {
-            panic!("No start state specified for grammar");
-        }
-        let start = self.start.unwrap();
+        let grammar = self.build_no_check();
 
-        if self.prods_by_lhs.get(&start).is_none() {
-            panic!("Start state has no productions");
-        }
-
-        let nss = build_nss(&self.prods_by_lhs);
-
-        let non_terminals: HashSet<Symbol> = self
-            .prods_by_lhs
-            .iter()
-            .map(|(lhs, _)| lhs)
-            .cloned()
-            .collect();
-
-        let terminals: HashSet<Symbol> = self
-            .prods_by_lhs
-            .iter()
-            .flat_map(|(_, prods)| prods)
-            .flat_map(|prod| &prod.rhs)
-            .filter(|symbol| !non_terminals.contains(*symbol))
-            .cloned()
-            .collect();
-
-        for ignored in &self.ignorable {
-            if non_terminals.contains(ignored) {
+        for ignored in &grammar.ignorable {
+            if grammar.non_terminals.contains(ignored) {
                 return Err(BuildError::NonTerminalIgnoredErr(ignored.to_string()));
             }
         }
 
-        Ok(SimpleGrammar {
-            prods_by_lhs: self.prods_by_lhs,
-            nss,
-            non_terminals,
-            terminals,
-            ignorable: self.ignorable,
-            start,
-        })
+        Ok(grammar)
     }
 }
 
 pub struct EncodedGrammar<SymbolIn: GrammarSymbol> {
-    prods_by_lhs: HashMap<usize, Vec<Production<usize>>>,
-    nss: HashSet<usize>,
-    non_terminals: HashSet<usize>,
-    terminals: HashSet<usize>,
-    ignorable: HashSet<usize>,
-    start: usize,
+    grammar: SimpleGrammar<usize>,
     encoder: Encoder<SymbolIn>,
 }
 
 impl<SymbolIn: GrammarSymbol> Grammar<usize> for EncodedGrammar<SymbolIn> {
     fn is_nullable_nt(&self, lhs: &usize) -> bool {
-        self.nss.contains(lhs)
+        self.grammar.is_nullable_nt(lhs)
     }
 
     fn is_non_terminal(&self, symbol: &usize) -> bool {
-        self.non_terminals.contains(symbol)
+        self.grammar.is_non_terminal(symbol)
     }
 
     fn is_ignorable(&self, symbol: &usize) -> bool {
-        self.ignorable.contains(symbol)
+        self.grammar.is_ignorable(symbol)
     }
 
     fn terminals(&self) -> &HashSet<usize> {
-        &self.terminals
+        self.grammar.terminals()
     }
 
     fn start(&self) -> &usize {
-        &self.start
+        self.grammar.start()
     }
 
     fn productions_for_lhs(&self, lhs: &usize) -> Option<&Vec<Production<usize>>> {
-        self.prods_by_lhs.get(lhs)
+        self.grammar.productions_for_lhs(lhs)
     }
 
     fn weighted_parse(&self) -> bool {
-        !self.ignorable.is_empty()
+        self.grammar.weighted_parse()
     }
 
     fn symbol_string(&self, symbol: &usize) -> String {
@@ -237,74 +218,48 @@ impl<SymbolIn: GrammarSymbol> Grammar<usize> for EncodedGrammar<SymbolIn> {
 }
 
 pub struct EncodedGrammarBuilder<SymbolIn: GrammarSymbol> {
-    prods_by_lhs: HashMap<usize, Vec<Production<usize>>>,
-    ignorable: HashSet<usize>,
-    start: Option<usize>,
+    builder: SimpleGrammarBuilder<usize>,
     encoder: Encoder<SymbolIn>,
 }
 
 impl<SymbolIn: GrammarSymbol> EncodedGrammarBuilder<SymbolIn> {
     pub fn new() -> Self {
         EncodedGrammarBuilder {
-            prods_by_lhs: HashMap::new(),
-            ignorable: HashSet::new(),
-            start: None,
+            builder: SimpleGrammarBuilder::new(),
             encoder: Encoder::new(),
         }
     }
 }
 
-impl<SymbolIn: GrammarSymbol> GrammarBuilder<SymbolIn, usize, EncodedGrammar<SymbolIn>> for EncodedGrammarBuilder<SymbolIn> {
+impl<SymbolIn: GrammarSymbol> GrammarBuilder<SymbolIn, usize, EncodedGrammar<SymbolIn>>
+    for EncodedGrammarBuilder<SymbolIn>
+{
     fn add_optional_state(&mut self, opt_state: &SymbolIn, dest_state: &SymbolIn) {
         let opt_state_encoded = self.encoder.encode(opt_state);
         let dest_state_encoded = self.encoder.encode(dest_state);
 
-        if !self.prods_by_lhs.contains_key(&opt_state_encoded) {
-            self.prods_by_lhs.insert(opt_state_encoded, vec![
-                Production {
-                    lhs: opt_state_encoded,
-                    rhs: vec![dest_state_encoded],
-                },
-                Production {
-                    lhs: opt_state_encoded,
-                    rhs: Vec::new(),
-                },
-            ]);
-        }
+        self.builder
+            .add_optional_state(&opt_state_encoded, &dest_state_encoded);
     }
 
     fn add_production(&mut self, production: Production<SymbolIn>) -> Production<usize> {
-        let rhs: Vec<usize> = production.rhs
+        let rhs: Vec<usize> = production
+            .rhs
             .iter()
             .map(|sym| self.encoder.encode(sym))
             .collect();
 
-        let encoded_production = Production::from(
-            self.encoder.encode(&production.lhs),
-            rhs,
-        );
+        let encoded_production = Production::from(self.encoder.encode(&production.lhs), rhs);
 
-        if let Some(vec) = self.prods_by_lhs.get_mut(&encoded_production.lhs) {
-            vec.push(encoded_production.clone());
-            return encoded_production;
-        }
-
-        self.prods_by_lhs
-            .insert(encoded_production.lhs, vec![encoded_production.clone()]);
-
-        encoded_production
+        self.builder.add_production(encoded_production)
     }
 
     fn try_mark_start(&mut self, start: &SymbolIn) {
-        if self.start.is_some() {
-            return;
-        }
-
-        self.start = Some(self.encoder.encode(start));
+        self.builder.try_mark_start(&self.encoder.encode(start));
     }
 
     fn mark_ignorable(&mut self, symbol: &SymbolIn) {
-        self.ignorable.insert(self.encoder.encode(symbol));
+        self.builder.mark_ignorable(&self.encoder.encode(symbol));
     }
 
     fn kind_for(&mut self, token: &SymbolIn) -> usize {
@@ -312,54 +267,45 @@ impl<SymbolIn: GrammarSymbol> GrammarBuilder<SymbolIn, usize, EncodedGrammar<Sym
     }
 
     fn build(self) -> Result<EncodedGrammar<SymbolIn>, BuildError> {
-        if self.start.is_none() {
-            panic!("No start state specified for grammar");
-        }
-        let start = self.start.unwrap();
+        let grammar = self.builder.build_no_check();
 
-        if self.prods_by_lhs.get(&start).is_none() {
-            panic!("Start state has no productions");
-        }
-
-        let nss = build_nss(&self.prods_by_lhs);
-
-        let non_terminals: HashSet<usize> = self
-            .prods_by_lhs
-            .iter()
-            .map(|(lhs, _)| lhs)
-            .cloned()
-            .collect();
-
-        let terminals: HashSet<usize> = self
-            .prods_by_lhs
-            .iter()
-            .flat_map(|(_, prods)| prods)
-            .flat_map(|prod| &prod.rhs)
-            .filter(|symbol| !non_terminals.contains(*symbol))
-            .cloned()
-            .collect();
-
-        for ignored in &self.ignorable {
-            if non_terminals.contains(ignored) {
+        for ignored in &grammar.ignorable {
+            if grammar.non_terminals.contains(ignored) {
                 return Err(BuildError::NonTerminalIgnoredErr(
-                    self.encoder.decode(*ignored).unwrap().to_string()
+                    self.encoder.decode(*ignored).unwrap().to_string(),
                 ));
             }
         }
 
         Ok(EncodedGrammar {
-            prods_by_lhs: self.prods_by_lhs,
-            nss,
-            non_terminals,
-            terminals,
-            ignorable: self.ignorable,
-            start,
+            grammar,
             encoder: self.encoder,
         })
     }
 }
 
-fn build_nss<Symbol: GrammarSymbol>(prods_by_lhs: &HashMap<Symbol, Vec<Production<Symbol>>>) -> HashSet<Symbol> {
+fn build_non_terminals<Symbol: GrammarSymbol>(
+    prods_by_lhs: &HashMap<Symbol, Vec<Production<Symbol>>>,
+) -> HashSet<Symbol> {
+    prods_by_lhs.iter().map(|(lhs, _)| lhs).cloned().collect()
+}
+
+fn build_terminals<Symbol: GrammarSymbol>(
+    prods_by_lhs: &HashMap<Symbol, Vec<Production<Symbol>>>,
+    non_terminals: &HashSet<Symbol>,
+) -> HashSet<Symbol> {
+    prods_by_lhs
+        .iter()
+        .flat_map(|(_, prods)| prods)
+        .flat_map(|prod| &prod.rhs)
+        .filter(|symbol| !non_terminals.contains(*symbol))
+        .cloned()
+        .collect()
+}
+
+fn build_nss<Symbol: GrammarSymbol>(
+    prods_by_lhs: &HashMap<Symbol, Vec<Production<Symbol>>>,
+) -> HashSet<Symbol> {
     let mut nss: HashSet<Symbol> = HashSet::new();
     let mut prods_by_rhs: HashMap<&Symbol, Vec<&Production<Symbol>>> = HashMap::new();
     let mut work_stack: Vec<&Symbol> = Vec::new();
@@ -384,12 +330,11 @@ fn build_nss<Symbol: GrammarSymbol>(prods_by_lhs: &HashMap<Symbol, Vec<Productio
             Some(work_symbol) => {
                 if let Some(prods) = prods_by_rhs.get(work_symbol) {
                     for prod in prods {
-                        if !nss.contains(&prod.lhs)
-                            && prod.rhs.iter().all(|sym| nss.contains(sym))
-                            {
-                                nss.insert(prod.lhs.clone());
-                                work_stack.push(&prod.lhs);
-                            }
+                        if !nss.contains(&prod.lhs) && prod.rhs.iter().all(|sym| nss.contains(sym))
+                        {
+                            nss.insert(prod.lhs.clone());
+                            work_stack.push(&prod.lhs);
+                        }
                     }
                 }
             }
@@ -399,13 +344,23 @@ fn build_nss<Symbol: GrammarSymbol>(prods_by_lhs: &HashMap<Symbol, Vec<Productio
     nss
 }
 
-pub struct NonTerminalBuilder<'builder, SymbolIn: GrammarSymbol, SymbolOut: GrammarSymbol, GrammarType> {
+pub struct NonTerminalBuilder<
+    'builder,
+    SymbolIn: GrammarSymbol,
+    SymbolOut: GrammarSymbol,
+    GrammarType,
+> {
     grammar_builder: &'builder mut GrammarBuilder<SymbolIn, SymbolOut, GrammarType>,
     lhs: SymbolIn,
 }
 
-impl<'builder, SymbolIn: GrammarSymbol, SymbolOut: GrammarSymbol, GrammarType> NonTerminalBuilder<'builder, SymbolIn, SymbolOut, GrammarType> {
-    fn new(grammar_builder: &'builder mut GrammarBuilder<SymbolIn, SymbolOut, GrammarType>, lhs: SymbolIn) -> Self {
+impl<'builder, SymbolIn: GrammarSymbol, SymbolOut: GrammarSymbol, GrammarType>
+    NonTerminalBuilder<'builder, SymbolIn, SymbolOut, GrammarType>
+{
+    fn new(
+        grammar_builder: &'builder mut GrammarBuilder<SymbolIn, SymbolOut, GrammarType>,
+        lhs: SymbolIn,
+    ) -> Self {
         NonTerminalBuilder {
             grammar_builder,
             lhs,

@@ -11,7 +11,8 @@ static FAIL_SEQUENCE_LENGTH: usize = 10;
 
 //TODO(shane) change these types to Symbol
 pub trait Scanner<State: Data, Symbol: GrammarSymbol>: 'static + Send + Sync {
-    fn scan(&self, input: &[char], cdfa: &CDFA<State, Symbol>) -> Result<Vec<Token<Symbol>>, Error>;
+    fn scan(&self, input: &[char], cdfa: &CDFA<State, Symbol>)
+        -> Result<Vec<Token<Symbol>>, Error>;
 }
 
 pub fn def_scanner<State: Data, Symbol: GrammarSymbol>() -> Box<Scanner<State, Symbol>> {

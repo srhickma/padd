@@ -1,6 +1,6 @@
 use {
     core::{
-        fmt::{Formatter, FormatterBuilder, PatternPair},
+        fmt::{FormatterBuilder, PatternPair},
         parse::{
             grammar::{Grammar, GrammarBuilder, GrammarSymbol},
             Production, Tree,
@@ -13,6 +13,7 @@ use {
             self,
             lang::SpecSymbol,
             region::{self, RegionType},
+            SpecGenResult,
         },
         util::string_utils,
     },
@@ -22,7 +23,7 @@ use {
 pub fn generate_spec<Symbol: 'static + GrammarSymbol, GrammarType, GrammarBuilderType>(
     parse: &Tree<SpecSymbol>,
     mut grammar_builder: GrammarBuilderType,
-) -> Result<(Box<CDFA<usize, Symbol>>, Box<Grammar<Symbol>>, Formatter<Symbol>), spec::GenError>
+) -> Result<SpecGenResult<Symbol>, spec::GenError>
 where
     GrammarType: 'static + Grammar<Symbol>,
     GrammarBuilderType: GrammarBuilder<String, Symbol, GrammarType>,
@@ -42,7 +43,11 @@ where
 
     orphan_check(&ecdfa, &grammar)?;
 
-    Ok((Box::new(ecdfa), Box::new(grammar), formatter_builder.build()))
+    Ok((
+        Box::new(ecdfa),
+        Box::new(grammar),
+        formatter_builder.build(),
+    ))
 }
 
 fn traverse_spec_regions<CDFABuilderType, CDFAType, Symbol: GrammarSymbol, GrammarType>(
@@ -112,7 +117,8 @@ fn traverse_grammar_region<Symbol: GrammarSymbol, GrammarType>(
     grammar_node: &Tree<SpecSymbol>,
     grammar_builder: &mut GrammarBuilder<String, Symbol, GrammarType>,
     formatter_builder: &mut FormatterBuilder<Symbol>,
-) -> Result<(), spec::GenError> where
+) -> Result<(), spec::GenError>
+where
     GrammarType: Grammar<Symbol>,
 {
     generate_grammar_prods(
@@ -160,7 +166,12 @@ where
 
     let transopt_node = state_node.get_child(1);
     if !transopt_node.is_empty() {
-        generate_cdfa_trans(transopt_node.get_child(0), &states, builder, grammar_builder)?;
+        generate_cdfa_trans(
+            transopt_node.get_child(0),
+            &states,
+            builder,
+            grammar_builder,
+        )?;
     }
 
     if states_node.children.len() == 2 {
@@ -211,7 +222,14 @@ where
 
             // Immediate state pass-through
             for source in sources {
-                add_cdfa_tokenizer(acceptor_node, token, Some(*source), &kind, builder, grammar_builder)?;
+                add_cdfa_tokenizer(
+                    acceptor_node,
+                    token,
+                    Some(*source),
+                    &kind,
+                    builder,
+                    grammar_builder,
+                )?;
             }
 
             token
@@ -355,7 +373,8 @@ fn generate_grammar_prods<Symbol: GrammarSymbol, GrammarType>(
     prods_node: &Tree<SpecSymbol>,
     grammar_builder: &mut GrammarBuilder<String, Symbol, GrammarType>,
     formatter_builder: &mut FormatterBuilder<Symbol>,
-) -> Result<(), spec::GenError> where
+) -> Result<(), spec::GenError>
+where
     GrammarType: Grammar<Symbol>,
 {
     if prods_node.children.len() == 2 {
@@ -377,13 +396,15 @@ fn generate_grammar_prods<Symbol: GrammarSymbol, GrammarType>(
     )
 }
 
+#[allow(clippy::ptr_arg)]
 fn generate_grammar_rhss<Symbol: GrammarSymbol, GrammarType>(
     rhss_node: &Tree<SpecSymbol>,
     lhs: &String,
     def_pattern_node: &Tree<SpecSymbol>,
     grammar_builder: &mut GrammarBuilder<String, Symbol, GrammarType>,
     formatter_builder: &mut FormatterBuilder<Symbol>,
-) -> Result<(), spec::GenError> where
+) -> Result<(), spec::GenError>
+where
     GrammarType: Grammar<Symbol>,
 {
     let rhs_node = rhss_node.get_child(rhss_node.children.len() - 1);
@@ -393,10 +414,8 @@ fn generate_grammar_rhss<Symbol: GrammarSymbol, GrammarType>(
 
     grammar_builder.try_mark_start(lhs);
 
-    let production = grammar_builder.add_production(Production {
-        lhs: lhs.clone(),
-        rhs: ids,
-    });
+    let string_production = Production::from(lhs.clone(), ids);
+    let production = grammar_builder.add_production(string_production.clone());
 
     let mut pattopt_node = rhs_node.get_child(2);
     if pattopt_node.is_empty() {
@@ -410,6 +429,7 @@ fn generate_grammar_rhss<Symbol: GrammarSymbol, GrammarType>(
 
         formatter_builder.add_pattern(PatternPair {
             production,
+            string_production,
             pattern,
         })?;
     }

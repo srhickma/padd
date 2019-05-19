@@ -7,10 +7,10 @@ use {
         fmt::Formatter,
         parse::{
             self,
-            grammar::{Grammar, EncodedGrammarBuilder},
-            Parser
+            grammar::{EncodedGrammarBuilder, Grammar},
+            Parser,
         },
-        scan::{self, CDFA, Scanner},
+        scan::{self, Scanner, CDFA},
         spec,
     },
     std::{error, fmt},

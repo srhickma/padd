@@ -2,7 +2,7 @@ use core::{
     data::Data,
     parse::{
         self,
-        grammar::{self, GrammarBuilder, SimpleGrammar, SimpleGrammarBuilder, GrammarSymbol},
+        grammar::{self, GrammarBuilder, GrammarSymbol, SimpleGrammar, SimpleGrammarBuilder},
         Tree,
     },
     scan::{
@@ -97,7 +97,10 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<SpecSymbol>, scan::CDFAError> {
 
     builder.state(&S::Or).accept().tokenize(&SpecSymbol::TOr);
 
-    builder.state(&S::Semi).accept().tokenize(&SpecSymbol::TSemi);
+    builder
+        .state(&S::Semi)
+        .accept()
+        .tokenize(&SpecSymbol::TSemi);
 
     builder
         .state(&S::CilPartial)
@@ -184,7 +187,9 @@ fn build_alphabet_region(
     Ok(())
 }
 
-fn build_cdfa_region(builder: &mut EncodedCDFABuilder<S, SpecSymbol>) -> Result<(), scan::CDFAError> {
+fn build_cdfa_region(
+    builder: &mut EncodedCDFABuilder<S, SpecSymbol>,
+) -> Result<(), scan::CDFAError> {
     builder
         .state(&S::CDFATag)
         .accept_to_from_all(&S::CDFA)?
@@ -223,9 +228,15 @@ fn build_cdfa_region(builder: &mut EncodedCDFABuilder<S, SpecSymbol>) -> Result<
 
     builder.state(&S::Hat).accept().tokenize(&SpecSymbol::THat);
 
-    builder.state(&S::Arrow).accept().tokenize(&SpecSymbol::TArrow);
+    builder
+        .state(&S::Arrow)
+        .accept()
+        .tokenize(&SpecSymbol::TArrow);
 
-    builder.state(&S::Range).accept().tokenize(&SpecSymbol::TRange);
+    builder
+        .state(&S::Range)
+        .accept()
+        .tokenize(&SpecSymbol::TRange);
 
     builder.state(&S::Def).accept().tokenize(&SpecSymbol::TDef);
 
@@ -273,7 +284,10 @@ fn build_grammar_region(
         .mark_trans(&S::OptId, ']')?
         .mark_range(&S::OptIdPartial, '_', 'Z')?;
 
-    builder.state(&S::OptId).accept().tokenize(&SpecSymbol::TOptId);
+    builder
+        .state(&S::OptId)
+        .accept()
+        .tokenize(&SpecSymbol::TOptId);
 
     builder
         .state(&S::PatternPartial)
@@ -346,8 +360,7 @@ impl Data for SpecSymbol {
     }
 }
 
-impl GrammarSymbol for SpecSymbol {
-}
+impl GrammarSymbol for SpecSymbol {}
 
 lazy_static! {
     static ref SPEC_GRAMMAR: SimpleGrammar<SpecSymbol> = build_spec_grammar().unwrap();
@@ -413,11 +426,10 @@ fn build_spec_grammar() -> Result<SimpleGrammar<SpecSymbol>, grammar::BuildError
         .to(vec![SpecSymbol::TArrow, SpecSymbol::TId])
         .epsilon();
 
-    builder.from(SpecSymbol::Targets).to(vec![SpecSymbol::TId]).to(vec![
-        SpecSymbol::Targets,
-        SpecSymbol::TOr,
-        SpecSymbol::TId,
-    ]);
+    builder
+        .from(SpecSymbol::Targets)
+        .to(vec![SpecSymbol::TId])
+        .to(vec![SpecSymbol::Targets, SpecSymbol::TOr, SpecSymbol::TId]);
 
     builder
         .from(SpecSymbol::TransitionsOpt)
@@ -449,7 +461,11 @@ fn build_spec_grammar() -> Result<SimpleGrammar<SpecSymbol>, grammar::BuildError
 
     builder
         .from(SpecSymbol::Matchers)
-        .to(vec![SpecSymbol::Matchers, SpecSymbol::TOr, SpecSymbol::Matcher])
+        .to(vec![
+            SpecSymbol::Matchers,
+            SpecSymbol::TOr,
+            SpecSymbol::Matcher,
+        ])
         .to(vec![SpecSymbol::Matcher]);
 
     builder
@@ -481,9 +497,11 @@ fn build_spec_grammar() -> Result<SimpleGrammar<SpecSymbol>, grammar::BuildError
         .to(vec![SpecSymbol::RightHandSides, SpecSymbol::RightHandSide])
         .to(vec![SpecSymbol::RightHandSide]);
 
-    builder
-        .from(SpecSymbol::RightHandSide)
-        .to(vec![SpecSymbol::TOr, SpecSymbol::Ids, SpecSymbol::PatternOpt]);
+    builder.from(SpecSymbol::RightHandSide).to(vec![
+        SpecSymbol::TOr,
+        SpecSymbol::Ids,
+        SpecSymbol::PatternOpt,
+    ]);
 
     builder
         .from(SpecSymbol::PatternOpt)

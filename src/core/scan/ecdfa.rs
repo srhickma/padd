@@ -1,8 +1,8 @@
 use {
     core::{
         data::{
+            map::{CEHashMap, CEHashMapIterator},
             Data,
-            map::{CEHashMap, CEHashMapIterator}
         },
         parse::grammar::GrammarSymbol,
         scan::{alphabet::HashedAlphabet, CDFABuilder, CDFAError, TransitionResult, CDFA},
@@ -70,8 +70,8 @@ impl<State: Data, Symbol: GrammarSymbol> EncodedCDFABuilder<State, Symbol> {
     }
 }
 
-impl<State: Data, Symbol: GrammarSymbol>
-    CDFABuilder<State, Symbol, EncodedCDFA<Symbol>> for EncodedCDFABuilder<State, Symbol>
+impl<State: Data, Symbol: GrammarSymbol> CDFABuilder<State, Symbol, EncodedCDFA<Symbol>>
+    for EncodedCDFABuilder<State, Symbol>
 {
     fn new() -> Self {
         EncodedCDFABuilder {
@@ -257,12 +257,8 @@ pub struct EncodedCDFAStateBuilder<
     state: &'state State,
 }
 
-impl<
-        'scope,
-        'state: 'scope,
-        State: 'state + Data,
-        Symbol: 'scope + GrammarSymbol,
-    > EncodedCDFAStateBuilder<'scope, 'state, State, Symbol>
+impl<'scope, 'state: 'scope, State: 'state + Data, Symbol: 'scope + GrammarSymbol>
+    EncodedCDFAStateBuilder<'scope, 'state, State, Symbol>
 {
     pub fn accept(&mut self) -> &mut Self {
         self.ecdfa_builder.accept(self.state);
@@ -966,6 +962,12 @@ ID <- 'fdk'
             Num,
         }
 
+        impl Data for S {
+            fn to_string(&self) -> String {
+                format!("{:?}", self)
+            }
+        }
+
         let mut builder: EncodedCDFABuilder<S, String> = EncodedCDFABuilder::new();
         builder
             .set_alphabet("a!123456789".chars())
@@ -1042,6 +1044,12 @@ A <- 'a'
             LastA,
         }
 
+        impl Data for S {
+            fn to_string(&self) -> String {
+                format!("{:?}", self)
+            }
+        }
+
         let mut builder: EncodedCDFABuilder<S, String> = EncodedCDFABuilder::new();
         builder.set_alphabet("a".chars()).mark_start(&S::Start);
         builder.mark_trans(&S::Start, &S::A, 'a').unwrap();
@@ -1080,6 +1088,12 @@ A <- 'a'
             Start,
             A,
             LastA,
+        }
+
+        impl Data for S {
+            fn to_string(&self) -> String {
+                format!("{:?}", self)
+            }
         }
 
         let mut builder: EncodedCDFABuilder<S, String> = EncodedCDFABuilder::new();
