@@ -1,6 +1,6 @@
 use {
     core::{
-        fmt::{FormatterBuilder, PatternPair},
+        fmt::{FormatterBuilder, PatternPair, InjectionAffinity, InjectableString},
         parse::{
             grammar::{Grammar, GrammarBuilder, GrammarSymbol},
             Production, Tree,
@@ -63,7 +63,9 @@ where
 {
     let mut region_handler = |inner_node: &Tree<SpecSymbol>, region_type: &RegionType| {
         match region_type {
-            RegionType::Injectable => traverse_injectable_region(inner_node, grammar_builder),
+            RegionType::Injectable => {
+                traverse_injectable_region(inner_node, grammar_builder, formatter_builder)?
+            },
             RegionType::Ignorable => traverse_ignorable_region(inner_node, grammar_builder),
             RegionType::Alphabet => traverse_alphabet_region(inner_node, cdfa_builder),
             RegionType::CDFA => traverse_cdfa_region(inner_node, cdfa_builder, grammar_builder)?,
@@ -81,12 +83,37 @@ where
 fn traverse_injectable_region<Symbol: GrammarSymbol, GrammarType>(
     injectable_node: &Tree<SpecSymbol>,
     grammar_builder: &mut GrammarBuilder<String, Symbol, GrammarType>,
-) where
+    formatter_builder: &mut FormatterBuilder<Symbol>,
+) -> Result<(), spec::GenError>
+where
     GrammarType: Grammar<Symbol>,
 {
-    //TODO(shane) implement this
-    //let terminal = injectable_node.get_child(1).lhs.lexeme();
-    //grammar_builder.mark_ignorable(terminal);
+    let terminal_string = injectable_node.get_child(2).lhs.lexeme();
+    grammar_builder.mark_injectable(terminal_string);
+
+    let affinity = match &injectable_node.get_child(1).lhs.lexeme()[..] {
+        "left" => InjectionAffinity::Left,
+        "right" => InjectionAffinity::Right,
+        aff => panic!("Unexpected injection affinity: '{}'", aff),
+    };
+
+    let pattopt_node = injectable_node.get_child(3);
+    let pattern_string = if !pattopt_node.is_empty() {
+        let pattc = &pattopt_node.get_child(0).lhs.lexeme();
+        let pattern_string = &pattc[..].trim_matches('`');
+        Some(string_utils::replace_escapes(pattern_string))
+    } else {
+        None
+    };
+
+    formatter_builder.add_injection(InjectableString {
+        terminal: grammar_builder.kind_for(terminal_string),
+        terminal_string: terminal_string.clone(),
+        pattern_string,
+        affinity,
+    })?;
+
+    Ok(())
 }
 
 fn traverse_ignorable_region<Symbol: GrammarSymbol, GrammarType>(

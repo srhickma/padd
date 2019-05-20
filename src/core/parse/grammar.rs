@@ -15,6 +15,7 @@ impl GrammarSymbol for String {}
 pub trait Grammar<Symbol: GrammarSymbol>: Send + Sync {
     fn is_nullable_nt(&self, lhs: &Symbol) -> bool;
     fn is_non_terminal(&self, symbol: &Symbol) -> bool;
+    fn is_injectable(&self, symbol: &Symbol) -> bool;
     fn is_ignorable(&self, symbol: &Symbol) -> bool;
     fn terminals(&self) -> &HashSet<Symbol>;
     fn start(&self) -> &Symbol;
@@ -27,6 +28,7 @@ pub trait GrammarBuilder<SymbolIn: GrammarSymbol, SymbolOut: GrammarSymbol, Gram
     fn add_optional_state(&mut self, opt_state: &SymbolIn, dest_state: &SymbolIn);
     fn add_production(&mut self, production: Production<SymbolIn>) -> Production<SymbolOut>;
     fn try_mark_start(&mut self, start: &SymbolIn);
+    fn mark_injectable(&mut self, symbol: &SymbolIn);
     fn mark_ignorable(&mut self, symbol: &SymbolIn);
     fn kind_for(&mut self, token: &SymbolIn) -> SymbolOut;
     fn build(self) -> Result<GrammarType, BuildError>;
@@ -37,6 +39,7 @@ pub struct SimpleGrammar<Symbol: GrammarSymbol> {
     nss: HashSet<Symbol>,
     non_terminals: HashSet<Symbol>,
     terminals: HashSet<Symbol>,
+    injectable: HashSet<Symbol>,
     ignorable: HashSet<Symbol>,
     start: Symbol,
 }
@@ -48,6 +51,10 @@ impl<Symbol: GrammarSymbol> Grammar<Symbol> for SimpleGrammar<Symbol> {
 
     fn is_non_terminal(&self, symbol: &Symbol) -> bool {
         self.non_terminals.contains(symbol)
+    }
+
+    fn is_injectable(&self, symbol: &Symbol) -> bool {
+        self.injectable.contains(symbol)
     }
 
     fn is_ignorable(&self, symbol: &Symbol) -> bool {
@@ -77,6 +84,7 @@ impl<Symbol: GrammarSymbol> Grammar<Symbol> for SimpleGrammar<Symbol> {
 
 pub struct SimpleGrammarBuilder<Symbol: GrammarSymbol> {
     prods_by_lhs: HashMap<Symbol, Vec<Production<Symbol>>>,
+    injectable: HashSet<Symbol>,
     ignorable: HashSet<Symbol>,
     start: Option<Symbol>,
 }
@@ -85,6 +93,7 @@ impl<Symbol: GrammarSymbol> SimpleGrammarBuilder<Symbol> {
     pub fn new() -> Self {
         SimpleGrammarBuilder {
             prods_by_lhs: HashMap::new(),
+            injectable: HashSet::new(),
             ignorable: HashSet::new(),
             start: None,
         }
@@ -116,6 +125,7 @@ impl<Symbol: GrammarSymbol> SimpleGrammarBuilder<Symbol> {
             nss,
             non_terminals,
             terminals,
+            injectable: self.injectable,
             ignorable: self.ignorable,
             start,
         }
@@ -157,6 +167,10 @@ impl<Symbol: GrammarSymbol> GrammarBuilder<Symbol, Symbol, SimpleGrammar<Symbol>
         self.start = Some(start.clone());
     }
 
+    fn mark_injectable(&mut self, symbol: &Symbol) {
+        self.injectable.insert(symbol.clone());
+    }
+
     fn mark_ignorable(&mut self, symbol: &Symbol) {
         self.ignorable.insert(symbol.clone());
     }
@@ -171,6 +185,12 @@ impl<Symbol: GrammarSymbol> GrammarBuilder<Symbol, Symbol, SimpleGrammar<Symbol>
         for ignored in &grammar.ignorable {
             if grammar.non_terminals.contains(ignored) {
                 return Err(BuildError::NonTerminalIgnoredErr(ignored.to_string()));
+            }
+        }
+
+        for injected in &grammar.injectable {
+            if grammar.non_terminals.contains(injected) {
+                return Err(BuildError::NonTerminalInjectedErr(injected.to_string()));
             }
         }
 
@@ -190,6 +210,10 @@ impl<SymbolIn: GrammarSymbol> Grammar<usize> for EncodedGrammar<SymbolIn> {
 
     fn is_non_terminal(&self, symbol: &usize) -> bool {
         self.grammar.is_non_terminal(symbol)
+    }
+
+    fn is_injectable(&self, symbol: &usize) -> bool {
+        self.grammar.is_injectable(symbol)
     }
 
     fn is_ignorable(&self, symbol: &usize) -> bool {
@@ -258,6 +282,10 @@ impl<SymbolIn: GrammarSymbol> GrammarBuilder<SymbolIn, usize, EncodedGrammar<Sym
         self.builder.try_mark_start(&self.encoder.encode(start));
     }
 
+    fn mark_injectable(&mut self, symbol: &SymbolIn) {
+        self.builder.mark_injectable(&self.encoder.encode(symbol));
+    }
+
     fn mark_ignorable(&mut self, symbol: &SymbolIn) {
         self.builder.mark_ignorable(&self.encoder.encode(symbol));
     }
@@ -273,6 +301,14 @@ impl<SymbolIn: GrammarSymbol> GrammarBuilder<SymbolIn, usize, EncodedGrammar<Sym
             if grammar.non_terminals.contains(ignored) {
                 return Err(BuildError::NonTerminalIgnoredErr(
                     self.encoder.decode(*ignored).unwrap().to_string(),
+                ));
+            }
+        }
+
+        for injected in &grammar.injectable {
+            if grammar.non_terminals.contains(injected) {
+                return Err(BuildError::NonTerminalInjectedErr(
+                    self.encoder.decode(*injected).unwrap().to_string(),
                 ));
             }
         }
@@ -385,6 +421,7 @@ impl<'builder, SymbolIn: GrammarSymbol, SymbolOut: GrammarSymbol, GrammarType>
 #[derive(Debug)]
 pub enum BuildError {
     NonTerminalIgnoredErr(String),
+    NonTerminalInjectedErr(String),
 }
 
 impl fmt::Display for BuildError {
@@ -392,7 +429,10 @@ impl fmt::Display for BuildError {
         match *self {
             BuildError::NonTerminalIgnoredErr(ref symbol) => {
                 write!(f, "Ignored symbol '{}' is non-terminal", symbol)
-            }
+            },
+            BuildError::NonTerminalInjectedErr(ref symbol) => {
+                write!(f, "Injected symbol '{}' is non-terminal", symbol)
+            },
         }
     }
 }
@@ -401,6 +441,7 @@ impl error::Error for BuildError {
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match *self {
             BuildError::NonTerminalIgnoredErr(_) => None,
+            BuildError::NonTerminalInjectedErr(_) => None,
         }
     }
 }

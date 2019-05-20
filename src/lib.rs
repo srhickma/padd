@@ -777,6 +777,63 @@ grammar {
     }
 
     #[test]
+    fn failed_pattern_scan_error() {
+        //setup
+        let spec = "
+alphabet ''
+
+cdfa {
+    start ;
+}
+
+grammar {
+    s | `\\\\`;
+}
+        "
+            .to_string();
+
+        //exercise
+        let res = FormatJobRunner::build(&spec);
+
+        //verify
+        assert!(res.is_err());
+
+        let mut err: &Error = &res.err().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "Failed to generate specification: Formatter build error: Pattern build error: \
+            Pattern scan error: No accepting scans after (1,1): \\..."
+        );
+
+        err = err.source().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "Formatter build error: Pattern build error: \
+            Pattern scan error: No accepting scans after (1,1): \\..."
+        );
+
+        err = err.source().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "Pattern build error: Pattern scan error: No accepting scans after (1,1): \\..."
+        );
+
+        err = err.source().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "Pattern scan error: No accepting scans after (1,1): \\..."
+        );
+
+        err = err.source().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "No accepting scans after (1,1): \\..."
+        );
+
+        assert!(err.source().is_none());
+    }
+
+    #[test]
     fn failed_pattern_parse_error() {
         //setup
         let spec = "
@@ -801,15 +858,21 @@ grammar {
         let mut err: &Error = &res.err().unwrap();
         assert_eq!(
             format!("{}", err),
-            "Failed to generate specification: Formatter build error: Pattern parse error: \
+            "Failed to generate specification: Formatter build error: Pattern build error: \
+            Pattern parse error: Recognition failed after consuming all tokens"
+        );
+
+        err = err.source().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "Formatter build error: Pattern build error: Pattern parse error: \
              Recognition failed after consuming all tokens"
         );
 
         err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
-            "Formatter build error: Pattern parse error: \
-             Recognition failed after consuming all tokens"
+            "Pattern build error: Pattern parse error: Recognition failed after consuming all tokens"
         );
 
         err = err.source().unwrap();
@@ -852,14 +915,22 @@ grammar {
         let mut err: &Error = &res.err().unwrap();
         assert_eq!(
             format!("{}", err),
-            "Failed to generate specification: Formatter build error: Pattern capture error: \
+            "Failed to generate specification: Formatter build error: Pattern build error: \
+             Pattern capture error: Capture index 4 out of bounds for production \'s\' with 0 \
+             children"
+        );
+
+        err = err.source().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "Formatter build error: Pattern build error: Pattern capture error: \
              Capture index 4 out of bounds for production \'s\' with 0 children"
         );
 
         err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
-            "Formatter build error: Pattern capture error: \
+            "Pattern build error: Pattern capture error: \
              Capture index 4 out of bounds for production \'s\' with 0 children"
         );
 
@@ -952,6 +1023,128 @@ grammar {
 
         err = err.source().unwrap();
         assert_eq!(format!("{}", err), "Ignored symbol 's' is non-terminal");
+
+        assert!(err.source().is_none());
+    }
+
+    #[test]
+    fn failed_injected_terminal_error_encoded() {
+        //setup
+        let spec = "
+alphabet 's'
+
+cdfa {
+    start
+        's' -> S;
+}
+
+inject left s
+
+grammar {
+    s | S;
+}
+        "
+            .to_string();
+
+        //exercise
+        let res = FormatJobRunner::build(&spec);
+
+        //verify
+        assert!(res.is_err());
+
+        let mut err: &Error = &res.err().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "Failed to generate specification: Grammar build error: Injected symbol 's' is \
+             non-terminal"
+        );
+
+        err = err.source().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "Grammar build error: Injected symbol 's' is non-terminal"
+        );
+
+        err = err.source().unwrap();
+        assert_eq!(format!("{}", err), "Injected symbol 's' is non-terminal");
+
+        assert!(err.source().is_none());
+    }
+
+    #[test]
+    fn failed_injected_terminal_error_simple() {
+        //setup
+        let spec = "
+alphabet 's'
+
+cdfa {
+    start
+        's' -> S;
+}
+
+inject left s
+
+grammar {
+    s | S;
+}
+        ";
+
+        //exercise
+        let parse = spec::parse_spec(spec).unwrap();
+        let grammar_builder = SimpleGrammarBuilder::new();
+        let res = spec::generate_spec(&parse, grammar_builder);
+
+        //verify
+        assert!(res.is_err());
+
+        let mut err: &Error = &res.err().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "Grammar build error: Injected symbol 's' is \
+             non-terminal"
+        );
+
+        err = err.source().unwrap();
+        assert_eq!(format!("{}", err), "Injected symbol 's' is non-terminal");
+
+        assert!(err.source().is_none());
+    }
+
+    #[test]
+    fn failed_duplicate_injection() {
+        //setup
+        let spec = "
+alphabet 's'
+
+cdfa {
+    start
+        's' -> S;
+}
+
+inject left S
+inject right S `pattern`
+
+grammar {
+    s | S;
+}
+        ";
+
+        //exercise
+        let parse = spec::parse_spec(spec).unwrap();
+        let grammar_builder = SimpleGrammarBuilder::new();
+        let res = spec::generate_spec(&parse, grammar_builder);
+
+        //verify
+        assert!(res.is_err());
+
+        let mut err: &Error = &res.err().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "Formatter build error: Injection specified multiple times for symbol \'S\'"
+        );
+
+        err = err.source().unwrap();
+        assert_eq!(format!("{}", err), "Injection specified multiple times for symbol \'S\'");
 
         assert!(err.source().is_none());
     }

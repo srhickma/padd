@@ -1,9 +1,13 @@
 use {
     core::{
         fmt::pattern::{Capture, Pattern, Segment},
-        parse::{grammar::GrammarSymbol, Production, Tree},
+        parse::{
+            grammar::GrammarSymbol,
+            Production,
+            Tree
+        },
     },
-    std::collections::HashMap,
+    std::{collections::HashMap, fmt, error},
 };
 
 mod pattern;
@@ -24,6 +28,7 @@ impl<Symbol: GrammarSymbol> Formatter<Symbol> {
 
 pub struct FormatterBuilder<Symbol: GrammarSymbol> {
     pattern_map: HashMap<Production<Symbol>, Pattern>,
+    injection_map: HashMap<Symbol, Injectable>,
     memory: HashMap<String, Pattern>,
 }
 
@@ -31,6 +36,7 @@ impl<Symbol: GrammarSymbol> FormatterBuilder<Symbol> {
     pub fn new() -> FormatterBuilder<Symbol> {
         FormatterBuilder {
             pattern_map: HashMap::new(),
+            injection_map: HashMap::new(),
             memory: HashMap::new(),
         }
     }
@@ -56,9 +62,73 @@ impl<Symbol: GrammarSymbol> FormatterBuilder<Symbol> {
         self.pattern_map.insert(pair.production, pattern);
         Ok(())
     }
+
+    pub fn add_injection(&mut self, injection: InjectableString<Symbol>) -> Result<(), BuildError> {
+        if self.injection_map.contains_key(&injection.terminal) {
+            return Err(BuildError::DuplicateInjectionErr(injection.terminal_string));
+        }
+
+        let pattern = match injection.pattern_string {
+            None => None,
+            Some(pattern_string) => {
+                let production = Production::from(
+                    injection.terminal.clone(),
+                    vec![injection.terminal.clone()]
+                );
+
+                Some(pattern::generate_pattern(
+                    &pattern_string,
+                    &production,
+                    &production.string_production(),
+                )?)
+            },
+        };
+
+        self.injection_map.insert(
+            injection.terminal,
+            Injectable {
+                pattern,
+                affinity: injection.affinity,
+            }
+        );
+
+        Ok(())
+    }
 }
 
-pub type BuildError = pattern::BuildError;
+#[derive(Debug)]
+pub enum BuildError {
+    PatternBuildErr(pattern::BuildError),
+    DuplicateInjectionErr(String),
+}
+
+impl fmt::Display for BuildError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            BuildError::PatternBuildErr(ref err) => {
+                write!(f, "Pattern build error: {}", err)
+            },
+            BuildError::DuplicateInjectionErr(ref symbol) => {
+                write!(f, "Injection specified multiple times for symbol '{}'", symbol)
+            },
+        }
+    }
+}
+
+impl error::Error for BuildError {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        match *self {
+            BuildError::PatternBuildErr(ref err) => Some(err),
+            BuildError::DuplicateInjectionErr(_) => None,
+        }
+    }
+}
+
+impl From<pattern::BuildError> for BuildError {
+    fn from(err: pattern::BuildError) -> BuildError {
+        BuildError::PatternBuildErr(err)
+    }
+}
 
 struct FormatJob<'parse, Symbol: GrammarSymbol + 'parse> {
     parse: &'parse Tree<Symbol>,
@@ -165,4 +235,21 @@ pub struct PatternPair<Symbol: GrammarSymbol> {
     pub production: Production<Symbol>,
     pub string_production: Production<String>,
     pub pattern: String,
+}
+
+pub enum InjectionAffinity {
+    Left,
+    Right,
+}
+
+pub struct Injectable {
+    pattern: Option<Pattern>,
+    affinity: InjectionAffinity,
+}
+
+pub struct InjectableString<Symbol: GrammarSymbol> {
+    pub terminal: Symbol,
+    pub terminal_string: String,
+    pub pattern_string: Option<String>,
+    pub affinity: InjectionAffinity,
 }
