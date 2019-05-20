@@ -26,6 +26,7 @@ pub fn def_parser<Symbol: GrammarSymbol>() -> Box<Parser<Symbol>> {
 pub struct Tree<Symbol: GrammarSymbol> {
     pub lhs: Token<Symbol>,
     pub children: Vec<Tree<Symbol>>,
+    pub injected: bool,
 }
 
 impl<Symbol: GrammarSymbol> Tree<Symbol> {
@@ -49,15 +50,17 @@ impl<Symbol: GrammarSymbol> Tree<Symbol> {
         Tree {
             lhs: Token::null(),
             children: vec![],
+            injected: false,
         }
     }
 
     fn to_string_internal(&self, prefix: String, is_tail: bool) -> String {
         if self.children.is_empty() {
             format!(
-                "{}{}{}",
+                "{}{}{}{}",
                 prefix,
                 if is_tail { "└── " } else { "├── " },
+                if self.injected { "<< " } else { "" },
                 self.lhs.to_string()
             )
         } else {
@@ -594,6 +597,69 @@ mod tests {
         add_productions(&["s A s A", "s C", "s "], &mut grammar_builder);
         grammar_builder.try_mark_start(&"s".to_string());
         grammar_builder.mark_ignorable(&"C".to_string());
+        let grammar = grammar_builder.build().unwrap();
+
+        let scan = vec![
+            Token::leaf("A".to_string(), "a".to_string()),
+            Token::leaf("C".to_string(), "c".to_string()),
+            Token::leaf("A".to_string(), "a".to_string()),
+        ];
+
+        let parser = def_parser();
+
+        //exercise
+        let tree = parser.parse(scan, &grammar);
+
+        //verify
+        assert_eq!(
+            tree.unwrap().to_string(),
+            "└── s
+    ├── A <- 'a'
+    ├── s
+    │   └── C <- 'c'
+    └── A <- 'a'"
+        );
+    }
+
+    #[test]
+    fn injectable_terminal() {
+        //setup
+        let mut grammar_builder = SimpleGrammarBuilder::new();
+        add_productions(&["s A s B", "s "], &mut grammar_builder);
+        grammar_builder.try_mark_start(&"s".to_string());
+        grammar_builder.mark_injectable(&"C".to_string());
+        let grammar = grammar_builder.build().unwrap();
+
+        let scan = vec![
+            Token::leaf("A".to_string(), "a".to_string()),
+            Token::leaf("C".to_string(), "c".to_string()),
+            Token::leaf("B".to_string(), "b".to_string()),
+        ];
+
+        let parser = def_parser();
+
+        //exercise
+        let tree = parser.parse(scan, &grammar);
+
+        //verify
+        assert_eq!(
+            tree.unwrap().to_string(),
+            "└── s
+    ├── A <- 'a'
+    ├── s
+    │   └──  <- 'NULL'
+    ├── << C <- 'c'
+    └── B <- 'b'"
+        );
+    }
+
+    #[test]
+    fn favour_non_injected_terminals() {
+        //setup
+        let mut grammar_builder = SimpleGrammarBuilder::new();
+        add_productions(&["s A s A", "s C", "s "], &mut grammar_builder);
+        grammar_builder.try_mark_start(&"s".to_string());
+        grammar_builder.mark_injectable(&"C".to_string());
         let grammar = grammar_builder.build().unwrap();
 
         let scan = vec![

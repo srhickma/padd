@@ -1,6 +1,6 @@
 use {
     core::{
-        fmt::{FormatterBuilder, PatternPair, InjectionAffinity, InjectableString},
+        fmt::{FormatterBuilder, InjectableString, InjectionAffinity, PatternPair},
         parse::{
             grammar::{Grammar, GrammarBuilder, GrammarSymbol},
             Production, Tree,
@@ -65,7 +65,7 @@ where
         match region_type {
             RegionType::Injectable => {
                 traverse_injectable_region(inner_node, grammar_builder, formatter_builder)?
-            },
+            }
             RegionType::Ignorable => traverse_ignorable_region(inner_node, grammar_builder),
             RegionType::Alphabet => traverse_alphabet_region(inner_node, cdfa_builder),
             RegionType::CDFA => traverse_cdfa_region(inner_node, cdfa_builder, grammar_builder)?,

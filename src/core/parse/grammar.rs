@@ -74,7 +74,7 @@ impl<Symbol: GrammarSymbol> Grammar<Symbol> for SimpleGrammar<Symbol> {
     }
 
     fn weighted_parse(&self) -> bool {
-        !self.ignorable.is_empty()
+        !self.ignorable.is_empty() || !self.injectable.is_empty()
     }
 
     fn symbol_string(&self, symbol: &Symbol) -> String {
@@ -181,19 +181,7 @@ impl<Symbol: GrammarSymbol> GrammarBuilder<Symbol, Symbol, SimpleGrammar<Symbol>
 
     fn build(self) -> Result<SimpleGrammar<Symbol>, BuildError> {
         let grammar = self.build_no_check();
-
-        for ignored in &grammar.ignorable {
-            if grammar.non_terminals.contains(ignored) {
-                return Err(BuildError::NonTerminalIgnoredErr(ignored.to_string()));
-            }
-        }
-
-        for injected in &grammar.injectable {
-            if grammar.non_terminals.contains(injected) {
-                return Err(BuildError::NonTerminalInjectedErr(injected.to_string()));
-            }
-        }
-
+        check_grammar(&grammar, &|symbol| symbol.to_string())?;
         Ok(grammar)
     }
 }
@@ -295,29 +283,35 @@ impl<SymbolIn: GrammarSymbol> GrammarBuilder<SymbolIn, usize, EncodedGrammar<Sym
     }
 
     fn build(self) -> Result<EncodedGrammar<SymbolIn>, BuildError> {
+        let encoder = self.encoder;
         let grammar = self.builder.build_no_check();
-
-        for ignored in &grammar.ignorable {
-            if grammar.non_terminals.contains(ignored) {
-                return Err(BuildError::NonTerminalIgnoredErr(
-                    self.encoder.decode(*ignored).unwrap().to_string(),
-                ));
-            }
-        }
-
-        for injected in &grammar.injectable {
-            if grammar.non_terminals.contains(injected) {
-                return Err(BuildError::NonTerminalInjectedErr(
-                    self.encoder.decode(*injected).unwrap().to_string(),
-                ));
-            }
-        }
-
-        Ok(EncodedGrammar {
-            grammar,
-            encoder: self.encoder,
-        })
+        check_grammar(&grammar, &|symbol| {
+            encoder.decode(*symbol).unwrap().to_string()
+        })?;
+        Ok(EncodedGrammar { grammar, encoder })
     }
+}
+
+fn check_grammar<Symbol: GrammarSymbol>(
+    grammar: &SimpleGrammar<Symbol>,
+    symbol_decoder: &Fn(&Symbol) -> String,
+) -> Result<(), BuildError> {
+    for ignored in &grammar.ignorable {
+        if grammar.non_terminals.contains(ignored) {
+            return Err(BuildError::NonTerminalIgnoredErr(symbol_decoder(ignored)));
+        }
+    }
+
+    for injected in &grammar.injectable {
+        if grammar.non_terminals.contains(injected) {
+            return Err(BuildError::NonTerminalInjectedErr(symbol_decoder(injected)));
+        }
+        if grammar.ignorable.contains(injected) {
+            return Err(BuildError::IgnoredAndInjectedErr(symbol_decoder(injected)));
+        }
+    }
+
+    Ok(())
 }
 
 fn build_non_terminals<Symbol: GrammarSymbol>(
@@ -422,6 +416,7 @@ impl<'builder, SymbolIn: GrammarSymbol, SymbolOut: GrammarSymbol, GrammarType>
 pub enum BuildError {
     NonTerminalIgnoredErr(String),
     NonTerminalInjectedErr(String),
+    IgnoredAndInjectedErr(String),
 }
 
 impl fmt::Display for BuildError {
@@ -429,10 +424,13 @@ impl fmt::Display for BuildError {
         match *self {
             BuildError::NonTerminalIgnoredErr(ref symbol) => {
                 write!(f, "Ignored symbol '{}' is non-terminal", symbol)
-            },
+            }
             BuildError::NonTerminalInjectedErr(ref symbol) => {
                 write!(f, "Injected symbol '{}' is non-terminal", symbol)
-            },
+            }
+            BuildError::IgnoredAndInjectedErr(ref symbol) => {
+                write!(f, "Symbol '{}' is both ignored and injected", symbol)
+            }
         }
     }
 }
@@ -442,6 +440,7 @@ impl error::Error for BuildError {
         match *self {
             BuildError::NonTerminalIgnoredErr(_) => None,
             BuildError::NonTerminalInjectedErr(_) => None,
+            BuildError::IgnoredAndInjectedErr(_) => None,
         }
     }
 }

@@ -1,19 +1,16 @@
 use {
     core::{
         fmt::pattern::{Capture, Pattern, Segment},
-        parse::{
-            grammar::GrammarSymbol,
-            Production,
-            Tree
-        },
+        parse::{grammar::GrammarSymbol, Production, Tree},
     },
-    std::{collections::HashMap, fmt, error},
+    std::{collections::HashMap, error, fmt},
 };
 
 mod pattern;
 
 pub struct Formatter<Symbol: GrammarSymbol> {
     pattern_map: HashMap<Production<Symbol>, Pattern>,
+    injection_map: HashMap<Symbol, Injectable>,
 }
 
 impl<Symbol: GrammarSymbol> Formatter<Symbol> {
@@ -44,6 +41,7 @@ impl<Symbol: GrammarSymbol> FormatterBuilder<Symbol> {
     pub fn build(self) -> Formatter<Symbol> {
         Formatter {
             pattern_map: self.pattern_map,
+            injection_map: self.injection_map,
         }
     }
 
@@ -71,17 +69,15 @@ impl<Symbol: GrammarSymbol> FormatterBuilder<Symbol> {
         let pattern = match injection.pattern_string {
             None => None,
             Some(pattern_string) => {
-                let production = Production::from(
-                    injection.terminal.clone(),
-                    vec![injection.terminal.clone()]
-                );
+                let production =
+                    Production::from(injection.terminal.clone(), vec![injection.terminal.clone()]);
 
                 Some(pattern::generate_pattern(
                     &pattern_string,
                     &production,
                     &production.string_production(),
                 )?)
-            },
+            }
         };
 
         self.injection_map.insert(
@@ -89,7 +85,7 @@ impl<Symbol: GrammarSymbol> FormatterBuilder<Symbol> {
             Injectable {
                 pattern,
                 affinity: injection.affinity,
-            }
+            },
         );
 
         Ok(())
@@ -105,12 +101,12 @@ pub enum BuildError {
 impl fmt::Display for BuildError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            BuildError::PatternBuildErr(ref err) => {
-                write!(f, "Pattern build error: {}", err)
-            },
-            BuildError::DuplicateInjectionErr(ref symbol) => {
-                write!(f, "Injection specified multiple times for symbol '{}'", symbol)
-            },
+            BuildError::PatternBuildErr(ref err) => write!(f, "Pattern build error: {}", err),
+            BuildError::DuplicateInjectionErr(ref symbol) => write!(
+                f,
+                "Injection specified multiple times for symbol '{}'",
+                symbol
+            ),
         }
     }
 }

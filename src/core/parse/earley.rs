@@ -142,7 +142,19 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
             let symbol = scan[cursor].kind();
 
             let next_row = if grammar.is_ignorable(symbol) {
-                cross_ignorable(chart.row(cursor), symbol, grammar)
+                cross_shadow_symbol(
+                    chart.row(cursor),
+                    symbol,
+                    SymbolParseMethod::Ignored,
+                    grammar,
+                )
+            } else if grammar.is_injectable(symbol) {
+                cross_shadow_symbol(
+                    chart.row(cursor),
+                    symbol,
+                    SymbolParseMethod::Injected,
+                    grammar,
+                )
             } else {
                 cross(chart.row(cursor).incomplete().items.iter(), symbol, grammar)
             };
@@ -203,9 +215,10 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
             dest
         }
 
-        fn cross_ignorable<'inner, 'grammar: 'inner, Symbol: GrammarSymbol>(
+        fn cross_shadow_symbol<'inner, 'grammar: 'inner, Symbol: GrammarSymbol>(
             src: &'inner RChartRow<'grammar, Symbol>,
             symbol: &Symbol,
+            spm: SymbolParseMethod,
             grammar: &'grammar Grammar<Symbol>,
         ) -> Vec<Item<'grammar, Symbol>> {
             let mut dest: Vec<Item<Symbol>> = Vec::new();
@@ -214,12 +227,12 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                 if item.next_symbol().unwrap() == symbol {
                     advance_past_symbol(item, &mut dest, grammar);
                 } else {
-                    dest.push(ignore_next_symbol(item, symbol));
+                    dest.push(advance_via_shadow(item, symbol, spm.clone()));
                 }
             }
 
             for item in &src.complete.items {
-                dest.push(ignore_next_symbol(item, symbol));
+                dest.push(advance_via_shadow(item, symbol, spm.clone()));
             }
 
             dest
@@ -248,9 +261,10 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
             }
         }
 
-        fn ignore_next_symbol<'inner, 'grammar: 'inner, Symbol: GrammarSymbol>(
+        fn advance_via_shadow<'inner, 'grammar: 'inner, Symbol: GrammarSymbol>(
             item: &'inner Item<'grammar, Symbol>,
             symbol: &Symbol,
+            spm: SymbolParseMethod,
         ) -> Item<'grammar, Symbol> {
             let mut shadow_vec = match item.shadow {
                 Some(ref shadow_vec) => shadow_vec.clone(),
@@ -266,7 +280,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
 
             shadow_vec.push(ShadowSymbol {
                 symbol: symbol.clone(),
-                spm: SymbolParseMethod::Ignored,
+                spm,
             });
 
             Item {
@@ -435,6 +449,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                     None => Tree {
                         lhs: scan[edge.start].clone(),
                         children: Vec::new(),
+                        injected: edge.spm == SymbolParseMethod::Injected,
                     },
                     Some(rule) => Tree {
                         lhs: Token::interior(rule.lhs.clone()),
@@ -445,6 +460,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                                 vec![Tree {
                                     lhs: scan[edge.start].clone(),
                                     children: Vec::new(),
+                                    injected: edge.spm == SymbolParseMethod::Injected,
                                 }]
                             } else {
                                 nlp_map
@@ -457,6 +473,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                                     .collect()
                             }
                         },
+                        injected: false,
                     },
                 }
             }
@@ -578,6 +595,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                         //Non-empty rhs
                         lhs: scan[edge.start].clone(),
                         children: Vec::new(),
+                        injected: false,
                     },
                     Some(rule) => Tree {
                         lhs: Token::interior(rule.lhs.clone()),
@@ -594,6 +612,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                             }
                             children
                         },
+                        injected: false,
                     },
                 }
             }
@@ -987,6 +1006,7 @@ struct ShadowSymbol<Symbol: GrammarSymbol> {
 enum SymbolParseMethod {
     Standard,
     Ignored,
+    Injected,
 }
 
 type Node = usize;
