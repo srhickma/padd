@@ -1162,6 +1162,101 @@ kind=A lexeme=a"
         )
     }
 
+    #[test]
+    fn injectable_terminals_region() {
+        //setup
+        let spec = "
+alphabet ''
+
+cdfa {
+    start ;
+}
+
+inject left id1
+inject right id2 `{}\n`
+
+inject
+left
+id3
+`some pattern`
+
+grammar {
+    s |;
+}
+        ";
+
+        //exercise
+        let tree = lang::parse_spec(spec).unwrap();
+
+        //verify
+        assert_eq!(
+            tree.to_string(),
+            "└── Spec
+    └── Regions
+        ├── Regions
+        │   ├── Regions
+        │   │   ├── Regions
+        │   │   │   ├── Regions
+        │   │   │   │   ├── Regions
+        │   │   │   │   │   └── Region
+        │   │   │   │   │       └── Alphabet
+        │   │   │   │   │           ├── TAlphabet <- 'alphabet'
+        │   │   │   │   │           └── TCil <- ''''
+        │   │   │   │   └── Region
+        │   │   │   │       └── CDFA
+        │   │   │   │           ├── TCDFA <- 'cdfa'
+        │   │   │   │           ├── TLeftBrace <- '{'
+        │   │   │   │           ├── States
+        │   │   │   │           │   └── State
+        │   │   │   │           │       ├── StateDeclarator
+        │   │   │   │           │       │   └── Targets
+        │   │   │   │           │       │       └── TId <- 'start'
+        │   │   │   │           │       ├── TransitionsOpt
+        │   │   │   │           │       │   └──  <- 'NULL'
+        │   │   │   │           │       └── TSemi <- ';'
+        │   │   │   │           └── TRightBrace <- '}'
+        │   │   │   └── Region
+        │   │   │       └── Injectable
+        │   │   │           ├── TInjectable <- 'inject'
+        │   │   │           ├── TInjectionAffinity <- 'left'
+        │   │   │           ├── TId <- 'id1'
+        │   │   │           └── PatternOpt
+        │   │   │               └──  <- 'NULL'
+        │   │   └── Region
+        │   │       └── Injectable
+        │   │           ├── TInjectable <- 'inject'
+        │   │           ├── TInjectionAffinity <- 'right'
+        │   │           ├── TId <- 'id2'
+        │   │           └── PatternOpt
+        │   │               └── TPattern <- '`{}\\n`'
+        │   └── Region
+        │       └── Injectable
+        │           ├── TInjectable <- 'inject'
+        │           ├── TInjectionAffinity <- 'left'
+        │           ├── TId <- 'id3'
+        │           └── PatternOpt
+        │               └── TPattern <- '`some pattern`'
+        └── Region
+            └── Grammar
+                ├── TGrammar <- 'grammar'
+                ├── TLeftBrace <- '{'
+                ├── Productions
+                │   └── Production
+                │       ├── TId <- 's'
+                │       ├── PatternOpt
+                │       │   └──  <- 'NULL'
+                │       ├── RightHandSides
+                │       │   └── RightHandSide
+                │       │       ├── TOr <- '|'
+                │       │       ├── Ids
+                │       │       │   └──  <- 'NULL'
+                │       │       └── PatternOpt
+                │       │           └──  <- 'NULL'
+                │       └── TSemi <- ';'
+                └── TRightBrace <- '}'"
+        )
+    }
+
     fn tokens_string(tokens: Vec<Token<String>>) -> String {
         let mut res_string = String::new();
         for token in tokens {

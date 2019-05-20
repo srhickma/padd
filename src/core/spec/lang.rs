@@ -18,6 +18,12 @@ static SPEC_ALPHABET: &'static str = "`-=~!@#$%^&*()+{}|[]\\;':\"<>?,./_01234567
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
 enum S {
     Start,
+    InjectableTag,
+    InjectablePreAffinity,
+    InjectionAffinity,
+    InjectablePreId,
+    InjectableId,
+    InjectablePreComplete,
     Ignorable,
     IgnorableTag,
     IgnorableId,
@@ -73,6 +79,7 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<SpecSymbol>, scan::CDFAError> {
 
     builder
         .state(&S::Start)
+        .mark_chain(&S::InjectableTag, "inject".chars())?
         .mark_chain(&S::IgnorableTag, "ignore".chars())?
         .mark_chain(&S::AlphabetTag, "alphabet".chars())?
         .mark_chain(&S::CDFATag, "cdfa".chars())?
@@ -83,6 +90,7 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<SpecSymbol>, scan::CDFAError> {
         .mark_trans(&S::Whitespace, '\n')?
         .mark_trans(&S::Whitespace, '\r')?;
 
+    build_injectable_region(&mut builder)?;
     build_ignorable_region(&mut builder)?;
     build_alphabet_region(&mut builder)?;
     build_cdfa_region(&mut builder)?;
@@ -119,12 +127,73 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<SpecSymbol>, scan::CDFAError> {
         .tokenize(&SpecSymbol::TId);
 
     builder
+        .state(&S::PatternPartial)
+        .mark_trans(&S::Pattern, '`')?
+        .default_to(&S::PatternPartial)?;
+
+    builder
+        .state(&S::Pattern)
+        .accept()
+        .tokenize(&SpecSymbol::TPattern);
+
+    builder
         .state(&S::Comment)
         .mark_trans(&S::Fail, '\n')?
         .default_to(&S::Comment)?
         .accept();
 
     builder.build()
+}
+
+fn build_injectable_region(
+    builder: &mut EncodedCDFABuilder<S, SpecSymbol>,
+) -> Result<(), scan::CDFAError> {
+    builder
+        .state(&S::InjectableTag)
+        .accept_to_from_all(&S::InjectablePreAffinity)?
+        .tokenize(&SpecSymbol::TInjectable);
+
+    builder
+        .state(&S::InjectablePreAffinity)
+        .mark_chain(&S::InjectionAffinity, "left".chars())?
+        .mark_chain(&S::InjectionAffinity, "right".chars())?
+        .mark_trans(&S::Comment, '#')?
+        .mark_trans(&S::Whitespace, ' ')?
+        .mark_trans(&S::Whitespace, '\t')?
+        .mark_trans(&S::Whitespace, '\r')?
+        .mark_trans(&S::Whitespace, '\n')?;
+
+    builder
+        .state(&S::InjectionAffinity)
+        .accept_to_from_all(&S::InjectablePreId)?
+        .tokenize(&SpecSymbol::TInjectionAffinity);
+
+    builder
+        .state(&S::InjectablePreId)
+        .mark_range(&S::InjectableId, '0', 'Z')?
+        .mark_trans(&S::Comment, '#')?
+        .mark_trans(&S::Whitespace, ' ')?
+        .mark_trans(&S::Whitespace, '\t')?
+        .mark_trans(&S::Whitespace, '\r')?
+        .mark_trans(&S::Whitespace, '\n')?;
+
+    builder
+        .state(&S::InjectableId)
+        .mark_range(&S::InjectableId, '_', 'Z')?
+        .accept_to_from_all(&S::InjectablePreComplete)?
+        .tokenize(&SpecSymbol::TId);
+
+    builder
+        .state(&S::InjectablePreComplete)
+        .mark_trans(&S::PatternPartial, '`')?
+        .mark_trans(&S::Comment, '#')?
+        .mark_trans(&S::Whitespace, ' ')?
+        .mark_trans(&S::Whitespace, '\t')?
+        .mark_trans(&S::Whitespace, '\r')?
+        .mark_trans(&S::Whitespace, '\n')?
+        .accept_to_from_all(&S::Start)?;
+
+    Ok(())
 }
 
 fn build_ignorable_region(
@@ -141,6 +210,7 @@ fn build_ignorable_region(
         .mark_trans(&S::Comment, '#')?
         .mark_trans(&S::Whitespace, ' ')?
         .mark_trans(&S::Whitespace, '\t')?
+        .mark_trans(&S::Whitespace, '\r')?
         .mark_trans(&S::Whitespace, '\n')?;
 
     builder
@@ -166,8 +236,8 @@ fn build_alphabet_region(
         .mark_trans(&S::Comment, '#')?
         .mark_trans(&S::Whitespace, ' ')?
         .mark_trans(&S::Whitespace, '\t')?
-        .mark_trans(&S::Whitespace, '\n')?
-        .mark_trans(&S::Whitespace, '\r')?;
+        .mark_trans(&S::Whitespace, '\r')?
+        .mark_trans(&S::Whitespace, '\n')?;
 
     builder
         .state(&S::AlphabetStringPartial)
@@ -201,8 +271,8 @@ fn build_cdfa_region(
         .mark_trans(&S::Comment, '#')?
         .mark_trans(&S::Whitespace, ' ')?
         .mark_trans(&S::Whitespace, '\t')?
-        .mark_trans(&S::Whitespace, '\n')?
-        .mark_trans(&S::Whitespace, '\r')?;
+        .mark_trans(&S::Whitespace, '\r')?
+        .mark_trans(&S::Whitespace, '\n')?;
 
     builder
         .state(&S::CDFAEntryBrace)
@@ -223,8 +293,8 @@ fn build_cdfa_region(
         .mark_trans(&S::Comment, '#')?
         .mark_trans(&S::Whitespace, ' ')?
         .mark_trans(&S::Whitespace, '\t')?
-        .mark_trans(&S::Whitespace, '\n')?
-        .mark_trans(&S::Whitespace, '\r')?;
+        .mark_trans(&S::Whitespace, '\r')?
+        .mark_trans(&S::Whitespace, '\n')?;
 
     builder.state(&S::Hat).accept().tokenize(&SpecSymbol::THat);
 
@@ -257,8 +327,8 @@ fn build_grammar_region(
         .mark_trans(&S::Comment, '#')?
         .mark_trans(&S::Whitespace, ' ')?
         .mark_trans(&S::Whitespace, '\t')?
-        .mark_trans(&S::Whitespace, '\n')?
-        .mark_trans(&S::Whitespace, '\r')?;
+        .mark_trans(&S::Whitespace, '\r')?
+        .mark_trans(&S::Whitespace, '\n')?;
 
     builder
         .state(&S::GrammarEntryBrace)
@@ -276,8 +346,8 @@ fn build_grammar_region(
         .mark_trans(&S::Comment, '#')?
         .mark_trans(&S::Whitespace, ' ')?
         .mark_trans(&S::Whitespace, '\t')?
-        .mark_trans(&S::Whitespace, '\n')?
-        .mark_trans(&S::Whitespace, '\r')?;
+        .mark_trans(&S::Whitespace, '\r')?
+        .mark_trans(&S::Whitespace, '\n')?;
 
     builder
         .state(&S::OptIdPartial)
@@ -289,16 +359,6 @@ fn build_grammar_region(
         .accept()
         .tokenize(&SpecSymbol::TOptId);
 
-    builder
-        .state(&S::PatternPartial)
-        .mark_trans(&S::Pattern, '`')?
-        .default_to(&S::PatternPartial)?;
-
-    builder
-        .state(&S::Pattern)
-        .accept()
-        .tokenize(&SpecSymbol::TPattern);
-
     Ok(())
 }
 
@@ -307,6 +367,7 @@ pub enum SpecSymbol {
     Spec,
     Regions,
     Region,
+    Injectable,
     Ignorable,
     Alphabet,
     CDFA,
@@ -346,6 +407,8 @@ pub enum SpecSymbol {
     TOptId,
     TDef,
     TIgnorable,
+    TInjectable,
+    TInjectionAffinity,
 }
 
 impl Default for SpecSymbol {
@@ -379,10 +442,18 @@ fn build_spec_grammar() -> Result<SimpleGrammar<SpecSymbol>, grammar::BuildError
 
     builder
         .from(SpecSymbol::Region)
+        .to(vec![SpecSymbol::Injectable])
         .to(vec![SpecSymbol::Ignorable])
         .to(vec![SpecSymbol::Alphabet])
         .to(vec![SpecSymbol::CDFA])
         .to(vec![SpecSymbol::Grammar]);
+
+    builder.from(SpecSymbol::Injectable).to(vec![
+        SpecSymbol::TInjectable,
+        SpecSymbol::TInjectionAffinity,
+        SpecSymbol::TId,
+        SpecSymbol::PatternOpt,
+    ]);
 
     builder
         .from(SpecSymbol::Ignorable)

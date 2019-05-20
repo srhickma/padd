@@ -32,10 +32,22 @@ impl<State: Data, Symbol: GrammarSymbol> Scanner<State, Symbol> for MaximalMunch
             let mut line: usize = line;
             let mut character: usize = character;
 
+            let next_start = cdfa.acceptor_destination(&state, &state);
+
+            let end_state = if let Some(ref accd) = next_start {
+                if cdfa.accepts(&state) && state != *accd {
+                    Some(state.clone())
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
             let mut last_accepting = ScanOneResult {
                 consumed: 0,
-                end_state: None,
-                next_start: None,
+                end_state,
+                next_start,
                 line,
                 character,
             };
