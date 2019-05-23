@@ -1,6 +1,7 @@
 use {
     core::{
         data::Data,
+        fmt::InjectionAffinity,
         parse::{
             self,
             grammar::{Grammar, GrammarSymbol},
@@ -122,7 +123,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
             parse_chart: &mut PChart<'grammar, Symbol>,
         ) {
             for item in &chart.row(cursor).complete().items {
-                if !item.ignore_next {
+                if !item.ignore_next || cursor == chart.len() - 1 {
                     mark_completed_item(&item, cursor, parse_chart);
                 }
             }
@@ -146,6 +147,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                     chart.row(cursor),
                     symbol,
                     SymbolParseMethod::Ignored,
+                    None,
                     grammar,
                 )
             } else if grammar.is_injectable(symbol) {
@@ -153,6 +155,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                     chart.row(cursor),
                     symbol,
                     SymbolParseMethod::Injected,
+                    grammar.injection_affinity(symbol),
                     grammar,
                 )
             } else {
@@ -185,6 +188,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                     next: 0,
                     depth,
                     ignore_next: false,
+                    weight: 0,
                 };
 
                 if symbol != grammar.start() || !chart.row(cursor).contains(&new_item) {
@@ -219,6 +223,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
             src: &'inner RChartRow<'grammar, Symbol>,
             symbol: &Symbol,
             spm: SymbolParseMethod,
+            affinity: Option<&InjectionAffinity>,
             grammar: &'grammar Grammar<Symbol>,
         ) -> Vec<Item<'grammar, Symbol>> {
             let mut dest: Vec<Item<Symbol>> = Vec::new();
@@ -227,12 +232,24 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                 if item.next_symbol().unwrap() == symbol {
                     advance_past_symbol(item, &mut dest, grammar);
                 } else {
-                    dest.push(advance_via_shadow(item, symbol, spm.clone()));
+                    dest.push(advance_via_shadow(
+                        item,
+                        symbol,
+                        spm.clone(),
+                        affinity,
+                        grammar,
+                    ));
                 }
             }
 
             for item in &src.complete.items {
-                dest.push(advance_via_shadow(item, symbol, spm.clone()));
+                dest.push(advance_via_shadow(
+                    item,
+                    symbol,
+                    spm.clone(),
+                    affinity,
+                    grammar,
+                ));
             }
 
             dest
@@ -265,6 +282,8 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
             item: &'inner Item<'grammar, Symbol>,
             symbol: &Symbol,
             spm: SymbolParseMethod,
+            affinity_opt: Option<&InjectionAffinity>,
+            grammar: &'grammar Grammar<Symbol>,
         ) -> Item<'grammar, Symbol> {
             let mut shadow_vec = match item.shadow {
                 Some(ref shadow_vec) => shadow_vec.clone(),
@@ -283,6 +302,28 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                 spm,
             });
 
+            let mut ignore_next = true;
+            let mut weight = item.weight + 1;
+
+            if let Some(affinity) = affinity_opt {
+                let satisfied = match affinity {
+                    InjectionAffinity::Left => {
+                        let prev_symbol = item.prev_symbol();
+                        prev_symbol.is_some() && !grammar.is_non_terminal(prev_symbol.unwrap())
+                    }
+                    InjectionAffinity::Right => {
+                        let next_symbol = item.next_symbol();
+                        next_symbol.is_some() && !grammar.is_non_terminal(next_symbol.unwrap())
+                    }
+                };
+
+                if !satisfied {
+                    weight += 1;
+                } else if *affinity == InjectionAffinity::Left {
+                    ignore_next = false;
+                }
+            }
+
             Item {
                 rule: item.rule,
                 shadow: Some(shadow_vec),
@@ -290,7 +331,8 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                 start: item.start,
                 next: item.next,
                 depth: item.depth,
-                ignore_next: true,
+                ignore_next,
+                weight,
             }
         }
 
@@ -299,11 +341,6 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
             finish: usize,
             parse_chart: &mut PChart<'grammar, Symbol>,
         ) {
-            let weight = match item.shadow {
-                None => 0,
-                Some(ref shadow_vec) => shadow_vec.len() - item.shadow_top + 1,
-            };
-
             parse_chart.row_mut(item.start).add_edge(Edge {
                 rule: Some(item.rule),
                 shadow: item.shadow.clone(),
@@ -311,7 +348,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                 start: item.start,
                 finish,
                 spm: SymbolParseMethod::Standard,
-                weight,
+                weight: item.weight,
                 depth: item.depth,
             });
         }
@@ -386,7 +423,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                     .row(row)
                     .edges
                     .iter()
-                    .filter(|edge| !edge.rule.unwrap().rhs.is_empty())
+                    .filter(|edge| !edge.is_empty())
                     .filter(|edge| !edge.is_terminal(grammar))
                     .for_each(|edge| {
                         ordered_edges.push(edge);
@@ -449,17 +486,19 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                     None => Tree {
                         lhs: scan[edge.start].clone(),
                         children: Vec::new(),
+                        production: None,
                         injected: edge.spm == SymbolParseMethod::Injected,
                     },
                     Some(rule) => Tree {
                         lhs: Token::interior(rule.lhs.clone()),
                         children: {
-                            if edge.rule.unwrap().rhs.is_empty() {
+                            if edge.is_empty() {
                                 vec![Tree::null()]
                             } else if edge.is_terminal(grammar) {
                                 vec![Tree {
                                     lhs: scan[edge.start].clone(),
                                     children: Vec::new(),
+                                    production: None,
                                     injected: edge.spm == SymbolParseMethod::Injected,
                                 }]
                             } else {
@@ -472,6 +511,10 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                                     .map(|edge| link_shallow_paths(edge, grammar, scan, nlp_map))
                                     .collect()
                             }
+                        },
+                        production: match edge.rule {
+                            Some(production) => Some(production.clone()),
+                            None => None,
                         },
                         injected: false,
                     },
@@ -595,6 +638,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                         //Non-empty rhs
                         lhs: scan[edge.start].clone(),
                         children: Vec::new(),
+                        production: None,
                         injected: false,
                     },
                     Some(rule) => Tree {
@@ -611,6 +655,10 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                                 children.push(Tree::null());
                             }
                             children
+                        },
+                        production: match edge.rule {
+                            Some(production) => Some(production.clone()),
+                            None => None,
                         },
                         injected: false,
                     },
@@ -818,6 +866,7 @@ struct Item<'rule, Symbol: GrammarSymbol + 'rule> {
     next: usize,
     depth: usize,
     ignore_next: bool,
+    weight: usize,
 }
 
 impl<'rule, Symbol: GrammarSymbol + 'rule> Item<'rule, Symbol> {
@@ -830,6 +879,7 @@ impl<'rule, Symbol: GrammarSymbol + 'rule> Item<'rule, Symbol> {
             next: 0,
             depth: 0,
             ignore_next: false,
+            weight: 0,
         }
     }
 
@@ -847,12 +897,21 @@ impl<'rule, Symbol: GrammarSymbol + 'rule> Item<'rule, Symbol> {
             next: self.next + 1,
             depth: self.depth,
             ignore_next: false,
+            weight: self.weight,
         }
     }
 
     fn next_symbol<'scope>(&'scope self) -> Option<&'rule Symbol> {
         if self.next < self.rule.rhs.len() {
             Some(&self.rule.rhs[self.next])
+        } else {
+            None
+        }
+    }
+
+    fn prev_symbol<'scope>(&'scope self) -> Option<&'rule Symbol> {
+        if self.next > 0 {
+            self.rule.rhs.get(self.next - 1)
         } else {
             None
         }
@@ -975,6 +1034,23 @@ impl<'prod, Symbol: GrammarSymbol + 'prod> Edge<'prod, Symbol> {
 
     fn is_terminal(&self, grammar: &Grammar<Symbol>) -> bool {
         self.rule.unwrap().rhs.len() == 1 && !grammar.is_non_terminal(&self.rule.unwrap().rhs[0])
+    }
+
+    fn is_empty(&self) -> bool {
+        let empty_normal = match self.rule {
+            Some(rule) => rule.rhs.is_empty(),
+            None => true,
+        };
+
+        let empty_shadow = match &self.shadow {
+            Some(shadow) => shadow
+                .iter()
+                .find(|sym| sym.spm != SymbolParseMethod::Ignored)
+                .is_none(),
+            None => true,
+        };
+
+        empty_normal && empty_shadow
     }
 }
 

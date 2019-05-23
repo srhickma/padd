@@ -89,13 +89,14 @@ where
     GrammarType: Grammar<Symbol>,
 {
     let terminal_string = injectable_node.get_child(2).lhs.lexeme();
-    grammar_builder.mark_injectable(terminal_string);
 
     let affinity = match &injectable_node.get_child(1).lhs.lexeme()[..] {
         "left" => InjectionAffinity::Left,
         "right" => InjectionAffinity::Right,
         aff => panic!("Unexpected injection affinity: '{}'", aff),
     };
+
+    grammar_builder.mark_injectable(terminal_string, affinity.clone());
 
     let pattopt_node = injectable_node.get_child(3);
     let pattern_string = if !pattopt_node.is_empty() {

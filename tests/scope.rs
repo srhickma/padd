@@ -124,7 +124,7 @@ fn assert_matches_file(result: String, file_name: &str) {
             output_file.unwrap().read_to_string(&mut output).unwrap();
         }
         Err(_) => {
-            let mut output_file = File::create(&file_path);
+            let output_file = File::create(&file_path);
             match output_file {
                 Ok(_) => {
                     output_file.unwrap().write(result.as_bytes()).unwrap();

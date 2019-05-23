@@ -1,5 +1,5 @@
 use {
-    core::{data::Data, parse::Production, util::encoder::Encoder},
+    core::{data::Data, fmt::InjectionAffinity, parse::Production, util::encoder::Encoder},
     std::{
         collections::{HashMap, HashSet},
         error, fmt,
@@ -16,6 +16,7 @@ pub trait Grammar<Symbol: GrammarSymbol>: Send + Sync {
     fn is_nullable_nt(&self, lhs: &Symbol) -> bool;
     fn is_non_terminal(&self, symbol: &Symbol) -> bool;
     fn is_injectable(&self, symbol: &Symbol) -> bool;
+    fn injection_affinity(&self, symbol: &Symbol) -> Option<&InjectionAffinity>;
     fn is_ignorable(&self, symbol: &Symbol) -> bool;
     fn terminals(&self) -> &HashSet<Symbol>;
     fn start(&self) -> &Symbol;
@@ -28,7 +29,7 @@ pub trait GrammarBuilder<SymbolIn: GrammarSymbol, SymbolOut: GrammarSymbol, Gram
     fn add_optional_state(&mut self, opt_state: &SymbolIn, dest_state: &SymbolIn);
     fn add_production(&mut self, production: Production<SymbolIn>) -> Production<SymbolOut>;
     fn try_mark_start(&mut self, start: &SymbolIn);
-    fn mark_injectable(&mut self, symbol: &SymbolIn);
+    fn mark_injectable(&mut self, symbol: &SymbolIn, affinity: InjectionAffinity);
     fn mark_ignorable(&mut self, symbol: &SymbolIn);
     fn kind_for(&mut self, token: &SymbolIn) -> SymbolOut;
     fn build(self) -> Result<GrammarType, BuildError>;
@@ -39,7 +40,7 @@ pub struct SimpleGrammar<Symbol: GrammarSymbol> {
     nss: HashSet<Symbol>,
     non_terminals: HashSet<Symbol>,
     terminals: HashSet<Symbol>,
-    injectable: HashSet<Symbol>,
+    injectable: HashMap<Symbol, InjectionAffinity>,
     ignorable: HashSet<Symbol>,
     start: Symbol,
 }
@@ -54,7 +55,11 @@ impl<Symbol: GrammarSymbol> Grammar<Symbol> for SimpleGrammar<Symbol> {
     }
 
     fn is_injectable(&self, symbol: &Symbol) -> bool {
-        self.injectable.contains(symbol)
+        self.injectable.contains_key(symbol)
+    }
+
+    fn injection_affinity(&self, symbol: &Symbol) -> Option<&InjectionAffinity> {
+        self.injectable.get(symbol)
     }
 
     fn is_ignorable(&self, symbol: &Symbol) -> bool {
@@ -84,7 +89,7 @@ impl<Symbol: GrammarSymbol> Grammar<Symbol> for SimpleGrammar<Symbol> {
 
 pub struct SimpleGrammarBuilder<Symbol: GrammarSymbol> {
     prods_by_lhs: HashMap<Symbol, Vec<Production<Symbol>>>,
-    injectable: HashSet<Symbol>,
+    injectable: HashMap<Symbol, InjectionAffinity>,
     ignorable: HashSet<Symbol>,
     start: Option<Symbol>,
 }
@@ -93,7 +98,7 @@ impl<Symbol: GrammarSymbol> SimpleGrammarBuilder<Symbol> {
     pub fn new() -> Self {
         SimpleGrammarBuilder {
             prods_by_lhs: HashMap::new(),
-            injectable: HashSet::new(),
+            injectable: HashMap::new(),
             ignorable: HashSet::new(),
             start: None,
         }
@@ -167,8 +172,8 @@ impl<Symbol: GrammarSymbol> GrammarBuilder<Symbol, Symbol, SimpleGrammar<Symbol>
         self.start = Some(start.clone());
     }
 
-    fn mark_injectable(&mut self, symbol: &Symbol) {
-        self.injectable.insert(symbol.clone());
+    fn mark_injectable(&mut self, symbol: &Symbol, affinity: InjectionAffinity) {
+        self.injectable.insert(symbol.clone(), affinity);
     }
 
     fn mark_ignorable(&mut self, symbol: &Symbol) {
@@ -202,6 +207,10 @@ impl<SymbolIn: GrammarSymbol> Grammar<usize> for EncodedGrammar<SymbolIn> {
 
     fn is_injectable(&self, symbol: &usize) -> bool {
         self.grammar.is_injectable(symbol)
+    }
+
+    fn injection_affinity(&self, symbol: &usize) -> Option<&InjectionAffinity> {
+        self.grammar.injection_affinity(symbol)
     }
 
     fn is_ignorable(&self, symbol: &usize) -> bool {
@@ -270,8 +279,9 @@ impl<SymbolIn: GrammarSymbol> GrammarBuilder<SymbolIn, usize, EncodedGrammar<Sym
         self.builder.try_mark_start(&self.encoder.encode(start));
     }
 
-    fn mark_injectable(&mut self, symbol: &SymbolIn) {
-        self.builder.mark_injectable(&self.encoder.encode(symbol));
+    fn mark_injectable(&mut self, symbol: &SymbolIn, affinity: InjectionAffinity) {
+        self.builder
+            .mark_injectable(&self.encoder.encode(symbol), affinity);
     }
 
     fn mark_ignorable(&mut self, symbol: &SymbolIn) {
@@ -302,7 +312,7 @@ fn check_grammar<Symbol: GrammarSymbol>(
         }
     }
 
-    for injected in &grammar.injectable {
+    for injected in grammar.injectable.keys() {
         if grammar.non_terminals.contains(injected) {
             return Err(BuildError::NonTerminalInjectedErr(symbol_decoder(injected)));
         }
