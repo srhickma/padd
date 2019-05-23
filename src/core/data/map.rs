@@ -32,6 +32,22 @@ impl<V: Default> CEHashMap<V> {
         self.vector[key] = Some(value);
     }
 
+    /// Removes and returns the value associated with a key in the map, if one exists.
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - the key at which to remove the value from the map.
+    pub fn remove(&mut self, key: usize) -> Option<V> {
+        if self.vector.len() > key {
+            self.vector
+                .splice(key..=key, vec![None])
+                .collect::<Vec<_>>()
+                .swap_remove(0)
+        } else {
+            None
+        }
+    }
+
     /// Returns a reference to the value stored in the map at the given key, or `None` if no such value is stored.
     ///
     /// # Arguments

@@ -570,3 +570,139 @@ grammar {
     //verify
     assert_eq!(res, "a a a c b b b");
 }
+
+#[test]
+fn test_inject_terminals_simple() {
+    //setup
+    let spec = "
+alphabet 'abc'
+
+cdfa {
+    start
+        'a' -> ^A
+        'b' -> ^B
+        'c' -> ^C;
+}
+
+inject left C ` <{}>`
+
+grammar {
+    s
+        | A s B `{} {} {}`
+        | ;
+}
+    "
+    .to_string();
+
+    let input = "acb".to_string();
+
+    let fjr = FormatJobRunner::build(&spec).unwrap();
+
+    //exercise
+    let res = fjr.format(FormatJob::from_text(input)).unwrap();
+
+    //verify
+    assert_eq!(res, "a <c>  b");
+}
+
+#[test]
+fn test_inject_terminals_complex() {
+    //setup
+    let spec = "
+alphabet 'abcd'
+
+cdfa {
+    start
+        'a' -> ^A
+        'b' -> ^B
+        'c' -> ^C
+        'd' -> ^D;
+}
+
+inject left C ` <{}>`
+inject right D
+
+grammar {
+    s
+        | A s d B `{} {}{} {}`
+        | ;
+
+    d
+        | d D ` \\\\[{1}\\\\] `
+        | ;
+}
+    "
+    .to_string();
+
+    let input = "cdaadaacbbcdbbdcd".to_string();
+
+    let fjr = FormatJobRunner::build(&spec).unwrap();
+
+    //exercise
+    let res = fjr.format(FormatJob::from_text(input)).unwrap();
+
+    //verify
+    assert_eq!(res, "d <c>a a da a <c>  b b <c> [d]  b bd <c>d");
+}
+
+#[test]
+fn test_inject_terminals_empty() {
+    //setup
+    let spec = "
+alphabet 'a'
+
+cdfa {
+    start
+        'a' -> ^A;
+}
+
+inject left A
+
+grammar {
+    s | ;
+}
+    "
+    .to_string();
+
+    let input = "a".to_string();
+
+    let fjr = FormatJobRunner::build(&spec).unwrap();
+
+    //exercise
+    let res = fjr.format(FormatJob::from_text(input)).unwrap();
+
+    //verify
+    assert_eq!(res, "a");
+}
+
+#[test]
+fn test_ignored_terminal_injection() {
+    //setup
+    let spec = "
+alphabet 'ab'
+
+cdfa {
+    start
+        'a' -> ^A
+        'b' -> ^B;
+}
+
+inject right B
+
+grammar {
+    s
+        | A A `{}`;
+}
+    "
+    .to_string();
+
+    let input = "babab".to_string();
+
+    let fjr = FormatJobRunner::build(&spec).unwrap();
+
+    //exercise
+    let res = fjr.format(FormatJob::from_text(input)).unwrap();
+
+    //verify
+    assert_eq!(res, "bab");
+}
