@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/srhickma/padd.svg?branch=master)](https://travis-ci.org/srhickma/padd)
+[![Build Status](https://travis-ci.com/srhickma/padd.svg?branch=master)](https://travis-ci.com/srhickma/padd)
 [![Test Coverage](https://codecov.io/gh/srhickma/padd/branch/master/graph/badge.svg)](https://codecov.io/gh/srhickma/padd)
 
 # padd
