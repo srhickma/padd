@@ -1089,7 +1089,9 @@ impl<'prod, Symbol: GrammarSymbol + 'prod> Edge<'prod, Symbol> {
     }
 
     fn is_terminal(&self, grammar: &Grammar<Symbol>) -> bool {
-        self.rule.unwrap().rhs.len() == 1 && !grammar.is_non_terminal(&self.rule.unwrap().rhs[0])
+        self.rule.unwrap().rhs.len() == 1
+            && !grammar.is_non_terminal(&self.rule.unwrap().rhs[0])
+            && self.shadow.is_none()
     }
 
     fn is_empty(&self) -> bool {
