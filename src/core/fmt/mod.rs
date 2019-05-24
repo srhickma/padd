@@ -332,7 +332,7 @@ impl<'parse, Symbol: GrammarSymbol + 'parse> FormatJob<'parse, Symbol> {
         let mut postfix = String::new();
 
         if let Some(injections) = injections_opt {
-            for injection in injections {
+            for injection in injections.iter().rev() {
                 let injection_string = match injection.pattern {
                     Some(ref pattern) => {
                         self.fill_pattern_inner(pattern, &[injection.tree], outer_scope, None)
