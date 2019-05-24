@@ -2,6 +2,7 @@ package com.padd.tests;
 
 public class InlineStatements {
     public void test() {
+        // Normal if-then
         if (x) {
             call();
             call();
@@ -10,10 +11,12 @@ public class InlineStatements {
             int x = y;
         }
 
+        // Inline if-then
         if (x) {
             call();
         }
 
+        // Normal if-then-else
         if (x) {
             call();
             call();
@@ -22,12 +25,7 @@ public class InlineStatements {
             call();
         }
 
-        if (x) {
-            call();
-        } else {
-            call();
-        }
-
+        // Inline if-then-else
         if (x) {
             call();
         } else {
@@ -40,6 +38,24 @@ public class InlineStatements {
             call();
         }
 
+        if (x) {
+            call();
+        } else {
+            call();
+        }
+
+        // Normal if-then-else if
+        if (x) {
+            call();
+        } else if (y) {
+            call();
+        } else if (z) {
+            call();
+        } else {
+            call();
+        }
+
+        // Inline if-then-else if
         if (x) {
             call();
         } else if (y) {
@@ -70,32 +86,27 @@ public class InlineStatements {
             call();
         }
 
-        if (x) {
-            call();
-        } else if (y) {
-            call();
-        } else if (z) {
-            call();
-        } else {
-            call();
-        }
-
+        // Normal while
         while (x) {
             call();
         }
 
+        // Inline while
         while (x) {
             call();
         }
 
+        // Normal do-while
         do {
             call();
         } while (x);
 
+        // Inline do-while
         do {
             call();
         } while (x);
 
+        // Normal for
         for (int i = 0; i < x; ++i) {
             call();
         }
@@ -104,6 +115,7 @@ public class InlineStatements {
             call();
         }
 
+        // Inline for
         for (int i = 0; i < x; ++i) {
             call();
         }

@@ -232,15 +232,13 @@ cdfa {
     ws      ^_
         ' ' | '\t' | '\n' | '\r' -> ws;
 
-    lcom    ^_
+    lcom    ^LCOM
         '\n' -> fail
         _ -> lcom;
 
     bcom
-        '*/' -> bcomm # TODO get rid of this after introducing comments
+        '*/' -> ^_
         _ -> bcom;
-
-    bcomm   ^_; # TODO get rid of this after introducing comments
 
     MOD | ASSERT | PRIM | BREAK | CASE | CATCH | ENUM | CLASS | CONTINUE | DEFAULT | DO | ELSE | EXTENDS | FINALLY | FOR
         | IF | IMPLEMENTS | IMPORT | INSTANCEOF | NEW | PACKAGE | RETURN | SUPER | SWITCH | THIS | THROWS | TRY | VOID
@@ -251,6 +249,8 @@ cdfa {
     id      ^ID
         '_' .. '9' | '$' -> id;
 }
+
+inject right LCOM `{}\n[prefix]`
 
 grammar {
     cmp_unit
