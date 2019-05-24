@@ -1,0 +1,173 @@
+// Here is where the license goes
+// and here
+// and here
+// ...
+// ...
+// ...
+// ...
+// ...
+// ...
+// ...
+// ...
+// ...
+// ...
+// and now its done.
+package com.konjex.util;
+
+// Something
+import org.jetbrains.annotations.NotNull;
+// Why is there a comment here?
+import java.util.Iterator;
+
+// Here is some comment about the class
+// It does x, y, z.
+// For more information see https://www.moreinfo.com/?
+public class DoublyLinkedList<T> implements Iterable<T> {
+    // Start of the linked list
+    private LinkedListNode<T> first;
+
+    private LinkedListNode<T> last;
+
+    // End of the linked list
+    private int length;
+
+    // Default constructor
+    public DoublyLinkedList() {
+    // No-op
+    }
+
+    public DoublyLinkedList(T... elements// This is a strange place for a comment
+    ) {
+        // Just add all the elements
+        for (T element : elements) {
+            addLast(element);
+        }
+    }
+
+    public void addFirst(T value) {
+        if (isEmpty()) {
+            first = new LinkedListNode<>(
+                value,
+                null,
+                null
+            );
+            last = first;
+        } else {
+            LinkedListNode<T> newNode = new LinkedListNode<>(
+                value,
+                null,
+                first
+            );
+            first.setPrev(newNode);
+            // Append to the front
+            first = newNode;
+        }
+
+        length++;
+    }
+
+    // Add an element to the end of the linked list.
+    // Never throws.
+    public void addLast(T value) {
+        if (isEmpty()) {
+            first = new LinkedListNode<>(
+                value,
+                null,
+                null
+            );
+            last = first;
+        } else {
+            LinkedListNode<T> newNode = new LinkedListNode<>(
+                value,
+                last,
+                null
+            );
+            last.setNext(newNode);
+            last = newNode;
+        }
+
+        length++;
+    }
+
+    public void removeFirst() {
+        if (!removeIfLast()) {
+            first = first.getNext();
+            first.setPrev(null);
+        }
+    }
+
+    public void removeLast() {
+        if (!removeIfLast()) {
+            last = last.getPrev();
+            last.setNext(null);
+        }
+    }
+
+    private boolean removeIfLast() {
+        if (isEmpty()) {
+            return true;
+        }
+
+        // Decrement length
+        length--;
+
+        // Reset first and last pointers if the list is now empty.
+        // Return true if this is the case.
+        if (length == 0) {
+            first = null;
+            last = null;
+            return true;
+        }
+
+        return false;
+    // Return false only if there are remaining elements
+    }
+
+    public boolean isEmpty() {
+        return first == null;
+    }
+
+    public LinkedListNode<T> getFirst() {
+        return first;
+    }
+
+    public LinkedListNode<T> getLast() {
+        return last;
+    }
+
+    public int size() {
+        return length;
+    }
+
+    @NotNull
+    @Override
+    public Iterator<T> iterator() {
+        return new Iterator<T>() {
+            // A
+            private LinkedListNode<T> currentNode = first;
+
+            @Override
+            public boolean hasNext() {
+                // Test1
+                // Test2
+                return !isEmpty() && currentNode.hasNext();
+            }
+
+            @Override
+            public T next() {
+                T value = currentNode// This is a strange place for a comment
+                .getValue();
+                currentNode = currentNode.getNext()// This place is even stranger
+                ;
+                return value;
+            }
+
+            @Override
+            // This method overrides a method on Iterator
+            public void remove() {
+                // We don't allow element removal via this iterator
+                throw new UnsupportedOperationException();
+            }
+        };
+    }
+}

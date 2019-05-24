@@ -69,6 +69,11 @@ fn test_java8_inline() {
 }
 
 #[test]
+fn test_java8_line_comments() {
+    test_fjr("java8_line_comments", "java8");
+}
+
+#[test]
 fn test_json_simple() {
     test_fjr("json_simple", "json");
 }
