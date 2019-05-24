@@ -165,7 +165,18 @@ impl<'parse, Symbol: GrammarSymbol + 'parse> FormatJob<'parse, Symbol> {
                 //Reconstruct one after the other
                 let mut res = String::new();
                 for child in &node.children {
-                    res = format!("{}{}", res, self.recur(child, scope));
+                    res = if child.injected {
+                        let injectable = &self.injection_map[child.lhs.kind()];
+                        let injection = Injection {
+                            tree: child,
+                            pattern: &injectable.pattern,
+                            direction: injectable.affinity.clone(),
+                        };
+
+                        format!("{}{}", res, self.injection_string(&injection, scope))
+                    } else {
+                        format!("{}{}", res, self.recur(child, scope))
+                    };
                 }
                 res
             }
@@ -333,12 +344,7 @@ impl<'parse, Symbol: GrammarSymbol + 'parse> FormatJob<'parse, Symbol> {
 
         if let Some(injections) = injections_opt {
             for injection in injections.iter().rev() {
-                let injection_string = match injection.pattern {
-                    Some(ref pattern) => {
-                        self.fill_pattern_inner(pattern, &[injection.tree], outer_scope, None)
-                    }
-                    None => injection.tree.lhs.lexeme().clone(),
-                };
+                let injection_string = self.injection_string(injection, outer_scope);
 
                 match injection.direction {
                     InjectionAffinity::Left => postfix = format!("{}{}", postfix, injection_string),
@@ -348,6 +354,20 @@ impl<'parse, Symbol: GrammarSymbol + 'parse> FormatJob<'parse, Symbol> {
         }
 
         format!("{}{}{}", prefix, child_string, postfix)
+    }
+
+    #[inline(always)]
+    fn injection_string(
+        &self,
+        injection: &Injection<Symbol>,
+        scope: &HashMap<String, String>,
+    ) -> String {
+        match injection.pattern {
+            Some(ref pattern) => {
+                self.fill_pattern_inner(pattern, &[injection.tree], scope, None)
+            }
+            None => injection.tree.lhs.lexeme().clone(),
+        }
     }
 }
 
