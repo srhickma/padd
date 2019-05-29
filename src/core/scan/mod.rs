@@ -30,7 +30,6 @@ pub trait CDFA<State: Data, Symbol: GrammarSymbol>: Send + Sync {
 pub trait CDFABuilder<State: Data, Symbol: GrammarSymbol, CDFAType> {
     fn new() -> Self;
     fn build(self) -> Result<CDFAType, CDFAError>;
-
     fn set_alphabet(&mut self, chars: impl Iterator<Item = char>) -> &mut Self;
     fn accept(&mut self, state: &State) -> &mut Self;
     fn accept_to(
@@ -41,12 +40,19 @@ pub trait CDFABuilder<State: Data, Symbol: GrammarSymbol, CDFAType> {
     ) -> Result<&mut Self, CDFAError>;
     fn accept_to_from_all(&mut self, state: &State, to: &State) -> Result<&mut Self, CDFAError>;
     fn mark_start(&mut self, state: &State) -> &mut Self;
-    fn mark_trans(&mut self, from: &State, to: &State, on: char) -> Result<&mut Self, CDFAError>;
+    fn mark_trans(
+        &mut self,
+        from: &State,
+        to: &State,
+        on: char,
+        consumer: ConsumerStrategy,
+    ) -> Result<&mut Self, CDFAError>;
     fn mark_chain(
         &mut self,
         from: &State,
         to: &State,
         on: impl Iterator<Item = char>,
+        consumer: ConsumerStrategy,
     ) -> Result<&mut Self, CDFAError>;
     fn mark_range(
         &mut self,
@@ -54,6 +60,7 @@ pub trait CDFABuilder<State: Data, Symbol: GrammarSymbol, CDFAType> {
         to: &State,
         start: char,
         end: char,
+        consumer: ConsumerStrategy,
     ) -> Result<&mut Self, CDFAError>;
     fn mark_range_for_all<'state_o: 'state_i, 'state_i>(
         &mut self,
@@ -61,17 +68,29 @@ pub trait CDFABuilder<State: Data, Symbol: GrammarSymbol, CDFAType> {
         to: &'state_o State,
         start: char,
         end: char,
+        consumer: ConsumerStrategy,
     ) -> Result<&mut Self, CDFAError>;
-    fn default_to(&mut self, from: &State, to: &State) -> Result<&mut Self, CDFAError>;
+    fn default_to(
+        &mut self,
+        from: &State,
+        to: &State,
+        consumer: ConsumerStrategy,
+    ) -> Result<&mut Self, CDFAError>;
     fn tokenize(&mut self, state: &State, token: &Symbol) -> &mut Self;
 }
 
-pub struct TransitionResult<State> {
+#[derive(Clone)]
+pub enum ConsumerStrategy {
+    All,
+    None,
+}
+
+pub struct TransitionResult<State: Data> {
     state: Option<State>,
     consumed: usize,
 }
 
-impl<State> TransitionResult<State> {
+impl<State: Data> TransitionResult<State> {
     pub fn fail() -> Self {
         TransitionResult {
             state: None,
@@ -79,15 +98,32 @@ impl<State> TransitionResult<State> {
         }
     }
 
-    pub fn direct(state: State) -> Self {
-        TransitionResult::new(state, 1)
+    pub fn direct(dest: &TransitionDestination<State>) -> Self {
+        TransitionResult::new(dest, 1)
     }
 
-    pub fn new(state: State, consumed: usize) -> Self {
+    pub fn new(dest: &TransitionDestination<State>, traversed: usize) -> Self {
+        let consumed = match dest.consumer {
+            ConsumerStrategy::All => traversed,
+            ConsumerStrategy::None => 0,
+        };
+
         TransitionResult {
-            state: Some(state),
+            state: Some(dest.state.clone()),
             consumed,
         }
+    }
+}
+
+#[derive(Clone)]
+pub struct TransitionDestination<State: Data> {
+    state: State,
+    consumer: ConsumerStrategy,
+}
+
+impl<State: Data> TransitionDestination<State> {
+    pub fn new(state: State, consumer: ConsumerStrategy) -> Self {
+        TransitionDestination { state, consumer }
     }
 }
 

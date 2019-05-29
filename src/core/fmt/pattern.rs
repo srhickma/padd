@@ -9,7 +9,7 @@ use {
         scan::{
             self,
             ecdfa::{EncodedCDFA, EncodedCDFABuilder},
-            CDFABuilder,
+            CDFABuilder, ConsumerStrategy,
         },
         util::string_utils,
     },
@@ -79,7 +79,7 @@ fn build_pattern_ecdfa() -> Result<EncodedCDFA<PatternSymbol>, scan::CDFAError> 
         .accept()
         .tokenize(&PatternSymbol::TFiller);
 
-    builder.default_to(&S::Escape, &S::Filler)?;
+    builder.default_to(&S::Escape, &S::Filler, ConsumerStrategy::All)?;
 
     builder
         .state(&S::Number)
