@@ -706,3 +706,50 @@ grammar {
     //verify
     assert_eq!(res, "bab");
 }
+
+#[test]
+fn test_non_consuming_transitions() {
+    //setup
+    let spec = "
+alphabet 'abc'
+
+cdfa {
+    start1
+        'a' -> ^A1
+        'b' ->> start2
+        _ ->> start3;
+
+    start2
+        'b' -> b;
+
+    b   ^B2
+        'c' ->> start3;
+
+
+    start3
+        'c' -> ^C3;
+}
+
+grammar {
+    s
+        | s x `{} {}`
+        | x;
+
+    x
+        | A1 `A1\\\\{{}\\\\}`
+        | B2 `B2\\\\{{}\\\\}`
+        | C3 `C3\\\\{{}\\\\}`;
+}
+    "
+    .to_string();
+
+    let input = "abcacb".to_string();
+
+    let fjr = FormatJobRunner::build(&spec).unwrap();
+
+    //exercise
+    let res = fjr.format(FormatJob::from_text(input)).unwrap();
+
+    //verify
+    assert_eq!(res, "A1{a} C3{bc} A1{a} C3{c} B2{b}");
+}

@@ -1287,6 +1287,53 @@ grammar {
         )
     }
 
+    #[test]
+    fn non_consuming_transitions() {
+        //setup
+        let spec = "
+alphabet 'abc'
+
+cdfa {
+    start1
+        'a' -> ^A1
+        'b' ->> start2
+        _ ->> start3;
+
+    start2
+        'b' -> ^B2
+        'c' -> ^C2;
+
+    start3
+        'c' -> ^C3;
+}
+
+grammar {
+    s |;
+}
+        ";
+
+        let input = "abca".to_string();
+        let chars: Vec<char> = input.chars().collect();
+
+        let scanner = scan::def_scanner();
+        let tree = lang::parse_spec(spec);
+        let parse = tree.unwrap();
+        let (cdfa, _, _) = generate_spec(&parse, SimpleGrammarBuilder::new()).unwrap();
+
+        //exercise
+        let tokens = scanner.scan(&chars[..], &*cdfa).unwrap();
+
+        //verify
+        assert_eq!(
+            tokens_string(tokens),
+            "
+kind=A1 lexeme=a
+kind=B2 lexeme=b
+kind=C3 lexeme=c
+kind=A1 lexeme=a"
+        )
+    }
+
     fn tokens_string(tokens: Vec<Token<String>>) -> String {
         let mut res_string = String::new();
         for token in tokens {

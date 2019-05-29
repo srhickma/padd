@@ -1146,6 +1146,58 @@ A <- 'a'
         );
     }
 
+    #[test]
+    fn non_consuming_transitions() {
+        //setup
+        #[derive(PartialEq, Eq, Hash, Clone, Debug)]
+        enum S {
+            Start1,
+            Start2,
+            A,
+            B,
+        }
+
+        impl Data for S {
+            fn to_string(&self) -> String {
+                format!("{:?}", self)
+            }
+        }
+
+        let mut builder: EncodedCDFABuilder<S, String> = EncodedCDFABuilder::new();
+        builder.set_alphabet("ab".chars()).mark_start(&S::Start1);
+        builder
+            .mark_trans(&S::Start1, &S::A, 'a', ConsumerStrategy::All)
+            .unwrap()
+            .default_to(&S::Start1, &S::Start2, ConsumerStrategy::None)
+            .unwrap();
+        builder
+            .mark_trans(&S::Start2, &S::B, 'b', ConsumerStrategy::All)
+            .unwrap();
+        builder.accept(&S::A);
+        builder.accept(&S::B);
+        builder.state(&S::A).tokenize(&"A".to_string());
+        builder.state(&S::B).tokenize(&"B".to_string());
+
+        let cdfa: EncodedCDFA<String> = builder.build().unwrap();
+
+        let input = "ab".to_string();
+        let chars: Vec<char> = input.chars().collect();
+
+        let scanner = scan::def_scanner();
+
+        //exercise
+        let tokens = scanner.scan(&chars[..], &cdfa).unwrap();
+
+        //verify
+        assert_eq!(
+            tokens_string(&tokens),
+            "\
+A <- 'a'
+B <- 'b'
+"
+        );
+    }
+
     fn tokens_string<Kind: Data>(tokens: &Vec<Token<Kind>>) -> String {
         let mut result = String::new();
         for token in tokens {
