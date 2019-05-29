@@ -7,7 +7,7 @@ use {
         },
         scan::{
             ecdfa::{EncodedCDFA, EncodedCDFABuilder},
-            CDFABuilder, State, CDFA,
+            CDFABuilder, ConsumerStrategy, State, CDFA,
         },
         spec::{
             self,
@@ -250,20 +250,18 @@ where
 {
     let tran_node = trans_node.get_child(trans_node.children.len() - 1);
 
-    let trand_node = tran_node.get_child(2);
-
-    let dest = match trand_node.get_child(0).lhs.kind() {
-        &SpecSymbol::TId => trand_node.get_child(0).lhs.lexeme(),
+    let destination = tran_node.get_child(2).get_child(0);
+    let dest = match destination.lhs.kind() {
+        &SpecSymbol::TId => destination.lhs.lexeme(),
         &SpecSymbol::Acceptor => {
-            let acceptor_node = trand_node.get_child(0);
-            let id_or_def_node = acceptor_node.get_child(1);
+            let id_or_def_node = destination.get_child(1);
             let token = id_or_def_node.get_child(0).lhs.lexeme();
             let kind = grammar_builder.kind_for(token);
 
             // Immediate state pass-through
             for source in sources {
                 add_cdfa_tokenizer(
-                    acceptor_node,
+                    destination,
                     token,
                     Some(*source),
                     &kind,
@@ -277,14 +275,20 @@ where
         symbol => panic!("Unexpected transition destination symbol: {:?}", symbol),
     };
 
-    let matcher = tran_node.get_child(0);
+    let consumer = match tran_node.get_child(1).get_child(0).lhs.kind() {
+        SpecSymbol::TArrow => ConsumerStrategy::All,
+        SpecSymbol::TDoubleArrow => ConsumerStrategy::None,
+        s => panic!("Unexpected transition consumer: {:?}", s),
+    };
+
+    let matcher = tran_node.get_child(0).get_child(0);
     match matcher.lhs.kind() {
         SpecSymbol::Matchers => {
-            generate_cdfa_mtcs(matcher, sources, dest, builder)?;
+            generate_cdfa_mtcs(matcher, sources, dest, builder, &consumer)?;
         }
         SpecSymbol::TDef => {
             for source in sources {
-                builder.default_to(source, dest)?;
+                builder.default_to(source, dest, consumer.clone())?;
             }
         }
         _ => panic!("Transition map input is neither Matchers nor TDef"),
@@ -303,6 +307,7 @@ fn generate_cdfa_mtcs<CDFABuilderType, CDFAType, Symbol: GrammarSymbol>(
     sources: &[&State],
     dest: &State,
     builder: &mut CDFABuilderType,
+    consumer: &ConsumerStrategy,
 ) -> Result<(), spec::GenError>
 where
     CDFAType: CDFA<usize, Symbol>,
@@ -322,11 +327,16 @@ where
         let matcher_cleaned = string_utils::replace_escapes(&matcher_string);
         if matcher_cleaned.len() == 1 {
             for source in sources {
-                builder.mark_trans(source, dest, matcher_cleaned.chars().next().unwrap())?;
+                builder.mark_trans(
+                    source,
+                    dest,
+                    matcher_cleaned.chars().next().unwrap(),
+                    consumer.clone(),
+                )?;
             }
         } else {
             for source in sources {
-                builder.mark_chain(source, dest, matcher_cleaned.chars())?;
+                builder.mark_chain(source, dest, matcher_cleaned.chars(), consumer.clone())?;
             }
         }
     } else {
@@ -368,11 +378,17 @@ where
         let range_start = range_start_string.chars().next().unwrap();
         let range_end = range_end_string.chars().next().unwrap();
 
-        builder.mark_range_for_all(sources.iter(), dest, range_start, range_end)?;
+        builder.mark_range_for_all(
+            sources.iter(),
+            dest,
+            range_start,
+            range_end,
+            consumer.clone(),
+        )?;
     }
 
     if mtcs_node.children.len() == 3 {
-        generate_cdfa_mtcs(mtcs_node.get_child(0), sources, dest, builder)
+        generate_cdfa_mtcs(mtcs_node.get_child(0), sources, dest, builder, consumer)
     } else {
         Ok(())
     }

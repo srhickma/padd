@@ -5,7 +5,10 @@ use {
             Data,
         },
         parse::grammar::GrammarSymbol,
-        scan::{alphabet::HashedAlphabet, CDFABuilder, CDFAError, TransitionResult, CDFA},
+        scan::{
+            alphabet::HashedAlphabet, CDFABuilder, CDFAError, ConsumerStrategy,
+            TransitionDestination, TransitionResult, CDFA,
+        },
         util::encoder::Encoder,
     },
     std::{collections::HashMap, fmt::Debug, usize},
@@ -148,13 +151,19 @@ impl<State: Data, Symbol: GrammarSymbol> CDFABuilder<State, Symbol, EncodedCDFA<
         self
     }
 
-    fn mark_trans(&mut self, from: &State, to: &State, on: char) -> Result<&mut Self, CDFAError> {
+    fn mark_trans(
+        &mut self,
+        from: &State,
+        to: &State,
+        on: char,
+        consumer: ConsumerStrategy,
+    ) -> Result<&mut Self, CDFAError> {
         let from_encoded = self.encoder.encode(from);
         let to_encoded = self.encoder.encode(to);
 
         {
             let t_trie = self.get_transition_trie(from_encoded);
-            t_trie.insert(on, to_encoded)?;
+            t_trie.insert(on, TransitionDestination::new(to_encoded, consumer))?;
         }
 
         Ok(self)
@@ -165,6 +174,7 @@ impl<State: Data, Symbol: GrammarSymbol> CDFABuilder<State, Symbol, EncodedCDFA<
         from: &State,
         to: &State,
         on: impl Iterator<Item = char>,
+        consumer: ConsumerStrategy,
     ) -> Result<&mut Self, CDFAError> {
         let from_encoded = self.encoder.encode(from);
         let to_encoded = self.encoder.encode(to);
@@ -174,7 +184,7 @@ impl<State: Data, Symbol: GrammarSymbol> CDFABuilder<State, Symbol, EncodedCDFA<
 
             let mut chars: Vec<char> = Vec::new();
             on.for_each(|c| chars.push(c));
-            t_trie.insert_chain(&chars, to_encoded)?;
+            t_trie.insert_chain(&chars, TransitionDestination::new(to_encoded, consumer))?;
         }
 
         Ok(self)
@@ -186,11 +196,12 @@ impl<State: Data, Symbol: GrammarSymbol> CDFABuilder<State, Symbol, EncodedCDFA<
         to: &State,
         start: char,
         end: char,
+        consumer: ConsumerStrategy,
     ) -> Result<&mut Self, CDFAError> {
         let to_mark = self.get_alphabet_range(start, end);
 
         for c in &to_mark {
-            self.mark_trans(from, to, *c)?;
+            self.mark_trans(from, to, *c, consumer.clone())?;
         }
 
         Ok(self)
@@ -202,26 +213,32 @@ impl<State: Data, Symbol: GrammarSymbol> CDFABuilder<State, Symbol, EncodedCDFA<
         to: &'state_o State,
         start: char,
         end: char,
+        consumer: ConsumerStrategy,
     ) -> Result<&mut Self, CDFAError> {
         let to_mark = self.get_alphabet_range(start, end);
 
         for source in sources {
             for c in &to_mark {
-                self.mark_trans(&source, to, *c)?;
+                self.mark_trans(&source, to, *c, consumer.clone())?;
             }
         }
 
         Ok(self)
     }
 
-    fn default_to(&mut self, from: &State, to: &State) -> Result<&mut Self, CDFAError> {
+    fn default_to(
+        &mut self,
+        from: &State,
+        to: &State,
+        consumer: ConsumerStrategy,
+    ) -> Result<&mut Self, CDFAError> {
         let from_encoded = self.encoder.encode(from);
         let to_encoded = self.encoder.encode(to);
 
         match {
             let t_trie = self.get_transition_trie(from_encoded);
 
-            t_trie.set_default(to_encoded)
+            t_trie.set_default(TransitionDestination::new(to_encoded, consumer))
         } {
             Err(err) => Err(err),
             Ok(()) => Ok(self),
@@ -259,7 +276,8 @@ impl<'scope, 'state: 'scope, State: 'state + Data, Symbol: 'scope + GrammarSymbo
     }
 
     pub fn mark_trans(&mut self, to: &State, on: char) -> Result<&mut Self, CDFAError> {
-        self.ecdfa_builder.mark_trans(self.state, to, on)?;
+        self.ecdfa_builder
+            .mark_trans(self.state, to, on, ConsumerStrategy::All)?;
         Ok(self)
     }
 
@@ -268,7 +286,8 @@ impl<'scope, 'state: 'scope, State: 'state + Data, Symbol: 'scope + GrammarSymbo
         to: &State,
         on: impl Iterator<Item = char>,
     ) -> Result<&mut Self, CDFAError> {
-        self.ecdfa_builder.mark_chain(self.state, to, on)?;
+        self.ecdfa_builder
+            .mark_chain(self.state, to, on, ConsumerStrategy::All)?;
         Ok(self)
     }
 
@@ -278,12 +297,14 @@ impl<'scope, 'state: 'scope, State: 'state + Data, Symbol: 'scope + GrammarSymbo
         start: char,
         end: char,
     ) -> Result<&mut Self, CDFAError> {
-        self.ecdfa_builder.mark_range(self.state, to, start, end)?;
+        self.ecdfa_builder
+            .mark_range(self.state, to, start, end, ConsumerStrategy::All)?;
         Ok(self)
     }
 
     pub fn default_to(&mut self, to: &State) -> Result<&mut Self, CDFAError> {
-        self.ecdfa_builder.default_to(self.state, to)?;
+        self.ecdfa_builder
+            .default_to(self.state, to, ConsumerStrategy::All)?;
         Ok(self)
     }
 
@@ -346,7 +367,7 @@ impl<Symbol: GrammarSymbol> CDFA<usize, Symbol> for EncodedCDFA<Symbol> {
 
 struct TransitionTrie {
     root: TransitionNode,
-    default: Option<usize>,
+    default: Option<TransitionDestination<usize>>,
 }
 
 impl TransitionTrie {
@@ -354,7 +375,7 @@ impl TransitionTrie {
         TransitionTrie {
             root: TransitionNode {
                 children: HashMap::new(),
-                dest: usize::max_value(),
+                dest: TransitionDestination::new(usize::max_value(), ConsumerStrategy::None),
             },
             default: None,
         }
@@ -366,9 +387,9 @@ impl TransitionTrie {
         if curr.children.is_empty() {
             match self.default {
                 None => TransitionResult::fail(),
-                Some(state) => match input.first() {
+                Some(ref dest) => match input.first() {
                     None => TransitionResult::fail(),
-                    Some(_) => TransitionResult::direct(state),
+                    Some(_) => TransitionResult::direct(dest),
                 },
             }
         } else {
@@ -379,7 +400,7 @@ impl TransitionTrie {
                     Some(c) => match curr.get_child(*c) {
                         None => match self.default {
                             None => return TransitionResult::fail(),
-                            Some(state) => return TransitionResult::direct(state),
+                            Some(ref dest) => return TransitionResult::direct(dest),
                         },
                         Some(child) => child,
                     },
@@ -388,15 +409,19 @@ impl TransitionTrie {
                 cursor += 1;
             }
 
-            TransitionResult::new(curr.dest, cursor)
+            TransitionResult::new(&curr.dest, cursor)
         }
     }
 
-    fn insert(&mut self, c: char, dest: usize) -> Result<(), CDFAError> {
+    fn insert(&mut self, c: char, dest: TransitionDestination<usize>) -> Result<(), CDFAError> {
         TransitionTrie::insert_internal(c, &mut self.root, true, dest)
     }
 
-    fn insert_chain(&mut self, chars: &[char], dest: usize) -> Result<(), CDFAError> {
+    fn insert_chain(
+        &mut self,
+        chars: &[char],
+        dest: TransitionDestination<usize>,
+    ) -> Result<(), CDFAError> {
         TransitionTrie::insert_chain_internal(0, &mut self.root, chars, dest)
     }
 
@@ -404,14 +429,14 @@ impl TransitionTrie {
         i: usize,
         node: &mut TransitionNode,
         chars: &[char],
-        dest: usize,
+        dest: TransitionDestination<usize>,
     ) -> Result<(), CDFAError> {
         if i == chars.len() {
             return Ok(());
         }
 
         let c = chars[i];
-        TransitionTrie::insert_internal(c, node, i == chars.len() - 1, dest)?;
+        TransitionTrie::insert_internal(c, node, i == chars.len() - 1, dest.clone())?;
         TransitionTrie::insert_chain_internal(i + 1, node.get_child_mut(c).unwrap(), chars, dest)
     }
 
@@ -419,12 +444,16 @@ impl TransitionTrie {
         c: char,
         node: &mut TransitionNode,
         last: bool,
-        dest: usize,
+        dest: TransitionDestination<usize>,
     ) -> Result<(), CDFAError> {
         if !node.has_child(c) {
             let child = TransitionNode {
                 children: HashMap::new(),
-                dest: if last { dest } else { usize::max_value() },
+                dest: if last {
+                    dest
+                } else {
+                    TransitionDestination::new(usize::max_value(), ConsumerStrategy::None)
+                },
             };
             node.add_child(c, child);
         } else if last {
@@ -436,7 +465,7 @@ impl TransitionTrie {
         Ok(())
     }
 
-    fn set_default(&mut self, default: usize) -> Result<(), CDFAError> {
+    fn set_default(&mut self, default: TransitionDestination<usize>) -> Result<(), CDFAError> {
         if self.default.is_some() {
             Err(CDFAError::BuildErr(
                 "Default matcher used twice".to_string(),
@@ -456,7 +485,7 @@ impl Default for TransitionTrie {
 
 struct TransitionNode {
     children: HashMap<char, TransitionNode>,
-    dest: usize,
+    dest: TransitionDestination<usize>,
 }
 
 impl TransitionNode {
@@ -915,7 +944,7 @@ FIVE <- 'five'
             .accept(&"id".to_string())
             .tokenize(&"id".to_string(), &"ID".to_string());
         builder
-            .default_to(&"id".to_string(), &"id".to_string())
+            .default_to(&"id".to_string(), &"id".to_string(), ConsumerStrategy::All)
             .unwrap();
 
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
@@ -1040,9 +1069,13 @@ A <- 'a'
 
         let mut builder: EncodedCDFABuilder<S, String> = EncodedCDFABuilder::new();
         builder.set_alphabet("a".chars()).mark_start(&S::Start);
-        builder.mark_trans(&S::Start, &S::A, 'a').unwrap();
+        builder
+            .mark_trans(&S::Start, &S::A, 'a', ConsumerStrategy::All)
+            .unwrap();
         builder.accept_to(&S::A, &S::Start, &S::LastA).unwrap();
-        builder.mark_trans(&S::LastA, &S::A, 'a').unwrap();
+        builder
+            .mark_trans(&S::LastA, &S::A, 'a', ConsumerStrategy::All)
+            .unwrap();
         builder.accept_to(&S::A, &S::LastA, &S::Start).unwrap();
         builder.state(&S::A).tokenize(&"A".to_string());
 
@@ -1086,7 +1119,9 @@ A <- 'a'
 
         let mut builder: EncodedCDFABuilder<S, String> = EncodedCDFABuilder::new();
         builder.set_alphabet("a".chars()).mark_start(&S::Start);
-        builder.mark_trans(&S::Start, &S::A, 'a').unwrap();
+        builder
+            .mark_trans(&S::Start, &S::A, 'a', ConsumerStrategy::All)
+            .unwrap();
         builder.accept_to_from_all(&S::A, &S::LastA).unwrap();
         builder.accept_to_from_all(&S::A, &S::Start).unwrap();
         builder.state(&S::A).tokenize(&"A".to_string());
@@ -1107,6 +1142,58 @@ A <- 'a'
             "\
 A <- 'a'
 A <- 'a'
+"
+        );
+    }
+
+    #[test]
+    fn non_consuming_transitions() {
+        //setup
+        #[derive(PartialEq, Eq, Hash, Clone, Debug)]
+        enum S {
+            Start1,
+            Start2,
+            A,
+            B,
+        }
+
+        impl Data for S {
+            fn to_string(&self) -> String {
+                format!("{:?}", self)
+            }
+        }
+
+        let mut builder: EncodedCDFABuilder<S, String> = EncodedCDFABuilder::new();
+        builder.set_alphabet("ab".chars()).mark_start(&S::Start1);
+        builder
+            .mark_trans(&S::Start1, &S::A, 'a', ConsumerStrategy::All)
+            .unwrap()
+            .default_to(&S::Start1, &S::Start2, ConsumerStrategy::None)
+            .unwrap();
+        builder
+            .mark_trans(&S::Start2, &S::B, 'b', ConsumerStrategy::All)
+            .unwrap();
+        builder.accept(&S::A);
+        builder.accept(&S::B);
+        builder.state(&S::A).tokenize(&"A".to_string());
+        builder.state(&S::B).tokenize(&"B".to_string());
+
+        let cdfa: EncodedCDFA<String> = builder.build().unwrap();
+
+        let input = "ab".to_string();
+        let chars: Vec<char> = input.chars().collect();
+
+        let scanner = scan::def_scanner();
+
+        //exercise
+        let tokens = scanner.scan(&chars[..], &cdfa).unwrap();
+
+        //verify
+        assert_eq!(
+            tokens_string(&tokens),
+            "\
+A <- 'a'
+B <- 'b'
 "
         );
     }

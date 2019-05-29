@@ -44,6 +44,7 @@ enum S {
     Or,
     Hat,
     Arrow,
+    DoubleArrow,
     Range,
     Pattern,
     PatternPartial,
@@ -300,8 +301,14 @@ fn build_cdfa_region(
 
     builder
         .state(&S::Arrow)
+        .mark_trans(&S::DoubleArrow, '>')?
         .accept()
         .tokenize(&SpecSymbol::TArrow);
+
+    builder
+        .state(&S::DoubleArrow)
+        .accept()
+        .tokenize(&SpecSymbol::TDoubleArrow);
 
     builder
         .state(&S::Range)
@@ -377,6 +384,8 @@ pub enum SpecSymbol {
     TransitionsOpt,
     Transitions,
     Transition,
+    TransitionPattern,
+    TransitionMethod,
     TransitionDestination,
     Matchers,
     Matcher,
@@ -399,6 +408,7 @@ pub enum SpecSymbol {
     TSemi,
     THat,
     TArrow,
+    TDoubleArrow,
     TId,
     TOr,
     TRange,
@@ -512,18 +522,21 @@ fn build_spec_grammar() -> Result<SimpleGrammar<SpecSymbol>, grammar::BuildError
         .to(vec![SpecSymbol::Transitions, SpecSymbol::Transition])
         .to(vec![SpecSymbol::Transition]);
 
+    builder.from(SpecSymbol::Transition).to(vec![
+        SpecSymbol::TransitionPattern,
+        SpecSymbol::TransitionMethod,
+        SpecSymbol::TransitionDestination,
+    ]);
+
     builder
-        .from(SpecSymbol::Transition)
-        .to(vec![
-            SpecSymbol::Matchers,
-            SpecSymbol::TArrow,
-            SpecSymbol::TransitionDestination,
-        ])
-        .to(vec![
-            SpecSymbol::TDef,
-            SpecSymbol::TArrow,
-            SpecSymbol::TransitionDestination,
-        ]);
+        .from(SpecSymbol::TransitionPattern)
+        .to(vec![SpecSymbol::Matchers])
+        .to(vec![SpecSymbol::TDef]);
+
+    builder
+        .from(SpecSymbol::TransitionMethod)
+        .to(vec![SpecSymbol::TArrow])
+        .to(vec![SpecSymbol::TDoubleArrow]);
 
     builder
         .from(SpecSymbol::TransitionDestination)

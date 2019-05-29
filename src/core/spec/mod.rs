@@ -268,38 +268,48 @@ grammar {
         │           │   │   │   │       │       │   │   ├── Transitions
         │           │   │   │   │       │       │   │   │   ├── Transitions
         │           │   │   │   │       │       │   │   │   │   └── Transition
-        │           │   │   │   │       │       │   │   │   │       ├── Matchers
-        │           │   │   │   │       │       │   │   │   │       │   └── Matcher
-        │           │   │   │   │       │       │   │   │   │       │       └── TCil <- '' ''
-        │           │   │   │   │       │       │   │   │   │       ├── TArrow <- '->'
+        │           │   │   │   │       │       │   │   │   │       ├── TransitionPattern
+        │           │   │   │   │       │       │   │   │   │       │   └── Matchers
+        │           │   │   │   │       │       │   │   │   │       │       └── Matcher
+        │           │   │   │   │       │       │   │   │   │       │           └── TCil <- '' ''
+        │           │   │   │   │       │       │   │   │   │       ├── TransitionMethod
+        │           │   │   │   │       │       │   │   │   │       │   └── TArrow <- '->'
         │           │   │   │   │       │       │   │   │   │       └── TransitionDestination
         │           │   │   │   │       │       │   │   │   │           └── TId <- 'ws'
         │           │   │   │   │       │       │   │   │   └── Transition
-        │           │   │   │   │       │       │   │   │       ├── Matchers
-        │           │   │   │   │       │       │   │   │       │   └── Matcher
-        │           │   │   │   │       │       │   │   │       │       └── TCil <- ''\\t''
-        │           │   │   │   │       │       │   │   │       ├── TArrow <- '->'
+        │           │   │   │   │       │       │   │   │       ├── TransitionPattern
+        │           │   │   │   │       │       │   │   │       │   └── Matchers
+        │           │   │   │   │       │       │   │   │       │       └── Matcher
+        │           │   │   │   │       │       │   │   │       │           └── TCil <- ''\\t''
+        │           │   │   │   │       │       │   │   │       ├── TransitionMethod
+        │           │   │   │   │       │       │   │   │       │   └── TArrow <- '->'
         │           │   │   │   │       │       │   │   │       └── TransitionDestination
         │           │   │   │   │       │       │   │   │           └── TId <- 'ws'
         │           │   │   │   │       │       │   │   └── Transition
-        │           │   │   │   │       │       │   │       ├── Matchers
-        │           │   │   │   │       │       │   │       │   └── Matcher
-        │           │   │   │   │       │       │   │       │       └── TCil <- ''\\n''
-        │           │   │   │   │       │       │   │       ├── TArrow <- '->'
+        │           │   │   │   │       │       │   │       ├── TransitionPattern
+        │           │   │   │   │       │       │   │       │   └── Matchers
+        │           │   │   │   │       │       │   │       │       └── Matcher
+        │           │   │   │   │       │       │   │       │           └── TCil <- ''\\n''
+        │           │   │   │   │       │       │   │       ├── TransitionMethod
+        │           │   │   │   │       │       │   │       │   └── TArrow <- '->'
         │           │   │   │   │       │       │   │       └── TransitionDestination
         │           │   │   │   │       │       │   │           └── TId <- 'ws'
         │           │   │   │   │       │       │   └── Transition
-        │           │   │   │   │       │       │       ├── Matchers
-        │           │   │   │   │       │       │       │   └── Matcher
-        │           │   │   │   │       │       │       │       └── TCil <- ''{''
-        │           │   │   │   │       │       │       ├── TArrow <- '->'
+        │           │   │   │   │       │       │       ├── TransitionPattern
+        │           │   │   │   │       │       │       │   └── Matchers
+        │           │   │   │   │       │       │       │       └── Matcher
+        │           │   │   │   │       │       │       │           └── TCil <- ''{''
+        │           │   │   │   │       │       │       ├── TransitionMethod
+        │           │   │   │   │       │       │       │   └── TArrow <- '->'
         │           │   │   │   │       │       │       └── TransitionDestination
         │           │   │   │   │       │       │           └── TId <- 'lbr'
         │           │   │   │   │       │       └── Transition
-        │           │   │   │   │       │           ├── Matchers
-        │           │   │   │   │       │           │   └── Matcher
-        │           │   │   │   │       │           │       └── TCil <- ''}''
-        │           │   │   │   │       │           ├── TArrow <- '->'
+        │           │   │   │   │       │           ├── TransitionPattern
+        │           │   │   │   │       │           │   └── Matchers
+        │           │   │   │   │       │           │       └── Matcher
+        │           │   │   │   │       │           │           └── TCil <- ''}''
+        │           │   │   │   │       │           ├── TransitionMethod
+        │           │   │   │   │       │           │   └── TArrow <- '->'
         │           │   │   │   │       │           └── TransitionDestination
         │           │   │   │   │       │               └── TId <- 'rbr'
         │           │   │   │   │       └── TSemi <- ';'
@@ -318,24 +328,30 @@ grammar {
         │           │   │   │       │       ├── Transitions
         │           │   │   │       │       │   ├── Transitions
         │           │   │   │       │       │   │   └── Transition
-        │           │   │   │       │       │   │       ├── Matchers
-        │           │   │   │       │       │   │       │   └── Matcher
-        │           │   │   │       │       │   │       │       └── TCil <- '' ''
-        │           │   │   │       │       │   │       ├── TArrow <- '->'
+        │           │   │   │       │       │   │       ├── TransitionPattern
+        │           │   │   │       │       │   │       │   └── Matchers
+        │           │   │   │       │       │   │       │       └── Matcher
+        │           │   │   │       │       │   │       │           └── TCil <- '' ''
+        │           │   │   │       │       │   │       ├── TransitionMethod
+        │           │   │   │       │       │   │       │   └── TArrow <- '->'
         │           │   │   │       │       │   │       └── TransitionDestination
         │           │   │   │       │       │   │           └── TId <- 'ws'
         │           │   │   │       │       │   └── Transition
-        │           │   │   │       │       │       ├── Matchers
-        │           │   │   │       │       │       │   └── Matcher
-        │           │   │   │       │       │       │       └── TCil <- ''\\t''
-        │           │   │   │       │       │       ├── TArrow <- '->'
+        │           │   │   │       │       │       ├── TransitionPattern
+        │           │   │   │       │       │       │   └── Matchers
+        │           │   │   │       │       │       │       └── Matcher
+        │           │   │   │       │       │       │           └── TCil <- ''\\t''
+        │           │   │   │       │       │       ├── TransitionMethod
+        │           │   │   │       │       │       │   └── TArrow <- '->'
         │           │   │   │       │       │       └── TransitionDestination
         │           │   │   │       │       │           └── TId <- 'ws'
         │           │   │   │       │       └── Transition
-        │           │   │   │       │           ├── Matchers
-        │           │   │   │       │           │   └── Matcher
-        │           │   │   │       │           │       └── TCil <- ''\\n''
-        │           │   │   │       │           ├── TArrow <- '->'
+        │           │   │   │       │           ├── TransitionPattern
+        │           │   │   │       │           │   └── Matchers
+        │           │   │   │       │           │       └── Matcher
+        │           │   │   │       │           │           └── TCil <- ''\\n''
+        │           │   │   │       │           ├── TransitionMethod
+        │           │   │   │       │           │   └── TArrow <- '->'
         │           │   │   │       │           └── TransitionDestination
         │           │   │   │       │               └── TId <- 'ws'
         │           │   │   │       └── TSemi <- ';'
@@ -457,7 +473,7 @@ cdfa {
 
     ID | ki
         ' ' -> fail
-        _ -> ID;
+        _ ->> ID;
 
     state   ^ACC -> other_start
         'v' -> ^_
@@ -504,15 +520,19 @@ grammar {
         │           │   │   │   │   │       │   └── Transitions
         │           │   │   │   │   │       │       ├── Transitions
         │           │   │   │   │   │       │       │   └── Transition
-        │           │   │   │   │   │       │       │       ├── Matchers
-        │           │   │   │   │   │       │       │       │   └── Matcher
-        │           │   │   │   │   │       │       │       │       └── TCil <- ''i''
-        │           │   │   │   │   │       │       │       ├── TArrow <- '->'
+        │           │   │   │   │   │       │       │       ├── TransitionPattern
+        │           │   │   │   │   │       │       │       │   └── Matchers
+        │           │   │   │   │   │       │       │       │       └── Matcher
+        │           │   │   │   │   │       │       │       │           └── TCil <- ''i''
+        │           │   │   │   │   │       │       │       ├── TransitionMethod
+        │           │   │   │   │   │       │       │       │   └── TArrow <- '->'
         │           │   │   │   │   │       │       │       └── TransitionDestination
         │           │   │   │   │   │       │       │           └── TId <- 'ki'
         │           │   │   │   │   │       │       └── Transition
-        │           │   │   │   │   │       │           ├── TDef <- '_'
-        │           │   │   │   │   │       │           ├── TArrow <- '->'
+        │           │   │   │   │   │       │           ├── TransitionPattern
+        │           │   │   │   │   │       │           │   └── TDef <- '_'
+        │           │   │   │   │   │       │           ├── TransitionMethod
+        │           │   │   │   │   │       │           │   └── TArrow <- '->'
         │           │   │   │   │   │       │           └── TransitionDestination
         │           │   │   │   │   │       │               └── Acceptor
         │           │   │   │   │   │       │                   ├── THat <- '^'
@@ -528,10 +548,12 @@ grammar {
         │           │   │   │   │       ├── TransitionsOpt
         │           │   │   │   │       │   └── Transitions
         │           │   │   │   │       │       └── Transition
-        │           │   │   │   │       │           ├── Matchers
-        │           │   │   │   │       │           │   └── Matcher
-        │           │   │   │   │       │           │       └── TCil <- ''n''
-        │           │   │   │   │       │           ├── TArrow <- '->'
+        │           │   │   │   │       │           ├── TransitionPattern
+        │           │   │   │   │       │           │   └── Matchers
+        │           │   │   │   │       │           │       └── Matcher
+        │           │   │   │   │       │           │           └── TCil <- ''n''
+        │           │   │   │   │       │           ├── TransitionMethod
+        │           │   │   │   │       │           │   └── TArrow <- '->'
         │           │   │   │   │       │           └── TransitionDestination
         │           │   │   │   │       │               └── Acceptor
         │           │   │   │   │       │                   ├── THat <- '^'
@@ -552,15 +574,19 @@ grammar {
         │           │   │   │       │   └── Transitions
         │           │   │   │       │       ├── Transitions
         │           │   │   │       │       │   └── Transition
-        │           │   │   │       │       │       ├── Matchers
-        │           │   │   │       │       │       │   └── Matcher
-        │           │   │   │       │       │       │       └── TCil <- '' ''
-        │           │   │   │       │       │       ├── TArrow <- '->'
+        │           │   │   │       │       │       ├── TransitionPattern
+        │           │   │   │       │       │       │   └── Matchers
+        │           │   │   │       │       │       │       └── Matcher
+        │           │   │   │       │       │       │           └── TCil <- '' ''
+        │           │   │   │       │       │       ├── TransitionMethod
+        │           │   │   │       │       │       │   └── TArrow <- '->'
         │           │   │   │       │       │       └── TransitionDestination
         │           │   │   │       │       │           └── TId <- 'fail'
         │           │   │   │       │       └── Transition
-        │           │   │   │       │           ├── TDef <- '_'
-        │           │   │   │       │           ├── TArrow <- '->'
+        │           │   │   │       │           ├── TransitionPattern
+        │           │   │   │       │           │   └── TDef <- '_'
+        │           │   │   │       │           ├── TransitionMethod
+        │           │   │   │       │           │   └── TDoubleArrow <- '->>'
         │           │   │   │       │           └── TransitionDestination
         │           │   │   │       │               └── TId <- 'ID'
         │           │   │   │       └── TSemi <- ';'
@@ -579,10 +605,12 @@ grammar {
         │           │   │       │   └── Transitions
         │           │   │       │       ├── Transitions
         │           │   │       │       │   └── Transition
-        │           │   │       │       │       ├── Matchers
-        │           │   │       │       │       │   └── Matcher
-        │           │   │       │       │       │       └── TCil <- ''v''
-        │           │   │       │       │       ├── TArrow <- '->'
+        │           │   │       │       │       ├── TransitionPattern
+        │           │   │       │       │       │   └── Matchers
+        │           │   │       │       │       │       └── Matcher
+        │           │   │       │       │       │           └── TCil <- ''v''
+        │           │   │       │       │       ├── TransitionMethod
+        │           │   │       │       │       │   └── TArrow <- '->'
         │           │   │       │       │       └── TransitionDestination
         │           │   │       │       │           └── Acceptor
         │           │   │       │       │               ├── THat <- '^'
@@ -591,12 +619,14 @@ grammar {
         │           │   │       │       │               └── AcceptorDestinationOpt
         │           │   │       │       │                   └──  <- 'NULL'
         │           │   │       │       └── Transition
-        │           │   │       │           ├── Matchers
-        │           │   │       │           │   └── Matcher
-        │           │   │       │           │       ├── TCil <- ''i''
-        │           │   │       │           │       ├── TRange <- '..'
-        │           │   │       │           │       └── TCil <- ''j''
-        │           │   │       │           ├── TArrow <- '->'
+        │           │   │       │           ├── TransitionPattern
+        │           │   │       │           │   └── Matchers
+        │           │   │       │           │       └── Matcher
+        │           │   │       │           │           ├── TCil <- ''i''
+        │           │   │       │           │           ├── TRange <- '..'
+        │           │   │       │           │           └── TCil <- ''j''
+        │           │   │       │           ├── TransitionMethod
+        │           │   │       │           │   └── TArrow <- '->'
         │           │   │       │           └── TransitionDestination
         │           │   │       │               └── TId <- 'def_acc'
         │           │   │       └── TSemi <- ';'
@@ -1254,6 +1284,53 @@ grammar {
                 │       │           └──  <- 'NULL'
                 │       └── TSemi <- ';'
                 └── TRightBrace <- '}'"
+        )
+    }
+
+    #[test]
+    fn non_consuming_transitions() {
+        //setup
+        let spec = "
+alphabet 'abc'
+
+cdfa {
+    start1
+        'a' -> ^A1
+        'b' ->> start2
+        _ ->> start3;
+
+    start2
+        'b' -> ^B2
+        'c' -> ^C2;
+
+    start3
+        'c' -> ^C3;
+}
+
+grammar {
+    s |;
+}
+        ";
+
+        let input = "abca".to_string();
+        let chars: Vec<char> = input.chars().collect();
+
+        let scanner = scan::def_scanner();
+        let tree = lang::parse_spec(spec);
+        let parse = tree.unwrap();
+        let (cdfa, _, _) = generate_spec(&parse, SimpleGrammarBuilder::new()).unwrap();
+
+        //exercise
+        let tokens = scanner.scan(&chars[..], &*cdfa).unwrap();
+
+        //verify
+        assert_eq!(
+            tokens_string(tokens),
+            "
+kind=A1 lexeme=a
+kind=B2 lexeme=b
+kind=C3 lexeme=c
+kind=A1 lexeme=a"
         )
     }
 
