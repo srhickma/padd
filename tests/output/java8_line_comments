@@ -15,8 +15,7 @@
 package com.konjex.util;
 
 // Something
-import org.jetbrains.annotations.NotNull;
-// Why is there a comment here?
+import org.jetbrains.annotations.NotNull; /* Why is there a comment here? */
 import java.util.Iterator;
 
 // Here is some comment about the class
@@ -26,9 +25,8 @@ public class DoublyLinkedList<T> implements Iterable<T> {
     // Start of the linked list
     private LinkedListNode<T> first;
 
-    private LinkedListNode<T> last;
+    private LinkedListNode<T> last; /* End of the linked list */
 
-    // End of the linked list
     private int length;
 
     // Default constructor
@@ -36,8 +34,7 @@ public class DoublyLinkedList<T> implements Iterable<T> {
     // No-op
     }
 
-    public DoublyLinkedList(T... elements// This is a strange place for a comment
-    ) {
+    public DoublyLinkedList(T... elements /* This is a strange place for a comment */) {
         // Just add all the elements
         for (T element : elements) {
             addLast(element);
@@ -58,8 +55,7 @@ public class DoublyLinkedList<T> implements Iterable<T> {
                 null,
                 first
             );
-            first.setPrev(newNode);
-            // Append to the front
+            first.setPrev(newNode); /* Append to the front */
             first = newNode;
         }
 
@@ -119,8 +115,7 @@ public class DoublyLinkedList<T> implements Iterable<T> {
             return true;
         }
 
-        return false;
-    // Return false only if there are remaining elements
+        return false; /* Return false only if there are remaining elements */
     }
 
     public boolean isEmpty() {
@@ -142,8 +137,7 @@ public class DoublyLinkedList<T> implements Iterable<T> {
     @NotNull
     @Override
     public Iterator<T> iterator() {
-        return new Iterator<T>() {
-            // A
+        return new Iterator<T>() { /* A */
             private LinkedListNode<T> currentNode = first;
 
             @Override
@@ -155,15 +149,12 @@ public class DoublyLinkedList<T> implements Iterable<T> {
 
             @Override
             public T next() {
-                T value = currentNode// This is a strange place for a comment
-                .getValue();
-                currentNode = currentNode.getNext()// This place is even stranger
-                ;
+                T value = currentNode /* This is a strange place for a comment */.getValue();
+                currentNode = currentNode.getNext() /* This place is even stranger */;
                 return value;
             }
 
-            @Override
-            // This method overrides a method on Iterator
+            @Override /* This method overrides a method on Iterator */
             public void remove() {
                 // We don't allow element removal via this iterator
                 throw new UnsupportedOperationException();

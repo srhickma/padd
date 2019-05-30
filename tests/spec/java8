@@ -1,7 +1,12 @@
 alphabet '<>=+-*/\\%(){}[],.;:#!?^$@&|"\'`~ \t\n\r_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
 
 cdfa {
-    start
+    start_empty_line
+        '//' -> prefix_lcom
+        ' ' | '\t' | '\n' | '\r' -> ws
+        _ ->> ^_ -> start_non_empty_line;
+
+    start_non_empty_line
         '{' -> ^LBRACE
         '}' -> ^RBRACE
         '(' -> ^LPAREN
@@ -86,7 +91,8 @@ cdfa {
         'while' -> ^WHILE
 
         # MISC
-        ' ' | '\t' | '\n' | '\r' -> ws
+        ' ' | '\t' | '\r' -> ws
+        '\n' -> ^_ -> start_empty_line
         '#' | '$' | '`' -> fail
         _ -> id;
 
@@ -124,7 +130,7 @@ cdfa {
         '=' -> ^ASSN;
 
     slash   ^SLASH
-        '/' -> lcom
+        '/' -> inline_lcom_prefix
         '*' -> bcom
         '=' -> ^ASSN;
 
@@ -232,9 +238,16 @@ cdfa {
     ws      ^_
         ' ' | '\t' | '\n' | '\r' -> ws;
 
-    lcom    ^LCOM
+    prefix_lcom     ^PREFIX_LCOM
+            '\n' -> fail
+            _ -> prefix_lcom;
+
+    inline_lcom_prefix ^_ -> inline_lcom
+            ' ' | '\t' -> inline_lcom_prefix;
+
+    inline_lcom     ^INLINE_LCOM -> start_non_empty_line
         '\n' -> fail
-        _ -> lcom;
+        _ -> inline_lcom;
 
     bcom
         '*/' -> ^_
@@ -250,7 +263,8 @@ cdfa {
         '_' .. '9' | '$' -> id;
 }
 
-inject right LCOM `{}\n[prefix]`
+inject left INLINE_LCOM ` /* {} */`
+inject right PREFIX_LCOM `{}\n[prefix]`
 
 grammar {
     cmp_unit
