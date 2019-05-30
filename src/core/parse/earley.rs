@@ -302,7 +302,10 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                 spm,
             });
 
-            let mut ignore_next = true;
+            let ignore_next = match affinity_opt {
+                Some(InjectionAffinity::Left) => false,
+                _ => true,
+            };
             let mut weight = item.weight + 1;
 
             if let Some(affinity) = affinity_opt {
@@ -319,8 +322,6 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
 
                 if !satisfied {
                     weight += 1;
-                } else if *affinity == InjectionAffinity::Left {
-                    ignore_next = false;
                 }
             }
 

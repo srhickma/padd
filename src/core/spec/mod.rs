@@ -1334,6 +1334,56 @@ kind=A1 lexeme=a"
         )
     }
 
+    #[test]
+    fn inject_left_before_nested_empty_optional() {
+        //setup
+        let spec = "
+alphabet 'abc'
+
+cdfa {
+    start
+        'a' -> ^A
+        'b' -> ^B
+        'c' -> ^C;
+}
+
+inject left C
+
+grammar {
+    s
+        | v B
+        | ;
+
+    v
+        | A [s];
+}
+        ";
+
+        let input = "acb".to_string();
+        let chars: Vec<char> = input.chars().collect();
+
+        let scanner = scan::def_scanner();
+        let tree = lang::parse_spec(spec);
+        let parse = tree.unwrap();
+        let (cdfa, grammar, _) = generate_spec(&parse, SimpleGrammarBuilder::new()).unwrap();
+
+        //exercise
+        let tokens = scanner.scan(&chars[..], &*cdfa).unwrap();
+        let parse = parse::def_parser().parse(tokens, &*grammar).unwrap();
+
+        //verify
+        assert_eq!(
+            parse.to_string(),
+            "└── s
+    ├── v
+    │   ├── A <- 'a'
+    │   ├── << C <- 'c'
+    │   └── opt#s
+    │       └──  <- 'NULL'
+    └── B <- 'b'"
+        )
+    }
+
     fn tokens_string(tokens: Vec<Token<String>>) -> String {
         let mut res_string = String::new();
         for token in tokens {
