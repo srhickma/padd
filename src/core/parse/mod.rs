@@ -56,6 +56,34 @@ impl<Symbol: GrammarSymbol> Tree<Symbol> {
         }
     }
 
+    #[allow(dead_code)]
+    pub fn decode(&self, grammar: &Grammar<Symbol>) -> Tree<String> {
+        let lhs = match self.lhs.kind_opt() {
+            Some(ref symbol) => {
+                Token::leaf(grammar.symbol_string(symbol), self.lhs.lexeme().clone())
+            }
+            None => Token::null(),
+        };
+
+        let children: Vec<Tree<String>> = self
+            .children
+            .iter()
+            .map(|tree| tree.decode(grammar))
+            .collect();
+
+        let production = match self.production {
+            Some(ref prod) => Some(prod.decode(grammar)),
+            None => None,
+        };
+
+        Tree {
+            lhs,
+            children,
+            production,
+            injected: self.injected,
+        }
+    }
+
     fn to_string_internal(&self, prefix: String, is_tail: bool) -> String {
         if self.children.is_empty() {
             format!(
@@ -125,6 +153,17 @@ impl<Symbol: GrammarSymbol> Production<Symbol> {
         Production {
             lhs: self.lhs.to_string(),
             rhs: self.rhs.iter().map(Data::to_string).collect(),
+        }
+    }
+
+    pub fn decode(&self, grammar: &Grammar<Symbol>) -> Production<String> {
+        Production {
+            lhs: self.lhs.to_string(),
+            rhs: self
+                .rhs
+                .iter()
+                .map(|symbol| grammar.symbol_string(symbol))
+                .collect(),
         }
     }
 }
