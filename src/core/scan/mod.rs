@@ -190,6 +190,10 @@ impl<Symbol: Data> Token<Symbol> {
         self.kind.as_ref().unwrap()
     }
 
+    pub fn kind_opt(&self) -> &Option<Symbol> {
+        &self.kind
+    }
+
     pub fn lexeme(&self) -> &String {
         &self.lexeme
     }
