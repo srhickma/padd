@@ -622,7 +622,8 @@ grammar {
         | grouped_statements isolated_block_statement block_statements `{}\n\n[prefix]{}\n[prefix]{}`
         | grouped_statements inline_isolated_block_statement `{}\n\n[prefix]{}\n`
         | inline_isolated_block_statement
-        | grouped_statements;
+        | grouped_statements
+        | PREFIX_LCOM `{}\n`;
 
     isolated_block_statement `{}\n`
         | class_dec

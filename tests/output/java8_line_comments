@@ -31,7 +31,7 @@ public class DoublyLinkedList<T> implements Iterable<T> {
 
     // Default constructor
     public DoublyLinkedList() {
-    // No-op
+        // No-op
     }
 
     public DoublyLinkedList(T... elements /* This is a strange place for a comment */) {
