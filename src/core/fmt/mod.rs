@@ -363,9 +363,7 @@ impl<'parse, Symbol: GrammarSymbol + 'parse> FormatJob<'parse, Symbol> {
         scope: &HashMap<String, String>,
     ) -> String {
         match injection.pattern {
-            Some(ref pattern) => {
-                self.fill_pattern_inner(pattern, &[injection.tree], scope, None)
-            }
+            Some(ref pattern) => self.fill_pattern_inner(pattern, &[injection.tree], scope, None),
             None => injection.tree.lhs.lexeme().clone(),
         }
     }

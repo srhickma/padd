@@ -23,6 +23,7 @@ import java.util.Set;
 final class InheritingState implements State {
     private final State parent;
 
+    // Must be a linked hashmap in order to preserve order of bindings in Modules.
     private final Map<Key<?>, Binding<?>> explicitBindingsMutable = Maps.newLinkedHashMap();
 
     private final Map<Key<?>, Binding<?>> explicitBindings = Collections.unmodifiableMap(explicitBindingsMutable);
@@ -55,7 +56,7 @@ final class InheritingState implements State {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings("unchecked") /* we only put in BindingImpls that match their key types */
     public <T> BindingImpl<T> getExplicitBinding(Key<T> key) {
         Binding<?> binding = explicitBindings.get(key);
         return binding != null ? (BindingImpl<T>)binding : parent.getExplicitBinding(key);

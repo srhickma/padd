@@ -642,7 +642,7 @@ grammar {
     let res = fjr.format(FormatJob::from_text(input)).unwrap();
 
     //verify
-    assert_eq!(res, "d <c>a a da a <c>  b b <c> [d]  b bd <c>d");
+    assert_eq!(res, " <c>da a da a <c>  b b <c> [d]  b bd <c>d");
 }
 
 #[test]
