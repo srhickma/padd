@@ -3,6 +3,9 @@ package com.konjex.lens.conf;
 import java.io.File;
 import java.util.function.Consumer;
 
+/**
+ * Class for loading lens configuration files by name.
+ */
 public abstract class ConfigFileLoader {
     private static final String CMD_CONFIG_PATH = System.getProperty("user.home") + File.separator + ".lens" + File.separator;
 

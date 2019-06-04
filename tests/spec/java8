@@ -11,6 +11,11 @@ cdfa {
         ' ' | '\t' | '\r' -> ^_
         _ ->> ^PREFIX -> start_empty_line;
 
+    start_bcom_itl
+        '*' -> prefixed_bcom_start
+        ' ' | '\t' | '\r' | '\n' -> ws
+        _ -> non_prefixed_bcom;
+
     start_non_empty_line
         '{' -> ^LBRACE
         '}' -> ^RBRACE
@@ -255,8 +260,23 @@ cdfa {
         _ -> inline_lcom;
 
     bcom
-        '*/' -> ^_
+        '\n' -> ^BCOM_START -> start_bcom_itl
+        '*/' -> ^INLINE_BCOM -> start_empty_line
         _ -> bcom;
+
+    prefixed_bcom_start
+        '/' -> ^PREFIXED_BCOM_LINE_END -> start_empty_line
+        _ ->> prefixed_bcom;
+
+    prefixed_bcom
+        '\n' -> ^PREFIXED_BCOM_LINE -> start_bcom_itl
+        '*/' -> ^PREFIXED_BCOM_LINE_END -> start_empty_line
+        _ -> prefixed_bcom;
+
+    non_prefixed_bcom
+        '\n' -> ^NON_PREFIXED_BCOM_LINE -> start_bcom_itl
+        '*/' -> ^NON_PREFIXED_BCOM_LINE_END -> start_empty_line
+        _ -> non_prefixed_bcom;
 
     MOD | ASSERT | PRIM | BREAK | CASE | CATCH | ENUM | CLASS | CONTINUE | DEFAULT | DO | ELSE | EXTENDS | FINALLY | FOR
         | IF | IMPLEMENTS | IMPORT | INSTANCEOF | NEW | PACKAGE | RETURN | SUPER | SWITCH | THIS | THROWS | TRY | VOID
@@ -268,9 +288,20 @@ cdfa {
         '_' .. '9' | '$' -> id;
 }
 
+# Line comments
 inject left INLINE_LCOM ` /* {} */`
 inject right PREFIX_LCOM
 inject right ISO_BREAK `\n[prefix]`
+
+# Block comments
+inject right BCOM_START
+inject right INLINE_BCOM `{}\n[prefix]`
+inject right PREFIXED_BCOM_LINE `[prefix] {}`
+inject right NON_PREFIXED_BCOM_LINE `[prefix] * {}`
+inject right PREFIXED_BCOM_LINE_END `[prefix] {}\n[prefix]`
+inject right NON_PREFIXED_BCOM_LINE_END `[prefix] * {}\n[prefix]`
+
+# Misc injections
 inject right PREFIX `[prefix]`
 
 grammar {
