@@ -777,6 +777,34 @@ mod tests {
         );
     }
 
+    #[test]
+    fn injection_into_single_terminal() {
+        //setup
+        let mut grammar_builder = SimpleGrammarBuilder::new();
+        add_productions(&["s A"], &mut grammar_builder);
+        grammar_builder.try_mark_start(&"s".to_string());
+        grammar_builder.mark_injectable(&"B".to_string(), InjectionAffinity::Right);
+        let grammar = grammar_builder.build().unwrap();
+
+        let scan = vec![
+            Token::leaf("B".to_string(), "b".to_string()),
+            Token::leaf("A".to_string(), "a".to_string()),
+        ];
+
+        let parser = def_parser();
+
+        //exercise
+        let tree = parser.parse(scan, &grammar);
+
+        //verify
+        assert_eq!(
+            tree.unwrap().to_string(),
+            "└── s
+    ├── << B <- 'b'
+    └── A <- 'a'"
+        );
+    }
+
     pub fn add_productions<'scope>(
         strings: &'scope [&'scope str],
         grammar_builder: &mut SimpleGrammarBuilder<String>,

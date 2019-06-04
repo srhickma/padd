@@ -31,6 +31,7 @@ public final class CollectionFactory {
     private static final Set<Class<?>> approximableMapTypes = new HashSet<>();
 
     static {
+        // Standard collection interfaces
         approximableCollectionTypes.add(Collection.class);
         approximableCollectionTypes.add(List.class);
         approximableCollectionTypes.add(Set.class);
@@ -39,6 +40,7 @@ public final class CollectionFactory {
         approximableMapTypes.add(Map.class);
         approximableMapTypes.add(SortedMap.class);
         approximableMapTypes.add(NavigableMap.class);
+        // Common concrete collection classes
         approximableCollectionTypes.add(ArrayList.class);
         approximableCollectionTypes.add(LinkedList.class);
         approximableCollectionTypes.add(HashSet.class);
@@ -65,6 +67,7 @@ public final class CollectionFactory {
         } else if (collection instanceof List) {
             return new ArrayList<>(capacity);
         } else if (collection instanceof EnumSet) {
+            // Cast is necessary for compilation in Eclipse 4.4.1.
             Collection<E> enumSet = (Collection<E>)EnumSet.copyOf((EnumSet)collection);
             enumSet.clear();
             return enumSet;
@@ -103,6 +106,7 @@ public final class CollectionFactory {
             }
         } else if (EnumSet.class == collectionType) {
             Assert.notNull(elementType, "Cannot create EnumSet for unknown element type");
+            // Cast is necessary for compilation in Eclipse 4.4.1.
             return (Collection<E>)EnumSet.noneOf(asEnumType(elementType));
         } else {
             if (!Collection.class.isAssignableFrom(collectionType)) {
