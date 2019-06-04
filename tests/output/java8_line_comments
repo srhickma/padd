@@ -99,7 +99,13 @@ public class DoublyLinkedList<T> implements Iterable<T> {
         }
     }
 
+    // ---------------------------------------------------------------------- //
+    // HERE IS A LARGE FLOATING COMMENT                                       //
+    // ---------------------------------------------------------------------- //
+
     private boolean removeIfLast() {
+        // Here is a small floating comment
+
         if (isEmpty()) {
             return true;
         }

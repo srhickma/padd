@@ -6,6 +6,11 @@ cdfa {
         ' ' | '\t' | '\n' | '\r' -> ws
         _ ->> ^_ -> start_non_empty_line;
 
+    start_after_prefix_lcom
+        '\n' -> ^ISO_BREAK -> start_empty_line
+        ' ' | '\t' | '\r' -> ^_
+        _ ->> ^PREFIX -> start_empty_line;
+
     start_non_empty_line
         '{' -> ^LBRACE
         '}' -> ^RBRACE
@@ -238,14 +243,14 @@ cdfa {
     ws      ^_
         ' ' | '\t' | '\n' | '\r' -> ws;
 
-    prefix_lcom     ^PREFIX_LCOM
-            '\n' -> fail
-            _ -> prefix_lcom;
+    prefix_lcom ^PREFIX_LCOM -> start_after_prefix_lcom
+        '\n' -> ^PREFIX_LCOM -> start_after_prefix_lcom
+        _ -> prefix_lcom;
 
     inline_lcom_prefix ^_ -> inline_lcom
-            ' ' | '\t' -> inline_lcom_prefix;
+        ' ' | '\t' -> inline_lcom_prefix;
 
-    inline_lcom     ^INLINE_LCOM -> start_non_empty_line
+    inline_lcom ^INLINE_LCOM -> start_non_empty_line
         '\n' -> fail
         _ -> inline_lcom;
 
@@ -264,7 +269,9 @@ cdfa {
 }
 
 inject left INLINE_LCOM ` /* {} */`
-inject right PREFIX_LCOM `{}\n[prefix]`
+inject right PREFIX_LCOM
+inject right ISO_BREAK `\n[prefix]`
+inject right PREFIX `[prefix]`
 
 grammar {
     cmp_unit
@@ -623,7 +630,7 @@ grammar {
         | grouped_statements inline_isolated_block_statement `{}\n\n[prefix]{}\n`
         | inline_isolated_block_statement
         | grouped_statements
-        | PREFIX_LCOM `{}\n`;
+        | PREFIX_LCOM PREFIX `{}`;
 
     isolated_block_statement `{}\n`
         | class_dec
