@@ -1,4 +1,5 @@
-/* Here is where the license goes
+/*
+ * Here is where the license goes
  * and here
  * and here
  * ...
@@ -11,19 +12,23 @@
  * ...
  * ...
  * ...
- * and now its done.*/
+ * and now its done.
+ */
 package com.konjex.util;
 
 /* Something */
 import org.jetbrains.annotations.NotNull; /* Why is there a comment here? */
 import java.util.Iterator;
 
-/**
+/*
+ * *
  * Here is some comment about the class
  * It does x, y, z.
- * For more information see https://www.moreinfo.com/? */
+ * For more information see https://www.moreinfo.com/? 
+ */
 public class DoublyLinkedList<T> implements Iterable<T> {
-    /* Start of the linked list
+    /*
+     * Start of the linked list
      *
      */
     private LinkedListNode<T> first;
@@ -43,7 +48,9 @@ public class DoublyLinkedList<T> implements Iterable<T> {
      */
     }
 
-    public DoublyLinkedList(T... elements/* This is a strange place for a comment
+    public DoublyLinkedList(T... elements
+    /*
+     * This is a strange place for a comment
      */
     ) {
         /* Just add all the elements */
@@ -67,10 +74,12 @@ public class DoublyLinkedList<T> implements Iterable<T> {
                 first
             );
             first.setPrev(newNode);
-            /** Append to the front
+            /*
+             * * Append to the front
              * Then do something else
              * Then do a third thing
              */
+            
             first = newNode;
         }
 
@@ -119,9 +128,11 @@ public class DoublyLinkedList<T> implements Iterable<T> {
         }
     }
 
-    /* ----------------------------------------------------------------------
+    /*
+     * ----------------------------------------------------------------------
      * HERE IS A LARGE FLOATING COMMENT
-     * ---------------------------------------------------------------------- */
+     * ---------------------------------------------------------------------- 
+     */
     private boolean removeIfLast() {
         /* Here is a small floating comment */
         if (isEmpty()) {
@@ -131,7 +142,8 @@ public class DoublyLinkedList<T> implements Iterable<T> {
         /* Decrement length */
         length--;
 
-        /* Reset first and last pointers if the list is now empty.
+        /*
+         * Reset first and last pointers if the list is now empty.
          * Return true if this is the case.
          */
         if (length == 0) {
@@ -141,8 +153,11 @@ public class DoublyLinkedList<T> implements Iterable<T> {
         }
 
         return false;
-    /*
-     * Return false only if there are remaining elements */
+        /*
+         * 
+         * Return false only if there are remaining elements 
+         */
+        
     }
 
     public boolean isEmpty() {
@@ -182,8 +197,10 @@ public class DoublyLinkedList<T> implements Iterable<T> {
             }
 
             @Override
-            /* This method overrides a method on Iterator
+            /*
+             * This method overrides a method on Iterator
              */
+            
             public void remove() {
                 /*
                  * We don't allow element removal via this iterator

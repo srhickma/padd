@@ -287,17 +287,17 @@ cdfa {
         _ -> inline_lbcom;
 
     inline_bcom_sp_start
-        '/' -> ^INLINE_BCOM_SP_LINE_END -> start_empty_line
+        '/' -> ^INLINE_BCOM_END -> start_empty_line
         _ ->> inline_bcom_sp;
 
     inline_bcom_sp
         '\n' -> ^INLINE_BCOM_SP_LINE -> start_inline_bcom_itl
-        '*/' -> ^INLINE_BCOM_SP_LINE_END -> start_empty_line
+        '*/' ->> ^INLINE_BCOM_SP_LINE_END -> bcom_end_consumer
         _ -> inline_bcom_sp;
 
     inline_bcom_nsp
         '\n' -> ^INLINE_BCOM_NSP_LINE -> start_inline_bcom_itl
-        '*/' -> ^INLINE_BCOM_NSP_LINE_END -> start_empty_line
+        '*/' ->> ^INLINE_BCOM_NSP_LINE_END -> bcom_end_consumer
         _ -> inline_bcom_nsp;
 
     prefix_lbcom_prefix ^_ -> prefix_lbcom_nnl
@@ -313,18 +313,21 @@ cdfa {
         _ -> prefix_lbcom;
 
     prefix_bcom_sp_start
-        '/' -> ^PREFIX_BCOM_SP_LINE_END -> start_empty_line
+        '/' -> ^PREFIX_BCOM_END -> start_empty_line
         _ ->> prefix_bcom_sp;
 
     prefix_bcom_sp
         '\n' -> ^PREFIX_BCOM_SP_LINE -> start_prefix_bcom_itl
-        '*/' -> ^PREFIX_BCOM_SP_LINE_END -> start_empty_line
+        '*/' ->> ^PREFIX_BCOM_SP_LINE_END -> bcom_end_consumer
         _ -> prefix_bcom_sp;
 
     prefix_bcom_nsp
         '\n' -> ^PREFIX_BCOM_NSP_LINE -> start_prefix_bcom_itl
-        '*/' -> ^PREFIX_BCOM_NSP_LINE_END -> start_empty_line
+        '*/' ->> ^PREFIX_BCOM_NSP_LINE_END -> bcom_end_consumer
         _ -> prefix_bcom_nsp;
+
+    bcom_end_consumer
+        '*/' -> ^_ -> start_empty_line;
 }
 
 # Inline line comments
@@ -339,16 +342,18 @@ inject right PREFIX_LBCOM `/* {}\n[prefix]`
 inject left INLINE_BCOM_START `\n[prefix]/*\n[prefix] * {}`
 inject left INLINE_BCOM_SP_LINE `[prefix] {}`
 inject left INLINE_BCOM_NSP_LINE `[prefix] * {}`
-inject left INLINE_BCOM_SP_LINE_END `[prefix] {}\n[prefix]`
-inject left INLINE_BCOM_NSP_LINE_END `[prefix] * {}\n[prefix]`
+inject left INLINE_BCOM_SP_LINE_END `[prefix] {}\n[prefix] */\n[prefix]`
+inject left INLINE_BCOM_NSP_LINE_END `[prefix] * {}\n[prefix] */\n[prefix]`
+inject left INLINE_BCOM_END `[prefix] {}\n[prefix]`
 
 # Prefix block comments
 inject right PREFIX_BCOM_SL_START `/*\n[prefix] * {}`
 inject right PREFIX_BCOM_NL_START `/*\n`
 inject right PREFIX_BCOM_SP_LINE `[prefix] {}`
 inject right PREFIX_BCOM_NSP_LINE `[prefix] * {}`
-inject right PREFIX_BCOM_SP_LINE_END `[prefix] {}\n[prefix]`
-inject right PREFIX_BCOM_NSP_LINE_END `[prefix] * {}\n[prefix]`
+inject right PREFIX_BCOM_SP_LINE_END `[prefix] {}\n[prefix] */\n[prefix]`
+inject right PREFIX_BCOM_NSP_LINE_END `[prefix] * {}\n[prefix] */\n[prefix]`
+inject right PREFIX_BCOM_END `[prefix] {}\n[prefix]`
 
 # Misc injections
 inject right ISO_BREAK `\n[prefix]`

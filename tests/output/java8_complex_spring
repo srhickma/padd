@@ -40,7 +40,8 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.util.ReflectionUtils;
 
-/**
+/*
+ * *
  * Factory for collections that is aware of Java 5, Java 6, and Spring collection types.
  *
  * <p>Mainly for internal use within the framework.
@@ -82,7 +83,8 @@ public final class CollectionFactory {
     private CollectionFactory() {
     }
 
-    /**
+    /*
+     * *
      * Determine whether the given collection type is an <em>approximable</em> type,
      * i.e. a type that {@link #createApproximateCollection} can approximate.
      * @param collectionType the collection type to check
@@ -92,7 +94,8 @@ public final class CollectionFactory {
         return (collectionType != null && approximableCollectionTypes.contains(collectionType));
     }
 
-    /**
+    /*
+     * *
      * Create the most approximate collection for the given collection.
      * <p><strong>Warning</strong>: Since the parameterized type {@code E} is
      * not bound to the type of elements contained in the supplied
@@ -130,7 +133,8 @@ public final class CollectionFactory {
         }
     }
 
-    /**
+    /*
+     * *
      * Create the most appropriate collection for the given collection type.
      * <p>Delegates to {@link #createCollection(Class, Class, int)} with a
      * {@code null} element type.
@@ -148,7 +152,8 @@ public final class CollectionFactory {
         );
     }
 
-    /**
+    /*
+     * *
      * Create the most appropriate collection for the given collection type.
      * <p><strong>Warning</strong>: Since the parameterized type {@code E} is
      * not bound to the supplied {@code elementType}, type safety cannot be
@@ -206,7 +211,8 @@ public final class CollectionFactory {
         }
     }
 
-    /**
+    /*
+     * *
      * Determine whether the given map type is an <em>approximable</em> type,
      * i.e. a type that {@link #createApproximateMap} can approximate.
      * @param mapType the map type to check
@@ -216,7 +222,8 @@ public final class CollectionFactory {
         return (mapType != null && approximableMapTypes.contains(mapType));
     }
 
-    /**
+    /*
+     * *
      * Create the most approximate map for the given map.
      * <p><strong>Warning</strong>: Since the parameterized type {@code K} is
      * not bound to the type of keys contained in the supplied {@code map},
@@ -246,7 +253,8 @@ public final class CollectionFactory {
         }
     }
 
-    /**
+    /*
+     * *
      * Create the most appropriate map for the given map type.
      * <p>Delegates to {@link #createMap(Class, Class, int)} with a
      * {@code null} key type.
@@ -264,7 +272,8 @@ public final class CollectionFactory {
         );
     }
 
-    /**
+    /*
+     * *
      * Create the most appropriate map for the given map type.
      * <p><strong>Warning</strong>: Since the parameterized type {@code K}
      * is not bound to the supplied {@code keyType}, type safety cannot be
@@ -322,7 +331,8 @@ public final class CollectionFactory {
         }
     }
 
-    /**
+    /*
+     * *
      * Create a variant of {@code java.util.Properties} that automatically adapts
      * non-String values to String representations on {@link Properties#getProperty}.
      * @return a new {@code Properties} instance
@@ -340,7 +350,8 @@ public final class CollectionFactory {
         };
     }
 
-    /**
+    /*
+     * *
      * Cast the given type to a subtype of {@link Enum}.
      * @param enumType the enum type, never {@code null}
      * @return the given type as subtype of {@link Enum}

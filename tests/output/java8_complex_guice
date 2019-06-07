@@ -35,7 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/** @author jessewilson@google.com (Jesse Wilson) */
+/* * @author jessewilson@google.com (Jesse Wilson) */
 final class InheritingState implements State {
     private final State parent;
 
@@ -48,10 +48,10 @@ final class InheritingState implements State {
 
     private final List<TypeConverterBinding> converters = Lists.newArrayList();
 
-    /*if[AOP]*/
+    /* if[AOP]*/
     private final List<MethodAspect> methodAspects = Lists.newArrayList();
 
-    /*end[AOP]*/
+    /* end[AOP]*/
     private final List<TypeListenerBinding> typeListenerBindings = Lists.newArrayList();
 
     private final List<ProvisionListenerBinding> provisionListenerBindings = Lists.newArrayList();
@@ -140,7 +140,7 @@ final class InheritingState implements State {
         return matchingConverter;
     }
 
-    /*if[AOP]*/
+    /* if[AOP]*/
     @Override
     public void addMethodAspect(MethodAspect methodAspect) {
         methodAspects.add(methodAspect);
@@ -151,7 +151,7 @@ final class InheritingState implements State {
         return new ImmutableList.Builder<MethodAspect>().addAll(parent.getMethodAspects()).addAll(methodAspects).build();
     }
 
-    /*end[AOP]*/
+    /* end[AOP]*/
     @Override
     public void addTypeListener(TypeListenerBinding listenerBinding) {
         typeListenerBindings.add(listenerBinding);
