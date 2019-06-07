@@ -3,6 +3,7 @@ alphabet '<>=+-*/\\%(){}[],.;:#!?^$@&|"\'`~ \t\n\r_ABCDEFGHIJKLMNOPQRSTUVWXYZabc
 cdfa {
     start_empty_line
         '//' -> prefix_lcom
+        '/*' -> prefix_lbcom
         ' ' | '\t' | '\n' | '\r' -> ws
         _ ->> ^_ -> start_non_empty_line;
 
@@ -141,7 +142,7 @@ cdfa {
 
     slash   ^SLASH
         '/' -> inline_lcom_prefix
-        '*' -> bcom
+        '*' -> inline_lbcom
         '=' -> ^ASSN;
 
     and     ^AND
@@ -259,10 +260,15 @@ cdfa {
         '\n' -> fail
         _ -> inline_lcom;
 
-    bcom
+    inline_lbcom
         '\n' -> ^BCOM_START -> start_bcom_itl
-        '*/' -> ^INLINE_BCOM -> start_empty_line
-        _ -> bcom;
+        '*/' -> ^INLINE_LBCOM -> start_non_empty_line
+        _ -> inline_lbcom;
+
+    prefix_lbcom
+        '\n' -> ^BCOM_START -> start_bcom_itl
+        '*/' -> ^PREFIX_LBCOM -> start_non_empty_line
+        _ -> prefix_lbcom;
 
     prefixed_bcom_start
         '/' -> ^PREFIXED_BCOM_LINE_END -> start_empty_line
@@ -291,17 +297,18 @@ cdfa {
 # Line comments
 inject left INLINE_LCOM ` /* {} */`
 inject right PREFIX_LCOM
-inject right ISO_BREAK `\n[prefix]`
+inject left INLINE_LBCOM ` {}`
+inject right PREFIX_LBCOM `{}\n[prefix]`
 
 # Block comments
 inject right BCOM_START
-inject right INLINE_BCOM `{}\n[prefix]`
 inject right PREFIXED_BCOM_LINE `[prefix] {}`
 inject right NON_PREFIXED_BCOM_LINE `[prefix] * {}`
 inject right PREFIXED_BCOM_LINE_END `[prefix] {}\n[prefix]`
 inject right NON_PREFIXED_BCOM_LINE_END `[prefix] * {}\n[prefix]`
 
 # Misc injections
+inject right ISO_BREAK `\n[prefix]`
 inject right PREFIX `[prefix]`
 
 grammar {
@@ -1082,4 +1089,8 @@ grammar {
         | STAR
         | PCT
         | SLASH;
+
+    #
+    # COMMENTS
+    #
 }
