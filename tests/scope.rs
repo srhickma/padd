@@ -1,4 +1,6 @@
 extern crate padd;
+#[macro_use(assert_diff)]
+extern crate difference;
 
 use {
     padd::{FormatJob, FormatJobRunner},
@@ -140,8 +142,5 @@ fn assert_matches_file(result: String, file_name: &str) {
         }
     }
 
-    if output != result {
-        println!("EXPECTED:\n{}\nBUT FOUND:\n{}", output, result);
-        panic!("Output did not match file")
-    }
+    assert_diff!(&output, &result, "\n", 0);
 }
