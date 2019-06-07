@@ -3,7 +3,7 @@ alphabet '<>=+-*/\\%(){}[],.;:#!?^$@&|"\'`~ \t\n\r_ABCDEFGHIJKLMNOPQRSTUVWXYZabc
 cdfa {
     start_empty_line
         '//' -> prefix_lcom
-        '/*' -> prefix_lbcom
+        '/*' -> prefix_lbcom_prefix
         ' ' | '\t' | '\n' | '\r' -> ws
         _ ->> ^_ -> start_non_empty_line;
 
@@ -12,10 +12,15 @@ cdfa {
         ' ' | '\t' | '\r' -> ^_
         _ ->> ^PREFIX -> start_empty_line;
 
-    start_bcom_itl
-        '*' -> prefixed_bcom_start
+    start_inline_bcom_itl
+        '*' -> inline_bcom_sp_start
         ' ' | '\t' | '\r' | '\n' -> ws
-        _ -> non_prefixed_bcom;
+        _ -> inline_bcom_nsp;
+
+    start_prefix_bcom_itl
+        '*' -> prefix_bcom_sp_start
+        ' ' | '\t' | '\r' | '\n' -> ws
+        _ -> prefix_bcom_nsp;
 
     start_non_empty_line
         '{' -> ^LBRACE
@@ -142,7 +147,7 @@ cdfa {
 
     slash   ^SLASH
         '/' -> inline_lcom_prefix
-        '*' -> inline_lbcom
+        '*' -> inline_lbcom_prefix
         '=' -> ^ASSN;
 
     and     ^AND
@@ -249,41 +254,6 @@ cdfa {
     ws      ^_
         ' ' | '\t' | '\n' | '\r' -> ws;
 
-    prefix_lcom ^PREFIX_LCOM -> start_after_prefix_lcom
-        '\n' -> ^PREFIX_LCOM -> start_after_prefix_lcom
-        _ -> prefix_lcom;
-
-    inline_lcom_prefix ^_ -> inline_lcom
-        ' ' | '\t' -> inline_lcom_prefix;
-
-    inline_lcom ^INLINE_LCOM -> start_non_empty_line
-        '\n' -> fail
-        _ -> inline_lcom;
-
-    inline_lbcom
-        '\n' -> ^BCOM_START -> start_bcom_itl
-        '*/' -> ^INLINE_LBCOM -> start_non_empty_line
-        _ -> inline_lbcom;
-
-    prefix_lbcom
-        '\n' -> ^BCOM_START -> start_bcom_itl
-        '*/' -> ^PREFIX_LBCOM -> start_non_empty_line
-        _ -> prefix_lbcom;
-
-    prefixed_bcom_start
-        '/' -> ^PREFIXED_BCOM_LINE_END -> start_empty_line
-        _ ->> prefixed_bcom;
-
-    prefixed_bcom
-        '\n' -> ^PREFIXED_BCOM_LINE -> start_bcom_itl
-        '*/' -> ^PREFIXED_BCOM_LINE_END -> start_empty_line
-        _ -> prefixed_bcom;
-
-    non_prefixed_bcom
-        '\n' -> ^NON_PREFIXED_BCOM_LINE -> start_bcom_itl
-        '*/' -> ^NON_PREFIXED_BCOM_LINE_END -> start_empty_line
-        _ -> non_prefixed_bcom;
-
     MOD | ASSERT | PRIM | BREAK | CASE | CATCH | ENUM | CLASS | CONTINUE | DEFAULT | DO | ELSE | EXTENDS | FINALLY | FOR
         | IF | IMPLEMENTS | IMPORT | INSTANCEOF | NEW | PACKAGE | RETURN | SUPER | SWITCH | THIS | THROWS | TRY | VOID
         | WHILE | INTERFACE | SYNCHRONIZED | STATIC
@@ -292,20 +262,93 @@ cdfa {
 
     id      ^ID
         '_' .. '9' | '$' -> id;
+
+    #
+    # COMMENTS
+    #
+
+    prefix_lcom ^PREFIX_LCOM -> start_after_prefix_lcom
+        '\n' -> ^PREFIX_LCOM -> start_after_prefix_lcom
+        _ -> prefix_lcom;
+
+    inline_lcom_prefix ^_ -> inline_lcom
+        ' ' | '\t' -> inline_lcom_prefix;
+
+    inline_lcom ^INLINE_LCOM -> start_empty_line
+        '\n' -> fail
+        _ -> inline_lcom;
+
+    inline_lbcom_prefix ^_ -> inline_lbcom
+        ' ' | '\t' -> inline_lbcom_prefix;
+
+    inline_lbcom
+        '\n' -> ^INLINE_BCOM_START -> start_inline_bcom_itl
+        '*/' -> ^INLINE_LBCOM -> start_empty_line
+        _ -> inline_lbcom;
+
+    inline_bcom_sp_start
+        '/' -> ^INLINE_BCOM_SP_LINE_END -> start_empty_line
+        _ ->> inline_bcom_sp;
+
+    inline_bcom_sp
+        '\n' -> ^INLINE_BCOM_SP_LINE -> start_inline_bcom_itl
+        '*/' -> ^INLINE_BCOM_SP_LINE_END -> start_empty_line
+        _ -> inline_bcom_sp;
+
+    inline_bcom_nsp
+        '\n' -> ^INLINE_BCOM_NSP_LINE -> start_inline_bcom_itl
+        '*/' -> ^INLINE_BCOM_NSP_LINE_END -> start_empty_line
+        _ -> inline_bcom_nsp;
+
+    prefix_lbcom_prefix ^_ -> prefix_lbcom_nnl
+        ' ' | '\t' -> prefix_lbcom_prefix;
+
+    prefix_lbcom_nnl
+            '\n' -> ^PREFIX_BCOM_NL_START -> start_prefix_bcom_itl
+            _ ->> prefix_lbcom;
+
+    prefix_lbcom
+        '\n' -> ^PREFIX_BCOM_SL_START -> start_prefix_bcom_itl
+        '*/' -> ^PREFIX_LBCOM -> start_empty_line
+        _ -> prefix_lbcom;
+
+    prefix_bcom_sp_start
+        '/' -> ^PREFIX_BCOM_SP_LINE_END -> start_empty_line
+        _ ->> prefix_bcom_sp;
+
+    prefix_bcom_sp
+        '\n' -> ^PREFIX_BCOM_SP_LINE -> start_prefix_bcom_itl
+        '*/' -> ^PREFIX_BCOM_SP_LINE_END -> start_empty_line
+        _ -> prefix_bcom_sp;
+
+    prefix_bcom_nsp
+        '\n' -> ^PREFIX_BCOM_NSP_LINE -> start_prefix_bcom_itl
+        '*/' -> ^PREFIX_BCOM_NSP_LINE_END -> start_empty_line
+        _ -> prefix_bcom_nsp;
 }
 
-# Line comments
+# Inline line comments
 inject left INLINE_LCOM ` /* {} */`
-inject right PREFIX_LCOM
-inject left INLINE_LBCOM ` {}`
-inject right PREFIX_LBCOM `{}\n[prefix]`
+inject left INLINE_LBCOM ` /* {}`
 
-# Block comments
-inject right BCOM_START
-inject right PREFIXED_BCOM_LINE `[prefix] {}`
-inject right NON_PREFIXED_BCOM_LINE `[prefix] * {}`
-inject right PREFIXED_BCOM_LINE_END `[prefix] {}\n[prefix]`
-inject right NON_PREFIXED_BCOM_LINE_END `[prefix] * {}\n[prefix]`
+# Prefix line comments
+inject right PREFIX_LCOM
+inject right PREFIX_LBCOM `/* {}\n[prefix]`
+
+# Inline block comments
+inject left INLINE_BCOM_START `\n[prefix]/*\n[prefix] * {}`
+inject left INLINE_BCOM_SP_LINE `[prefix] {}`
+inject left INLINE_BCOM_NSP_LINE `[prefix] * {}`
+inject left INLINE_BCOM_SP_LINE_END `[prefix] {}\n[prefix]`
+inject left INLINE_BCOM_NSP_LINE_END `[prefix] * {}\n[prefix]`
+
+# Prefix block comments
+inject right PREFIX_BCOM_SL_START `/*\n[prefix] * {}`
+inject right PREFIX_BCOM_NL_START `/*\n`
+inject right PREFIX_BCOM_SP_LINE `[prefix] {}`
+inject right PREFIX_BCOM_NSP_LINE `[prefix] * {}`
+inject right PREFIX_BCOM_SP_LINE_END `[prefix] {}\n[prefix]`
+inject right PREFIX_BCOM_NSP_LINE_END `[prefix] * {}\n[prefix]`
 
 # Misc injections
 inject right ISO_BREAK `\n[prefix]`

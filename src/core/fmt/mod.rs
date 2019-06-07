@@ -479,14 +479,22 @@ impl<'parse, Symbol: GrammarSymbol + 'parse> FormatJob<'parse, Symbol> {
         let mut postfix = String::new();
 
         if let Some(injections) = injections_opt {
-            for injection in injections.iter().rev() {
-                let injection_string = self.injection_string(injection, outer_scope);
+            injections
+                .iter()
+                .filter(|injection| injection.direction == InjectionAffinity::Left)
+                .for_each(|injection| {
+                    let injection_string = self.injection_string(injection, outer_scope);
+                    postfix = format!("{}{}", postfix, injection_string);
+                });
 
-                match injection.direction {
-                    InjectionAffinity::Left => postfix = format!("{}{}", postfix, injection_string),
-                    InjectionAffinity::Right => prefix = format!("{}{}", injection_string, prefix),
-                }
-            }
+            injections
+                .iter()
+                .filter(|injection| injection.direction == InjectionAffinity::Right)
+                .rev()
+                .for_each(|injection| {
+                    let injection_string = self.injection_string(injection, outer_scope);
+                    prefix = format!("{}{}", injection_string, prefix);
+                });
         }
 
         format!("{}{}{}", prefix, child_string, postfix)
