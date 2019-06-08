@@ -344,7 +344,7 @@ inject left INLINE_BCOM_SP_LINE `[prefix] {}`
 inject left INLINE_BCOM_NSP_LINE `[prefix] * {}`
 inject left INLINE_BCOM_SP_LINE_END `[prefix] {}\n[prefix] */\n[prefix]`
 inject left INLINE_BCOM_NSP_LINE_END `[prefix] * {}\n[prefix] */\n[prefix]`
-inject left INLINE_BCOM_END `[prefix] {}\n[prefix]`
+inject left INLINE_BCOM_END `[prefix] {}`
 
 # Prefix block comments
 inject right PREFIX_BCOM_SL_START `/*\n[prefix] * {}`
@@ -716,7 +716,10 @@ grammar {
         | grouped_statements inline_isolated_block_statement `{}\n\n[prefix]{}\n`
         | inline_isolated_block_statement
         | grouped_statements
-        | PREFIX_LCOM PREFIX `{}`;
+        | PREFIX_LCOM PREFIX `{}`
+        | PREFIX_LBCOM `/* {}\n`
+        | lone_inline_bcom
+        | grouping_prefix_bcom;
 
     isolated_block_statement `{}\n`
         | class_dec
@@ -1141,4 +1144,45 @@ grammar {
     #
     # COMMENTS
     #
+
+    lone_inline_bcom
+        | INLINE_BCOM_START [inline_bcom_lines] inline_bcom_end `/*\n[prefix] {1}{2}`
+        | INLINE_BCOM_START [inline_bcom_lines] inline_bcom_end trailing_prefix_bcom_group `/*\n[prefix] {1}{3}`;
+
+    inline_bcom_lines
+        | inline_bcom_lines inline_bcom_line `{}{}[prefix] `
+        | inline_bcom_line `{}[prefix] `;
+    inline_bcom_line
+        | INLINE_BCOM_SP_LINE
+        | INLINE_BCOM_NSP_LINE `* {}`;
+
+    inline_bcom_end
+        | INLINE_BCOM_END
+        | INLINE_BCOM_SP_LINE_END
+        | INLINE_BCOM_NSP_LINE_END;
+
+    trailing_prefix_bcom_group
+        | PREFIX_BCOM_SL_START [prefix_bcom_lines] prefix_bcom_end `*\n[prefix] * {}[prefix] {}{}`
+        | PREFIX_BCOM_NL_START [prefix_bcom_lines] prefix_bcom_end `*\n[prefix] {1}{2}`;
+
+    grouping_prefix_bcom
+        | PREFIX_BCOM_SL_START [prefix_bcom_lines] prefix_bcom_end `/*\n[prefix] * {}[prefix] {}{}`
+        | PREFIX_BCOM_NL_START [prefix_bcom_lines] prefix_bcom_end `/*\n[prefix] {1}{2}`;
+
+    prefix_bcom_lines
+        | prefix_bcom_lines prefix_bcom_line `{}{}[prefix] `
+        | prefix_bcom_line `{}[prefix] `;
+    prefix_bcom_line
+        | PREFIX_BCOM_SP_LINE
+        | PREFIX_BCOM_NSP_LINE `* {}`
+        | PREFIX_BCOM_END `*\n`
+        | PREFIX_BCOM_SP_LINE_END `{}\n`
+        | PREFIX_BCOM_NSP_LINE_END `* {}\n`
+        | PREFIX_BCOM_SL_START `* {}`
+        | PREFIX_BCOM_NL_START;
+
+    prefix_bcom_end
+        | PREFIX_BCOM_END
+        | PREFIX_BCOM_SP_LINE_END
+        | PREFIX_BCOM_NSP_LINE_END `* {}\n[prefix] */`;
 }

@@ -43,6 +43,43 @@ public class DoublyLinkedList<T> implements Iterable<T> {
         */
     }
 
+    public DoublyLinkedList(){/*
+            * No-op
+            */
+        }
+
+        public DoublyLinkedList(){
+                /* No-op
+                */
+            }
+
+
+    public DoublyLinkedList(){
+        /*
+        No-op
+        */
+
+        /* HERE
+        * BE
+       THERE
+...
+       EVERYWHERE*/
+    }
+
+    public DoublyLinkedList(){/*
+        No-op
+        */
+
+        /* HERE
+        * BE
+       THERE
+...
+       EVERYWHERE*//*
+       BUT WAIT!
+       THERE ARE MORE COMMENTS!!!
+       */
+    }
+
     public DoublyLinkedList(
     T... elements /* This is a strange place for a comment
     */){

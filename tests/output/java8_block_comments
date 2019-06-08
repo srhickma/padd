@@ -39,20 +39,58 @@ public class DoublyLinkedList<T> implements Iterable<T> {
 
     /* Default constructor */
     public DoublyLinkedList() {
-    /* No-op */
+        /* No-op */
     }
 
     public DoublyLinkedList() {
-    /*
-     * No-op
-     */
+        /*
+         * No-op
+         */
+    }
+
+    public DoublyLinkedList() {
+        /*
+         * No-op
+         */
+    }
+
+    public DoublyLinkedList() {
+        /*
+         * No-op
+         */
+    }
+
+    public DoublyLinkedList() {
+        /*
+         * No-op
+         *
+         * HERE
+         * BE
+         * THERE
+         * ...
+         * EVERYWHERE
+         */
+    }
+
+    public DoublyLinkedList() {
+        /*
+         * No-op
+         *
+         * HERE
+         * BE
+         * THERE
+         * ...
+         * EVERYWHERE
+         
+         * BUT WAIT!
+         * THERE ARE MORE COMMENTS!!!
+         */
     }
 
     public DoublyLinkedList(T... elements
     /*
      * This is a strange place for a comment
-     */
-    ) {
+     */) {
         /* Just add all the elements */
         for (T element : elements) {
             addLast(element);
@@ -79,7 +117,6 @@ public class DoublyLinkedList<T> implements Iterable<T> {
              * Then do something else
              * Then do a third thing
              */
-            
             first = newNode;
         }
 
@@ -200,7 +237,6 @@ public class DoublyLinkedList<T> implements Iterable<T> {
             /*
              * This method overrides a method on Iterator
              */
-            
             public void remove() {
                 /*
                  * We don't allow element removal via this iterator
