@@ -200,7 +200,7 @@ where
         let kind = grammar_builder.kind_for(token);
 
         for state in &states {
-            add_cdfa_tokenizer(acceptor_node, *state, None, &kind, builder, grammar_builder)?;
+            add_cdfa_state_tokenizer(acceptor_node, *state, &kind, builder, grammar_builder)?;
         }
     }
 
@@ -260,10 +260,10 @@ where
 
             // Immediate state pass-through
             for source in sources {
-                add_cdfa_tokenizer(
+                add_cdfa_trans_tokenizer(
                     destination,
                     token,
-                    Some(*source),
+                    *source,
                     &kind,
                     builder,
                     grammar_builder,
@@ -395,10 +395,9 @@ where
 }
 
 #[allow(clippy::ptr_arg)]
-fn add_cdfa_tokenizer<CDFABuilderType, CDFAType, Symbol: GrammarSymbol, GrammarType>(
+fn add_cdfa_state_tokenizer<CDFABuilderType, CDFAType, Symbol: GrammarSymbol, GrammarType>(
     acceptor_node: &Tree<SpecSymbol>,
     state: &State,
-    from: Option<&State>,
     kind: &Symbol,
     builder: &mut CDFABuilderType,
     grammar_builder: &mut GrammarBuilder<String, Symbol, GrammarType>,
@@ -413,10 +412,35 @@ where
         builder.accept(state);
     } else {
         let acceptor_destination = &accd_opt_node.get_child(1).lhs.lexeme();
-        match from {
-            None => builder.accept_to_from_all(state, acceptor_destination)?,
-            Some(from_state) => builder.accept_to(state, from_state, acceptor_destination)?,
-        };
+        builder.accept_to_from_all(state, acceptor_destination)?;
+    }
+
+    if *kind != grammar_builder.kind_for(&spec::DEF_MATCHER) {
+        builder.tokenize(state, kind);
+    }
+    Ok(())
+}
+
+#[allow(clippy::ptr_arg)]
+fn add_cdfa_trans_tokenizer<CDFABuilderType, CDFAType, Symbol: GrammarSymbol, GrammarType>(
+    acceptor_node: &Tree<SpecSymbol>,
+    state: &State,
+    from: &State,
+    kind: &Symbol,
+    builder: &mut CDFABuilderType,
+    grammar_builder: &mut GrammarBuilder<String, Symbol, GrammarType>,
+) -> Result<(), spec::GenError>
+    where
+        CDFAType: CDFA<usize, Symbol>,
+        CDFABuilderType: CDFABuilder<String, Symbol, CDFAType>,
+        GrammarType: Grammar<Symbol>,
+{
+    let accd_opt_node = acceptor_node.get_child(2);
+    if accd_opt_node.is_empty() {
+        builder.accept(state);
+    } else {
+        let acceptor_destination = &accd_opt_node.get_child(1).lhs.lexeme();
+        builder.accept_to(state, from, acceptor_destination)?;
     }
 
     if *kind != grammar_builder.kind_for(&spec::DEF_MATCHER) {
