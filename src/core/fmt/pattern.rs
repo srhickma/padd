@@ -117,7 +117,7 @@ fn build_pattern_ecdfa() -> Result<EncodedCDFA<PatternSymbol>, scan::CDFAError> 
     builder.build()
 }
 
-/// PatternSymbol: An enum whose elements are the symbols in the grammar of a pattern.
+/// Pattern Symbol: An enum whose elements are the symbols in the grammar of a pattern.
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub enum PatternSymbol {
     Pattern,
@@ -248,7 +248,7 @@ pub struct Pattern {
     pub segments: Vec<Segment>,
 }
 
-/// Segment: represent a single section of a pattern.
+/// Segment: Represents a single section of a pattern.
 ///
 /// # Types
 ///
@@ -265,7 +265,7 @@ pub enum Segment {
     Capture(Capture),
 }
 
-/// Capture: stores information about the capture of a child's formatting, to be inserted into the
+/// Capture: Stores information about the capture of a child's formatting, to be inserted into the
 /// pattern string of the parent.
 ///
 /// # Fields
@@ -280,13 +280,13 @@ pub struct Capture {
     pub declarations: Vec<Declaration>,
 }
 
-/// Declaration: represents a variable declaration in a `Capture`.
+/// Declaration: Represents a variable declaration in a `Capture`.
 ///
 /// # Fields
 ///
 /// * `key` - the name of the variable.
-/// * `value` - the pattern which should be evaluated to determine the value of the variable.
-/// If value is `None` indicates that the variable will be cleared.
+/// * `value` - the pattern which should be evaluated to determine the value of the variable. A
+/// value of `None` indicates that the variable will be cleared.
 #[derive(Clone)]
 pub struct Declaration {
     pub key: String,
@@ -314,8 +314,8 @@ pub fn generate_pattern<Symbol: GrammarSymbol>(
     generate_pattern_internal(&parse, prod, string_prod)
 }
 
-/// Returns a `Pattern` a pattern parse tree, or an error if the parsed patter does not represent a
-/// valid pattern (i.e. fails context-sensitive analysis).
+/// Returns a `Pattern` object given a pattern parse tree, or an error if the parsed pattern does
+/// not represent a valid pattern (i.e. fails context-sensitive analysis).
 ///
 /// # Type Parameters
 ///
@@ -347,7 +347,7 @@ pub fn generate_pattern_internal<Symbol: GrammarSymbol>(
 ///
 /// # Parameters
 ///
-/// * `node` - the parse tree node for the current pattern segment of the pattern.
+/// * `node` - the parse tree node of the current segment of the pattern.
 /// * `accumulator` - a vector to accumulate the segments of the pattern as it is built.
 /// * `prod` - the production associated with the pattern being built.
 /// * `string_prod` - the string representation of `prod`, useful for building errors.
@@ -479,7 +479,7 @@ fn parse_decl<Symbol: GrammarSymbol>(
     })
 }
 
-/// Parses a patter from an input string.
+/// Parses a pattern from an input string.
 ///
 /// Returns the root node of the parse tree, or an error if a pattern could not be parsed from the
 /// input.
@@ -501,8 +501,8 @@ fn parse_pattern(input: &str) -> Result<Tree<PatternSymbol>, BuildError> {
 ///
 /// # Types
 ///
-/// * `ScanErr` - Indicates that an error that occurred while lexing a pattern.
-/// * `ParseErr` - Indicates that an error that occurred while parsing a pattern.
+/// * `ScanErr` - Indicates that an error occurred while lexing a pattern.
+/// * `ParseErr` - Indicates that an error occurred while parsing a pattern.
 /// * `CaptureErr` - Indicates that an invalid pattern capture is present (e.g. out-of-bounds).
 #[derive(Debug)]
 pub enum BuildError {

@@ -1,4 +1,4 @@
-/// Return `input` with all backslash-escaped characters replaced, i.e. \n, \t, \\ are
+/// Returns `input` with all backslash-escaped characters replaced, i.e. \n, \t, \\ are
 /// replaced by "newline", "tab", and "\" characters, and all other backslashes are simply
 /// removed.
 pub fn replace_escapes(input: &str) -> String {

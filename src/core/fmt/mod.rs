@@ -11,15 +11,14 @@ mod pattern;
 
 /// Formatter: A utility struct used to format parse trees based on a set of `Pattern` objects.
 ///
-/// # Type Parameters:
+/// # Type Parameters
 ///
 /// * `Symbol` - the symbol type of the parse tree's to be formatted.
 ///
-/// # Fields:
+/// # Fields
 ///
-/// * `pattern_map` - a map from production right-hand-sides (stored as strings) to their respective
-/// patterns.
-/// * `injection_map` - a map from grammar symbols to their respecive injectables, used to format
+/// * `pattern_map` - a map from productions to their respective patterns.
+/// * `injection_map` - a map from grammar symbols to their respective injectables, used to format
 /// injected symbols.
 pub struct Formatter<Symbol: GrammarSymbol> {
     pattern_map: HashMap<Production<Symbol>, Pattern>,
@@ -40,17 +39,16 @@ impl<Symbol: GrammarSymbol> Formatter<Symbol> {
 
 /// Formatter Builder: A builder for efficiently constructing `Formatter` structs.
 ///
-/// # Type Parameters:
+/// # Type Parameters
 ///
 /// * `Symbol` - the symbol type of the parse tree's to be formatted.
 ///
-/// # Fields:
+/// # Fields
 ///
-/// * `pattern_map` - a map from productions (stored as strings) to their respective
-/// patterns.
-/// * `injection_map` - a map from grammar symbols to their respecive injectables, used to format
+/// * `pattern_map` - a map from productions to their respective patterns.
+/// * `injection_map` - a map from grammar symbols to their respective injectables, used to format
 /// injected symbols.
-/// * `memory` - a map from patter strings to `Pattern` objects, so that parsing can be skipped for
+/// * `memory` - a map from pattern strings to `Pattern` objects, so that parsing can be skipped for
 /// pattern strings that have already been seen elsewhere in the specification.
 pub struct FormatterBuilder<Symbol: GrammarSymbol> {
     pattern_map: HashMap<Production<Symbol>, Pattern>,
@@ -68,7 +66,7 @@ impl<Symbol: GrammarSymbol> FormatterBuilder<Symbol> {
         }
     }
 
-    /// Returns the `Formatter` for this `FormatterBuilder`, consuming the builder.
+    /// Builds a `Formatter` from this `FormatterBuilder`, consuming the builder.
     pub fn build(self) -> Formatter<Symbol> {
         Formatter {
             pattern_map: self.pattern_map,
@@ -80,7 +78,7 @@ impl<Symbol: GrammarSymbol> FormatterBuilder<Symbol> {
     ///
     /// Returns an error if the passed pattern string cannot be built into a `Pattern`.
     ///
-    /// # Parameters:
+    /// # Parameters
     ///
     /// * `pair` - the `PatternPair` storing the pattern string and production.
     pub fn add_pattern(&mut self, pair: PatternPair<Symbol>) -> Result<(), BuildError> {
@@ -103,9 +101,9 @@ impl<Symbol: GrammarSymbol> FormatterBuilder<Symbol> {
     ///
     /// Returns an error if the injection pattern string cannot be built into a `Pattern`.
     ///
-    /// # Parameters:
+    /// # Parameters
     ///
-    /// * `injectable` - the injection specification to be added.
+    /// * `injection` - the injection specification to be added.
     pub fn add_injection(&mut self, injection: InjectableString<Symbol>) -> Result<(), BuildError> {
         if self.injection_map.contains_key(&injection.terminal) {
             return Err(BuildError::DuplicateInjectionErr(injection.terminal_string));
@@ -143,7 +141,7 @@ impl<Symbol: GrammarSymbol> FormatterBuilder<Symbol> {
 ///
 /// * `PatternBuildErr` - Indicates that an error that occurred while building a pattern.
 /// * `DuplicateInjectionErr` - Indicates that a particular symbol was specified for injection
-/// multiple times.
+/// more than once.
 #[derive(Debug)]
 pub enum BuildError {
     PatternBuildErr(pattern::BuildError),
@@ -180,13 +178,12 @@ impl From<pattern::BuildError> for BuildError {
 
 /// Injection: A struct representing the injection of a symbol before or after a non-injected tree.
 ///
-///
-/// # Type Parameters:
+/// # Type Parameters
 ///
 /// * `Symbol` - the symbol type of the grammar used to construct the parse tree (and the symbol
 /// being injected).
 ///
-/// # Fields:
+/// # Fields
 ///
 /// * `tree` - the parse tree of the node which this injection will attach to.
 /// * `pattern` - the pattern used to format the injected string.
@@ -201,16 +198,15 @@ struct Injection<'scope, Symbol: GrammarSymbol> {
 /// Format Job: A payload struct for the formatter which stores the parse tree being formatted and
 /// all other data needed to carry out the formatting.
 ///
-/// # Type Parameters:
+/// # Type Parameters
 ///
 /// * `Symbol` - the symbol type of the grammar used to construct the parse tree.
 ///
-/// # Fields:
+/// # Fields
 ///
 /// * `parse` - the parse tree to be formatted.
-/// * `pattern_map` - a map from productions (stored as strings) to their respective
-/// patterns.
-/// * `injection_map` - a map from grammar symbols to their respecive injectables, used to format
+/// * `pattern_map` - a map from productions to their respective patterns.
+/// * `injection_map` - a map from grammar symbols to their respective injectables, used to format
 /// injected symbols.
 struct FormatJob<'parse, Symbol: GrammarSymbol + 'parse> {
     parse: &'parse Tree<Symbol>,
@@ -219,7 +215,7 @@ struct FormatJob<'parse, Symbol: GrammarSymbol + 'parse> {
 }
 
 impl<'parse, Symbol: GrammarSymbol + 'parse> FormatJob<'parse, Symbol> {
-    /// Runs the formatter on the `FormatJob`.
+    /// Runs the formatter on this `FormatJob`.
     ///
     /// Returns the formatted string.
     fn run(&self) -> String {
@@ -228,7 +224,7 @@ impl<'parse, Symbol: GrammarSymbol + 'parse> FormatJob<'parse, Symbol> {
 
     /// Returns the formatted string of the passed parse tree node.
     ///
-    /// # Parameters:
+    /// # Parameters
     ///
     /// * `node` - the current parse tree node.
     /// * `scope` - a hashmap storing the values of variables in the scope of the current node,
@@ -275,9 +271,9 @@ impl<'parse, Symbol: GrammarSymbol + 'parse> FormatJob<'parse, Symbol> {
     ///
     /// Injections are filtered and directed at this stage of formatting. Injections are paired
     /// with their neighbours based on their preferred affinity, or their non-preferred neighbour
-    /// if their preferred neighbour not being captured by the pattern (or doesn't exist).
+    /// if their preferred neighbour is not captured by the pattern (or doesn't exist).
     ///
-    /// # Parameters:
+    /// # Parameters
     ///
     /// * `pattern` - the pattern to be used when formatting the children.
     /// * `children` - a slice of parse tree nodes storing the children of the current (pattern)
@@ -357,7 +353,7 @@ impl<'parse, Symbol: GrammarSymbol + 'parse> FormatJob<'parse, Symbol> {
     /// Injections can optionally be provided, in which case they will be consumed and passed to
     /// capture evaluation to be injected.
     ///
-    /// # Parameters:
+    /// # Parameters
     ///
     /// * `pattern` - the pattern to be used when formatting the children.
     /// * `children` - a slice of parse tree nodes storing the children of the current (pattern)
@@ -406,10 +402,10 @@ impl<'parse, Symbol: GrammarSymbol + 'parse> FormatJob<'parse, Symbol> {
     /// This method determines the inner scope of the capture, and then calls
     /// `evaluate_capture_internal` to perform the actual evaluation.
     ///
-    /// # Parameters:
+    /// # Parameters
     ///
     /// * `capture` - the pattern capture to be "filled".
-    /// * `children` - a vector of parse tree nodes storing the children of the current (pattern)
+    /// * `children` - a slice of parse tree nodes storing the children of the current (pattern)
     /// node.
     /// * `outer_scope` - a hashmap storing the values of variables in the scope of the current
     /// node, indexed by the variable names.
@@ -457,11 +453,11 @@ impl<'parse, Symbol: GrammarSymbol + 'parse> FormatJob<'parse, Symbol> {
 
     /// Returns the formatted string for a pattern capture given the associated child node.
     ///
-    /// This method uses `recur` with the inner scope of the capture to build the formatted string
-    /// the child node, then prefixes and postfixes the string with the injection strings of all
+    /// This method calls `recur` with the inner scope of the capture to build the formatted string
+    /// of the child node, then prefixes and postfixes the string with the injection strings of all
     /// passed injections.
     ///
-    /// # Parameters:
+    /// # Parameters
     ///
     /// * `child` - the child node to being captured.
     /// * `outer_scope` - a hashmap storing the values of variables in the scope of the parent
@@ -498,7 +494,7 @@ impl<'parse, Symbol: GrammarSymbol + 'parse> FormatJob<'parse, Symbol> {
 
     /// Returns the formatted string for an injection.
     ///
-    /// # Parameters:
+    /// # Parameters
     ///
     /// * `injection` - the injection to be formatted.
     /// * `scope` - the variable scope in which to format the injection, indexed by variable names.
@@ -517,12 +513,12 @@ impl<'parse, Symbol: GrammarSymbol + 'parse> FormatJob<'parse, Symbol> {
 
 /// Pattern Pair: A pair representing an un-parsed pattern.
 ///
-/// # Type Parameters:
+/// # Type Parameters
 ///
 /// * `Symbol` - the symbol type of the pattern's production.
 ///
-/// # Fields:
-/// 
+/// # Fields
+///
 /// * `production` - the grammar production which this pattern applies to.
 /// * `string_production` - the string representation of `production`, useful for building errors.
 /// * `pattern` - the raw pattern string, retrieved from the specification.
@@ -561,7 +557,7 @@ impl InjectionAffinity {
 /// Note: the symbol itself is not stored in an `Injectable`, since it will already be stored as a
 /// key in the injection map.
 ///
-/// # Fields:
+/// # Fields
 ///
 /// * `pattern` - an optional pattern to use when formatting the injection string.
 /// * `affinity` - the affinity of the injection.
@@ -570,13 +566,13 @@ struct Injectable {
     affinity: InjectionAffinity,
 }
 
-/// InjectableString: External representation of an injection specification.
+/// Injectable String: External representation of an injection specification.
 ///
-/// # Type Parameters:
+/// # Type Parameters
 ///
 /// * `Symbol` - the symbol type of the terminal being considered for injection.
 ///
-/// # Fields:
+/// # Fields
 ///
 /// * `terminal` - the terminal symbol being considered for injection.
 /// * `terminal_string` - the string representation of `terminal`, useful for building errors.
