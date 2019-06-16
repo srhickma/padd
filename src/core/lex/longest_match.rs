@@ -74,7 +74,10 @@ impl<State: Data, Symbol: GrammarSymbol> Lexer<State, Symbol> for LongestMatchLe
                             last_accepting = ScanOneResult {
                                 consumed,
                                 end_state: Some(next.clone()),
-                                next_start: cdfa.acceptor_destination(&next, &state),
+                                next_start: match res.acceptor_destination {
+                                    Some(destination) => Some(destination), // TODO(shane) fix this api!
+                                    None => cdfa.acceptor_destination(&next, &state),
+                                },
                                 line,
                                 character,
                             };

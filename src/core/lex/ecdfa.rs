@@ -6,7 +6,7 @@ use {
         },
         lex::{
             alphabet::HashedAlphabet, CDFABuilder, CDFAError, ConsumerStrategy,
-            TransitionDestination, TransitionResult, CDFA,
+            TransitionDestination, TransitionResult, CDFA, Transit,
         },
         parse::grammar::GrammarSymbol,
         util::encoder::Encoder,
@@ -154,16 +154,25 @@ impl<State: Data, Symbol: GrammarSymbol> CDFABuilder<State, Symbol, EncodedCDFA<
     fn mark_trans(
         &mut self,
         from: &State,
-        to: &State,
+        transit: Transit<State>,
         on: char,
-        consumer: ConsumerStrategy,
     ) -> Result<&mut Self, CDFAError> {
         let from_encoded = self.encoder.encode(from);
-        let to_encoded = self.encoder.encode(to);
+        let to_encoded = self.encoder.encode(&transit.dest);
+        // TODO(shane) conglomerate this stuff
+        let acceptor_destination_encoded = match transit.acceptor_destination {
+            None => None,
+            Some(acceptor_destination) => Some(self.encoder.encode(&acceptor_destination)),
+        };
+        let transition_delta = TransitionDestination::new(
+            to_encoded,
+            transit.consumer,
+            acceptor_destination_encoded
+        );
 
         {
             let t_trie = self.get_transition_trie(from_encoded);
-            t_trie.insert(on, TransitionDestination::new(to_encoded, consumer))?;
+            t_trie.insert(on, transition_delta)?;
         }
 
         Ok(self)
@@ -172,19 +181,27 @@ impl<State: Data, Symbol: GrammarSymbol> CDFABuilder<State, Symbol, EncodedCDFA<
     fn mark_chain(
         &mut self,
         from: &State,
-        to: &State,
+        transit: Transit<State>,
         on: impl Iterator<Item = char>,
-        consumer: ConsumerStrategy,
     ) -> Result<&mut Self, CDFAError> {
         let from_encoded = self.encoder.encode(from);
-        let to_encoded = self.encoder.encode(to);
+        let to_encoded = self.encoder.encode(&transit.dest);
+        let acceptor_destination_encoded = match transit.acceptor_destination {
+            None => None,
+            Some(acceptor_destination) => Some(self.encoder.encode(&acceptor_destination)),
+        };
+        let transition_delta = TransitionDestination::new(
+            to_encoded,
+            transit.consumer,
+            acceptor_destination_encoded
+        );
 
         {
             let t_trie = self.get_transition_trie(from_encoded);
 
             let mut chars: Vec<char> = Vec::new();
             on.for_each(|c| chars.push(c));
-            t_trie.insert_chain(&chars, TransitionDestination::new(to_encoded, consumer))?;
+            t_trie.insert_chain(&chars, transition_delta)?;
         }
 
         Ok(self)
@@ -193,15 +210,14 @@ impl<State: Data, Symbol: GrammarSymbol> CDFABuilder<State, Symbol, EncodedCDFA<
     fn mark_range(
         &mut self,
         from: &State,
-        to: &State,
+        transit: Transit<State>,
         start: char,
         end: char,
-        consumer: ConsumerStrategy,
     ) -> Result<&mut Self, CDFAError> {
         let to_mark = self.get_alphabet_range(start, end);
 
         for c in &to_mark {
-            self.mark_trans(from, to, *c, consumer.clone())?;
+            self.mark_trans(from, transit.clone(), *c)?;
         }
 
         Ok(self)
@@ -210,16 +226,15 @@ impl<State: Data, Symbol: GrammarSymbol> CDFABuilder<State, Symbol, EncodedCDFA<
     fn mark_range_for_all<'state_o: 'state_i, 'state_i>(
         &mut self,
         sources: impl Iterator<Item = &'state_i &'state_o State>,
-        to: &'state_o State,
+        transit: Transit<State>,
         start: char,
         end: char,
-        consumer: ConsumerStrategy,
-    ) -> Result<&mut Self, CDFAError> {
+    ) -> Result<&mut Self, CDFAError> where State: 'state_o {
         let to_mark = self.get_alphabet_range(start, end);
 
         for source in sources {
             for c in &to_mark {
-                self.mark_trans(&source, to, *c, consumer.clone())?;
+                self.mark_trans(&source, transit.clone(), *c)?;
             }
         }
 
@@ -229,16 +244,24 @@ impl<State: Data, Symbol: GrammarSymbol> CDFABuilder<State, Symbol, EncodedCDFA<
     fn default_to(
         &mut self,
         from: &State,
-        to: &State,
-        consumer: ConsumerStrategy,
+        transit: Transit<State>,
     ) -> Result<&mut Self, CDFAError> {
         let from_encoded = self.encoder.encode(from);
-        let to_encoded = self.encoder.encode(to);
+        let to_encoded = self.encoder.encode(&transit.dest);
+        let acceptor_destination_encoded = match transit.acceptor_destination {
+            None => None,
+            Some(acceptor_destination) => Some(self.encoder.encode(&acceptor_destination)),
+        };
+        let transition_delta = TransitionDestination::new( // TODO(shane) abstract this transformation
+            to_encoded,
+            transit.consumer,
+            acceptor_destination_encoded
+        );
 
         match {
             let t_trie = self.get_transition_trie(from_encoded);
 
-            t_trie.set_default(TransitionDestination::new(to_encoded, consumer))
+            t_trie.set_default(transition_delta)
         } {
             Err(err) => Err(err),
             Ok(()) => Ok(self),
@@ -275,36 +298,36 @@ impl<'scope, 'state: 'scope, State: 'state + Data, Symbol: 'scope + GrammarSymbo
         Ok(self)
     }
 
-    pub fn mark_trans(&mut self, to: &State, on: char) -> Result<&mut Self, CDFAError> {
+    pub fn mark_trans(&mut self, transit: Transit<State>, on: char) -> Result<&mut Self, CDFAError> {
         self.ecdfa_builder
-            .mark_trans(self.state, to, on, ConsumerStrategy::All)?;
+            .mark_trans(self.state, transit, on)?;
         Ok(self)
     }
 
     pub fn mark_chain(
         &mut self,
-        to: &State,
+        transit: Transit<State>,
         on: impl Iterator<Item = char>,
     ) -> Result<&mut Self, CDFAError> {
         self.ecdfa_builder
-            .mark_chain(self.state, to, on, ConsumerStrategy::All)?;
+            .mark_chain(self.state, transit, on)?;
         Ok(self)
     }
 
     pub fn mark_range(
         &mut self,
-        to: &State,
+        transit: Transit<State>,
         start: char,
         end: char,
     ) -> Result<&mut Self, CDFAError> {
         self.ecdfa_builder
-            .mark_range(self.state, to, start, end, ConsumerStrategy::All)?;
+            .mark_range(self.state, transit, start, end)?;
         Ok(self)
     }
 
-    pub fn default_to(&mut self, to: &State) -> Result<&mut Self, CDFAError> {
+    pub fn default_to(&mut self, transit: Transit<State>) -> Result<&mut Self, CDFAError> {
         self.ecdfa_builder
-            .default_to(self.state, to, ConsumerStrategy::All)?;
+            .default_to(self.state, transit)?;
         Ok(self)
     }
 
@@ -375,7 +398,7 @@ impl TransitionTrie {
         TransitionTrie {
             root: TransitionNode {
                 children: HashMap::new(),
-                dest: TransitionDestination::new(usize::max_value(), ConsumerStrategy::None),
+                dest: TransitionDestination::new(usize::max_value(), ConsumerStrategy::None, None),
             },
             default: None,
         }
@@ -452,7 +475,7 @@ impl TransitionTrie {
                 dest: if last {
                     dest
                 } else {
-                    TransitionDestination::new(usize::max_value(), ConsumerStrategy::None)
+                    TransitionDestination::new(usize::max_value(), ConsumerStrategy::None, None)
                 },
             };
             node.add_child(c, child);
@@ -592,7 +615,7 @@ impl AcceptorDestinationMux {
 mod tests {
     use core::{
         data::Data,
-        lex::{self, Token},
+        lex::{self, Token, TransitBuilder},
     };
 
     use super::*;
@@ -606,13 +629,13 @@ mod tests {
             .mark_start(&"start".to_string());
         builder
             .state(&"start".to_string())
-            .mark_trans(&"zero".to_string(), '0')
+            .mark_trans(Transit::to("zero".to_string()), '0')
             .unwrap()
-            .mark_trans(&"notzero".to_string(), '1')
+            .mark_trans(Transit::to("notzero".to_string()), '1')
             .unwrap();
         builder
             .state(&"notzero".to_string())
-            .default_to(&"notzero".to_string())
+            .default_to(Transit::to("notzero".to_string()))
             .unwrap()
             .accept()
             .tokenize(&"NZ".to_string());
@@ -652,23 +675,23 @@ NZ <- '11010101'
             .mark_start(&"start".to_string());
         builder
             .state(&"start".to_string())
-            .mark_trans(&"ws".to_string(), ' ')
+            .mark_trans(Transit::to("ws".to_string()), ' ')
             .unwrap()
-            .mark_trans(&"ws".to_string(), '\t')
+            .mark_trans(Transit::to("ws".to_string()), '\t')
             .unwrap()
-            .mark_trans(&"ws".to_string(), '\n')
+            .mark_trans(Transit::to("ws".to_string()), '\n')
             .unwrap()
-            .mark_trans(&"lbr".to_string(), '{')
+            .mark_trans(Transit::to("lbr".to_string()), '{')
             .unwrap()
-            .mark_trans(&"rbr".to_string(), '}')
+            .mark_trans(Transit::to("rbr".to_string()), '}')
             .unwrap();
         builder
             .state(&"ws".to_string())
-            .mark_trans(&"ws".to_string(), ' ')
+            .mark_trans(Transit::to("ws".to_string()), ' ')
             .unwrap()
-            .mark_trans(&"ws".to_string(), '\t')
+            .mark_trans(Transit::to("ws".to_string()), '\t')
             .unwrap()
-            .mark_trans(&"ws".to_string(), '\n')
+            .mark_trans(Transit::to("ws".to_string()), '\n')
             .unwrap()
             .accept()
             .tokenize(&"WS".to_string());
@@ -721,23 +744,23 @@ RBR <- '}'
             .mark_start(&"start".to_string());
         builder
             .state(&"start".to_string())
-            .mark_trans(&"ws".to_string(), ' ')
+            .mark_trans(Transit::to("ws".to_string()), ' ')
             .unwrap()
-            .mark_trans(&"ws".to_string(), '\t')
+            .mark_trans(Transit::to("ws".to_string()), '\t')
             .unwrap()
-            .mark_trans(&"ws".to_string(), '\n')
+            .mark_trans(Transit::to("ws".to_string()), '\n')
             .unwrap()
-            .mark_trans(&"lbr".to_string(), '{')
+            .mark_trans(Transit::to("lbr".to_string()), '{')
             .unwrap()
-            .mark_trans(&"rbr".to_string(), '}')
+            .mark_trans(Transit::to("rbr".to_string()), '}')
             .unwrap();
         builder
             .state(&"ws".to_string())
-            .mark_trans(&"ws".to_string(), ' ')
+            .mark_trans(Transit::to("ws".to_string()), ' ')
             .unwrap()
-            .mark_trans(&"ws".to_string(), '\t')
+            .mark_trans(Transit::to("ws".to_string()), '\t')
             .unwrap()
-            .mark_trans(&"ws".to_string(), '\n')
+            .mark_trans(Transit::to("ws".to_string()), '\n')
             .unwrap()
             .accept();
         builder
@@ -785,23 +808,23 @@ RBR <- '}'
             .mark_start(&"start".to_string());
         builder
             .state(&"start".to_string())
-            .mark_trans(&"ws".to_string(), ' ')
+            .mark_trans(Transit::to("ws".to_string()), ' ')
             .unwrap()
-            .mark_trans(&"ws".to_string(), '\t')
+            .mark_trans(Transit::to("ws".to_string()), '\t')
             .unwrap()
-            .mark_trans(&"ws".to_string(), '\n')
+            .mark_trans(Transit::to("ws".to_string()), '\n')
             .unwrap()
-            .mark_trans(&"lbr".to_string(), '{')
+            .mark_trans(Transit::to("lbr".to_string()), '{')
             .unwrap()
-            .mark_trans(&"rbr".to_string(), '}')
+            .mark_trans(Transit::to("rbr".to_string()), '}')
             .unwrap();
         builder
             .state(&"ws".to_string())
-            .mark_trans(&"ws".to_string(), ' ')
+            .mark_trans(Transit::to("ws".to_string()), ' ')
             .unwrap()
-            .mark_trans(&"ws".to_string(), '\t')
+            .mark_trans(Transit::to("ws".to_string()), '\t')
             .unwrap()
-            .mark_trans(&"ws".to_string(), '\n')
+            .mark_trans(Transit::to("ws".to_string()), '\n')
             .unwrap()
             .accept();
         builder
@@ -837,23 +860,23 @@ RBR <- '}'
             .mark_start(&"start".to_string());
         builder
             .state(&"start".to_string())
-            .mark_trans(&"ws".to_string(), ' ')
+            .mark_trans(Transit::to("ws".to_string()), ' ')
             .unwrap()
-            .mark_trans(&"ws".to_string(), '\t')
+            .mark_trans(Transit::to("ws".to_string()), '\t')
             .unwrap()
-            .mark_trans(&"ws".to_string(), '\n')
+            .mark_trans(Transit::to("ws".to_string()), '\n')
             .unwrap()
-            .mark_trans(&"lbr".to_string(), '{')
+            .mark_trans(Transit::to("lbr".to_string()), '{')
             .unwrap()
-            .mark_trans(&"rbr".to_string(), '}')
+            .mark_trans(Transit::to("rbr".to_string()), '}')
             .unwrap();
         builder
             .state(&"ws".to_string())
-            .mark_trans(&"ws".to_string(), ' ')
+            .mark_trans(Transit::to("ws".to_string()), ' ')
             .unwrap()
-            .mark_trans(&"ws".to_string(), '\t')
+            .mark_trans(Transit::to("ws".to_string()), '\t')
             .unwrap()
-            .mark_trans(&"ws".to_string(), '\n')
+            .mark_trans(Transit::to("ws".to_string()), '\n')
             .unwrap()
             .accept();
         builder
@@ -889,9 +912,9 @@ RBR <- '}'
             .mark_start(&"start".to_string());
         builder
             .state(&"start".to_string())
-            .mark_chain(&"four".to_string(), "four".chars())
+            .mark_chain(Transit::to("four".to_string()), "four".chars())
             .unwrap()
-            .mark_chain(&"five".to_string(), "five".chars())
+            .mark_chain(Transit::to("five".to_string()), "five".chars())
             .unwrap();
         builder
             .accept(&"four".to_string())
@@ -934,9 +957,9 @@ FIVE <- 'five'
             .mark_start(&"start".to_string());
         builder
             .state(&"start".to_string())
-            .mark_chain(&"FOR".to_string(), "for".chars())
+            .mark_chain(Transit::to("FOR".to_string()), "for".chars())
             .unwrap()
-            .default_to(&"id".to_string())
+            .default_to(Transit::to("id".to_string()))
             .unwrap();
         builder
             .accept(&"FOR".to_string())
@@ -944,7 +967,7 @@ FIVE <- 'five'
             .accept(&"id".to_string())
             .tokenize(&"id".to_string(), &"ID".to_string());
         builder
-            .default_to(&"id".to_string(), &"id".to_string(), ConsumerStrategy::All)
+            .default_to(&"id".to_string(), Transit::to("id".to_string()))
             .unwrap();
 
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
@@ -991,13 +1014,13 @@ ID <- 'fdk'
             .mark_start(&S::Start);
         builder
             .state(&S::Start)
-            .mark_trans(&S::A, 'a')
+            .mark_trans(Transit::to(S::A), 'a')
             .unwrap()
-            .mark_trans(&S::BangIn, '!')
+            .mark_trans(Transit::to(S::BangIn), '!')
             .unwrap();
         builder
             .state(&S::A)
-            .mark_trans(&S::A, 'a')
+            .mark_trans(Transit::to(S::A), 'a')
             .unwrap()
             .tokenize(&"A".to_string())
             .accept();
@@ -1013,9 +1036,9 @@ ID <- 'fdk'
             .unwrap();
         builder
             .state(&S::Hidden)
-            .mark_range(&S::Num, '1', '9')
+            .mark_range(Transit::to(S::Num), '1', '9')
             .unwrap()
-            .mark_trans(&S::BangOut, '!')
+            .mark_trans(Transit::to(S::BangOut), '!')
             .unwrap();
         builder.state(&S::Num).tokenize(&"NUM".to_string()).accept();
 
@@ -1070,11 +1093,11 @@ A <- 'a'
         let mut builder: EncodedCDFABuilder<S, String> = EncodedCDFABuilder::new();
         builder.set_alphabet("a".chars()).mark_start(&S::Start);
         builder
-            .mark_trans(&S::Start, &S::A, 'a', ConsumerStrategy::All)
+            .mark_trans(&S::Start, Transit::to(S::A), 'a')
             .unwrap();
         builder.accept_to(&S::A, &S::Start, &S::LastA).unwrap();
         builder
-            .mark_trans(&S::LastA, &S::A, 'a', ConsumerStrategy::All)
+            .mark_trans(&S::LastA, Transit::to(S::A), 'a')
             .unwrap();
         builder.accept_to(&S::A, &S::LastA, &S::Start).unwrap();
         builder.state(&S::A).tokenize(&"A".to_string());
@@ -1120,7 +1143,7 @@ A <- 'a'
         let mut builder: EncodedCDFABuilder<S, String> = EncodedCDFABuilder::new();
         builder.set_alphabet("a".chars()).mark_start(&S::Start);
         builder
-            .mark_trans(&S::Start, &S::A, 'a', ConsumerStrategy::All)
+            .mark_trans(&S::Start, Transit::to(S::A), 'a')
             .unwrap();
         builder.accept_to_from_all(&S::A, &S::LastA).unwrap();
         builder.accept_to_from_all(&S::A, &S::Start).unwrap();
@@ -1166,13 +1189,21 @@ A <- 'a'
         let mut builder: EncodedCDFABuilder<S, String> = EncodedCDFABuilder::new();
         builder.set_alphabet("ab".chars()).mark_start(&S::Start1);
         builder
-            .mark_trans(&S::Start1, &S::A, 'a', ConsumerStrategy::All)
-            .unwrap()
-            .default_to(&S::Start1, &S::Start2, ConsumerStrategy::None)
-            .unwrap();
+            .mark_trans(
+                &S::Start1,
+                TransitBuilder::to(S::A).consumer(ConsumerStrategy::All).build(),
+                'a'
+            ).unwrap()
+            .default_to(
+                &S::Start1,
+                TransitBuilder::to(S::Start2).consumer(ConsumerStrategy::None).build()
+            ).unwrap();
         builder
-            .mark_trans(&S::Start2, &S::B, 'b', ConsumerStrategy::All)
-            .unwrap();
+            .mark_trans(
+                &S::Start2,
+                TransitBuilder::to(S::B).consumer(ConsumerStrategy::All).build(),
+                'b'
+            ).unwrap();
         builder.accept(&S::A);
         builder.accept(&S::B);
         builder.state(&S::A).tokenize(&"A".to_string());

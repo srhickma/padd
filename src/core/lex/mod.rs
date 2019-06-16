@@ -31,7 +31,7 @@ pub trait CDFABuilder<State: Data, Symbol: GrammarSymbol, CDFAType> {
     fn build(self) -> Result<CDFAType, CDFAError>;
     fn set_alphabet(&mut self, chars: impl Iterator<Item = char>) -> &mut Self;
     fn accept(&mut self, state: &State) -> &mut Self;
-    fn accept_to(
+    fn accept_to( // TODO(shane) can we get rid of one of these??
         &mut self,
         state: &State,
         from: &State,
@@ -42,40 +42,95 @@ pub trait CDFABuilder<State: Data, Symbol: GrammarSymbol, CDFAType> {
     fn mark_trans(
         &mut self,
         from: &State,
-        to: &State,
+        transit: Transit<State>,
         on: char,
-        consumer: ConsumerStrategy,
     ) -> Result<&mut Self, CDFAError>;
     fn mark_chain(
         &mut self,
         from: &State,
-        to: &State,
+        transit: Transit<State>,
         on: impl Iterator<Item = char>,
-        consumer: ConsumerStrategy,
     ) -> Result<&mut Self, CDFAError>;
     fn mark_range(
         &mut self,
         from: &State,
-        to: &State,
+        transit: Transit<State>,
         start: char,
         end: char,
-        consumer: ConsumerStrategy,
     ) -> Result<&mut Self, CDFAError>;
     fn mark_range_for_all<'state_o: 'state_i, 'state_i>(
         &mut self,
         sources: impl Iterator<Item = &'state_i &'state_o State>,
-        to: &'state_o State,
+        transit: Transit<State>,
         start: char,
         end: char,
-        consumer: ConsumerStrategy,
-    ) -> Result<&mut Self, CDFAError>;
+    ) -> Result<&mut Self, CDFAError> where State: 'state_o;
     fn default_to(
         &mut self,
         from: &State,
-        to: &State,
-        consumer: ConsumerStrategy,
+        transit: Transit<State>,
     ) -> Result<&mut Self, CDFAError>;
     fn tokenize(&mut self, state: &State, token: &Symbol) -> &mut Self;
+}
+
+#[derive(Clone)]
+pub struct Transit<State: Data> {
+    dest: State,
+    consumer: ConsumerStrategy,
+    // accepts: bool,
+    acceptor_destination: Option<State>,
+}
+
+impl<State: Data> Transit<State> {
+    pub fn to(dest: State) -> Self {
+        Transit {
+            dest,
+            consumer: ConsumerStrategy::All,
+            acceptor_destination: None,
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct TransitBuilder<State: Data> {
+    dest: State,
+    consumer: ConsumerStrategy,
+    // accepts: bool,
+    acceptor_destination: Option<State>,
+}
+
+impl<State: Data> TransitBuilder<State> {
+    pub fn to(dest: State) -> Self {
+        TransitBuilder {
+            dest,
+            consumer: ConsumerStrategy::All,
+            acceptor_destination: None,
+        }
+    }
+
+    pub fn consumer(&mut self, consumer: ConsumerStrategy) -> &mut Self {
+        self.consumer = consumer;
+        self
+    }
+
+    pub fn accept(&mut self) -> &mut Self {
+        // self.accepts = true;
+        self
+    }
+
+    pub fn accept_to(&mut self, acceptor_destination: State) -> &mut Self {
+        // self.accepts = true;
+        self.acceptor_destination = Some(acceptor_destination);
+        self
+    }
+
+    pub fn build(&self) -> Transit<State> {
+        Transit {
+            dest: self.dest.clone(),
+            consumer: self.consumer.clone(),
+            acceptor_destination: self.acceptor_destination.clone(),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -87,6 +142,7 @@ pub enum ConsumerStrategy {
 pub struct TransitionResult<State: Data> {
     state: Option<State>,
     consumed: usize,
+    acceptor_destination: Option<State>,
 }
 
 impl<State: Data> TransitionResult<State> {
@@ -94,6 +150,7 @@ impl<State: Data> TransitionResult<State> {
         TransitionResult {
             state: None,
             consumed: 0,
+            acceptor_destination: None,
         }
     }
 
@@ -110,6 +167,7 @@ impl<State: Data> TransitionResult<State> {
         TransitionResult {
             state: Some(dest.state.clone()),
             consumed,
+            acceptor_destination: dest.acceptor_destination.clone(),
         }
     }
 }
@@ -118,11 +176,16 @@ impl<State: Data> TransitionResult<State> {
 pub struct TransitionDestination<State: Data> {
     state: State,
     consumer: ConsumerStrategy,
+    acceptor_destination: Option<State>,
 }
 
 impl<State: Data> TransitionDestination<State> {
-    pub fn new(state: State, consumer: ConsumerStrategy) -> Self {
-        TransitionDestination { state, consumer }
+    pub fn new(
+        state: State,
+        consumer: ConsumerStrategy,
+        acceptor_destination: Option<State>
+    ) -> Self {
+        TransitionDestination { state, consumer, acceptor_destination }
     }
 }
 
@@ -238,5 +301,3 @@ impl error::Error for Error {
         None
     }
 }
-
-pub type State = String;
