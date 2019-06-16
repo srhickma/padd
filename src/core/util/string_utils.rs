@@ -1,3 +1,6 @@
+/// Returns `input` with all backslash-escaped characters replaced, i.e. \n, \t, \\ are
+/// replaced by "newline", "tab", and "\" characters, and all other backslashes are simply
+/// removed.
 pub fn replace_escapes(input: &str) -> String {
     let mut res = String::with_capacity(input.as_bytes().len());
     let mut last_char: char = ' ';
@@ -29,6 +32,42 @@ pub fn replace_escapes(input: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn replace_escapes_empty() {
+        //setup
+        let input = "";
+
+        //exercise
+        let res = replace_escapes(input);
+
+        //verify
+        assert_eq!(res, "");
+    }
+
+    #[test]
+    fn replace_escapes_single() {
+        //setup
+        let input = "\\n";
+
+        //exercise
+        let res = replace_escapes(input);
+
+        //verify
+        assert_eq!(res, "\n");
+    }
+
+    #[test]
+    fn replace_escapes_chained() {
+        //setup
+        let input = "\\\\n\\n\\\\\\t";
+
+        //exercise
+        let res = replace_escapes(input);
+
+        //verify
+        assert_eq!(res, "\\n\n\\\t");
+    }
 
     #[test]
     fn replace_escapes_full() {
