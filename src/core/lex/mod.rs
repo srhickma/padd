@@ -5,17 +5,16 @@ use {
 
 pub mod alphabet;
 pub mod ecdfa;
-pub mod maximal_munch;
+pub mod longest_match;
 
 static FAIL_SEQUENCE_LENGTH: usize = 10;
 
-pub trait Scanner<State: Data, Symbol: GrammarSymbol>: 'static + Send + Sync {
-    fn scan(&self, input: &[char], cdfa: &CDFA<State, Symbol>)
-        -> Result<Vec<Token<Symbol>>, Error>;
+pub trait Lexer<State: Data, Symbol: GrammarSymbol>: 'static + Send + Sync {
+    fn lex(&self, input: &[char], cdfa: &CDFA<State, Symbol>) -> Result<Vec<Token<Symbol>>, Error>;
 }
 
-pub fn def_scanner<State: Data, Symbol: GrammarSymbol>() -> Box<Scanner<State, Symbol>> {
-    Box::new(maximal_munch::MaximalMunchScanner)
+pub fn def_lexer<State: Data, Symbol: GrammarSymbol>() -> Box<Lexer<State, Symbol>> {
+    Box::new(longest_match::LongestMatchLexer)
 }
 
 pub trait CDFA<State: Data, Symbol: GrammarSymbol>: Send + Sync {
@@ -228,7 +227,7 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "No accepting scans after ({},{}): {}...",
+            "No accepting tokens after ({},{}): {}...",
             self.line, self.character, self.sequence
         )
     }

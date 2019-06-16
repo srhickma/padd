@@ -5,12 +5,12 @@ extern crate stopwatch;
 use {
     core::{
         fmt::Formatter,
+        lex::{self, Lexer, CDFA},
         parse::{
             self,
             grammar::{EncodedGrammarBuilder, Grammar},
             Parser,
         },
-        scan::{self, Scanner, CDFA},
         spec,
     },
     std::{error, fmt},
@@ -35,7 +35,7 @@ pub struct FormatJobRunner {
     cdfa: Box<CDFA<StateType, SymbolType>>,
     grammar: Box<Grammar<SymbolType>>,
     formatter: Formatter<SymbolType>,
-    scanner: Box<Scanner<StateType, SymbolType>>,
+    lexer: Box<Lexer<StateType, SymbolType>>,
     parser: Box<Parser<SymbolType>>,
 }
 
@@ -48,7 +48,7 @@ impl FormatJobRunner {
             cdfa,
             grammar,
             formatter,
-            scanner: scan::def_scanner(),
+            lexer: lex::def_lexer(),
             parser: parse::def_parser(),
         })
     }
@@ -56,7 +56,7 @@ impl FormatJobRunner {
     pub fn format(&self, job: FormatJob) -> Result<String, FormatError> {
         let chars: Vec<char> = job.text.chars().collect();
 
-        let tokens = self.scanner.scan(&chars[..], &*self.cdfa)?;
+        let tokens = self.lexer.lex(&chars[..], &*self.cdfa)?;
         let parse = self.parser.parse(tokens, &*self.grammar)?;
         Ok(self.formatter.format(&parse))
     }
@@ -104,14 +104,14 @@ impl From<spec::GenError> for BuildError {
 
 #[derive(Debug)]
 pub enum FormatError {
-    ScanErr(scan::Error),
+    LexErr(lex::Error),
     ParseErr(parse::Error),
 }
 
 impl fmt::Display for FormatError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            FormatError::ScanErr(ref err) => write!(f, "Failed to scan input: {}", err),
+            FormatError::LexErr(ref err) => write!(f, "Failed to lex input: {}", err),
             FormatError::ParseErr(ref err) => write!(f, "Failed to parse input: {}", err),
         }
     }
@@ -120,15 +120,15 @@ impl fmt::Display for FormatError {
 impl error::Error for FormatError {
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match *self {
-            FormatError::ScanErr(ref err) => Some(err),
+            FormatError::LexErr(ref err) => Some(err),
             FormatError::ParseErr(ref err) => Some(err),
         }
     }
 }
 
-impl From<scan::Error> for FormatError {
-    fn from(err: scan::Error) -> FormatError {
-        FormatError::ScanErr(err)
+impl From<lex::Error> for FormatError {
+    fn from(err: lex::Error) -> FormatError {
+        FormatError::LexErr(err)
     }
 }
 
@@ -145,7 +145,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn failed_scan_input() {
+    fn failed_lex_input() {
         //setup
         let spec = "
 alphabet 'ab'
@@ -171,11 +171,11 @@ grammar {
         let mut err: &Error = &res.err().unwrap();
         assert_eq!(
             format!("{}", err),
-            "Failed to scan input: No accepting scans after (1,1): b..."
+            "Failed to lex input: No accepting tokens after (1,1): b..."
         );
 
         err = err.source().unwrap();
-        assert_eq!(format!("{}", err), "No accepting scans after (1,1): b...");
+        assert_eq!(format!("{}", err), "No accepting tokens after (1,1): b...");
 
         assert!(err.source().is_none());
     }
@@ -222,7 +222,7 @@ grammar {
     }
 
     #[test]
-    fn failed_scan_spec() {
+    fn failed_lex_spec() {
         //setup
         let spec = "
 alphabet 'ab'~
@@ -246,20 +246,20 @@ grammar {
         let mut err: &Error = &res.err().unwrap();
         assert_eq!(
             format!("{}", err),
-            "Failed to parse specification: Scan error: No accepting scans after (2,14): \
+            "Failed to parse specification: Lex error: No accepting tokens after (2,14): \
              ~\n\ncdfa {\n..."
         );
 
         err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
-            "Scan error: No accepting scans after (2,14): ~\n\ncdfa {\n..."
+            "Lex error: No accepting tokens after (2,14): ~\n\ncdfa {\n..."
         );
 
         err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
-            "No accepting scans after (2,14): ~\n\ncdfa {\n..."
+            "No accepting tokens after (2,14): ~\n\ncdfa {\n..."
         );
 
         assert!(err.source().is_none());
@@ -310,7 +310,7 @@ grammar {
     }
 
     #[test]
-    fn failed_empty_scan() {
+    fn failed_empty_lex() {
         //setup
         let spec = "".to_string();
 
@@ -323,14 +323,14 @@ grammar {
         let mut err: &Error = &res.err().unwrap();
         assert_eq!(
             format!("{}", err),
-            "Failed to parse specification: Parse error: No tokens scanned"
+            "Failed to parse specification: Parse error: No symbols tokenized"
         );
 
         err = err.source().unwrap();
-        assert_eq!(format!("{}", err), "Parse error: No tokens scanned");
+        assert_eq!(format!("{}", err), "Parse error: No symbols tokenized");
 
         err = err.source().unwrap();
-        assert_eq!(format!("{}", err), "No tokens scanned");
+        assert_eq!(format!("{}", err), "No symbols tokenized");
 
         assert!(err.source().is_none());
     }
@@ -777,7 +777,7 @@ grammar {
     }
 
     #[test]
-    fn failed_pattern_scan_error() {
+    fn failed_pattern_lex_error() {
         //setup
         let spec = "
 alphabet ''
@@ -802,30 +802,30 @@ grammar {
         assert_eq!(
             format!("{}", err),
             "Failed to generate specification: Formatter build error: Pattern build error: \
-             Pattern scan error: No accepting scans after (1,1): \\..."
+             Pattern lex error: No accepting tokens after (1,1): \\..."
         );
 
         err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
             "Formatter build error: Pattern build error: \
-             Pattern scan error: No accepting scans after (1,1): \\..."
+             Pattern lex error: No accepting tokens after (1,1): \\..."
         );
 
         err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
-            "Pattern build error: Pattern scan error: No accepting scans after (1,1): \\..."
+            "Pattern build error: Pattern lex error: No accepting tokens after (1,1): \\..."
         );
 
         err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
-            "Pattern scan error: No accepting scans after (1,1): \\..."
+            "Pattern lex error: No accepting tokens after (1,1): \\..."
         );
 
         err = err.source().unwrap();
-        assert_eq!(format!("{}", err), "No accepting scans after (1,1): \\...");
+        assert_eq!(format!("{}", err), "No accepting tokens after (1,1): \\...");
 
         assert!(err.source().is_none());
     }

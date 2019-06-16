@@ -975,7 +975,7 @@ mod tests {
             assert!(logged_results.failed.contains(&FailedFJ {
                 file_name: temp_path,
                 error_message: String::from(
-                    "Failed to scan input: No accepting scans after (1,1): class Simp..."
+                    "Failed to lex input: No accepting tokens after (1,1): class Simp..."
                 )
             }));
 
@@ -1184,7 +1184,7 @@ mod tests {
             assert!(logged_results.failed.contains(&FailedFJ {
                 file_name: temp_path,
                 error_message: String::from(
-                    "Failed to scan input: No accepting scans after (1,1): class Simp..."
+                    "Failed to lex input: No accepting tokens after (1,1): class Simp..."
                 )
             }));
 

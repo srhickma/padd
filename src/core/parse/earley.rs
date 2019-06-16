@@ -2,12 +2,12 @@ use {
     core::{
         data::Data,
         fmt::InjectionAffinity,
+        lex::Token,
         parse::{
             self,
             grammar::{Grammar, GrammarSymbol},
             Parser, Production, Tree,
         },
-        scan::Token,
     },
     std::{
         cmp::Ordering,
@@ -21,15 +21,15 @@ pub struct EarleyParser;
 impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
     fn parse(
         &self,
-        scan: Vec<Token<Symbol>>,
+        lex: Vec<Token<Symbol>>,
         grammar: &Grammar<Symbol>,
     ) -> Result<Tree<Symbol>, parse::Error> {
         let mut chart: RChart<Symbol> = RChart::new();
         let mut parse_chart: PChart<Symbol> = PChart::new();
 
         let final_required_token = {
-            let mut index = scan.len();
-            for token in scan.iter().rev() {
+            let mut index = lex.len();
+            for token in lex.iter().rev() {
                 index -= 1;
                 if !grammar.is_injectable(token.kind()) && !grammar.is_ignorable(token.kind()) {
                     break;
@@ -52,7 +52,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
             scan_full(
                 cursor,
                 final_required_token,
-                &scan,
+                &lex,
                 grammar,
                 &mut chart,
                 &mut parse_chart,
@@ -150,17 +150,17 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
         fn scan_full<'inner, 'grammar: 'inner, Symbol: GrammarSymbol>(
             cursor: usize,
             final_required_token: usize,
-            scan: &[Token<Symbol>],
+            lex: &[Token<Symbol>],
             grammar: &'grammar Grammar<Symbol>,
             chart: &'inner mut RChart<'grammar, Symbol>,
             parse_chart: &mut PChart<'grammar, Symbol>,
         ) {
-            if cursor == scan.len() {
+            if cursor == lex.len() {
                 return;
             }
 
             let more_required_tokens = cursor <= final_required_token;
-            let symbol = scan[cursor].kind();
+            let symbol = lex[cursor].kind();
 
             let next_row = if grammar.is_ignorable(symbol) {
                 cross_shadow_symbol(
@@ -327,7 +327,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
 
                 if !at_start && !at_end {
                     // It is guaranteed that there is at least one satisfying parse for any
-                    // injectable which is not at the ends of the scan, and this isn't it.
+                    // injectable which is not at the ends of the lex, and this isn't it.
                     return;
                 }
             }
@@ -422,27 +422,27 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
         }
 
         return if recognized(grammar, &chart) {
-            if cursor - 1 == scan.len() {
-                Ok(parse_tree(grammar, &scan, parse_chart))
+            if cursor - 1 == lex.len() {
+                Ok(parse_tree(grammar, &lex, parse_chart))
             } else {
                 Err(parse::Error {
                     message: format!(
                         "Largest parse did not consume all tokens: {} of {}",
                         cursor - 1,
-                        scan.len()
+                        lex.len()
                     ),
                 })
             }
-        } else if scan.is_empty() {
+        } else if lex.is_empty() {
             Err(parse::Error {
-                message: "No tokens scanned".to_string(),
+                message: "No symbols tokenized".to_string(),
             })
-        } else if cursor - 1 == scan.len() {
+        } else if cursor - 1 == lex.len() {
             Err(parse::Error {
                 message: "Recognition failed after consuming all tokens".to_string(),
             })
         } else {
-            let token = &scan[cursor - 1];
+            let token = &lex[cursor - 1];
             Err(parse::Error {
                 message: format!(
                     "Recognition failed at token {}: {} <- '{}'",
@@ -455,19 +455,19 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
 
         fn parse_tree<'scope, Symbol: GrammarSymbol>(
             grammar: &'scope Grammar<Symbol>,
-            scan: &'scope [Token<Symbol>],
+            lex: &'scope [Token<Symbol>],
             chart: PChart<'scope, Symbol>,
         ) -> Tree<Symbol> {
             if grammar.weighted_parse() {
-                parse_bottom_up(grammar, scan, chart)
+                parse_bottom_up(grammar, lex, chart)
             } else {
-                parse_top_down(grammar, scan, chart)
+                parse_top_down(grammar, lex, chart)
             }
         }
 
         fn parse_bottom_up<'scope, Symbol: GrammarSymbol>(
             grammar: &'scope Grammar<Symbol>,
-            scan: &'scope [Token<Symbol>],
+            lex: &'scope [Token<Symbol>],
             chart: PChart<'scope, Symbol>,
         ) -> Tree<Symbol> {
             let mut weight_map: HashMap<&Edge<Symbol>, usize> = HashMap::new();
@@ -535,12 +535,12 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
             fn link_shallow_paths<'scope, Symbol: GrammarSymbol>(
                 edge: &Edge<Symbol>,
                 grammar: &'scope Grammar<Symbol>,
-                scan: &'scope [Token<Symbol>],
+                lex: &'scope [Token<Symbol>],
                 nlp_map: &HashMap<&Edge<Symbol>, ParsePath<Symbol>>,
             ) -> Tree<Symbol> {
                 match edge.rule {
                     None => Tree {
-                        lhs: scan[edge.start].clone(),
+                        lhs: lex[edge.start].clone(),
                         children: Vec::new(),
                         production: None,
                         injected: edge.spm == SymbolParseMethod::Injected,
@@ -552,7 +552,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                                 vec![Tree::null()]
                             } else if edge.is_terminal(grammar) {
                                 vec![Tree {
-                                    lhs: scan[edge.start].clone(),
+                                    lhs: lex[edge.start].clone(),
                                     children: Vec::new(),
                                     production: None,
                                     injected: edge.spm == SymbolParseMethod::Injected,
@@ -564,7 +564,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                                     .iter()
                                     .filter(|ref edge| edge.spm != SymbolParseMethod::Ignored)
                                     .rev()
-                                    .map(|edge| link_shallow_paths(edge, grammar, scan, nlp_map))
+                                    .map(|edge| link_shallow_paths(edge, grammar, lex, nlp_map))
                                     .collect()
                             }
                         },
@@ -667,7 +667,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
 
                 let bottom = edge.symbols_len();
                 match df_search(0, edge.start, bottom, edge, weight_map, grammar, chart) {
-                    None => panic!("Failed to decompose parse edge of recognized scan"),
+                    None => panic!("Failed to decompose parse edge of recognized lex"),
                     Some(mut path) => {
                         path.weight += edge.weight;
                         path
@@ -675,24 +675,24 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                 }
             }
 
-            link_shallow_paths(best_root_edge, grammar, scan, &nlp_map)
+            link_shallow_paths(best_root_edge, grammar, lex, &nlp_map)
         }
 
         fn parse_top_down<'scope, Symbol: GrammarSymbol>(
             grammar: &'scope Grammar<Symbol>,
-            scan: &'scope [Token<Symbol>],
+            lex: &'scope [Token<Symbol>],
             chart: PChart<'scope, Symbol>,
         ) -> Tree<Symbol> {
             fn recur<'scope, Symbol: GrammarSymbol>(
                 edge: &Edge<Symbol>,
                 grammar: &'scope Grammar<Symbol>,
-                scan: &'scope [Token<Symbol>],
+                lex: &'scope [Token<Symbol>],
                 chart: &PChart<Symbol>,
             ) -> Tree<Symbol> {
                 match edge.rule {
                     None => Tree {
                         //Non-empty rhs
-                        lhs: scan[edge.start].clone(),
+                        lhs: lex[edge.start].clone(),
                         children: Vec::new(),
                         production: None,
                         injected: false,
@@ -704,7 +704,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                                 .iter()
                                 .filter(|ref edge| edge.spm != SymbolParseMethod::Ignored)
                                 .rev()
-                                .map(|ref edge| recur(&edge, grammar, scan, chart))
+                                .map(|ref edge| recur(&edge, grammar, lex, chart))
                                 .collect();
                             if children.is_empty() {
                                 //Empty rhs
@@ -775,7 +775,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                 }
 
                 match df_search(&edges, &leaf, 0, edge.start) {
-                    None => panic!("Failed to decompose parse edge of recognized scan"),
+                    None => panic!("Failed to decompose parse edge of recognized lex"),
                     Some(path) => path,
                 }
             }
@@ -789,7 +789,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
 
             match root_edge {
                 None => panic!("Failed to find start item to begin parse"),
-                Some(edge) => recur(edge, grammar, scan, &chart),
+                Some(edge) => recur(edge, grammar, lex, &chart),
             }
         }
     }

@@ -1,12 +1,12 @@
 use {
     core::{
         fmt::{self, Formatter},
+        lex::{self, CDFA},
         parse::{
             self,
             grammar::{self, Grammar, GrammarBuilder, GrammarSymbol},
             Tree,
         },
-        scan::{self, CDFA},
         spec::lang::SpecSymbol,
     },
     std::{self, error},
@@ -45,7 +45,7 @@ where
 pub enum GenError {
     MatcherErr(String),
     MappingErr(String),
-    CDFAErr(scan::CDFAError),
+    CDFAErr(lex::CDFAError),
     FormatterErr(fmt::BuildError),
     GrammarBuildErr(grammar::BuildError),
     RegionErr(region::Error),
@@ -77,8 +77,8 @@ impl error::Error for GenError {
     }
 }
 
-impl From<scan::CDFAError> for GenError {
-    fn from(err: scan::CDFAError) -> GenError {
+impl From<lex::CDFAError> for GenError {
+    fn from(err: lex::CDFAError) -> GenError {
         GenError::CDFAErr(err)
     }
 }
@@ -103,14 +103,14 @@ impl From<region::Error> for GenError {
 
 #[derive(Debug)]
 pub enum ParseError {
-    ScanErr(scan::Error),
+    LexErr(lex::Error),
     ParseErr(parse::Error),
 }
 
 impl std::fmt::Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
-            ParseError::ScanErr(ref err) => write!(f, "Scan error: {}", err),
+            ParseError::LexErr(ref err) => write!(f, "Lex error: {}", err),
             ParseError::ParseErr(ref err) => write!(f, "Parse error: {}", err),
         }
     }
@@ -119,15 +119,15 @@ impl std::fmt::Display for ParseError {
 impl error::Error for ParseError {
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match *self {
-            ParseError::ScanErr(ref err) => Some(err),
+            ParseError::LexErr(ref err) => Some(err),
             ParseError::ParseErr(ref err) => Some(err),
         }
     }
 }
 
-impl From<scan::Error> for ParseError {
-    fn from(err: scan::Error) -> ParseError {
-        ParseError::ScanErr(err)
+impl From<lex::Error> for ParseError {
+    fn from(err: lex::Error) -> ParseError {
+        ParseError::LexErr(err)
     }
 }
 
@@ -139,7 +139,7 @@ impl From<parse::Error> for ParseError {
 
 #[cfg(test)]
 mod tests {
-    use core::{data::Data, parse::grammar::SimpleGrammarBuilder, scan::Token};
+    use core::{data::Data, lex::Token, parse::grammar::SimpleGrammarBuilder};
 
     use super::*;
 
@@ -714,7 +714,7 @@ grammar {
         let input = "  {  {  {{{\t}}}\n\r {} } \r }   { {}\n } ".to_string();
         let chars: Vec<char> = input.chars().collect();
 
-        let scanner = scan::def_scanner();
+        let lexer = lex::def_lexer();
         let parser = parse::def_parser();
 
         //specification
@@ -724,7 +724,7 @@ grammar {
             generate_spec(&parse, SimpleGrammarBuilder::new()).unwrap();
 
         //input
-        let tokens = scanner.scan(&chars[..], &*cdfa);
+        let tokens = lexer.lex(&chars[..], &*cdfa);
         let tree = parser.parse(tokens.unwrap(), &*grammar);
         let parse = tree.unwrap();
 
@@ -793,14 +793,14 @@ grammar {
         let input = "i ij ijjjijijiji inj in iii".to_string();
         let chars: Vec<char> = input.chars().collect();
 
-        let scanner = scan::def_scanner();
+        let lexer = lex::def_lexer();
 
         let tree = lang::parse_spec(spec);
         let parse = tree.unwrap();
         let (cdfa, _, _) = generate_spec(&parse, SimpleGrammarBuilder::new()).unwrap();
 
         //exercise
-        let tokens = scanner.scan(&chars[..], &*cdfa).unwrap();
+        let tokens = lexer.lex(&chars[..], &*cdfa).unwrap();
 
         let mut result = String::new();
         for token in tokens {
@@ -845,14 +845,14 @@ grammar {
         let input = "c c".to_string();
         let chars: Vec<char> = input.chars().collect();
 
-        let scanner = scan::def_scanner();
+        let lexer = lex::def_lexer();
 
         let tree = lang::parse_spec(spec);
         let parse = tree.unwrap();
         let (cdfa, _, _) = generate_spec(&parse, SimpleGrammarBuilder::new()).unwrap();
 
         //exercise
-        let tokens = scanner.scan(&chars[..], &*cdfa).unwrap();
+        let tokens = lexer.lex(&chars[..], &*cdfa).unwrap();
 
         //verify
         assert_eq!(
@@ -891,14 +891,14 @@ grammar {
         let input = "a ababab _abab ab_abba_".to_string();
         let chars: Vec<char> = input.chars().collect();
 
-        let scanner = scan::def_scanner();
+        let lexer = lex::def_lexer();
 
         let tree = lang::parse_spec(spec);
         let parse = tree.unwrap();
         let (cdfa, _, _) = generate_spec(&parse, SimpleGrammarBuilder::new()).unwrap();
 
         //exercise
-        let tokens = scanner.scan(&chars[..], &*cdfa).unwrap();
+        let tokens = lexer.lex(&chars[..], &*cdfa).unwrap();
 
         //verify
         assert_eq!(tokens_string(tokens), "\nkind=ID lexeme=a\nkind=ID lexeme=ababab\nkind=ID lexeme=_abab\nkind=ID lexeme=ab_abba_")
@@ -936,10 +936,10 @@ grammar {
         let input = "fdkgdfjgdjglkdjglkdjgljbnhbduhoifjeoigjeoghknhkjdfjgoirjt for if endif elseif somethign eldsfnj hi bob joe here final for fob else if id idhere fobre f ".to_string();
         let chars: Vec<char> = input.chars().collect();
 
-        let scanner = scan::def_scanner();
+        let lexer = lex::def_lexer();
 
         //exercise
-        let tokens = scanner.scan(&chars[..], &*cdfa).unwrap();
+        let tokens = lexer.lex(&chars[..], &*cdfa).unwrap();
 
         //verify
         assert_eq!(
@@ -996,11 +996,11 @@ grammar {
         let input = "ababaaaba".to_string();
         let chars: Vec<char> = input.chars().collect();
 
-        let scanner = scan::def_scanner();
+        let lexer = lex::def_lexer();
         let parser = parse::def_parser();
 
         //exercise
-        let tokens = scanner.scan(&chars[..], &*cdfa).unwrap();
+        let tokens = lexer.lex(&chars[..], &*cdfa).unwrap();
         let tree = parser.parse(tokens, &*grammar).unwrap();
 
         //verify
@@ -1063,11 +1063,11 @@ grammar {
         let input = "abaa".to_string();
         let chars: Vec<char> = input.chars().collect();
 
-        let scanner = scan::def_scanner();
+        let lexer = lex::def_lexer();
         let parser = parse::def_parser();
 
         //exercise
-        let tokens = scanner.scan(&chars[..], &*cdfa).unwrap();
+        let tokens = lexer.lex(&chars[..], &*cdfa).unwrap();
         let tree = parser.parse(tokens, &*grammar).unwrap();
         let res = formatter.format(&tree);
 
@@ -1101,13 +1101,13 @@ grammar {
         let input = "abcdefghijklmnopqrstuvwxyz".to_string();
         let chars: Vec<char> = input.chars().collect();
 
-        let scanner = scan::def_scanner();
+        let lexer = lex::def_lexer();
         let tree = lang::parse_spec(spec);
         let parse = tree.unwrap();
         let (cdfa, _, _) = generate_spec(&parse, SimpleGrammarBuilder::new()).unwrap();
 
         //exercise
-        let tokens = scanner.scan(&chars[..], &*cdfa).unwrap();
+        let tokens = lexer.lex(&chars[..], &*cdfa).unwrap();
 
         //verify
         assert_eq!(
@@ -1133,7 +1133,7 @@ kind=E lexeme=pqrstuvwxyz"
     }
 
     #[test]
-    fn context_sensitive_scanner() {
+    fn context_sensitive_lexer() {
         //setup
         let spec = "
 alphabet 'a!123456789'
@@ -1163,13 +1163,13 @@ grammar {
         let input = "!!aaa!!a!49913!a".to_string();
         let chars: Vec<char> = input.chars().collect();
 
-        let scanner = scan::def_scanner();
+        let lexer = lex::def_lexer();
         let tree = lang::parse_spec(spec);
         let parse = tree.unwrap();
         let (cdfa, _, _) = generate_spec(&parse, SimpleGrammarBuilder::new()).unwrap();
 
         //exercise
-        let tokens = scanner.scan(&chars[..], &*cdfa).unwrap();
+        let tokens = lexer.lex(&chars[..], &*cdfa).unwrap();
 
         //verify
         assert_eq!(
@@ -1315,13 +1315,13 @@ grammar {
         let input = "abca".to_string();
         let chars: Vec<char> = input.chars().collect();
 
-        let scanner = scan::def_scanner();
+        let lexer = lex::def_lexer();
         let tree = lang::parse_spec(spec);
         let parse = tree.unwrap();
         let (cdfa, _, _) = generate_spec(&parse, SimpleGrammarBuilder::new()).unwrap();
 
         //exercise
-        let tokens = scanner.scan(&chars[..], &*cdfa).unwrap();
+        let tokens = lexer.lex(&chars[..], &*cdfa).unwrap();
 
         //verify
         assert_eq!(
@@ -1362,13 +1362,13 @@ grammar {
         let input = "acb".to_string();
         let chars: Vec<char> = input.chars().collect();
 
-        let scanner = scan::def_scanner();
+        let lexer = lex::def_lexer();
         let tree = lang::parse_spec(spec);
         let parse = tree.unwrap();
         let (cdfa, grammar, _) = generate_spec(&parse, SimpleGrammarBuilder::new()).unwrap();
 
         //exercise
-        let tokens = scanner.scan(&chars[..], &*cdfa).unwrap();
+        let tokens = lexer.lex(&chars[..], &*cdfa).unwrap();
         let parse = parse::def_parser().parse(tokens, &*grammar).unwrap();
 
         //verify
