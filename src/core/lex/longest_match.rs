@@ -1,17 +1,17 @@
 use core::{
     data::Data,
+    lex::{self, Lexer, Token, CDFA, FAIL_SEQUENCE_LENGTH},
     parse::grammar::GrammarSymbol,
-    scan::{self, Scanner, Token, CDFA, FAIL_SEQUENCE_LENGTH},
 };
 
-pub struct MaximalMunchScanner;
+pub struct LongestMatchLexer;
 
-impl<State: Data, Symbol: GrammarSymbol> Scanner<State, Symbol> for MaximalMunchScanner {
-    fn scan<'cdfa>(
+impl<State: Data, Symbol: GrammarSymbol> Lexer<State, Symbol> for LongestMatchLexer {
+    fn lex<'cdfa>(
         &self,
         input: &[char],
         cdfa: &'cdfa CDFA<State, Symbol>,
-    ) -> Result<Vec<Token<Symbol>>, scan::Error> {
+    ) -> Result<Vec<Token<Symbol>>, lex::Error> {
         struct ScanOneResult<State> {
             consumed: usize,
             end_state: Option<State>,
@@ -117,7 +117,7 @@ impl<State: Data, Symbol: GrammarSymbol> Scanner<State, Symbol> for MaximalMunch
                             .map(Option::unwrap)
                             .collect();
 
-                        return Err(scan::Error {
+                        return Err(lex::Error {
                             sequence,
                             line,
                             character,

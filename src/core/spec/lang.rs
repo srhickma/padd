@@ -1,14 +1,14 @@
 use core::{
     data::Data,
+    lex::{
+        self,
+        ecdfa::{EncodedCDFA, EncodedCDFABuilder},
+        CDFABuilder,
+    },
     parse::{
         self,
         grammar::{self, GrammarBuilder, GrammarSymbol, SimpleGrammar, SimpleGrammarBuilder},
         Tree,
-    },
-    scan::{
-        self,
-        ecdfa::{EncodedCDFA, EncodedCDFABuilder},
-        CDFABuilder,
     },
     spec,
 };
@@ -71,7 +71,7 @@ thread_local! {
     static SPEC_ECDFA: EncodedCDFA<SpecSymbol> = build_spec_ecdfa().unwrap();
 }
 
-fn build_spec_ecdfa() -> Result<EncodedCDFA<SpecSymbol>, scan::CDFAError> {
+fn build_spec_ecdfa() -> Result<EncodedCDFA<SpecSymbol>, lex::CDFAError> {
     let mut builder: EncodedCDFABuilder<S, SpecSymbol> = EncodedCDFABuilder::new();
 
     builder
@@ -148,7 +148,7 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<SpecSymbol>, scan::CDFAError> {
 
 fn build_injectable_region(
     builder: &mut EncodedCDFABuilder<S, SpecSymbol>,
-) -> Result<(), scan::CDFAError> {
+) -> Result<(), lex::CDFAError> {
     builder
         .state(&S::InjectableTag)
         .accept_to_from_all(&S::InjectablePreAffinity)?
@@ -199,7 +199,7 @@ fn build_injectable_region(
 
 fn build_ignorable_region(
     builder: &mut EncodedCDFABuilder<S, SpecSymbol>,
-) -> Result<(), scan::CDFAError> {
+) -> Result<(), lex::CDFAError> {
     builder
         .state(&S::IgnorableTag)
         .accept_to_from_all(&S::Ignorable)?
@@ -225,7 +225,7 @@ fn build_ignorable_region(
 
 fn build_alphabet_region(
     builder: &mut EncodedCDFABuilder<S, SpecSymbol>,
-) -> Result<(), scan::CDFAError> {
+) -> Result<(), lex::CDFAError> {
     builder
         .state(&S::AlphabetTag)
         .accept_to_from_all(&S::Alphabet)?
@@ -260,7 +260,7 @@ fn build_alphabet_region(
 
 fn build_cdfa_region(
     builder: &mut EncodedCDFABuilder<S, SpecSymbol>,
-) -> Result<(), scan::CDFAError> {
+) -> Result<(), lex::CDFAError> {
     builder
         .state(&S::CDFATag)
         .accept_to_from_all(&S::CDFA)?
@@ -322,7 +322,7 @@ fn build_cdfa_region(
 
 fn build_grammar_region(
     builder: &mut EncodedCDFABuilder<S, SpecSymbol>,
-) -> Result<(), scan::CDFAError> {
+) -> Result<(), lex::CDFAError> {
     builder
         .state(&S::GrammarTag)
         .accept_to_from_all(&S::Grammar)?
@@ -610,7 +610,7 @@ pub fn parse_spec(input: &str) -> Result<Tree<SpecSymbol>, spec::ParseError> {
     SPEC_ECDFA.with(|cdfa| -> Result<Tree<SpecSymbol>, spec::ParseError> {
         let chars: Vec<char> = input.chars().collect();
 
-        let tokens = scan::def_scanner().scan(&chars[..], cdfa)?;
+        let tokens = lex::def_lexer().lex(&chars[..], cdfa)?;
         let parse = parse::def_parser().parse(tokens, &*SPEC_GRAMMAR)?;
         Ok(parse)
     })

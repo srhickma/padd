@@ -331,7 +331,7 @@ grammar {
 }
 
 #[test]
-fn test_online_context_sensitive_scanner() {
+fn test_online_context_sensitive_lexer() {
     //setup
     let spec = "
 alphabet 'a!123456789'
@@ -379,7 +379,7 @@ grammar {
 }
 
 #[test]
-fn test_region_based_scanner() {
+fn test_region_based_lexer() {
     //setup
     let spec = "
 alphabet 'abcdefghijklmnopqrstuvwxyz0123456789{}'

@@ -1,15 +1,15 @@
 use {
     core::{
         data::Data,
+        lex::{
+            self,
+            ecdfa::{EncodedCDFA, EncodedCDFABuilder},
+            CDFABuilder, ConsumerStrategy,
+        },
         parse::{
             self,
             grammar::{self, GrammarBuilder, GrammarSymbol, SimpleGrammar, SimpleGrammarBuilder},
             Production, Tree,
-        },
-        scan::{
-            self,
-            ecdfa::{EncodedCDFA, EncodedCDFABuilder},
-            CDFABuilder, ConsumerStrategy,
         },
         util::string_utils,
     },
@@ -49,7 +49,7 @@ thread_local! {
 
 /// Returns the ECDFA to lex formatting patterns, or an error if there is an issue with the ECDFA
 /// definition (e.g. ambiguity).
-fn build_pattern_ecdfa() -> Result<EncodedCDFA<PatternSymbol>, scan::CDFAError> {
+fn build_pattern_ecdfa() -> Result<EncodedCDFA<PatternSymbol>, lex::CDFAError> {
     let mut builder: EncodedCDFABuilder<S, PatternSymbol> = EncodedCDFABuilder::new();
 
     builder
@@ -491,7 +491,7 @@ fn parse_pattern(input: &str) -> Result<Tree<PatternSymbol>, BuildError> {
     PATTERN_ECDFA.with(|cdfa| -> Result<Tree<PatternSymbol>, BuildError> {
         let chars: Vec<char> = input.chars().collect();
 
-        let tokens = scan::def_scanner().scan(&chars[..], cdfa)?;
+        let tokens = lex::def_lexer().lex(&chars[..], cdfa)?;
         let parse = parse::def_parser().parse(tokens, &*PATTERN_GRAMMAR)?;
         Ok(parse)
     })
@@ -501,12 +501,12 @@ fn parse_pattern(input: &str) -> Result<Tree<PatternSymbol>, BuildError> {
 ///
 /// # Types
 ///
-/// * `ScanErr` - Indicates that an error occurred while lexing a pattern.
+/// * `LexErr` - Indicates that an error occurred while lexing a pattern.
 /// * `ParseErr` - Indicates that an error occurred while parsing a pattern.
 /// * `CaptureErr` - Indicates that an invalid pattern capture is present (e.g. out-of-bounds).
 #[derive(Debug)]
 pub enum BuildError {
-    ScanErr(scan::Error),
+    LexErr(lex::Error),
     ParseErr(parse::Error),
     CaptureErr(String),
 }
@@ -514,7 +514,7 @@ pub enum BuildError {
 impl fmt::Display for BuildError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            BuildError::ScanErr(ref err) => write!(f, "Pattern scan error: {}", err),
+            BuildError::LexErr(ref err) => write!(f, "Pattern lex error: {}", err),
             BuildError::ParseErr(ref err) => write!(f, "Pattern parse error: {}", err),
             BuildError::CaptureErr(ref err) => write!(f, "Pattern capture error: {}", err),
         }
@@ -524,16 +524,16 @@ impl fmt::Display for BuildError {
 impl error::Error for BuildError {
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match *self {
-            BuildError::ScanErr(ref err) => Some(err),
+            BuildError::LexErr(ref err) => Some(err),
             BuildError::ParseErr(ref err) => Some(err),
             BuildError::CaptureErr(_) => None,
         }
     }
 }
 
-impl From<scan::Error> for BuildError {
-    fn from(err: scan::Error) -> BuildError {
-        BuildError::ScanErr(err)
+impl From<lex::Error> for BuildError {
+    fn from(err: lex::Error) -> BuildError {
+        BuildError::LexErr(err)
     }
 }
 
@@ -866,7 +866,7 @@ mod tests {
     }
 
     #[test]
-    fn pattern_scan_error() {
+    fn pattern_lex_error() {
         //setup
         let input = "\\";
         let prod = Production {
@@ -881,7 +881,7 @@ mod tests {
         assert!(res.is_err());
         assert_eq!(
             format!("{}", res.err().unwrap()),
-            "Pattern scan error: No accepting scans after (1,1): \\..."
+            "Pattern lex error: No accepting tokens after (1,1): \\..."
         );
     }
 

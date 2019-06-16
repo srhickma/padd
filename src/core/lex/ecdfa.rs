@@ -4,11 +4,11 @@ use {
             map::{CEHashMap, CEHashMapIterator},
             Data,
         },
-        parse::grammar::GrammarSymbol,
-        scan::{
+        lex::{
             alphabet::HashedAlphabet, CDFABuilder, CDFAError, ConsumerStrategy,
             TransitionDestination, TransitionResult, CDFA,
         },
+        parse::grammar::GrammarSymbol,
         util::encoder::Encoder,
     },
     std::{collections::HashMap, fmt::Debug, usize},
@@ -592,13 +592,13 @@ impl AcceptorDestinationMux {
 mod tests {
     use core::{
         data::Data,
-        scan::{self, Token},
+        lex::{self, Token},
     };
 
     use super::*;
 
     #[test]
-    fn scan_binary() {
+    fn lex_binary() {
         //setup
         let mut builder: EncodedCDFABuilder<String, String> = EncodedCDFABuilder::new();
         builder
@@ -625,10 +625,10 @@ mod tests {
         let input = "000011010101".to_string();
         let chars: Vec<char> = input.chars().collect();
 
-        let scanner = scan::def_scanner();
+        let lexer = lex::def_lexer();
 
         //exercise
-        let tokens = scanner.scan(&chars[..], &cdfa).unwrap();
+        let tokens = lexer.lex(&chars[..], &cdfa).unwrap();
 
         //verify
         assert_eq!(
@@ -644,7 +644,7 @@ NZ <- '11010101'
     }
 
     #[test]
-    fn scan_brackets() {
+    fn lex_brackets() {
         //setup
         let mut builder: EncodedCDFABuilder<String, String> = EncodedCDFABuilder::new();
         builder
@@ -683,10 +683,10 @@ NZ <- '11010101'
         let input = "  {{\n}{}{} \t{} \t{}}".to_string();
         let chars: Vec<char> = input.chars().collect();
 
-        let scanner = scan::def_scanner();
+        let lexer = lex::def_lexer();
 
         //exercise
-        let tokens = scanner.scan(&chars[..], &cdfa).unwrap();
+        let tokens = lexer.lex(&chars[..], &cdfa).unwrap();
 
         //verify
         assert_eq!(
@@ -713,7 +713,7 @@ RBR <- '}'
     }
 
     #[test]
-    fn scan_ignore() {
+    fn lex_ignore() {
         //setup
         let mut builder: EncodedCDFABuilder<String, String> = EncodedCDFABuilder::new();
         builder
@@ -751,10 +751,10 @@ RBR <- '}'
         let input = "  {{\n}{}{} \t{} \t{}}".to_string();
         let chars: Vec<char> = input.chars().collect();
 
-        let scanner = scan::def_scanner();
+        let lexer = lex::def_lexer();
 
         //exercise
-        let tokens = scanner.scan(&chars[..], &cdfa).unwrap();
+        let tokens = lexer.lex(&chars[..], &cdfa).unwrap();
 
         //verify
         assert_eq!(
@@ -777,7 +777,7 @@ RBR <- '}'
     }
 
     #[test]
-    fn scan_fail_simple() {
+    fn lex_fail_simple() {
         //setup
         let mut builder: EncodedCDFABuilder<String, String> = EncodedCDFABuilder::new();
         builder
@@ -815,10 +815,10 @@ RBR <- '}'
         let input = "  {{\n}{}{} \tx{} \t{}}".to_string();
         let chars: Vec<char> = input.chars().collect();
 
-        let scanner = scan::def_scanner();
+        let lexer = lex::def_lexer();
 
         //exercise
-        let result = scanner.scan(&chars[..], &cdfa);
+        let result = lexer.lex(&chars[..], &cdfa);
 
         //verify
         assert!(result.is_err());
@@ -829,7 +829,7 @@ RBR <- '}'
     }
 
     #[test]
-    fn scan_fail_complex() {
+    fn lex_fail_complex() {
         //setup
         let mut builder: EncodedCDFABuilder<String, String> = EncodedCDFABuilder::new();
         builder
@@ -867,10 +867,10 @@ RBR <- '}'
         let input = "   {  {  {{{\t}}}\n {} }  }   { {}\n }   {  {  {{{\t}}}\n {} }  } xyz  { {}\n }   {  {  {{{\t}}}\n {} }  }   { {}\n } ".to_string();
         let chars: Vec<char> = input.chars().collect();
 
-        let scanner = scan::def_scanner();
+        let lexer = lex::def_lexer();
 
         //exercise
-        let result = scanner.scan(&chars[..], &cdfa);
+        let result = lexer.lex(&chars[..], &cdfa);
 
         //verify
         assert!(result.is_err());
@@ -881,7 +881,7 @@ RBR <- '}'
     }
 
     #[test]
-    fn scan_chain_simple() {
+    fn lex_chain_simple() {
         //setup
         let mut builder: EncodedCDFABuilder<String, String> = EncodedCDFABuilder::new();
         builder
@@ -904,10 +904,10 @@ RBR <- '}'
         let input = "fivefourfourfourfivefivefourfive".to_string();
         let chars: Vec<char> = input.chars().collect();
 
-        let scanner = scan::def_scanner();
+        let lexer = lex::def_lexer();
 
         //exercise
-        let tokens = scanner.scan(&chars[..], &cdfa).unwrap();
+        let tokens = lexer.lex(&chars[..], &cdfa).unwrap();
 
         //verify
         assert_eq!(
@@ -926,7 +926,7 @@ FIVE <- 'five'
     }
 
     #[test]
-    fn scan_chain_def() {
+    fn lex_chain_def() {
         //setup
         let mut builder: EncodedCDFABuilder<String, String> = EncodedCDFABuilder::new();
         builder
@@ -952,10 +952,10 @@ FIVE <- 'five'
         let input = "fdk".to_string();
         let chars: Vec<char> = input.chars().collect();
 
-        let scanner = scan::def_scanner();
+        let lexer = lex::def_lexer();
 
         //exercise
-        let tokens = scanner.scan(&chars[..], &cdfa).unwrap();
+        let tokens = lexer.lex(&chars[..], &cdfa).unwrap();
 
         //verify
         assert_eq!(
@@ -967,7 +967,7 @@ ID <- 'fdk'
     }
 
     #[test]
-    fn scan_context_sensitive() {
+    fn lex_context_sensitive() {
         //setup
         #[derive(PartialEq, Eq, Hash, Clone, Debug)]
         enum S {
@@ -1024,10 +1024,10 @@ ID <- 'fdk'
         let input = "!!aaa!!a!49913!a".to_string();
         let chars: Vec<char> = input.chars().collect();
 
-        let scanner = scan::def_scanner();
+        let lexer = lex::def_lexer();
 
         //exercise
-        let tokens = scanner.scan(&chars[..], &cdfa).unwrap();
+        let tokens = lexer.lex(&chars[..], &cdfa).unwrap();
 
         //verify
         assert_eq!(
@@ -1084,10 +1084,10 @@ A <- 'a'
         let input = "aaaa".to_string();
         let chars: Vec<char> = input.chars().collect();
 
-        let scanner = scan::def_scanner();
+        let lexer = lex::def_lexer();
 
         //exercise
-        let tokens = scanner.scan(&chars[..], &cdfa).unwrap();
+        let tokens = lexer.lex(&chars[..], &cdfa).unwrap();
 
         //verify
         assert_eq!(
@@ -1131,10 +1131,10 @@ A <- 'a'
         let input = "aa".to_string();
         let chars: Vec<char> = input.chars().collect();
 
-        let scanner = scan::def_scanner();
+        let lexer = lex::def_lexer();
 
         //exercise
-        let tokens = scanner.scan(&chars[..], &cdfa).unwrap();
+        let tokens = lexer.lex(&chars[..], &cdfa).unwrap();
 
         //verify
         assert_eq!(
@@ -1183,10 +1183,10 @@ A <- 'a'
         let input = "ab".to_string();
         let chars: Vec<char> = input.chars().collect();
 
-        let scanner = scan::def_scanner();
+        let lexer = lex::def_lexer();
 
         //exercise
-        let tokens = scanner.scan(&chars[..], &cdfa).unwrap();
+        let tokens = lexer.lex(&chars[..], &cdfa).unwrap();
 
         //verify
         assert_eq!(

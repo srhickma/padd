@@ -1,8 +1,8 @@
 use {
     core::{
         data::Data,
+        lex::Token,
         parse::grammar::{Grammar, GrammarSymbol},
-        scan::Token,
     },
     std::{error, fmt},
 };
@@ -13,7 +13,7 @@ pub mod grammar;
 pub trait Parser<Symbol: GrammarSymbol>: 'static + Send + Sync {
     fn parse(
         &self,
-        scan: Vec<Token<Symbol>>,
+        lex: Vec<Token<Symbol>>,
         grammar: &Grammar<Symbol>,
     ) -> Result<Tree<Symbol>, Error>;
 }
@@ -200,7 +200,7 @@ mod tests {
         grammar_builder.try_mark_start(&"Sentence".to_string());
         let grammar = grammar_builder.build().unwrap();
 
-        let scan = vec![
+        let lex = vec![
             Token::leaf("mary".to_string(), "Hello".to_string()),
             Token::leaf("runs".to_string(), "World!".to_string()),
         ];
@@ -208,7 +208,7 @@ mod tests {
         let parser = def_parser();
 
         //exercise
-        let tree = parser.parse(scan, &grammar);
+        let tree = parser.parse(lex, &grammar);
 
         //verify
         assert_eq!(
@@ -229,7 +229,7 @@ mod tests {
         grammar_builder.try_mark_start(&"S".to_string());
         let grammar = grammar_builder.build().unwrap();
 
-        let scan = vec![
+        let lex = vec![
             Token::leaf("BOF".to_string(), "a".to_string()),
             Token::leaf("x".to_string(), "b".to_string()),
             Token::leaf("EOF".to_string(), "c".to_string()),
@@ -238,7 +238,7 @@ mod tests {
         let parser = def_parser();
 
         //exercise
-        let tree = parser.parse(scan, &grammar);
+        let tree = parser.parse(lex, &grammar);
 
         //verify
         assert_eq!(
@@ -262,7 +262,7 @@ mod tests {
         grammar_builder.try_mark_start(&"S".to_string());
         let grammar = grammar_builder.build().unwrap();
 
-        let scan = "( ID OP ID ) OP ID OP ( ID )"
+        let lex = "( ID OP ID ) OP ID OP ( ID )"
             .split_whitespace()
             .map(|kind| Token::leaf(kind.to_string(), "xy".to_string()))
             .collect();
@@ -270,7 +270,7 @@ mod tests {
         let parser = def_parser();
 
         //exercise
-        let tree = parser.parse(scan, &grammar);
+        let tree = parser.parse(lex, &grammar);
 
         //verify
         assert_eq!(
@@ -320,7 +320,7 @@ mod tests {
         grammar_builder.try_mark_start(&"Sum".to_string());
         let grammar = grammar_builder.build().unwrap();
 
-        let scan = "NUM AS LPAREN NUM MD NUM AS NUM RPAREN"
+        let lex = "NUM AS LPAREN NUM MD NUM AS NUM RPAREN"
             .split_whitespace()
             .map(|kind| Token::leaf(kind.to_string(), "xy".to_string()))
             .collect();
@@ -328,7 +328,7 @@ mod tests {
         let parser = def_parser();
 
         //exercise
-        let tree = parser.parse(scan, &grammar);
+        let tree = parser.parse(lex, &grammar);
 
         //verify
         assert_eq!(
@@ -380,14 +380,14 @@ mod tests {
         grammar_builder.try_mark_start(&"s".to_string());
         let grammar = grammar_builder.build().unwrap();
 
-        let scan = "WHITESPACE LBRACKET WHITESPACE LBRACKET WHITESPACE RBRACKET WHITESPACE RBRACKET LBRACKET RBRACKET WHITESPACE".split_whitespace()
+        let lex = "WHITESPACE LBRACKET WHITESPACE LBRACKET WHITESPACE RBRACKET WHITESPACE RBRACKET LBRACKET RBRACKET WHITESPACE".split_whitespace()
             .map(|kind| Token::leaf(kind.to_string(), "xy".to_string()))
             .collect();
 
         let parser = def_parser();
 
         //exercise
-        let tree = parser.parse(scan, &grammar);
+        let tree = parser.parse(lex, &grammar);
 
         //verify
         assert_eq!(
@@ -443,7 +443,7 @@ mod tests {
         grammar_builder.try_mark_start(&"s".to_string());
         let grammar = grammar_builder.build().unwrap();
 
-        let scan = "WHITESPACE"
+        let lex = "WHITESPACE"
             .split_whitespace()
             .map(|kind| Token::leaf(kind.to_string(), "xy".to_string()))
             .collect();
@@ -451,7 +451,7 @@ mod tests {
         let parser = def_parser();
 
         //exercise
-        let tree = parser.parse(scan, &grammar);
+        let tree = parser.parse(lex, &grammar);
 
         //verify
         assert_eq!(
@@ -488,7 +488,7 @@ mod tests {
         grammar_builder.try_mark_start(&"sum".to_string());
         let grammar = grammar_builder.build().unwrap();
 
-        let scan = vec![
+        let lex = vec![
             Token::leaf("DIGIT".to_string(), "1".to_string()),
             Token::leaf("PM".to_string(), "+".to_string()),
             Token::leaf("LPAREN".to_string(), "(".to_string()),
@@ -503,7 +503,7 @@ mod tests {
         let parser = def_parser();
 
         //exercise
-        let tree = parser.parse(scan, &grammar);
+        let tree = parser.parse(lex, &grammar);
 
         //verify
         assert_eq!(
@@ -546,12 +546,12 @@ mod tests {
         grammar_builder.try_mark_start(&"s".to_string());
         let grammar = grammar_builder.build().unwrap();
 
-        let scan = vec![Token::leaf("kind".to_string(), "lexeme".to_string())];
+        let lex = vec![Token::leaf("kind".to_string(), "lexeme".to_string())];
 
         let parser = def_parser();
 
         //exercise
-        let res = parser.parse(scan, &grammar);
+        let res = parser.parse(lex, &grammar);
 
         //verify
         assert!(res.is_err());
@@ -570,7 +570,7 @@ mod tests {
         grammar_builder.mark_ignorable(&"C".to_string());
         let grammar = grammar_builder.build().unwrap();
 
-        let scan = vec![
+        let lex = vec![
             Token::leaf("A".to_string(), "a".to_string()),
             Token::leaf("C".to_string(), "c".to_string()),
             Token::leaf("C".to_string(), "c".to_string()),
@@ -580,7 +580,7 @@ mod tests {
         let parser = def_parser();
 
         //exercise
-        let tree = parser.parse(scan, &grammar);
+        let tree = parser.parse(lex, &grammar);
 
         //verify
         assert_eq!(
@@ -602,7 +602,7 @@ mod tests {
         grammar_builder.mark_ignorable(&"C".to_string());
         let grammar = grammar_builder.build().unwrap();
 
-        let scan = vec![
+        let lex = vec![
             Token::leaf("C".to_string(), "c".to_string()),
             Token::leaf("C".to_string(), "c".to_string()),
         ];
@@ -610,7 +610,7 @@ mod tests {
         let parser = def_parser();
 
         //exercise
-        let tree = parser.parse(scan, &grammar);
+        let tree = parser.parse(lex, &grammar);
 
         //verify
         assert_eq!(
@@ -628,7 +628,7 @@ mod tests {
         grammar_builder.mark_ignorable(&"C".to_string());
         let grammar = grammar_builder.build().unwrap();
 
-        let scan = vec![
+        let lex = vec![
             Token::leaf("A".to_string(), "a".to_string()),
             Token::leaf("C".to_string(), "c".to_string()),
             Token::leaf("A".to_string(), "a".to_string()),
@@ -637,7 +637,7 @@ mod tests {
         let parser = def_parser();
 
         //exercise
-        let tree = parser.parse(scan, &grammar);
+        let tree = parser.parse(lex, &grammar);
 
         //verify
         assert_eq!(
@@ -659,7 +659,7 @@ mod tests {
         grammar_builder.mark_injectable(&"C".to_string(), InjectionAffinity::Left);
         let grammar = grammar_builder.build().unwrap();
 
-        let scan = vec![
+        let lex = vec![
             Token::leaf("A".to_string(), "a".to_string()),
             Token::leaf("C".to_string(), "c".to_string()),
             Token::leaf("B".to_string(), "b".to_string()),
@@ -668,7 +668,7 @@ mod tests {
         let parser = def_parser();
 
         //exercise
-        let tree = parser.parse(scan, &grammar);
+        let tree = parser.parse(lex, &grammar);
 
         //verify
         assert_eq!(
@@ -691,7 +691,7 @@ mod tests {
         grammar_builder.mark_injectable(&"C".to_string(), InjectionAffinity::Right);
         let grammar = grammar_builder.build().unwrap();
 
-        let scan = vec![
+        let lex = vec![
             Token::leaf("A".to_string(), "a".to_string()),
             Token::leaf("C".to_string(), "c".to_string()),
             Token::leaf("B".to_string(), "b".to_string()),
@@ -700,7 +700,7 @@ mod tests {
         let parser = def_parser();
 
         //exercise
-        let tree = parser.parse(scan, &grammar);
+        let tree = parser.parse(lex, &grammar);
 
         //verify
         assert_eq!(
@@ -723,7 +723,7 @@ mod tests {
         grammar_builder.mark_injectable(&"C".to_string(), InjectionAffinity::Left);
         let grammar = grammar_builder.build().unwrap();
 
-        let scan = vec![
+        let lex = vec![
             Token::leaf("A".to_string(), "a".to_string()),
             Token::leaf("B".to_string(), "b".to_string()),
             Token::leaf("C".to_string(), "c".to_string()),
@@ -732,7 +732,7 @@ mod tests {
         let parser = def_parser();
 
         //exercise
-        let tree = parser.parse(scan, &grammar);
+        let tree = parser.parse(lex, &grammar);
 
         //verify
         assert_eq!(
@@ -755,7 +755,7 @@ mod tests {
         grammar_builder.mark_injectable(&"C".to_string(), InjectionAffinity::Left);
         let grammar = grammar_builder.build().unwrap();
 
-        let scan = vec![
+        let lex = vec![
             Token::leaf("A".to_string(), "a".to_string()),
             Token::leaf("C".to_string(), "c".to_string()),
             Token::leaf("A".to_string(), "a".to_string()),
@@ -764,7 +764,7 @@ mod tests {
         let parser = def_parser();
 
         //exercise
-        let tree = parser.parse(scan, &grammar);
+        let tree = parser.parse(lex, &grammar);
 
         //verify
         assert_eq!(
@@ -786,7 +786,7 @@ mod tests {
         grammar_builder.mark_injectable(&"B".to_string(), InjectionAffinity::Right);
         let grammar = grammar_builder.build().unwrap();
 
-        let scan = vec![
+        let lex = vec![
             Token::leaf("B".to_string(), "b".to_string()),
             Token::leaf("A".to_string(), "a".to_string()),
         ];
@@ -794,7 +794,7 @@ mod tests {
         let parser = def_parser();
 
         //exercise
-        let tree = parser.parse(scan, &grammar);
+        let tree = parser.parse(lex, &grammar);
 
         //verify
         assert_eq!(

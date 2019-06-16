@@ -1,13 +1,13 @@
 use {
     core::{
         fmt::{FormatterBuilder, InjectableString, InjectionAffinity, PatternPair},
+        lex::{
+            ecdfa::{EncodedCDFA, EncodedCDFABuilder},
+            CDFABuilder, ConsumerStrategy, State, CDFA,
+        },
         parse::{
             grammar::{Grammar, GrammarBuilder, GrammarSymbol},
             Production, Tree,
-        },
-        scan::{
-            ecdfa::{EncodedCDFA, EncodedCDFABuilder},
-            CDFABuilder, ConsumerStrategy, State, CDFA,
         },
         spec::{
             self,
