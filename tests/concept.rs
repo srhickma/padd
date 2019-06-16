@@ -753,3 +753,51 @@ grammar {
     //verify
     assert_eq!(res, "A1{a} C3{bc} A1{a} C3{c} B2{b}");
 }
+
+#[test]
+fn test_multiple_acceptor_destinations() {
+    //setup
+    let spec = "
+alphabet '123a'
+
+cdfa {
+    start
+        '1' -> ^NUM -> B1
+        '2' -> ^NUM -> B2
+        '3' -> NUM;
+
+    NUM ^NUM -> B3;
+
+    B1
+        'a' -> ^A1 -> start;
+
+    B2
+        'a' -> ^A2 -> start;
+
+    B3
+        'a' -> ^A3 -> start;
+}
+
+grammar {
+    s
+        | s NUM a `{} {}{}`
+        | NUM a;
+
+    a
+        | A1 `A1`
+        | A2 `A2`
+        | A3 `A3`;
+}
+    "
+    .to_string();
+
+    let input = "1a2a3a".to_string();
+
+    let fjr = FormatJobRunner::build(&spec).unwrap();
+
+    //exercise
+    let res = fjr.format(FormatJob::from_text(input)).unwrap();
+
+    //verify
+    assert_eq!(res, "1A1 2A2 3A3");
+}

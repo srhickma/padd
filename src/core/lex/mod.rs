@@ -21,7 +21,7 @@ pub trait CDFA<State: Data, Symbol: GrammarSymbol>: Send + Sync {
     fn transition(&self, state: &State, input: &[char]) -> TransitionResult<State>;
     fn has_transition(&self, state: &State, input: &[char]) -> bool;
     fn accepts(&self, state: &State) -> bool;
-    fn acceptor_destination(&self, state: &State, from: &State) -> Option<State>;
+    fn default_acceptor_destination(&self, state: &State) -> Option<State>;
     fn tokenize(&self, state: &State) -> Option<Symbol>;
     fn start(&self) -> State;
 }
@@ -31,13 +31,7 @@ pub trait CDFABuilder<State: Data, Symbol: GrammarSymbol, CDFAType> {
     fn build(self) -> Result<CDFAType, CDFAError>;
     fn set_alphabet(&mut self, chars: impl Iterator<Item = char>) -> &mut Self;
     fn accept(&mut self, state: &State) -> &mut Self;
-    fn accept_to( // TODO(shane) can we get rid of one of these??
-        &mut self,
-        state: &State,
-        from: &State,
-        to: &State,
-    ) -> Result<&mut Self, CDFAError>;
-    fn accept_to_from_all(&mut self, state: &State, to: &State) -> Result<&mut Self, CDFAError>;
+    fn accept_to(&mut self, state: &State, to: &State) -> &mut Self;
     fn mark_start(&mut self, state: &State) -> &mut Self;
     fn mark_trans(
         &mut self,
@@ -64,12 +58,11 @@ pub trait CDFABuilder<State: Data, Symbol: GrammarSymbol, CDFAType> {
         transit: Transit<State>,
         start: char,
         end: char,
-    ) -> Result<&mut Self, CDFAError> where State: 'state_o;
-    fn default_to(
-        &mut self,
-        from: &State,
-        transit: Transit<State>,
-    ) -> Result<&mut Self, CDFAError>;
+    ) -> Result<&mut Self, CDFAError>
+    where
+        State: 'state_o;
+    fn default_to(&mut self, from: &State, transit: Transit<State>)
+        -> Result<&mut Self, CDFAError>;
     fn tokenize(&mut self, state: &State, token: &Symbol) -> &mut Self;
 }
 
@@ -77,7 +70,6 @@ pub trait CDFABuilder<State: Data, Symbol: GrammarSymbol, CDFAType> {
 pub struct Transit<State: Data> {
     dest: State,
     consumer: ConsumerStrategy,
-    // accepts: bool,
     acceptor_destination: Option<State>,
 }
 
@@ -95,7 +87,6 @@ impl<State: Data> Transit<State> {
 pub struct TransitBuilder<State: Data> {
     dest: State,
     consumer: ConsumerStrategy,
-    // accepts: bool,
     acceptor_destination: Option<State>,
 }
 
@@ -113,13 +104,7 @@ impl<State: Data> TransitBuilder<State> {
         self
     }
 
-    pub fn accept(&mut self) -> &mut Self {
-        // self.accepts = true;
-        self
-    }
-
     pub fn accept_to(&mut self, acceptor_destination: State) -> &mut Self {
-        // self.accepts = true;
         self.acceptor_destination = Some(acceptor_destination);
         self
     }
@@ -154,38 +139,21 @@ impl<State: Data> TransitionResult<State> {
         }
     }
 
-    pub fn direct(dest: &TransitionDestination<State>) -> Self {
-        TransitionResult::new(dest, 1)
+    pub fn direct(transit: &Transit<State>) -> Self {
+        TransitionResult::new(transit, 1)
     }
 
-    pub fn new(dest: &TransitionDestination<State>, traversed: usize) -> Self {
-        let consumed = match dest.consumer {
+    pub fn new(transit: &Transit<State>, traversed: usize) -> Self {
+        let consumed = match transit.consumer {
             ConsumerStrategy::All => traversed,
             ConsumerStrategy::None => 0,
         };
 
         TransitionResult {
-            state: Some(dest.state.clone()),
+            state: Some(transit.dest.clone()),
             consumed,
-            acceptor_destination: dest.acceptor_destination.clone(),
+            acceptor_destination: transit.acceptor_destination.clone(),
         }
-    }
-}
-
-#[derive(Clone)]
-pub struct TransitionDestination<State: Data> {
-    state: State,
-    consumer: ConsumerStrategy,
-    acceptor_destination: Option<State>,
-}
-
-impl<State: Data> TransitionDestination<State> {
-    pub fn new(
-        state: State,
-        consumer: ConsumerStrategy,
-        acceptor_destination: Option<State>
-    ) -> Self {
-        TransitionDestination { state, consumer, acceptor_destination }
     }
 }
 

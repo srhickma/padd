@@ -101,7 +101,7 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<SpecSymbol>, lex::CDFAError> {
 
     builder
         .state(&S::RegionExitBrace)
-        .accept_to_from_all(&S::Start)?
+        .accept_to(&S::Start)
         .tokenize(&SpecSymbol::TRightBrace);
 
     builder.state(&S::Or).accept().tokenize(&SpecSymbol::TOr);
@@ -119,7 +119,9 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<SpecSymbol>, lex::CDFAError> {
 
     builder.state(&S::Cil).accept().tokenize(&SpecSymbol::TCil);
 
-    builder.state(&S::CilEscaped).default_to(Transit::to(S::CilPartial))?;
+    builder
+        .state(&S::CilEscaped)
+        .default_to(Transit::to(S::CilPartial))?;
 
     builder
         .state(&S::Id)
@@ -151,7 +153,7 @@ fn build_injectable_region(
 ) -> Result<(), lex::CDFAError> {
     builder
         .state(&S::InjectableTag)
-        .accept_to_from_all(&S::InjectablePreAffinity)?
+        .accept_to(&S::InjectablePreAffinity)
         .tokenize(&SpecSymbol::TInjectable);
 
     builder
@@ -166,7 +168,7 @@ fn build_injectable_region(
 
     builder
         .state(&S::InjectionAffinity)
-        .accept_to_from_all(&S::InjectablePreId)?
+        .accept_to(&S::InjectablePreId)
         .tokenize(&SpecSymbol::TInjectionAffinity);
 
     builder
@@ -181,7 +183,7 @@ fn build_injectable_region(
     builder
         .state(&S::InjectableId)
         .mark_range(Transit::to(S::InjectableId), '_', 'Z')?
-        .accept_to_from_all(&S::InjectablePreComplete)?
+        .accept_to(&S::InjectablePreComplete)
         .tokenize(&SpecSymbol::TId);
 
     builder
@@ -192,7 +194,7 @@ fn build_injectable_region(
         .mark_trans(Transit::to(S::Whitespace), '\t')?
         .mark_trans(Transit::to(S::Whitespace), '\r')?
         .mark_trans(Transit::to(S::Whitespace), '\n')?
-        .accept_to_from_all(&S::Start)?;
+        .accept_to(&S::Start);
 
     Ok(())
 }
@@ -202,7 +204,7 @@ fn build_ignorable_region(
 ) -> Result<(), lex::CDFAError> {
     builder
         .state(&S::IgnorableTag)
-        .accept_to_from_all(&S::Ignorable)?
+        .accept_to(&S::Ignorable)
         .tokenize(&SpecSymbol::TIgnorable);
 
     builder
@@ -217,7 +219,7 @@ fn build_ignorable_region(
     builder
         .state(&S::IgnorableId)
         .mark_range(Transit::to(S::IgnorableId), '_', 'Z')?
-        .accept_to_from_all(&S::Start)?
+        .accept_to(&S::Start)
         .tokenize(&SpecSymbol::TId);
 
     Ok(())
@@ -228,7 +230,7 @@ fn build_alphabet_region(
 ) -> Result<(), lex::CDFAError> {
     builder
         .state(&S::AlphabetTag)
-        .accept_to_from_all(&S::Alphabet)?
+        .accept_to(&S::Alphabet)
         .tokenize(&SpecSymbol::TAlphabet);
 
     builder
@@ -248,7 +250,7 @@ fn build_alphabet_region(
 
     builder
         .state(&S::AlphabetString)
-        .accept_to_from_all(&S::Start)?
+        .accept_to(&S::Start)
         .tokenize(&SpecSymbol::TCil);
 
     builder
@@ -263,7 +265,7 @@ fn build_cdfa_region(
 ) -> Result<(), lex::CDFAError> {
     builder
         .state(&S::CDFATag)
-        .accept_to_from_all(&S::CDFA)?
+        .accept_to(&S::CDFA)
         .tokenize(&SpecSymbol::TCDFA);
 
     builder
@@ -277,7 +279,7 @@ fn build_cdfa_region(
 
     builder
         .state(&S::CDFAEntryBrace)
-        .accept_to_from_all(&S::CDFABody)?
+        .accept_to(&S::CDFABody)
         .tokenize(&SpecSymbol::TLeftBrace);
 
     builder
@@ -325,7 +327,7 @@ fn build_grammar_region(
 ) -> Result<(), lex::CDFAError> {
     builder
         .state(&S::GrammarTag)
-        .accept_to_from_all(&S::Grammar)?
+        .accept_to(&S::Grammar)
         .tokenize(&SpecSymbol::TGrammar);
 
     builder
@@ -339,7 +341,7 @@ fn build_grammar_region(
 
     builder
         .state(&S::GrammarEntryBrace)
-        .accept_to_from_all(&S::GrammarBody)?
+        .accept_to(&S::GrammarBody)
         .tokenize(&SpecSymbol::TLeftBrace);
 
     builder

@@ -3,7 +3,7 @@ use {
         fmt::{FormatterBuilder, InjectableString, InjectionAffinity, PatternPair},
         lex::{
             ecdfa::{EncodedCDFA, EncodedCDFABuilder},
-            CDFABuilder, ConsumerStrategy, CDFA, TransitBuilder,
+            CDFABuilder, ConsumerStrategy, TransitBuilder, CDFA,
         },
         parse::{
             grammar::{Grammar, GrammarBuilder, GrammarSymbol},
@@ -258,15 +258,12 @@ where
             let dest = id_or_def_node.get_child(0).lhs.lexeme();
             let mut transit_builder = TransitBuilder::to(dest.clone());
 
+            builder.accept(dest);
+
             let accd_opt_node = destination.get_child(2);
-            if accd_opt_node.is_empty() {
-                builder.accept(dest);
-            } else {
+            if !accd_opt_node.is_empty() {
                 let acceptor_destination = &accd_opt_node.get_child(1).lhs.lexeme();
                 transit_builder.accept_to((*acceptor_destination).clone());
-
-                // TODO(shane) replace with transit builder call?
-                builder.accept(dest);
             }
 
             if *dest != *spec::DEF_MATCHER {
@@ -339,11 +336,7 @@ where
             }
         } else {
             for source in sources {
-                builder.mark_chain(
-                    source,
-                    transit_builder.build(),
-                    matcher_cleaned.chars()
-                )?;
+                builder.mark_chain(source, transit_builder.build(), matcher_cleaned.chars())?;
             }
         }
     } else {
@@ -418,7 +411,7 @@ where
         builder.accept(state);
     } else {
         let acceptor_destination = &accd_opt_node.get_child(1).lhs.lexeme();
-        builder.accept_to_from_all(state, acceptor_destination)?;
+        builder.accept_to(state, acceptor_destination);
     }
 
     if *kind != grammar_builder.kind_for(&spec::DEF_MATCHER) {

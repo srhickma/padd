@@ -5,13 +5,13 @@ use {
             Data,
         },
         lex::{
-            alphabet::HashedAlphabet, CDFABuilder, CDFAError, ConsumerStrategy,
-            TransitionDestination, TransitionResult, CDFA, Transit,
+            alphabet::HashedAlphabet, CDFABuilder, CDFAError, Transit, TransitBuilder,
+            TransitionResult, CDFA,
         },
         parse::grammar::GrammarSymbol,
         util::encoder::Encoder,
     },
-    std::{collections::HashMap, fmt::Debug, usize},
+    std::{collections::HashMap, usize},
 };
 
 pub struct EncodedCDFABuilder<State: Data, Symbol: GrammarSymbol> {
@@ -19,7 +19,7 @@ pub struct EncodedCDFABuilder<State: Data, Symbol: GrammarSymbol> {
     alphabet_str: String,
 
     alphabet: HashedAlphabet,
-    accepting: HashMap<usize, AcceptorDestinationMux>,
+    accepting: HashMap<usize, Option<usize>>,
     t_delta: CEHashMap<TransitionTrie>,
     tokenizer: CEHashMap<Symbol>,
     start: usize,
@@ -59,6 +59,16 @@ impl<State: Data, Symbol: GrammarSymbol> EncodedCDFABuilder<State, Symbol> {
             ecdfa_builder: self,
             state,
         }
+    }
+
+    fn encode_transit(&mut self, transit: Transit<State>) -> Transit<usize> {
+        let mut builder = TransitBuilder::to(self.encoder.encode(&transit.dest));
+
+        if let Some(acceptor_destination) = transit.acceptor_destination {
+            builder.accept_to(self.encoder.encode(&acceptor_destination));
+        }
+
+        builder.consumer(transit.consumer).build()
     }
 }
 
@@ -105,43 +115,16 @@ impl<State: Data, Symbol: GrammarSymbol> CDFABuilder<State, Symbol, EncodedCDFA<
     fn accept(&mut self, state: &State) -> &mut Self {
         let state_encoded = self.encoder.encode(state);
 
-        if self.accepting.contains_key(&state_encoded) {
-            return self;
-        }
-
-        self.accepting
-            .insert(state_encoded, AcceptorDestinationMux::new());
+        self.accepting.entry(state_encoded).or_insert(None);
         self
     }
 
-    fn accept_to(
-        &mut self,
-        state: &State,
-        from: &State,
-        to: &State,
-    ) -> Result<&mut Self, CDFAError> {
-        let state_encoded = self.encoder.encode(state);
-        let from_encoded = self.encoder.encode(from);
-        let to_encoded = self.encoder.encode(to);
-
-        self.accepting
-            .entry(state_encoded)
-            .or_insert_with(AcceptorDestinationMux::new)
-            .add_from(state, to_encoded, from_encoded)?;
-
-        Ok(self)
-    }
-
-    fn accept_to_from_all(&mut self, state: &State, to: &State) -> Result<&mut Self, CDFAError> {
+    fn accept_to(&mut self, state: &State, to: &State) -> &mut Self {
         let state_encoded = self.encoder.encode(state);
         let to_encoded = self.encoder.encode(to);
 
-        self.accepting
-            .entry(state_encoded)
-            .or_insert_with(AcceptorDestinationMux::new)
-            .add_from_all(state, to_encoded)?;
-
-        Ok(self)
+        self.accepting.insert(state_encoded, Some(to_encoded));
+        self
     }
 
     fn mark_start(&mut self, state: &State) -> &mut Self {
@@ -158,21 +141,11 @@ impl<State: Data, Symbol: GrammarSymbol> CDFABuilder<State, Symbol, EncodedCDFA<
         on: char,
     ) -> Result<&mut Self, CDFAError> {
         let from_encoded = self.encoder.encode(from);
-        let to_encoded = self.encoder.encode(&transit.dest);
-        // TODO(shane) conglomerate this stuff
-        let acceptor_destination_encoded = match transit.acceptor_destination {
-            None => None,
-            Some(acceptor_destination) => Some(self.encoder.encode(&acceptor_destination)),
-        };
-        let transition_delta = TransitionDestination::new(
-            to_encoded,
-            transit.consumer,
-            acceptor_destination_encoded
-        );
+        let transit_encoded = self.encode_transit(transit);
 
         {
             let t_trie = self.get_transition_trie(from_encoded);
-            t_trie.insert(on, transition_delta)?;
+            t_trie.insert(on, transit_encoded)?;
         }
 
         Ok(self)
@@ -185,23 +158,14 @@ impl<State: Data, Symbol: GrammarSymbol> CDFABuilder<State, Symbol, EncodedCDFA<
         on: impl Iterator<Item = char>,
     ) -> Result<&mut Self, CDFAError> {
         let from_encoded = self.encoder.encode(from);
-        let to_encoded = self.encoder.encode(&transit.dest);
-        let acceptor_destination_encoded = match transit.acceptor_destination {
-            None => None,
-            Some(acceptor_destination) => Some(self.encoder.encode(&acceptor_destination)),
-        };
-        let transition_delta = TransitionDestination::new(
-            to_encoded,
-            transit.consumer,
-            acceptor_destination_encoded
-        );
+        let transit_encoded = self.encode_transit(transit);
 
         {
             let t_trie = self.get_transition_trie(from_encoded);
 
             let mut chars: Vec<char> = Vec::new();
             on.for_each(|c| chars.push(c));
-            t_trie.insert_chain(&chars, transition_delta)?;
+            t_trie.insert_chain(&chars, transit_encoded)?;
         }
 
         Ok(self)
@@ -229,7 +193,10 @@ impl<State: Data, Symbol: GrammarSymbol> CDFABuilder<State, Symbol, EncodedCDFA<
         transit: Transit<State>,
         start: char,
         end: char,
-    ) -> Result<&mut Self, CDFAError> where State: 'state_o {
+    ) -> Result<&mut Self, CDFAError>
+    where
+        State: 'state_o,
+    {
         let to_mark = self.get_alphabet_range(start, end);
 
         for source in sources {
@@ -247,21 +214,12 @@ impl<State: Data, Symbol: GrammarSymbol> CDFABuilder<State, Symbol, EncodedCDFA<
         transit: Transit<State>,
     ) -> Result<&mut Self, CDFAError> {
         let from_encoded = self.encoder.encode(from);
-        let to_encoded = self.encoder.encode(&transit.dest);
-        let acceptor_destination_encoded = match transit.acceptor_destination {
-            None => None,
-            Some(acceptor_destination) => Some(self.encoder.encode(&acceptor_destination)),
-        };
-        let transition_delta = TransitionDestination::new( // TODO(shane) abstract this transformation
-            to_encoded,
-            transit.consumer,
-            acceptor_destination_encoded
-        );
+        let transit_encoded = self.encode_transit(transit);
 
         match {
             let t_trie = self.get_transition_trie(from_encoded);
 
-            t_trie.set_default(transition_delta)
+            t_trie.set_default(transit_encoded)
         } {
             Err(err) => Err(err),
             Ok(()) => Ok(self),
@@ -293,14 +251,17 @@ impl<'scope, 'state: 'scope, State: 'state + Data, Symbol: 'scope + GrammarSymbo
         self
     }
 
-    pub fn accept_to_from_all(&mut self, to: &State) -> Result<&mut Self, CDFAError> {
-        self.ecdfa_builder.accept_to_from_all(self.state, to)?;
-        Ok(self)
+    pub fn accept_to(&mut self, to: &State) -> &mut Self {
+        self.ecdfa_builder.accept_to(self.state, to);
+        self
     }
 
-    pub fn mark_trans(&mut self, transit: Transit<State>, on: char) -> Result<&mut Self, CDFAError> {
-        self.ecdfa_builder
-            .mark_trans(self.state, transit, on)?;
+    pub fn mark_trans(
+        &mut self,
+        transit: Transit<State>,
+        on: char,
+    ) -> Result<&mut Self, CDFAError> {
+        self.ecdfa_builder.mark_trans(self.state, transit, on)?;
         Ok(self)
     }
 
@@ -309,8 +270,7 @@ impl<'scope, 'state: 'scope, State: 'state + Data, Symbol: 'scope + GrammarSymbo
         transit: Transit<State>,
         on: impl Iterator<Item = char>,
     ) -> Result<&mut Self, CDFAError> {
-        self.ecdfa_builder
-            .mark_chain(self.state, transit, on)?;
+        self.ecdfa_builder.mark_chain(self.state, transit, on)?;
         Ok(self)
     }
 
@@ -326,8 +286,7 @@ impl<'scope, 'state: 'scope, State: 'state + Data, Symbol: 'scope + GrammarSymbo
     }
 
     pub fn default_to(&mut self, transit: Transit<State>) -> Result<&mut Self, CDFAError> {
-        self.ecdfa_builder
-            .default_to(self.state, transit)?;
+        self.ecdfa_builder.default_to(self.state, transit)?;
         Ok(self)
     }
 
@@ -341,7 +300,7 @@ pub struct EncodedCDFA<Symbol: GrammarSymbol> {
     //TODO add separate error message if character not in alphabet
     #[allow(dead_code)]
     alphabet: HashedAlphabet,
-    accepting: HashMap<usize, AcceptorDestinationMux>,
+    accepting: HashMap<usize, Option<usize>>,
     t_delta: CEHashMap<TransitionTrie>,
     tokenizer: CEHashMap<Symbol>,
     start: usize,
@@ -369,10 +328,10 @@ impl<Symbol: GrammarSymbol> CDFA<usize, Symbol> for EncodedCDFA<Symbol> {
         self.accepting.contains_key(state)
     }
 
-    fn acceptor_destination(&self, state: &usize, from: &usize) -> Option<usize> {
+    fn default_acceptor_destination(&self, state: &usize) -> Option<usize> {
         match self.accepting.get(state) {
-            None => None,
-            Some(accd_mux) => accd_mux.get_destination(*from),
+            Some(Some(acceptor_destination)) => Some(*acceptor_destination),
+            _ => None,
         }
     }
 
@@ -390,7 +349,7 @@ impl<Symbol: GrammarSymbol> CDFA<usize, Symbol> for EncodedCDFA<Symbol> {
 
 struct TransitionTrie {
     root: TransitionNode,
-    default: Option<TransitionDestination<usize>>,
+    default: Option<Transit<usize>>,
 }
 
 impl TransitionTrie {
@@ -398,7 +357,7 @@ impl TransitionTrie {
         TransitionTrie {
             root: TransitionNode {
                 children: HashMap::new(),
-                dest: TransitionDestination::new(usize::max_value(), ConsumerStrategy::None, None),
+                transit: None,
             },
             default: None,
         }
@@ -432,51 +391,43 @@ impl TransitionTrie {
                 cursor += 1;
             }
 
-            TransitionResult::new(&curr.dest, cursor)
+            TransitionResult::new(curr.transit.as_ref().unwrap(), cursor)
         }
     }
 
-    fn insert(&mut self, c: char, dest: TransitionDestination<usize>) -> Result<(), CDFAError> {
-        TransitionTrie::insert_internal(c, &mut self.root, true, dest)
+    fn insert(&mut self, c: char, transit: Transit<usize>) -> Result<(), CDFAError> {
+        TransitionTrie::insert_internal(c, &mut self.root, true, transit)
     }
 
-    fn insert_chain(
-        &mut self,
-        chars: &[char],
-        dest: TransitionDestination<usize>,
-    ) -> Result<(), CDFAError> {
-        TransitionTrie::insert_chain_internal(0, &mut self.root, chars, dest)
+    fn insert_chain(&mut self, chars: &[char], transit: Transit<usize>) -> Result<(), CDFAError> {
+        TransitionTrie::insert_chain_internal(0, &mut self.root, chars, transit)
     }
 
     fn insert_chain_internal(
         i: usize,
         node: &mut TransitionNode,
         chars: &[char],
-        dest: TransitionDestination<usize>,
+        transit: Transit<usize>,
     ) -> Result<(), CDFAError> {
         if i == chars.len() {
             return Ok(());
         }
 
         let c = chars[i];
-        TransitionTrie::insert_internal(c, node, i == chars.len() - 1, dest.clone())?;
-        TransitionTrie::insert_chain_internal(i + 1, node.get_child_mut(c).unwrap(), chars, dest)
+        TransitionTrie::insert_internal(c, node, i == chars.len() - 1, transit.clone())?;
+        TransitionTrie::insert_chain_internal(i + 1, node.get_child_mut(c).unwrap(), chars, transit)
     }
 
     fn insert_internal(
         c: char,
         node: &mut TransitionNode,
         last: bool,
-        dest: TransitionDestination<usize>,
+        transit: Transit<usize>,
     ) -> Result<(), CDFAError> {
         if !node.has_child(c) {
             let child = TransitionNode {
                 children: HashMap::new(),
-                dest: if last {
-                    dest
-                } else {
-                    TransitionDestination::new(usize::max_value(), ConsumerStrategy::None, None)
-                },
+                transit: if last { Some(transit) } else { None },
             };
             node.add_child(c, child);
         } else if last {
@@ -488,13 +439,13 @@ impl TransitionTrie {
         Ok(())
     }
 
-    fn set_default(&mut self, default: TransitionDestination<usize>) -> Result<(), CDFAError> {
+    fn set_default(&mut self, transit: Transit<usize>) -> Result<(), CDFAError> {
         if self.default.is_some() {
             Err(CDFAError::BuildErr(
                 "Default matcher used twice".to_string(),
             ))
         } else {
-            self.default = Some(default);
+            self.default = Some(transit);
             Ok(())
         }
     }
@@ -508,7 +459,7 @@ impl Default for TransitionTrie {
 
 struct TransitionNode {
     children: HashMap<char, TransitionNode>,
-    dest: TransitionDestination<usize>,
+    transit: Option<Transit<usize>>,
 }
 
 impl TransitionNode {
@@ -533,89 +484,11 @@ impl TransitionNode {
     }
 }
 
-struct AcceptorDestinationMux {
-    mux: Option<HashMap<usize, usize>>,
-    all: Option<usize>,
-}
-
-impl AcceptorDestinationMux {
-    fn new() -> Self {
-        AcceptorDestinationMux {
-            mux: None,
-            all: None,
-        }
-    }
-
-    fn add_from<State: Debug>(
-        &mut self,
-        state: &State,
-        dest_encoded: usize,
-        from_encoded: usize,
-    ) -> Result<(), CDFAError> {
-        if self.all.is_some() {
-            return Err(CDFAError::BuildErr(format!(
-                "State {:?} already has an acceptance destination from all incoming states",
-                state
-            )));
-        }
-
-        if self.mux.is_none() {
-            let mut mux = HashMap::new();
-            mux.insert(from_encoded, dest_encoded);
-            self.mux = Some(mux);
-        } else if let Some(ref mut mux) = self.mux {
-            {
-                let entry = mux.get(&from_encoded);
-                if entry.is_some() && *entry.unwrap() != dest_encoded {
-                    return Err(CDFAError::BuildErr(format!(
-                        "State {:?} is accepted multiple times with different destinations",
-                        state
-                    )));
-                }
-            }
-
-            mux.insert(from_encoded, dest_encoded);
-        }
-
-        Ok(())
-    }
-
-    fn add_from_all<State: Debug>(
-        &mut self,
-        state: &State,
-        dest_encoded: usize,
-    ) -> Result<(), CDFAError> {
-        if self.mux.is_some() {
-            return Err(CDFAError::BuildErr(format!(
-                "State {:?} already has an acceptance destination from a specific state",
-                state
-            )));
-        }
-
-        self.all = Some(dest_encoded);
-
-        Ok(())
-    }
-
-    fn get_destination(&self, from_encoded: usize) -> Option<usize> {
-        if let Some(dest) = self.all {
-            Some(dest)
-        } else if let Some(ref mux) = self.mux {
-            match mux.get(&from_encoded) {
-                None => None,
-                Some(dest) => Some(*dest),
-            }
-        } else {
-            None
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use core::{
         data::Data,
-        lex::{self, Token, TransitBuilder},
+        lex::{self, ConsumerStrategy, Token, TransitBuilder},
     };
 
     use super::*;
@@ -1027,13 +900,11 @@ ID <- 'fdk'
         builder
             .state(&S::BangIn)
             .tokenize(&"BANG".to_string())
-            .accept_to_from_all(&S::Hidden)
-            .unwrap();
+            .accept_to(&S::Hidden);
         builder
             .state(&S::BangOut)
             .tokenize(&"BANG".to_string())
-            .accept_to_from_all(&S::Start)
-            .unwrap();
+            .accept_to(&S::Start);
         builder
             .state(&S::Hidden)
             .mark_range(Transit::to(S::Num), '1', '9')
@@ -1093,14 +964,20 @@ A <- 'a'
         let mut builder: EncodedCDFABuilder<S, String> = EncodedCDFABuilder::new();
         builder.set_alphabet("a".chars()).mark_start(&S::Start);
         builder
-            .mark_trans(&S::Start, Transit::to(S::A), 'a')
+            .mark_trans(
+                &S::Start,
+                TransitBuilder::to(S::A).accept_to(S::LastA).build(),
+                'a',
+            )
             .unwrap();
-        builder.accept_to(&S::A, &S::Start, &S::LastA).unwrap();
         builder
-            .mark_trans(&S::LastA, Transit::to(S::A), 'a')
+            .mark_trans(
+                &S::LastA,
+                TransitBuilder::to(S::A).accept_to(S::Start).build(),
+                'a',
+            )
             .unwrap();
-        builder.accept_to(&S::A, &S::LastA, &S::Start).unwrap();
-        builder.state(&S::A).tokenize(&"A".to_string());
+        builder.state(&S::A).accept().tokenize(&"A".to_string());
 
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
 
@@ -1145,8 +1022,8 @@ A <- 'a'
         builder
             .mark_trans(&S::Start, Transit::to(S::A), 'a')
             .unwrap();
-        builder.accept_to_from_all(&S::A, &S::LastA).unwrap();
-        builder.accept_to_from_all(&S::A, &S::Start).unwrap();
+        builder.accept_to(&S::A, &S::LastA);
+        builder.accept_to(&S::A, &S::Start);
         builder.state(&S::A).tokenize(&"A".to_string());
 
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
@@ -1165,6 +1042,147 @@ A <- 'a'
             "\
 A <- 'a'
 A <- 'a'
+"
+        );
+    }
+
+    #[test]
+    fn multiple_transition_acceptor_destinations() {
+        //setup
+        #[derive(PartialEq, Eq, Hash, Clone, Debug)]
+        enum S {
+            Start,
+            A,
+            A1,
+            A2,
+            B1,
+            B2,
+        }
+
+        impl Data for S {
+            fn to_string(&self) -> String {
+                format!("{:?}", self)
+            }
+        }
+
+        let mut builder: EncodedCDFABuilder<S, String> = EncodedCDFABuilder::new();
+        builder.set_alphabet("12a".chars()).mark_start(&S::Start);
+        builder
+            .state(&S::Start)
+            .mark_trans(TransitBuilder::to(S::A).accept_to(S::B1).build(), '1')
+            .unwrap()
+            .mark_trans(TransitBuilder::to(S::A).accept_to(S::B2).build(), '2')
+            .unwrap();
+        builder
+            .state(&S::B1)
+            .mark_trans(Transit::to(S::A1), 'a')
+            .unwrap();
+        builder
+            .state(&S::B2)
+            .mark_trans(Transit::to(S::A2), 'a')
+            .unwrap();
+        builder.state(&S::A).accept().tokenize(&"A".to_string());
+        builder
+            .state(&S::A1)
+            .accept_to(&S::Start)
+            .tokenize(&"A1".to_string());
+        builder
+            .state(&S::A2)
+            .accept_to(&S::Start)
+            .tokenize(&"A2".to_string());
+
+        let cdfa: EncodedCDFA<String> = builder.build().unwrap();
+
+        let input = "1a2a1a".to_string();
+        let chars: Vec<char> = input.chars().collect();
+
+        let lexer = lex::def_lexer();
+
+        //exercise
+        let tokens = lexer.lex(&chars[..], &cdfa).unwrap();
+
+        //verify
+        assert_eq!(
+            tokens_string(&tokens),
+            "\
+A <- '1'
+A1 <- 'a'
+A <- '2'
+A2 <- 'a'
+A <- '1'
+A1 <- 'a'
+"
+        );
+    }
+
+    #[test]
+    fn acceptor_destination_precedence() {
+        //setup
+        #[derive(PartialEq, Eq, Hash, Clone, Debug)]
+        enum S {
+            Start,
+            A,
+            A1,
+            A2,
+            B1,
+            B2,
+        }
+
+        impl Data for S {
+            fn to_string(&self) -> String {
+                format!("{:?}", self)
+            }
+        }
+
+        let mut builder: EncodedCDFABuilder<S, String> = EncodedCDFABuilder::new();
+        builder.set_alphabet("12a".chars()).mark_start(&S::Start);
+        builder
+            .state(&S::Start)
+            .mark_trans(TransitBuilder::to(S::A).accept_to(S::B1).build(), '1')
+            .unwrap()
+            .mark_trans(Transit::to(S::A), '2')
+            .unwrap();
+        builder
+            .state(&S::B1)
+            .mark_trans(Transit::to(S::A1), 'a')
+            .unwrap();
+        builder
+            .state(&S::B2)
+            .mark_trans(Transit::to(S::A2), 'a')
+            .unwrap();
+        builder
+            .state(&S::A)
+            .accept_to(&S::B2)
+            .tokenize(&"A".to_string());
+        builder
+            .state(&S::A1)
+            .accept_to(&S::Start)
+            .tokenize(&"A1".to_string());
+        builder
+            .state(&S::A2)
+            .accept_to(&S::Start)
+            .tokenize(&"A2".to_string());
+
+        let cdfa: EncodedCDFA<String> = builder.build().unwrap();
+
+        let input = "1a2a1a".to_string();
+        let chars: Vec<char> = input.chars().collect();
+
+        let lexer = lex::def_lexer();
+
+        //exercise
+        let tokens = lexer.lex(&chars[..], &cdfa).unwrap();
+
+        //verify
+        assert_eq!(
+            tokens_string(&tokens),
+            "\
+A <- '1'
+A1 <- 'a'
+A <- '2'
+A2 <- 'a'
+A <- '1'
+A1 <- 'a'
 "
         );
     }
@@ -1191,19 +1209,28 @@ A <- 'a'
         builder
             .mark_trans(
                 &S::Start1,
-                TransitBuilder::to(S::A).consumer(ConsumerStrategy::All).build(),
-                'a'
-            ).unwrap()
+                TransitBuilder::to(S::A)
+                    .consumer(ConsumerStrategy::All)
+                    .build(),
+                'a',
+            )
+            .unwrap()
             .default_to(
                 &S::Start1,
-                TransitBuilder::to(S::Start2).consumer(ConsumerStrategy::None).build()
-            ).unwrap();
+                TransitBuilder::to(S::Start2)
+                    .consumer(ConsumerStrategy::None)
+                    .build(),
+            )
+            .unwrap();
         builder
             .mark_trans(
                 &S::Start2,
-                TransitBuilder::to(S::B).consumer(ConsumerStrategy::All).build(),
-                'b'
-            ).unwrap();
+                TransitBuilder::to(S::B)
+                    .consumer(ConsumerStrategy::All)
+                    .build(),
+                'b',
+            )
+            .unwrap();
         builder.accept(&S::A);
         builder.accept(&S::B);
         builder.state(&S::A).tokenize(&"A".to_string());
