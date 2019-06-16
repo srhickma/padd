@@ -4,7 +4,7 @@ use {
         lex::{
             self,
             ecdfa::{EncodedCDFA, EncodedCDFABuilder},
-            CDFABuilder, ConsumerStrategy,
+            CDFABuilder, Transit,
         },
         parse::{
             self,
@@ -58,41 +58,41 @@ fn build_pattern_ecdfa() -> Result<EncodedCDFA<PatternSymbol>, lex::CDFAError> {
 
     builder
         .state(&S::Start)
-        .mark_trans(&S::LeftBrace, '{')?
-        .mark_trans(&S::RightBrace, '}')?
-        .mark_trans(&S::LeftBracket, '[')?
-        .mark_trans(&S::RightBracket, ']')?
-        .mark_trans(&S::Semi, ';')?
-        .mark_trans(&S::Equals, '=')?
-        .mark_trans(&S::Escape, '\\')?
-        .mark_trans(&S::Zero, '0')?
-        .mark_range(&S::Number, '1', '9')?
-        .mark_range(&S::Alpha, 'a', 'Z')?
-        .default_to(&S::Filler)?;
+        .mark_trans(Transit::to(S::LeftBrace), '{')?
+        .mark_trans(Transit::to(S::RightBrace), '}')?
+        .mark_trans(Transit::to(S::LeftBracket), '[')?
+        .mark_trans(Transit::to(S::RightBracket), ']')?
+        .mark_trans(Transit::to(S::Semi), ';')?
+        .mark_trans(Transit::to(S::Equals), '=')?
+        .mark_trans(Transit::to(S::Escape), '\\')?
+        .mark_trans(Transit::to(S::Zero), '0')?
+        .mark_range(Transit::to(S::Number), '1', '9')?
+        .mark_range(Transit::to(S::Alpha), 'a', 'Z')?
+        .default_to(Transit::to(S::Filler))?;
 
     builder
         .state(&S::Filler)
-        .mark_trans(&S::Escape, '\\')?
-        .mark_trans(&S::Fail, '{')?
-        .mark_trans(&S::Fail, '}')?
-        .mark_trans(&S::Fail, '[')?
-        .mark_trans(&S::Fail, ';')?
-        .mark_trans(&S::Fail, '=')?
-        .default_to(&S::Filler)?
+        .mark_trans(Transit::to(S::Escape), '\\')?
+        .mark_trans(Transit::to(S::Fail), '{')?
+        .mark_trans(Transit::to(S::Fail), '}')?
+        .mark_trans(Transit::to(S::Fail), '[')?
+        .mark_trans(Transit::to(S::Fail), ';')?
+        .mark_trans(Transit::to(S::Fail), '=')?
+        .default_to(Transit::to(S::Filler))?
         .accept()
         .tokenize(&PatternSymbol::TFiller);
 
-    builder.default_to(&S::Escape, &S::Filler, ConsumerStrategy::All)?;
+    builder.default_to(&S::Escape, Transit::to(S::Filler))?;
 
     builder
         .state(&S::Number)
-        .mark_range(&S::Number, '0', '9')?
+        .mark_range(Transit::to(S::Number), '0', '9')?
         .accept()
         .tokenize(&PatternSymbol::TNumber);
 
     builder
         .state(&S::Alpha)
-        .mark_range(&S::Alpha, 'a', 'Z')?
+        .mark_range(Transit::to(S::Alpha), 'a', 'Z')?
         .accept()
         .tokenize(&PatternSymbol::TAlpha);
 

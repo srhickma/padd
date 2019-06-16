@@ -3,7 +3,7 @@ use {
         fmt::{FormatterBuilder, InjectableString, InjectionAffinity, PatternPair},
         lex::{
             ecdfa::{EncodedCDFA, EncodedCDFABuilder},
-            CDFABuilder, ConsumerStrategy, State, CDFA,
+            CDFABuilder, ConsumerStrategy, TransitBuilder, CDFA,
         },
         parse::{
             grammar::{Grammar, GrammarBuilder, GrammarSymbol},
@@ -188,7 +188,7 @@ where
         .lhs
         .lexeme();
 
-    let mut states: Vec<&State> = vec![head_state];
+    let mut states: Vec<&String> = vec![head_state];
     if targets_node.children.len() == 3 {
         generate_cdfa_targets(targets_node.get_child(0), &mut states);
     }
@@ -200,7 +200,7 @@ where
         let kind = grammar_builder.kind_for(token);
 
         for state in &states {
-            add_cdfa_tokenizer(acceptor_node, *state, None, &kind, builder, grammar_builder)?;
+            add_cdfa_state_tokenizer(acceptor_node, *state, &kind, builder, grammar_builder)?;
         }
     }
 
@@ -224,7 +224,7 @@ where
 
 fn generate_cdfa_targets<'tree>(
     targets_node: &'tree Tree<SpecSymbol>,
-    accumulator: &mut Vec<&'tree State>,
+    accumulator: &mut Vec<&'tree String>,
 ) {
     accumulator.push(
         &targets_node
@@ -239,7 +239,7 @@ fn generate_cdfa_targets<'tree>(
 
 fn generate_cdfa_trans<CDFABuilderType, CDFAType, Symbol: GrammarSymbol, GrammarType>(
     trans_node: &Tree<SpecSymbol>,
-    sources: &[&State],
+    sources: &[&String],
     builder: &mut CDFABuilderType,
     grammar_builder: &mut GrammarBuilder<String, Symbol, GrammarType>,
 ) -> Result<(), spec::GenError>
@@ -251,26 +251,26 @@ where
     let tran_node = trans_node.get_child(trans_node.children.len() - 1);
 
     let destination = tran_node.get_child(2).get_child(0);
-    let dest = match destination.lhs.kind() {
-        &SpecSymbol::TId => destination.lhs.lexeme(),
+    let mut transit_builder = match destination.lhs.kind() {
+        &SpecSymbol::TId => TransitBuilder::to(destination.lhs.lexeme().clone()),
         &SpecSymbol::Acceptor => {
             let id_or_def_node = destination.get_child(1);
-            let token = id_or_def_node.get_child(0).lhs.lexeme();
-            let kind = grammar_builder.kind_for(token);
+            let dest = id_or_def_node.get_child(0).lhs.lexeme();
+            let mut transit_builder = TransitBuilder::to(dest.clone());
 
-            // Immediate state pass-through
-            for source in sources {
-                add_cdfa_tokenizer(
-                    destination,
-                    token,
-                    Some(*source),
-                    &kind,
-                    builder,
-                    grammar_builder,
-                )?;
+            builder.accept(dest);
+
+            let accd_opt_node = destination.get_child(2);
+            if !accd_opt_node.is_empty() {
+                let acceptor_destination = &accd_opt_node.get_child(1).lhs.lexeme();
+                transit_builder.accept_to((*acceptor_destination).clone());
             }
 
-            token
+            if *dest != *spec::DEF_MATCHER {
+                builder.tokenize(dest, &grammar_builder.kind_for(dest));
+            }
+
+            transit_builder
         }
         symbol => panic!("Unexpected transition destination symbol: {:?}", symbol),
     };
@@ -281,14 +281,16 @@ where
         s => panic!("Unexpected transition consumer: {:?}", s),
     };
 
+    transit_builder.consumer(consumer);
+
     let matcher = tran_node.get_child(0).get_child(0);
     match matcher.lhs.kind() {
         SpecSymbol::Matchers => {
-            generate_cdfa_mtcs(matcher, sources, dest, builder, &consumer)?;
+            generate_cdfa_mtcs(matcher, sources, &transit_builder, builder)?;
         }
         SpecSymbol::TDef => {
             for source in sources {
-                builder.default_to(source, dest, consumer.clone())?;
+                builder.default_to(source, transit_builder.build())?;
             }
         }
         _ => panic!("Transition map input is neither Matchers nor TDef"),
@@ -304,10 +306,9 @@ where
 #[allow(clippy::ptr_arg)]
 fn generate_cdfa_mtcs<CDFABuilderType, CDFAType, Symbol: GrammarSymbol>(
     mtcs_node: &Tree<SpecSymbol>,
-    sources: &[&State],
-    dest: &State,
+    sources: &[&String],
+    transit_builder: &TransitBuilder<String>,
     builder: &mut CDFABuilderType,
-    consumer: &ConsumerStrategy,
 ) -> Result<(), spec::GenError>
 where
     CDFAType: CDFA<usize, Symbol>,
@@ -329,14 +330,13 @@ where
             for source in sources {
                 builder.mark_trans(
                     source,
-                    dest,
+                    transit_builder.build(),
                     matcher_cleaned.chars().next().unwrap(),
-                    consumer.clone(),
                 )?;
             }
         } else {
             for source in sources {
-                builder.mark_chain(source, dest, matcher_cleaned.chars(), consumer.clone())?;
+                builder.mark_chain(source, transit_builder.build(), matcher_cleaned.chars())?;
             }
         }
     } else {
@@ -380,25 +380,23 @@ where
 
         builder.mark_range_for_all(
             sources.iter(),
-            dest,
+            transit_builder.build(),
             range_start,
             range_end,
-            consumer.clone(),
         )?;
     }
 
     if mtcs_node.children.len() == 3 {
-        generate_cdfa_mtcs(mtcs_node.get_child(0), sources, dest, builder, consumer)
+        generate_cdfa_mtcs(mtcs_node.get_child(0), sources, transit_builder, builder)
     } else {
         Ok(())
     }
 }
 
 #[allow(clippy::ptr_arg)]
-fn add_cdfa_tokenizer<CDFABuilderType, CDFAType, Symbol: GrammarSymbol, GrammarType>(
+fn add_cdfa_state_tokenizer<CDFABuilderType, CDFAType, Symbol: GrammarSymbol, GrammarType>(
     acceptor_node: &Tree<SpecSymbol>,
-    state: &State,
-    from: Option<&State>,
+    state: &String,
     kind: &Symbol,
     builder: &mut CDFABuilderType,
     grammar_builder: &mut GrammarBuilder<String, Symbol, GrammarType>,
@@ -413,10 +411,7 @@ where
         builder.accept(state);
     } else {
         let acceptor_destination = &accd_opt_node.get_child(1).lhs.lexeme();
-        match from {
-            None => builder.accept_to_from_all(state, acceptor_destination)?,
-            Some(from_state) => builder.accept_to(state, from_state, acceptor_destination)?,
-        };
+        builder.accept_to(state, acceptor_destination);
     }
 
     if *kind != grammar_builder.kind_for(&spec::DEF_MATCHER) {

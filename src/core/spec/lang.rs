@@ -3,7 +3,7 @@ use core::{
     lex::{
         self,
         ecdfa::{EncodedCDFA, EncodedCDFABuilder},
-        CDFABuilder,
+        CDFABuilder, Transit,
     },
     parse::{
         self,
@@ -80,16 +80,16 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<SpecSymbol>, lex::CDFAError> {
 
     builder
         .state(&S::Start)
-        .mark_chain(&S::InjectableTag, "inject".chars())?
-        .mark_chain(&S::IgnorableTag, "ignore".chars())?
-        .mark_chain(&S::AlphabetTag, "alphabet".chars())?
-        .mark_chain(&S::CDFATag, "cdfa".chars())?
-        .mark_chain(&S::GrammarTag, "grammar".chars())?
-        .mark_trans(&S::Comment, '#')?
-        .mark_trans(&S::Whitespace, ' ')?
-        .mark_trans(&S::Whitespace, '\t')?
-        .mark_trans(&S::Whitespace, '\n')?
-        .mark_trans(&S::Whitespace, '\r')?;
+        .mark_chain(Transit::to(S::InjectableTag), "inject".chars())?
+        .mark_chain(Transit::to(S::IgnorableTag), "ignore".chars())?
+        .mark_chain(Transit::to(S::AlphabetTag), "alphabet".chars())?
+        .mark_chain(Transit::to(S::CDFATag), "cdfa".chars())?
+        .mark_chain(Transit::to(S::GrammarTag), "grammar".chars())?
+        .mark_trans(Transit::to(S::Comment), '#')?
+        .mark_trans(Transit::to(S::Whitespace), ' ')?
+        .mark_trans(Transit::to(S::Whitespace), '\t')?
+        .mark_trans(Transit::to(S::Whitespace), '\n')?
+        .mark_trans(Transit::to(S::Whitespace), '\r')?;
 
     build_injectable_region(&mut builder)?;
     build_ignorable_region(&mut builder)?;
@@ -101,7 +101,7 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<SpecSymbol>, lex::CDFAError> {
 
     builder
         .state(&S::RegionExitBrace)
-        .accept_to_from_all(&S::Start)?
+        .accept_to(&S::Start)
         .tokenize(&SpecSymbol::TRightBrace);
 
     builder.state(&S::Or).accept().tokenize(&SpecSymbol::TOr);
@@ -113,24 +113,26 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<SpecSymbol>, lex::CDFAError> {
 
     builder
         .state(&S::CilPartial)
-        .mark_trans(&S::Cil, '\'')?
-        .mark_trans(&S::CilEscaped, '\\')?
-        .default_to(&S::CilPartial)?;
+        .mark_trans(Transit::to(S::Cil), '\'')?
+        .mark_trans(Transit::to(S::CilEscaped), '\\')?
+        .default_to(Transit::to(S::CilPartial))?;
 
     builder.state(&S::Cil).accept().tokenize(&SpecSymbol::TCil);
 
-    builder.state(&S::CilEscaped).default_to(&S::CilPartial)?;
+    builder
+        .state(&S::CilEscaped)
+        .default_to(Transit::to(S::CilPartial))?;
 
     builder
         .state(&S::Id)
-        .mark_range(&S::Id, '_', 'Z')?
+        .mark_range(Transit::to(S::Id), '_', 'Z')?
         .accept()
         .tokenize(&SpecSymbol::TId);
 
     builder
         .state(&S::PatternPartial)
-        .mark_trans(&S::Pattern, '`')?
-        .default_to(&S::PatternPartial)?;
+        .mark_trans(Transit::to(S::Pattern), '`')?
+        .default_to(Transit::to(S::PatternPartial))?;
 
     builder
         .state(&S::Pattern)
@@ -139,8 +141,8 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<SpecSymbol>, lex::CDFAError> {
 
     builder
         .state(&S::Comment)
-        .mark_trans(&S::Fail, '\n')?
-        .default_to(&S::Comment)?
+        .mark_trans(Transit::to(S::Fail), '\n')?
+        .default_to(Transit::to(S::Comment))?
         .accept();
 
     builder.build()
@@ -151,48 +153,48 @@ fn build_injectable_region(
 ) -> Result<(), lex::CDFAError> {
     builder
         .state(&S::InjectableTag)
-        .accept_to_from_all(&S::InjectablePreAffinity)?
+        .accept_to(&S::InjectablePreAffinity)
         .tokenize(&SpecSymbol::TInjectable);
 
     builder
         .state(&S::InjectablePreAffinity)
-        .mark_chain(&S::InjectionAffinity, "left".chars())?
-        .mark_chain(&S::InjectionAffinity, "right".chars())?
-        .mark_trans(&S::Comment, '#')?
-        .mark_trans(&S::Whitespace, ' ')?
-        .mark_trans(&S::Whitespace, '\t')?
-        .mark_trans(&S::Whitespace, '\r')?
-        .mark_trans(&S::Whitespace, '\n')?;
+        .mark_chain(Transit::to(S::InjectionAffinity), "left".chars())?
+        .mark_chain(Transit::to(S::InjectionAffinity), "right".chars())?
+        .mark_trans(Transit::to(S::Comment), '#')?
+        .mark_trans(Transit::to(S::Whitespace), ' ')?
+        .mark_trans(Transit::to(S::Whitespace), '\t')?
+        .mark_trans(Transit::to(S::Whitespace), '\r')?
+        .mark_trans(Transit::to(S::Whitespace), '\n')?;
 
     builder
         .state(&S::InjectionAffinity)
-        .accept_to_from_all(&S::InjectablePreId)?
+        .accept_to(&S::InjectablePreId)
         .tokenize(&SpecSymbol::TInjectionAffinity);
 
     builder
         .state(&S::InjectablePreId)
-        .mark_range(&S::InjectableId, '0', 'Z')?
-        .mark_trans(&S::Comment, '#')?
-        .mark_trans(&S::Whitespace, ' ')?
-        .mark_trans(&S::Whitespace, '\t')?
-        .mark_trans(&S::Whitespace, '\r')?
-        .mark_trans(&S::Whitespace, '\n')?;
+        .mark_range(Transit::to(S::InjectableId), '0', 'Z')?
+        .mark_trans(Transit::to(S::Comment), '#')?
+        .mark_trans(Transit::to(S::Whitespace), ' ')?
+        .mark_trans(Transit::to(S::Whitespace), '\t')?
+        .mark_trans(Transit::to(S::Whitespace), '\r')?
+        .mark_trans(Transit::to(S::Whitespace), '\n')?;
 
     builder
         .state(&S::InjectableId)
-        .mark_range(&S::InjectableId, '_', 'Z')?
-        .accept_to_from_all(&S::InjectablePreComplete)?
+        .mark_range(Transit::to(S::InjectableId), '_', 'Z')?
+        .accept_to(&S::InjectablePreComplete)
         .tokenize(&SpecSymbol::TId);
 
     builder
         .state(&S::InjectablePreComplete)
-        .mark_trans(&S::PatternPartial, '`')?
-        .mark_trans(&S::Comment, '#')?
-        .mark_trans(&S::Whitespace, ' ')?
-        .mark_trans(&S::Whitespace, '\t')?
-        .mark_trans(&S::Whitespace, '\r')?
-        .mark_trans(&S::Whitespace, '\n')?
-        .accept_to_from_all(&S::Start)?;
+        .mark_trans(Transit::to(S::PatternPartial), '`')?
+        .mark_trans(Transit::to(S::Comment), '#')?
+        .mark_trans(Transit::to(S::Whitespace), ' ')?
+        .mark_trans(Transit::to(S::Whitespace), '\t')?
+        .mark_trans(Transit::to(S::Whitespace), '\r')?
+        .mark_trans(Transit::to(S::Whitespace), '\n')?
+        .accept_to(&S::Start);
 
     Ok(())
 }
@@ -202,22 +204,22 @@ fn build_ignorable_region(
 ) -> Result<(), lex::CDFAError> {
     builder
         .state(&S::IgnorableTag)
-        .accept_to_from_all(&S::Ignorable)?
+        .accept_to(&S::Ignorable)
         .tokenize(&SpecSymbol::TIgnorable);
 
     builder
         .state(&S::Ignorable)
-        .mark_range(&S::IgnorableId, '0', 'Z')?
-        .mark_trans(&S::Comment, '#')?
-        .mark_trans(&S::Whitespace, ' ')?
-        .mark_trans(&S::Whitespace, '\t')?
-        .mark_trans(&S::Whitespace, '\r')?
-        .mark_trans(&S::Whitespace, '\n')?;
+        .mark_range(Transit::to(S::IgnorableId), '0', 'Z')?
+        .mark_trans(Transit::to(S::Comment), '#')?
+        .mark_trans(Transit::to(S::Whitespace), ' ')?
+        .mark_trans(Transit::to(S::Whitespace), '\t')?
+        .mark_trans(Transit::to(S::Whitespace), '\r')?
+        .mark_trans(Transit::to(S::Whitespace), '\n')?;
 
     builder
         .state(&S::IgnorableId)
-        .mark_range(&S::IgnorableId, '_', 'Z')?
-        .accept_to_from_all(&S::Start)?
+        .mark_range(Transit::to(S::IgnorableId), '_', 'Z')?
+        .accept_to(&S::Start)
         .tokenize(&SpecSymbol::TId);
 
     Ok(())
@@ -228,32 +230,32 @@ fn build_alphabet_region(
 ) -> Result<(), lex::CDFAError> {
     builder
         .state(&S::AlphabetTag)
-        .accept_to_from_all(&S::Alphabet)?
+        .accept_to(&S::Alphabet)
         .tokenize(&SpecSymbol::TAlphabet);
 
     builder
         .state(&S::Alphabet)
-        .mark_trans(&S::AlphabetStringPartial, '\'')?
-        .mark_trans(&S::Comment, '#')?
-        .mark_trans(&S::Whitespace, ' ')?
-        .mark_trans(&S::Whitespace, '\t')?
-        .mark_trans(&S::Whitespace, '\r')?
-        .mark_trans(&S::Whitespace, '\n')?;
+        .mark_trans(Transit::to(S::AlphabetStringPartial), '\'')?
+        .mark_trans(Transit::to(S::Comment), '#')?
+        .mark_trans(Transit::to(S::Whitespace), ' ')?
+        .mark_trans(Transit::to(S::Whitespace), '\t')?
+        .mark_trans(Transit::to(S::Whitespace), '\r')?
+        .mark_trans(Transit::to(S::Whitespace), '\n')?;
 
     builder
         .state(&S::AlphabetStringPartial)
-        .mark_trans(&S::AlphabetString, '\'')?
-        .mark_trans(&S::AlphabetStringEscaped, '\\')?
-        .default_to(&S::AlphabetStringPartial)?;
+        .mark_trans(Transit::to(S::AlphabetString), '\'')?
+        .mark_trans(Transit::to(S::AlphabetStringEscaped), '\\')?
+        .default_to(Transit::to(S::AlphabetStringPartial))?;
 
     builder
         .state(&S::AlphabetString)
-        .accept_to_from_all(&S::Start)?
+        .accept_to(&S::Start)
         .tokenize(&SpecSymbol::TCil);
 
     builder
         .state(&S::AlphabetStringEscaped)
-        .default_to(&S::AlphabetStringPartial)?;
+        .default_to(Transit::to(S::AlphabetStringPartial))?;
 
     Ok(())
 }
@@ -263,45 +265,45 @@ fn build_cdfa_region(
 ) -> Result<(), lex::CDFAError> {
     builder
         .state(&S::CDFATag)
-        .accept_to_from_all(&S::CDFA)?
+        .accept_to(&S::CDFA)
         .tokenize(&SpecSymbol::TCDFA);
 
     builder
         .state(&S::CDFA)
-        .mark_trans(&S::CDFAEntryBrace, '{')?
-        .mark_trans(&S::Comment, '#')?
-        .mark_trans(&S::Whitespace, ' ')?
-        .mark_trans(&S::Whitespace, '\t')?
-        .mark_trans(&S::Whitespace, '\r')?
-        .mark_trans(&S::Whitespace, '\n')?;
+        .mark_trans(Transit::to(S::CDFAEntryBrace), '{')?
+        .mark_trans(Transit::to(S::Comment), '#')?
+        .mark_trans(Transit::to(S::Whitespace), ' ')?
+        .mark_trans(Transit::to(S::Whitespace), '\t')?
+        .mark_trans(Transit::to(S::Whitespace), '\r')?
+        .mark_trans(Transit::to(S::Whitespace), '\n')?;
 
     builder
         .state(&S::CDFAEntryBrace)
-        .accept_to_from_all(&S::CDFABody)?
+        .accept_to(&S::CDFABody)
         .tokenize(&SpecSymbol::TLeftBrace);
 
     builder
         .state(&S::CDFABody)
-        .mark_trans(&S::Or, '|')?
-        .mark_trans(&S::Semi, ';')?
-        .mark_trans(&S::CilPartial, '\'')?
-        .mark_range(&S::Id, '0', 'Z')?
-        .mark_trans(&S::Hat, '^')?
-        .mark_chain(&S::Arrow, "->".chars())?
-        .mark_chain(&S::Range, "..".chars())?
-        .mark_trans(&S::Def, '_')?
-        .mark_trans(&S::RegionExitBrace, '}')?
-        .mark_trans(&S::Comment, '#')?
-        .mark_trans(&S::Whitespace, ' ')?
-        .mark_trans(&S::Whitespace, '\t')?
-        .mark_trans(&S::Whitespace, '\r')?
-        .mark_trans(&S::Whitespace, '\n')?;
+        .mark_trans(Transit::to(S::Or), '|')?
+        .mark_trans(Transit::to(S::Semi), ';')?
+        .mark_trans(Transit::to(S::CilPartial), '\'')?
+        .mark_range(Transit::to(S::Id), '0', 'Z')?
+        .mark_trans(Transit::to(S::Hat), '^')?
+        .mark_chain(Transit::to(S::Arrow), "->".chars())?
+        .mark_chain(Transit::to(S::Range), "..".chars())?
+        .mark_trans(Transit::to(S::Def), '_')?
+        .mark_trans(Transit::to(S::RegionExitBrace), '}')?
+        .mark_trans(Transit::to(S::Comment), '#')?
+        .mark_trans(Transit::to(S::Whitespace), ' ')?
+        .mark_trans(Transit::to(S::Whitespace), '\t')?
+        .mark_trans(Transit::to(S::Whitespace), '\r')?
+        .mark_trans(Transit::to(S::Whitespace), '\n')?;
 
     builder.state(&S::Hat).accept().tokenize(&SpecSymbol::THat);
 
     builder
         .state(&S::Arrow)
-        .mark_trans(&S::DoubleArrow, '>')?
+        .mark_trans(Transit::to(S::DoubleArrow), '>')?
         .accept()
         .tokenize(&SpecSymbol::TArrow);
 
@@ -325,41 +327,41 @@ fn build_grammar_region(
 ) -> Result<(), lex::CDFAError> {
     builder
         .state(&S::GrammarTag)
-        .accept_to_from_all(&S::Grammar)?
+        .accept_to(&S::Grammar)
         .tokenize(&SpecSymbol::TGrammar);
 
     builder
         .state(&S::Grammar)
-        .mark_trans(&S::GrammarEntryBrace, '{')?
-        .mark_trans(&S::Comment, '#')?
-        .mark_trans(&S::Whitespace, ' ')?
-        .mark_trans(&S::Whitespace, '\t')?
-        .mark_trans(&S::Whitespace, '\r')?
-        .mark_trans(&S::Whitespace, '\n')?;
+        .mark_trans(Transit::to(S::GrammarEntryBrace), '{')?
+        .mark_trans(Transit::to(S::Comment), '#')?
+        .mark_trans(Transit::to(S::Whitespace), ' ')?
+        .mark_trans(Transit::to(S::Whitespace), '\t')?
+        .mark_trans(Transit::to(S::Whitespace), '\r')?
+        .mark_trans(Transit::to(S::Whitespace), '\n')?;
 
     builder
         .state(&S::GrammarEntryBrace)
-        .accept_to_from_all(&S::GrammarBody)?
+        .accept_to(&S::GrammarBody)
         .tokenize(&SpecSymbol::TLeftBrace);
 
     builder
         .state(&S::GrammarBody)
-        .mark_trans(&S::Or, '|')?
-        .mark_trans(&S::Semi, ';')?
-        .mark_range(&S::Id, '0', 'Z')?
-        .mark_trans(&S::OptIdPartial, '[')?
-        .mark_trans(&S::PatternPartial, '`')?
-        .mark_trans(&S::RegionExitBrace, '}')?
-        .mark_trans(&S::Comment, '#')?
-        .mark_trans(&S::Whitespace, ' ')?
-        .mark_trans(&S::Whitespace, '\t')?
-        .mark_trans(&S::Whitespace, '\r')?
-        .mark_trans(&S::Whitespace, '\n')?;
+        .mark_trans(Transit::to(S::Or), '|')?
+        .mark_trans(Transit::to(S::Semi), ';')?
+        .mark_range(Transit::to(S::Id), '0', 'Z')?
+        .mark_trans(Transit::to(S::OptIdPartial), '[')?
+        .mark_trans(Transit::to(S::PatternPartial), '`')?
+        .mark_trans(Transit::to(S::RegionExitBrace), '}')?
+        .mark_trans(Transit::to(S::Comment), '#')?
+        .mark_trans(Transit::to(S::Whitespace), ' ')?
+        .mark_trans(Transit::to(S::Whitespace), '\t')?
+        .mark_trans(Transit::to(S::Whitespace), '\r')?
+        .mark_trans(Transit::to(S::Whitespace), '\n')?;
 
     builder
         .state(&S::OptIdPartial)
-        .mark_trans(&S::OptId, ']')?
-        .mark_range(&S::OptIdPartial, '_', 'Z')?;
+        .mark_trans(Transit::to(S::OptId), ']')?
+        .mark_range(Transit::to(S::OptIdPartial), '_', 'Z')?;
 
     builder
         .state(&S::OptId)

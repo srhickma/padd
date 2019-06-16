@@ -32,7 +32,7 @@ impl<State: Data, Symbol: GrammarSymbol> Lexer<State, Symbol> for LongestMatchLe
             let mut line: usize = line;
             let mut character: usize = character;
 
-            let next_start = cdfa.acceptor_destination(&state, &state);
+            let next_start = cdfa.default_acceptor_destination(&state);
 
             let end_state = if let Some(ref accd) = next_start {
                 if cdfa.accepts(&state) && state != *accd {
@@ -74,7 +74,10 @@ impl<State: Data, Symbol: GrammarSymbol> Lexer<State, Symbol> for LongestMatchLe
                             last_accepting = ScanOneResult {
                                 consumed,
                                 end_state: Some(next.clone()),
-                                next_start: cdfa.acceptor_destination(&next, &state),
+                                next_start: match res.acceptor_destination {
+                                    Some(destination) => Some(destination),
+                                    None => cdfa.default_acceptor_destination(&next),
+                                },
                                 line,
                                 character,
                             };

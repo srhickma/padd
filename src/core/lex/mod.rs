@@ -21,7 +21,7 @@ pub trait CDFA<State: Data, Symbol: GrammarSymbol>: Send + Sync {
     fn transition(&self, state: &State, input: &[char]) -> TransitionResult<State>;
     fn has_transition(&self, state: &State, input: &[char]) -> bool;
     fn accepts(&self, state: &State) -> bool;
-    fn acceptor_destination(&self, state: &State, from: &State) -> Option<State>;
+    fn default_acceptor_destination(&self, state: &State) -> Option<State>;
     fn tokenize(&self, state: &State) -> Option<Symbol>;
     fn start(&self) -> State;
 }
@@ -31,51 +31,91 @@ pub trait CDFABuilder<State: Data, Symbol: GrammarSymbol, CDFAType> {
     fn build(self) -> Result<CDFAType, CDFAError>;
     fn set_alphabet(&mut self, chars: impl Iterator<Item = char>) -> &mut Self;
     fn accept(&mut self, state: &State) -> &mut Self;
-    fn accept_to(
-        &mut self,
-        state: &State,
-        from: &State,
-        to: &State,
-    ) -> Result<&mut Self, CDFAError>;
-    fn accept_to_from_all(&mut self, state: &State, to: &State) -> Result<&mut Self, CDFAError>;
+    fn accept_to(&mut self, state: &State, to: &State) -> &mut Self;
     fn mark_start(&mut self, state: &State) -> &mut Self;
     fn mark_trans(
         &mut self,
         from: &State,
-        to: &State,
+        transit: Transit<State>,
         on: char,
-        consumer: ConsumerStrategy,
     ) -> Result<&mut Self, CDFAError>;
     fn mark_chain(
         &mut self,
         from: &State,
-        to: &State,
+        transit: Transit<State>,
         on: impl Iterator<Item = char>,
-        consumer: ConsumerStrategy,
     ) -> Result<&mut Self, CDFAError>;
     fn mark_range(
         &mut self,
         from: &State,
-        to: &State,
+        transit: Transit<State>,
         start: char,
         end: char,
-        consumer: ConsumerStrategy,
     ) -> Result<&mut Self, CDFAError>;
     fn mark_range_for_all<'state_o: 'state_i, 'state_i>(
         &mut self,
         sources: impl Iterator<Item = &'state_i &'state_o State>,
-        to: &'state_o State,
+        transit: Transit<State>,
         start: char,
         end: char,
-        consumer: ConsumerStrategy,
-    ) -> Result<&mut Self, CDFAError>;
-    fn default_to(
-        &mut self,
-        from: &State,
-        to: &State,
-        consumer: ConsumerStrategy,
-    ) -> Result<&mut Self, CDFAError>;
+    ) -> Result<&mut Self, CDFAError>
+    where
+        State: 'state_o;
+    fn default_to(&mut self, from: &State, transit: Transit<State>)
+        -> Result<&mut Self, CDFAError>;
     fn tokenize(&mut self, state: &State, token: &Symbol) -> &mut Self;
+}
+
+#[derive(Clone)]
+pub struct Transit<State: Data> {
+    dest: State,
+    consumer: ConsumerStrategy,
+    acceptor_destination: Option<State>,
+}
+
+impl<State: Data> Transit<State> {
+    pub fn to(dest: State) -> Self {
+        Transit {
+            dest,
+            consumer: ConsumerStrategy::All,
+            acceptor_destination: None,
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct TransitBuilder<State: Data> {
+    dest: State,
+    consumer: ConsumerStrategy,
+    acceptor_destination: Option<State>,
+}
+
+impl<State: Data> TransitBuilder<State> {
+    pub fn to(dest: State) -> Self {
+        TransitBuilder {
+            dest,
+            consumer: ConsumerStrategy::All,
+            acceptor_destination: None,
+        }
+    }
+
+    pub fn consumer(&mut self, consumer: ConsumerStrategy) -> &mut Self {
+        self.consumer = consumer;
+        self
+    }
+
+    pub fn accept_to(&mut self, acceptor_destination: State) -> &mut Self {
+        self.acceptor_destination = Some(acceptor_destination);
+        self
+    }
+
+    pub fn build(&self) -> Transit<State> {
+        Transit {
+            dest: self.dest.clone(),
+            consumer: self.consumer.clone(),
+            acceptor_destination: self.acceptor_destination.clone(),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -87,6 +127,7 @@ pub enum ConsumerStrategy {
 pub struct TransitionResult<State: Data> {
     state: Option<State>,
     consumed: usize,
+    acceptor_destination: Option<State>,
 }
 
 impl<State: Data> TransitionResult<State> {
@@ -94,35 +135,25 @@ impl<State: Data> TransitionResult<State> {
         TransitionResult {
             state: None,
             consumed: 0,
+            acceptor_destination: None,
         }
     }
 
-    pub fn direct(dest: &TransitionDestination<State>) -> Self {
-        TransitionResult::new(dest, 1)
+    pub fn direct(transit: &Transit<State>) -> Self {
+        TransitionResult::new(transit, 1)
     }
 
-    pub fn new(dest: &TransitionDestination<State>, traversed: usize) -> Self {
-        let consumed = match dest.consumer {
+    pub fn new(transit: &Transit<State>, traversed: usize) -> Self {
+        let consumed = match transit.consumer {
             ConsumerStrategy::All => traversed,
             ConsumerStrategy::None => 0,
         };
 
         TransitionResult {
-            state: Some(dest.state.clone()),
+            state: Some(transit.dest.clone()),
             consumed,
+            acceptor_destination: transit.acceptor_destination.clone(),
         }
-    }
-}
-
-#[derive(Clone)]
-pub struct TransitionDestination<State: Data> {
-    state: State,
-    consumer: ConsumerStrategy,
-}
-
-impl<State: Data> TransitionDestination<State> {
-    pub fn new(state: State, consumer: ConsumerStrategy) -> Self {
-        TransitionDestination { state, consumer }
     }
 }
 
@@ -238,5 +269,3 @@ impl error::Error for Error {
         None
     }
 }
-
-pub type State = String;
