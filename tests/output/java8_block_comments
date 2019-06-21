@@ -87,6 +87,16 @@ public class DoublyLinkedList<T> implements Iterable<T> {
          */
     }
 
+    public DoublyLinkedList() {
+        /*
+         * This lone isolated comment should be compacted!
+         */
+    }
+
+    public DoublyLinkedList() {
+        /* This lone isolated comment should be compacted! */
+    }
+
     public DoublyLinkedList(T... elements
     /*
      * This is a strange place for a comment
@@ -170,8 +180,10 @@ public class DoublyLinkedList<T> implements Iterable<T> {
      * HERE IS A LARGE FLOATING COMMENT
      * ---------------------------------------------------------------------- 
      */
+
     private boolean removeIfLast() {
         /* Here is a small floating comment */
+
         if (isEmpty()) {
             return true;
         }

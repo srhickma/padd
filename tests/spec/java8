@@ -22,6 +22,16 @@ cdfa {
         ' ' | '\t' | '\r' | '\n' -> ws
         _ -> prefix_bcom_nsp;
 
+    start_after_bcom_pre
+        '\n' -> ^_ -> start_after_bcom_post
+        ' ' | '\t' | '\r' -> start_after_bcom_pre
+        _ ->> ^PREFIX -> start_empty_line;
+
+    start_after_bcom_post
+        '\n' -> ^ISO_BREAK -> start_empty_line
+        ' ' | '\t' | '\r' -> ^_
+        _ ->> ^PREFIX -> start_empty_line;
+
     start_non_empty_line
         '{' -> ^LBRACE
         '}' -> ^RBRACE
@@ -292,13 +302,16 @@ cdfa {
 
     inline_bcom_sp
         '\n' -> ^INLINE_BCOM_SP_LINE -> start_inline_bcom_itl
-        '*/' ->> ^INLINE_BCOM_SP_LINE_END -> bcom_end_consumer
+        '*/' ->> ^INLINE_BCOM_SP_LINE_END -> inline_bcom_end_consumer
         _ -> inline_bcom_sp;
 
     inline_bcom_nsp
         '\n' -> ^INLINE_BCOM_NSP_LINE -> start_inline_bcom_itl
-        '*/' ->> ^INLINE_BCOM_NSP_LINE_END -> bcom_end_consumer
+        '*/' ->> ^INLINE_BCOM_NSP_LINE_END -> inline_bcom_end_consumer
         _ -> inline_bcom_nsp;
+
+    inline_bcom_end_consumer
+        '*/' -> ^_ -> start_empty_line;
 
     prefix_lbcom_prefix ^_ -> prefix_lbcom_nnl
         ' ' | '\t' -> prefix_lbcom_prefix;
@@ -309,25 +322,25 @@ cdfa {
 
     prefix_lbcom
         '\n' -> ^PREFIX_BCOM_SL_START -> start_prefix_bcom_itl
-        '*/' -> ^PREFIX_LBCOM -> start_empty_line
+        '*/' -> ^PREFIX_LBCOM -> start_after_bcom_pre
         _ -> prefix_lbcom;
 
     prefix_bcom_sp_start
-        '/' -> ^PREFIX_BCOM_END -> start_empty_line
+        '/' -> ^PREFIX_BCOM_END -> start_after_bcom_pre
         _ ->> prefix_bcom_sp;
 
     prefix_bcom_sp
         '\n' -> ^PREFIX_BCOM_SP_LINE -> start_prefix_bcom_itl
-        '*/' ->> ^PREFIX_BCOM_SP_LINE_END -> bcom_end_consumer
+        '*/' ->> ^PREFIX_BCOM_SP_LINE_END -> prefix_bcom_end_consumer
         _ -> prefix_bcom_sp;
 
     prefix_bcom_nsp
         '\n' -> ^PREFIX_BCOM_NSP_LINE -> start_prefix_bcom_itl
-        '*/' ->> ^PREFIX_BCOM_NSP_LINE_END -> bcom_end_consumer
+        '*/' ->> ^PREFIX_BCOM_NSP_LINE_END -> prefix_bcom_end_consumer
         _ -> prefix_bcom_nsp;
 
-    bcom_end_consumer
-        '*/' -> ^_ -> start_empty_line;
+    prefix_bcom_end_consumer
+        '*/' -> ^_ -> start_after_bcom_pre;
 }
 
 # Inline line comments
@@ -336,7 +349,7 @@ inject left INLINE_LBCOM ` /* {}`
 
 # Prefix line comments
 inject right PREFIX_LCOM
-inject right PREFIX_LBCOM `/* {}\n[prefix]`
+inject right PREFIX_LBCOM `/* {}\n`
 
 # Inline block comments
 inject left INLINE_BCOM_START `\n[prefix]/*\n[prefix] * {}`
@@ -351,9 +364,9 @@ inject right PREFIX_BCOM_SL_START `/*\n[prefix] * {}`
 inject right PREFIX_BCOM_NL_START `/*\n`
 inject right PREFIX_BCOM_SP_LINE `[prefix] {}`
 inject right PREFIX_BCOM_NSP_LINE `[prefix] * {}`
-inject right PREFIX_BCOM_SP_LINE_END `[prefix] {}\n[prefix] */\n[prefix]`
-inject right PREFIX_BCOM_NSP_LINE_END `[prefix] * {}\n[prefix] */\n[prefix]`
-inject right PREFIX_BCOM_END `[prefix] {}\n[prefix]`
+inject right PREFIX_BCOM_SP_LINE_END `[prefix] {}\n[prefix] */\n`
+inject right PREFIX_BCOM_NSP_LINE_END `[prefix] * {}\n[prefix] */\n`
+inject right PREFIX_BCOM_END `[prefix] {}\n`
 
 # Misc injections
 inject right ISO_BREAK `\n[prefix]`
@@ -717,7 +730,7 @@ grammar {
         | inline_isolated_block_statement
         | grouped_statements
         | PREFIX_LCOM PREFIX `{}`
-        | PREFIX_LBCOM `/* {}\n`
+        | PREFIX_LBCOM [PREFIX] [ISO_BREAK] `/* {}\n`
         | lone_inline_bcom
         | grouping_prefix_bcom;
 
@@ -1175,14 +1188,14 @@ grammar {
     prefix_bcom_line
         | PREFIX_BCOM_SP_LINE
         | PREFIX_BCOM_NSP_LINE `* {}`
-        | PREFIX_BCOM_END `*\n`
-        | PREFIX_BCOM_SP_LINE_END `{}\n`
-        | PREFIX_BCOM_NSP_LINE_END `* {}\n`
+        | PREFIX_BCOM_END [PREFIX] [ISO_BREAK] `*\n`
+        | PREFIX_BCOM_SP_LINE_END [PREFIX] [ISO_BREAK] `{}\n`
+        | PREFIX_BCOM_NSP_LINE_END [PREFIX] [ISO_BREAK] `* {}\n`
         | PREFIX_BCOM_SL_START `* {}`
         | PREFIX_BCOM_NL_START;
 
-    prefix_bcom_end
-        | PREFIX_BCOM_END
-        | PREFIX_BCOM_SP_LINE_END
-        | PREFIX_BCOM_NSP_LINE_END `* {}\n[prefix] */`;
+    prefix_bcom_end `{}`
+        | PREFIX_BCOM_END [PREFIX] [ISO_BREAK]
+        | PREFIX_BCOM_SP_LINE_END [PREFIX] [ISO_BREAK]
+        | PREFIX_BCOM_NSP_LINE_END [PREFIX] [ISO_BREAK] `* {}\n[prefix] */`;
 }
