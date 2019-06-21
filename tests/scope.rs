@@ -1,8 +1,10 @@
-extern crate padd;
-#[macro_use(assert_diff)]
+extern crate colored;
 extern crate difference;
+extern crate padd;
 
 use {
+    colored::Colorize,
+    difference::{Changeset, Difference},
     padd::{FormatJob, FormatJobRunner},
     std::{
         fs::File,
@@ -142,5 +144,31 @@ fn assert_matches_file(result: String, file_name: &str) {
         }
     }
 
-    assert_diff!(&output, &result, "\n", 0);
+    let change_set = Changeset::new(&output, &result, "\n");
+    if change_set.distance != 0 {
+        print_pretty_diff(&change_set);
+        panic!("Output did not match file");
+    }
+}
+
+fn print_pretty_diff(change_set: &Changeset) {
+    for diff in &change_set.diffs {
+        match diff {
+            Difference::Same(string) => {
+                for line in string.split("\n") {
+                    println!(" |{}", line);
+                }
+            }
+            Difference::Rem(string) => {
+                for line in string.split("\n") {
+                    println!("{}", format!("-|{}", line).bright_red());
+                }
+            }
+            Difference::Add(string) => {
+                for line in string.split("\n") {
+                    println!("{}", format!("+|{}", line).bright_green());
+                }
+            }
+        };
+    }
 }
