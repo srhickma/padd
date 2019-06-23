@@ -1183,16 +1183,16 @@ grammar {
         | PREFIX_BCOM_NL_START [prefix_bcom_lines] prefix_bcom_end `/*\n[prefix] {1}{2}`;
 
     prefix_bcom_lines
-        | prefix_bcom_lines prefix_bcom_line `{}{}[prefix] `
-        | prefix_bcom_line `{}[prefix] `;
+        | prefix_bcom_lines prefix_bcom_line
+        | prefix_bcom_line;
     prefix_bcom_line
-        | PREFIX_BCOM_SP_LINE
-        | PREFIX_BCOM_NSP_LINE `* {}`
-        | PREFIX_BCOM_END [PREFIX] [ISO_BREAK] `*\n`
-        | PREFIX_BCOM_SP_LINE_END [PREFIX] [ISO_BREAK] `{}\n`
-        | PREFIX_BCOM_NSP_LINE_END [PREFIX] [ISO_BREAK] `* {}\n`
-        | PREFIX_BCOM_SL_START `* {}`
-        | PREFIX_BCOM_NL_START;
+        | PREFIX_BCOM_SP_LINE `{}[prefix] `
+        | PREFIX_BCOM_NSP_LINE `* {}[prefix] `
+        | PREFIX_BCOM_END [PREFIX] [ISO_BREAK] `*\n[prefix] `
+        | PREFIX_BCOM_SP_LINE_END [PREFIX] [ISO_BREAK] `{}\n[prefix] `
+        | PREFIX_BCOM_NSP_LINE_END [PREFIX] [ISO_BREAK] `* {}\n[prefix] `
+        | PREFIX_BCOM_SL_START `* {}[prefix] `
+        | PREFIX_BCOM_NL_START ``;
 
     prefix_bcom_end `{}`
         | PREFIX_BCOM_END [PREFIX] [ISO_BREAK]

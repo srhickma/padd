@@ -81,7 +81,6 @@ public class DoublyLinkedList<T> implements Iterable<T> {
          * THERE
          * ...
          * EVERYWHERE
-         
          * BUT WAIT!
          * THERE ARE MORE COMMENTS!!!
          */
