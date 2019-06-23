@@ -205,11 +205,14 @@ public class DoublyLinkedList<T> implements Iterable<T> {
          * 
          * Return false only if there are remaining elements 
          */
-        
     }
 
     public boolean isEmpty() {
         return first == null;
+        /*
+         * 
+         * Return true if there is no first element 
+         */
     }
 
     public LinkedListNode<T> getFirst() {

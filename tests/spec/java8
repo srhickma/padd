@@ -355,8 +355,8 @@ inject right PREFIX_LBCOM `/* {}\n`
 inject left INLINE_BCOM_START `\n[prefix]/*\n[prefix] * {}`
 inject left INLINE_BCOM_SP_LINE `[prefix] {}`
 inject left INLINE_BCOM_NSP_LINE `[prefix] * {}`
-inject left INLINE_BCOM_SP_LINE_END `[prefix] {}\n[prefix] */\n[prefix]`
-inject left INLINE_BCOM_NSP_LINE_END `[prefix] * {}\n[prefix] */\n[prefix]`
+inject left INLINE_BCOM_SP_LINE_END `[prefix] {}\n[prefix] */`
+inject left INLINE_BCOM_NSP_LINE_END `[prefix] * {}\n[prefix] */`
 inject left INLINE_BCOM_END `[prefix] {}`
 
 # Prefix block comments
