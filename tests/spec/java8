@@ -3,10 +3,31 @@ alphabet '<>=+-*/\\%(){}[],.;:#!?^$@&|"\'`~ \t\n\r_ABCDEFGHIJKLMNOPQRSTUVWXYZabc
 cdfa {
     start_empty_line
         '//' -> prefix_lcom
+        '/*' -> prefix_lbcom_prefix
         ' ' | '\t' | '\n' | '\r' -> ws
         _ ->> ^_ -> start_non_empty_line;
 
     start_after_prefix_lcom
+        '\n' -> ^ISO_BREAK -> start_empty_line
+        ' ' | '\t' | '\r' -> ^_
+        _ ->> ^PREFIX -> start_empty_line;
+
+    start_inline_bcom_itl
+        '*' -> inline_bcom_sp_start
+        ' ' | '\t' | '\r' | '\n' -> ws
+        _ -> inline_bcom_nsp;
+
+    start_prefix_bcom_itl
+        '*' -> prefix_bcom_sp_start
+        ' ' | '\t' | '\r' | '\n' -> ws
+        _ -> prefix_bcom_nsp;
+
+    start_after_bcom_pre
+        '\n' -> ^_ -> start_after_bcom_post
+        ' ' | '\t' | '\r' -> start_after_bcom_pre
+        _ ->> ^PREFIX -> start_empty_line;
+
+    start_after_bcom_post
         '\n' -> ^ISO_BREAK -> start_empty_line
         ' ' | '\t' | '\r' -> ^_
         _ ->> ^PREFIX -> start_empty_line;
@@ -136,7 +157,7 @@ cdfa {
 
     slash   ^SLASH
         '/' -> inline_lcom_prefix
-        '*' -> bcom
+        '*' -> inline_lbcom_prefix
         '=' -> ^ASSN;
 
     and     ^AND
@@ -243,21 +264,6 @@ cdfa {
     ws      ^_
         ' ' | '\t' | '\n' | '\r' -> ws;
 
-    prefix_lcom ^PREFIX_LCOM -> start_after_prefix_lcom
-        '\n' -> ^PREFIX_LCOM -> start_after_prefix_lcom
-        _ -> prefix_lcom;
-
-    inline_lcom_prefix ^_ -> inline_lcom
-        ' ' | '\t' -> inline_lcom_prefix;
-
-    inline_lcom ^INLINE_LCOM -> start_non_empty_line
-        '\n' -> fail
-        _ -> inline_lcom;
-
-    bcom
-        '*/' -> ^_
-        _ -> bcom;
-
     MOD | ASSERT | PRIM | BREAK | CASE | CATCH | ENUM | CLASS | CONTINUE | DEFAULT | DO | ELSE | EXTENDS | FINALLY | FOR
         | IF | IMPLEMENTS | IMPORT | INSTANCEOF | NEW | PACKAGE | RETURN | SUPER | SWITCH | THIS | THROWS | TRY | VOID
         | WHILE | INTERFACE | SYNCHRONIZED | STATIC
@@ -266,10 +272,103 @@ cdfa {
 
     id      ^ID
         '_' .. '9' | '$' -> id;
+
+    #
+    # COMMENTS
+    #
+
+    prefix_lcom ^PREFIX_LCOM -> start_after_prefix_lcom
+        '\n' -> ^PREFIX_LCOM -> start_after_prefix_lcom
+        _ -> prefix_lcom;
+
+    inline_lcom_prefix ^_ -> inline_lcom
+        ' ' | '\t' -> inline_lcom_prefix;
+
+    inline_lcom ^INLINE_LCOM -> start_empty_line
+        '\n' -> fail
+        _ -> inline_lcom;
+
+    inline_lbcom_prefix ^_ -> inline_lbcom
+        ' ' | '\t' -> inline_lbcom_prefix;
+
+    inline_lbcom
+        '\n' -> ^INLINE_BCOM_START -> start_inline_bcom_itl
+        '*/' -> ^INLINE_LBCOM -> start_empty_line
+        _ -> inline_lbcom;
+
+    inline_bcom_sp_start
+        '/' -> ^INLINE_BCOM_END -> start_empty_line
+        _ ->> inline_bcom_sp;
+
+    inline_bcom_sp
+        '\n' -> ^INLINE_BCOM_SP_LINE -> start_inline_bcom_itl
+        '*/' ->> ^INLINE_BCOM_SP_LINE_END -> inline_bcom_end_consumer
+        _ -> inline_bcom_sp;
+
+    inline_bcom_nsp
+        '\n' -> ^INLINE_BCOM_NSP_LINE -> start_inline_bcom_itl
+        '*/' ->> ^INLINE_BCOM_NSP_LINE_END -> inline_bcom_end_consumer
+        _ -> inline_bcom_nsp;
+
+    inline_bcom_end_consumer
+        '*/' -> ^_ -> start_empty_line;
+
+    prefix_lbcom_prefix ^_ -> prefix_lbcom_nnl
+        ' ' | '\t' -> prefix_lbcom_prefix;
+
+    prefix_lbcom_nnl
+            '\n' -> ^PREFIX_BCOM_NL_START -> start_prefix_bcom_itl
+            _ ->> prefix_lbcom;
+
+    prefix_lbcom
+        '\n' -> ^PREFIX_BCOM_SL_START -> start_prefix_bcom_itl
+        '*/' -> ^PREFIX_LBCOM -> start_after_bcom_pre
+        _ -> prefix_lbcom;
+
+    prefix_bcom_sp_start
+        '/' -> ^PREFIX_BCOM_END -> start_after_bcom_pre
+        _ ->> prefix_bcom_sp;
+
+    prefix_bcom_sp
+        '\n' -> ^PREFIX_BCOM_SP_LINE -> start_prefix_bcom_itl
+        '*/' ->> ^PREFIX_BCOM_SP_LINE_END -> prefix_bcom_end_consumer
+        _ -> prefix_bcom_sp;
+
+    prefix_bcom_nsp
+        '\n' -> ^PREFIX_BCOM_NSP_LINE -> start_prefix_bcom_itl
+        '*/' ->> ^PREFIX_BCOM_NSP_LINE_END -> prefix_bcom_end_consumer
+        _ -> prefix_bcom_nsp;
+
+    prefix_bcom_end_consumer
+        '*/' -> ^_ -> start_after_bcom_pre;
 }
 
+# Inline line comments
 inject left INLINE_LCOM ` /* {} */`
+inject left INLINE_LBCOM ` /* {}`
+
+# Prefix line comments
 inject right PREFIX_LCOM
+inject right PREFIX_LBCOM `/* {}\n`
+
+# Inline block comments
+inject left INLINE_BCOM_START `\n[prefix]/*\n[prefix] * {}`
+inject left INLINE_BCOM_SP_LINE `[prefix] {}`
+inject left INLINE_BCOM_NSP_LINE `[prefix] * {}`
+inject left INLINE_BCOM_SP_LINE_END `[prefix] {}\n[prefix] */`
+inject left INLINE_BCOM_NSP_LINE_END `[prefix] * {}\n[prefix] */`
+inject left INLINE_BCOM_END `[prefix] {}`
+
+# Prefix block comments
+inject right PREFIX_BCOM_SL_START `/*\n[prefix] * {}`
+inject right PREFIX_BCOM_NL_START `/*\n`
+inject right PREFIX_BCOM_SP_LINE `[prefix] {}`
+inject right PREFIX_BCOM_NSP_LINE `[prefix] * {}`
+inject right PREFIX_BCOM_SP_LINE_END `[prefix] {}\n[prefix] */\n`
+inject right PREFIX_BCOM_NSP_LINE_END `[prefix] * {}\n[prefix] */\n`
+inject right PREFIX_BCOM_END `[prefix] {}\n`
+
+# Misc injections
 inject right ISO_BREAK `\n[prefix]`
 inject right PREFIX `[prefix]`
 
@@ -630,7 +729,10 @@ grammar {
         | grouped_statements inline_isolated_block_statement `{}\n\n[prefix]{}\n`
         | inline_isolated_block_statement
         | grouped_statements
-        | PREFIX_LCOM PREFIX `{}`;
+        | PREFIX_LCOM PREFIX `{}`
+        | PREFIX_LBCOM [PREFIX] [ISO_BREAK] `/* {}\n`
+        | lone_inline_bcom
+        | grouping_prefix_bcom;
 
     isolated_block_statement `{}\n`
         | class_dec
@@ -1051,4 +1153,49 @@ grammar {
         | STAR
         | PCT
         | SLASH;
+
+    #
+    # COMMENTS
+    #
+
+    lone_inline_bcom
+        | INLINE_BCOM_START [inline_bcom_lines] inline_bcom_end `/*\n[prefix] {1}{2}`
+        | INLINE_BCOM_START [inline_bcom_lines] inline_bcom_end trailing_prefix_bcom_group `/*\n[prefix] {1}{3}`;
+
+    inline_bcom_lines
+        | inline_bcom_lines inline_bcom_line `{}{}[prefix] `
+        | inline_bcom_line `{}[prefix] `;
+    inline_bcom_line
+        | INLINE_BCOM_SP_LINE
+        | INLINE_BCOM_NSP_LINE `* {}`;
+
+    inline_bcom_end
+        | INLINE_BCOM_END
+        | INLINE_BCOM_SP_LINE_END
+        | INLINE_BCOM_NSP_LINE_END;
+
+    trailing_prefix_bcom_group
+        | PREFIX_BCOM_SL_START [prefix_bcom_lines] prefix_bcom_end `*\n[prefix] * {}[prefix] {}{}`
+        | PREFIX_BCOM_NL_START [prefix_bcom_lines] prefix_bcom_end `*\n[prefix] {1}{2}`;
+
+    grouping_prefix_bcom
+        | PREFIX_BCOM_SL_START [prefix_bcom_lines] prefix_bcom_end `/*\n[prefix] * {}[prefix] {}{}`
+        | PREFIX_BCOM_NL_START [prefix_bcom_lines] prefix_bcom_end `/*\n[prefix] {1}{2}`;
+
+    prefix_bcom_lines
+        | prefix_bcom_lines prefix_bcom_line
+        | prefix_bcom_line;
+    prefix_bcom_line
+        | PREFIX_BCOM_SP_LINE `{}[prefix] `
+        | PREFIX_BCOM_NSP_LINE `* {}[prefix] `
+        | PREFIX_BCOM_END [PREFIX] [ISO_BREAK] `*\n[prefix] `
+        | PREFIX_BCOM_SP_LINE_END [PREFIX] [ISO_BREAK] `{}\n[prefix] `
+        | PREFIX_BCOM_NSP_LINE_END [PREFIX] [ISO_BREAK] `* {}\n[prefix] `
+        | PREFIX_BCOM_SL_START `* {}[prefix] `
+        | PREFIX_BCOM_NL_START ``;
+
+    prefix_bcom_end `{}`
+        | PREFIX_BCOM_END [PREFIX] [ISO_BREAK]
+        | PREFIX_BCOM_SP_LINE_END [PREFIX] [ISO_BREAK]
+        | PREFIX_BCOM_NSP_LINE_END [PREFIX] [ISO_BREAK] `* {}\n[prefix] */`;
 }
