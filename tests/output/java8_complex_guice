@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.google.inject.internal;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -152,6 +153,7 @@ final class InheritingState implements State {
     }
 
     /* end[AOP]*/
+
     @Override
     public void addTypeListener(TypeListenerBinding listenerBinding) {
         typeListenerBindings.add(listenerBinding);
