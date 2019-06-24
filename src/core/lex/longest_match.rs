@@ -26,7 +26,7 @@ impl<State: Data, Symbol: GrammarSymbol> Lexer<State, Symbol> for LongestMatchLe
             line: usize,
             character: usize,
             cdfa: &CDFA<State, Symbol>,
-        ) -> ScanOneResult<State> {
+        ) -> Result<ScanOneResult<State>, lex::Error> {
             let mut remaining = input;
             let mut state: State = start;
             let mut line: usize = line;
@@ -65,6 +65,10 @@ impl<State: Data, Symbol: GrammarSymbol> Lexer<State, Symbol> for LongestMatchLe
                         line += 1;
                         character = 1;
                     }
+
+                    if !cdfa.alphabet_contains(*c) {
+                        return Err(lex::Error::AlphabetErr(*c));
+                    }
                 }
 
                 match res.state {
@@ -90,7 +94,7 @@ impl<State: Data, Symbol: GrammarSymbol> Lexer<State, Symbol> for LongestMatchLe
                 remaining = &remaining[res.consumed..];
             }
 
-            last_accepting
+            Ok(last_accepting)
         }
 
         let mut remaining = input;
@@ -101,7 +105,7 @@ impl<State: Data, Symbol: GrammarSymbol> Lexer<State, Symbol> for LongestMatchLe
 
         loop {
             let res: ScanOneResult<State> =
-                scan_one(remaining, next_start.clone(), line, character, cdfa);
+                scan_one(remaining, next_start.clone(), line, character, cdfa)?;
 
             next_start = match res.next_start {
                 None => next_start,
@@ -120,11 +124,11 @@ impl<State: Data, Symbol: GrammarSymbol> Lexer<State, Symbol> for LongestMatchLe
                             .map(Option::unwrap)
                             .collect();
 
-                        return Err(lex::Error {
+                        return Err(lex::Error::from(lex::UnacceptedError {
                             sequence,
                             line,
                             character,
-                        });
+                        }));
                     }
 
                     break;

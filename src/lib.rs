@@ -181,6 +181,45 @@ grammar {
     }
 
     #[test]
+    fn failed_lex_alphabet() {
+        //setup
+        let spec = "
+alphabet 'a'
+
+cdfa {
+    start _ -> ^_;
+}
+
+grammar {
+    s |;
+}
+        "
+        .to_string();
+
+        let fjr = FormatJobRunner::build(&spec).unwrap();
+
+        //exercise
+        let res = fjr.format(FormatJob::from_text("b".to_string()));
+
+        //verify
+        assert!(res.is_err());
+
+        let mut err: &Error = &res.err().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "Failed to lex input: Consuming character outside lexer alphabet: 'b'"
+        );
+
+        err = err.source().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "Consuming character outside lexer alphabet: 'b'"
+        );
+
+        assert!(err.source().is_none());
+    }
+
+    #[test]
     fn failed_parse_input() {
         //setup
         let spec = "

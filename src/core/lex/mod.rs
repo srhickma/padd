@@ -20,6 +20,7 @@ pub fn def_lexer<State: Data, Symbol: GrammarSymbol>() -> Box<Lexer<State, Symbo
 pub trait CDFA<State: Data, Symbol: GrammarSymbol>: Send + Sync {
     fn transition(&self, state: &State, input: &[char]) -> TransitionResult<State>;
     fn has_transition(&self, state: &State, input: &[char]) -> bool;
+    fn alphabet_contains(&self, c: char) -> bool;
     fn accepts(&self, state: &State) -> bool;
     fn default_acceptor_destination(&self, state: &State) -> Option<State>;
     fn tokenize(&self, state: &State) -> Option<Symbol>;
@@ -248,19 +249,23 @@ impl<Symbol: Data> Data for Token<Symbol> {
 }
 
 #[derive(Debug)]
-pub struct Error {
-    sequence: String,
-    character: usize,
-    line: usize,
+pub enum Error {
+    UnacceptedErr(UnacceptedError),
+    AlphabetErr(char),
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "No accepting tokens after ({},{}): {}...",
-            self.line, self.character, self.sequence
-        )
+        match self {
+            Error::UnacceptedErr(ref err) => write!(
+                f,
+                "No accepting tokens after ({},{}): {}...",
+                err.line, err.character, err.sequence,
+            ),
+            Error::AlphabetErr(c) => {
+                write!(f, "Consuming character outside lexer alphabet: '{}'", c,)
+            }
+        }
     }
 }
 
@@ -268,4 +273,17 @@ impl error::Error for Error {
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         None
     }
+}
+
+impl From<UnacceptedError> for Error {
+    fn from(err: UnacceptedError) -> Error {
+        Error::UnacceptedErr(err)
+    }
+}
+
+#[derive(Debug)]
+pub struct UnacceptedError {
+    sequence: String,
+    character: usize,
+    line: usize,
 }

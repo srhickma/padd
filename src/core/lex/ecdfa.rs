@@ -5,7 +5,7 @@ use {
             Data,
         },
         lex::{
-            alphabet::{self, HashedAlphabet},
+            alphabet::{self, Alphabet, HashedAlphabet},
             CDFABuilder, CDFAError, Transit, TransitBuilder, TransitionResult, CDFA,
         },
         parse::grammar::GrammarSymbol,
@@ -274,8 +274,6 @@ impl<'scope, 'state: 'scope, State: 'state + Data, Symbol: 'scope + GrammarSymbo
 }
 
 pub struct EncodedCDFA<Symbol: GrammarSymbol> {
-    //TODO add separate error message if character not in alphabet
-    #[allow(dead_code)]
     alphabet: Option<HashedAlphabet>,
     accepting: HashMap<usize, Option<usize>>,
     t_delta: CEHashMap<TransitionTrie>,
@@ -299,6 +297,13 @@ impl<Symbol: GrammarSymbol> CDFA<usize, Symbol> for EncodedCDFA<Symbol> {
 
     fn has_transition(&self, state: &usize, input: &[char]) -> bool {
         self.transition(state, input).state.is_some()
+    }
+
+    fn alphabet_contains(&self, c: char) -> bool {
+        match self.alphabet {
+            Some(ref alphabet) => alphabet.contains(c),
+            None => true,
+        }
     }
 
     fn accepts(&self, state: &usize) -> bool {
@@ -695,10 +700,14 @@ RBR <- '}'
 
         //verify
         assert!(result.is_err());
-        let err = result.err().unwrap();
-        assert_eq!(err.sequence, "x{} \t{}}");
-        assert_eq!(err.line, 2);
-        assert_eq!(err.character, 8);
+        match result.err().unwrap() {
+            lex::Error::UnacceptedErr(err) => {
+                assert_eq!(err.sequence, "x{} \t{}}");
+                assert_eq!(err.line, 2);
+                assert_eq!(err.character, 8);
+            }
+            _ => panic!("Unexpected error type"),
+        }
     }
 
     #[test]
@@ -747,10 +756,14 @@ RBR <- '}'
 
         //verify
         assert!(result.is_err());
-        let err = result.err().unwrap();
-        assert_eq!(err.sequence, "xyz  { {}\n");
-        assert_eq!(err.line, 4);
-        assert_eq!(err.character, 10);
+        match result.err().unwrap() {
+            lex::Error::UnacceptedErr(err) => {
+                assert_eq!(err.sequence, "xyz  { {}\n");
+                assert_eq!(err.line, 4);
+                assert_eq!(err.character, 10);
+            }
+            _ => panic!("Unexpected error type"),
+        }
     }
 
     #[test]
