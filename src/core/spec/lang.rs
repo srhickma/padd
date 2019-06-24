@@ -123,9 +123,12 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<SpecSymbol>, lex::CDFAError> {
         .state(&S::CilEscaped)
         .default_to(Transit::to(S::CilPartial))?;
 
-    builder
+    builder //_0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ
         .state(&S::Id)
-        .mark_range(Transit::to(S::Id), '_', 'Z')?
+        .mark_range(Transit::to(S::Id), 'a', 'z')?
+        .mark_range(Transit::to(S::Id), 'A', 'Z')?
+        .mark_range(Transit::to(S::Id), '0', '9')?
+        .mark_trans(Transit::to(S::Id), '_')?
         .accept()
         .tokenize(&SpecSymbol::TId);
 
@@ -173,7 +176,9 @@ fn build_injectable_region(
 
     builder
         .state(&S::InjectablePreId)
-        .mark_range(Transit::to(S::InjectableId), '0', 'Z')?
+        .mark_range(Transit::to(S::InjectableId), 'a', 'z')?
+        .mark_range(Transit::to(S::InjectableId), 'A', 'Z')?
+        .mark_range(Transit::to(S::InjectableId), '0', '9')?
         .mark_trans(Transit::to(S::Comment), '#')?
         .mark_trans(Transit::to(S::Whitespace), ' ')?
         .mark_trans(Transit::to(S::Whitespace), '\t')?
@@ -182,7 +187,10 @@ fn build_injectable_region(
 
     builder
         .state(&S::InjectableId)
-        .mark_range(Transit::to(S::InjectableId), '_', 'Z')?
+        .mark_range(Transit::to(S::InjectableId), 'a', 'z')?
+        .mark_range(Transit::to(S::InjectableId), 'A', 'Z')?
+        .mark_range(Transit::to(S::InjectableId), '0', '9')?
+        .mark_trans(Transit::to(S::InjectableId), '_')?
         .accept_to(&S::InjectablePreComplete)
         .tokenize(&SpecSymbol::TId);
 
@@ -209,7 +217,9 @@ fn build_ignorable_region(
 
     builder
         .state(&S::Ignorable)
-        .mark_range(Transit::to(S::IgnorableId), '0', 'Z')?
+        .mark_range(Transit::to(S::IgnorableId), 'a', 'z')?
+        .mark_range(Transit::to(S::IgnorableId), 'A', 'Z')?
+        .mark_range(Transit::to(S::IgnorableId), '0', '9')?
         .mark_trans(Transit::to(S::Comment), '#')?
         .mark_trans(Transit::to(S::Whitespace), ' ')?
         .mark_trans(Transit::to(S::Whitespace), '\t')?
@@ -218,7 +228,10 @@ fn build_ignorable_region(
 
     builder
         .state(&S::IgnorableId)
-        .mark_range(Transit::to(S::IgnorableId), '_', 'Z')?
+        .mark_range(Transit::to(S::IgnorableId), 'a', 'z')?
+        .mark_range(Transit::to(S::IgnorableId), 'A', 'Z')?
+        .mark_range(Transit::to(S::IgnorableId), '0', '9')?
+        .mark_trans(Transit::to(S::IgnorableId), '_')?
         .accept_to(&S::Start)
         .tokenize(&SpecSymbol::TId);
 
@@ -287,7 +300,9 @@ fn build_cdfa_region(
         .mark_trans(Transit::to(S::Or), '|')?
         .mark_trans(Transit::to(S::Semi), ';')?
         .mark_trans(Transit::to(S::CilPartial), '\'')?
-        .mark_range(Transit::to(S::Id), '0', 'Z')?
+        .mark_range(Transit::to(S::Id), 'a', 'z')?
+        .mark_range(Transit::to(S::Id), 'A', 'Z')?
+        .mark_range(Transit::to(S::Id), '0', '9')?
         .mark_trans(Transit::to(S::Hat), '^')?
         .mark_chain(Transit::to(S::Arrow), "->".chars())?
         .mark_chain(Transit::to(S::Range), "..".chars())?
@@ -348,7 +363,9 @@ fn build_grammar_region(
         .state(&S::GrammarBody)
         .mark_trans(Transit::to(S::Or), '|')?
         .mark_trans(Transit::to(S::Semi), ';')?
-        .mark_range(Transit::to(S::Id), '0', 'Z')?
+        .mark_range(Transit::to(S::Id), 'a', 'z')?
+        .mark_range(Transit::to(S::Id), 'A', 'Z')?
+        .mark_range(Transit::to(S::Id), '0', '9')?
         .mark_trans(Transit::to(S::OptIdPartial), '[')?
         .mark_trans(Transit::to(S::PatternPartial), '`')?
         .mark_trans(Transit::to(S::RegionExitBrace), '}')?
@@ -361,7 +378,10 @@ fn build_grammar_region(
     builder
         .state(&S::OptIdPartial)
         .mark_trans(Transit::to(S::OptId), ']')?
-        .mark_range(Transit::to(S::OptIdPartial), '_', 'Z')?;
+        .mark_range(Transit::to(S::OptIdPartial), 'a', 'z')?
+        .mark_range(Transit::to(S::OptIdPartial), 'A', 'Z')?
+        .mark_range(Transit::to(S::OptIdPartial), '0', '9')?
+        .mark_trans(Transit::to(S::OptIdPartial), '_')?;
 
     builder
         .state(&S::OptId)

@@ -67,7 +67,8 @@ fn build_pattern_ecdfa() -> Result<EncodedCDFA<PatternSymbol>, lex::CDFAError> {
         .mark_trans(Transit::to(S::Escape), '\\')?
         .mark_trans(Transit::to(S::Zero), '0')?
         .mark_range(Transit::to(S::Number), '1', '9')?
-        .mark_range(Transit::to(S::Alpha), 'a', 'Z')?
+        .mark_range(Transit::to(S::Alpha), 'a', 'z')?
+        .mark_range(Transit::to(S::Alpha), 'A', 'Z')?
         .default_to(Transit::to(S::Filler))?;
 
     builder
@@ -92,7 +93,8 @@ fn build_pattern_ecdfa() -> Result<EncodedCDFA<PatternSymbol>, lex::CDFAError> {
 
     builder
         .state(&S::Alpha)
-        .mark_range(Transit::to(S::Alpha), 'a', 'Z')?
+        .mark_range(Transit::to(S::Alpha), 'a', 'z')?
+        .mark_range(Transit::to(S::Alpha), 'A', 'Z')?
         .accept()
         .tokenize(&PatternSymbol::TAlpha);
 

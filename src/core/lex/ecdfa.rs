@@ -5,8 +5,8 @@ use {
             Data,
         },
         lex::{
-            alphabet::HashedAlphabet, CDFABuilder, CDFAError, Transit, TransitBuilder,
-            TransitionResult, CDFA,
+            alphabet::{self, HashedAlphabet},
+            CDFABuilder, CDFAError, Transit, TransitBuilder, TransitionResult, CDFA,
         },
         parse::grammar::GrammarSymbol,
         util::encoder::Encoder,
@@ -31,24 +31,6 @@ impl<State: Data, Symbol: GrammarSymbol> EncodedCDFABuilder<State, Symbol> {
             self.t_delta.insert(from, TransitionTrie::new());
         }
         self.t_delta.get_mut(from).unwrap()
-    }
-
-    fn get_alphabet_range(&self, start: char, end: char) -> Vec<char> {
-        let mut in_range = false;
-
-        self.alphabet_str
-            .chars()
-            .filter(|c| {
-                if *c == start {
-                    in_range = true;
-                }
-                if *c == end {
-                    in_range = false;
-                    return true;
-                }
-                in_range
-            })
-            .collect()
     }
 
     pub fn state<'scope, 'state: 'scope>(
@@ -178,7 +160,7 @@ impl<State: Data, Symbol: GrammarSymbol> CDFABuilder<State, Symbol, EncodedCDFA<
         start: char,
         end: char,
     ) -> Result<&mut Self, CDFAError> {
-        let to_mark = self.get_alphabet_range(start, end);
+        let to_mark = alphabet::get_range(start, end);
 
         for c in &to_mark {
             self.mark_trans(from, transit.clone(), *c)?;
@@ -197,7 +179,7 @@ impl<State: Data, Symbol: GrammarSymbol> CDFABuilder<State, Symbol, EncodedCDFA<
     where
         State: 'state_o,
     {
-        let to_mark = self.get_alphabet_range(start, end);
+        let to_mark = alphabet::get_range(start, end);
 
         for source in sources {
             for c in &to_mark {
