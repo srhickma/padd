@@ -1,5 +1,3 @@
-alphabet '<>=+-*/\\%(){}[],.;:#!?^$@&|"\'`~ \t\n\r_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
-
 cdfa {
     start_empty_line
         '//' -> prefix_lcom

@@ -16,9 +16,7 @@ use {
 
 pub struct EncodedCDFABuilder<State: Data, Symbol: GrammarSymbol> {
     encoder: Encoder<State>,
-    alphabet_str: String,
-
-    alphabet: HashedAlphabet,
+    alphabet: Option<HashedAlphabet>,
     accepting: HashMap<usize, Option<usize>>,
     t_delta: CEHashMap<TransitionTrie>,
     tokenizer: CEHashMap<Symbol>,
@@ -60,9 +58,7 @@ impl<State: Data, Symbol: GrammarSymbol> CDFABuilder<State, Symbol, EncodedCDFA<
     fn new() -> Self {
         EncodedCDFABuilder {
             encoder: Encoder::new(),
-            alphabet_str: String::new(),
-
-            alphabet: HashedAlphabet::new(),
+            alphabet: None,
             accepting: HashMap::new(),
             t_delta: CEHashMap::new(),
             tokenizer: CEHashMap::new(),
@@ -87,10 +83,9 @@ impl<State: Data, Symbol: GrammarSymbol> CDFABuilder<State, Symbol, EncodedCDFA<
     }
 
     fn set_alphabet(&mut self, chars: impl Iterator<Item = char>) -> &mut Self {
-        chars.for_each(|c| {
-            self.alphabet_str.push(c);
-            self.alphabet.insert(c);
-        });
+        let mut alphabet = HashedAlphabet::new();
+        chars.for_each(|c| alphabet.insert(c));
+        self.alphabet = Some(alphabet);
         self
     }
 
@@ -281,7 +276,7 @@ impl<'scope, 'state: 'scope, State: 'state + Data, Symbol: 'scope + GrammarSymbo
 pub struct EncodedCDFA<Symbol: GrammarSymbol> {
     //TODO add separate error message if character not in alphabet
     #[allow(dead_code)]
-    alphabet: HashedAlphabet,
+    alphabet: Option<HashedAlphabet>,
     accepting: HashMap<usize, Option<usize>>,
     t_delta: CEHashMap<TransitionTrie>,
     tokenizer: CEHashMap<Symbol>,
