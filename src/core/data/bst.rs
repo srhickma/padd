@@ -25,13 +25,16 @@ impl<Key: Ord, Value> AVLTree<Key, Value> {
         &mut self.nodes[index]
     }
 
+    fn node_height(&self, index_opt: Option<usize>) -> usize {
+        index_opt.map(|index| self.node(index).height).unwrap_or(0)
+    }
+
     fn add_node(&mut self, key: Key, value: Value, parent: Option<usize>) -> usize {
         let index = self.nodes.len();
         self.nodes.push(AVLTreeNode::new(key, value, parent, index));
         index
     }
 
-    // TODO(shane) can we simplify these match statements?
     fn search_path(
         &self,
         node: &AVLTreeNode<Key, Value>,
@@ -42,12 +45,57 @@ impl<Key: Ord, Value> AVLTree<Key, Value> {
         } else if *key < node.key {
             match node.left {
                 None => (false, node.index),
-                Some(_) => self.search_path(self.node(node.left.unwrap()), key),
+                Some(left_index) => self.search_path(self.node(left_index), key),
             }
         } else {
             match node.right {
                 None => (false, node.index),
-                Some(_) => self.search_path(self.node(node.right.unwrap()), key),
+                Some(right_index) => self.search_path(self.node(right_index), key),
+            }
+        }
+    }
+
+    fn re_balance(&mut self, new_node_index: usize) {
+        let mut current_index = new_node_index;
+        loop {
+            self.rotate_if_needed(current_index);
+
+            let (parent_index_opt, current_height) = {
+                let current_node = self.node(current_index);
+                (current_node.parent.clone(), current_node.height)
+            };
+
+            if let Some(parent_index) = parent_index_opt {
+                let parent = self.node_mut(parent_index);
+                if parent.height == current_height {
+                    parent.height += 1;
+                }
+
+                current_index = parent_index;
+            } else {
+                break;
+            }
+        }
+    }
+
+    fn rotate_if_needed(&mut self, current_index: usize) {
+        let current_node = self.node(current_index);
+        let left_height = self.node_height(current_node.left) as i64;
+        let right_height = self.node_height(current_node.right) as i64;
+
+        if left_height - right_height == 2 {
+            let left_node = self.node(current_node.left.unwrap());
+            if self.node_height(left_node.left) > self.node_height(left_node.right) {
+                // TODO(shane) perform rotation.
+            } else {
+                // TODO(shane) perform rotation.
+            }
+        } else if right_height - left_height == 2 {
+            let right_node = self.node(current_node.right.unwrap());
+            if self.node_height(right_node.left) > self.node_height(right_node.right) {
+                // TODO(shane) perform rotation.
+            } else {
+                // TODO(shane) perform rotation.
             }
         }
     }
@@ -62,16 +110,18 @@ impl<Key: Ord, Value> BinarySearchTree<Key, Value> for AVLTree<Key, Value> {
                 if !ok {
                     let left_child = key < self.node(last_node_index).key;
                     let new_node_index = self.add_node(key, value, Some(last_node_index));
-                    let parent = self.node_mut(last_node_index);
 
-                    if left_child {
-                        parent.left = Some(new_node_index);
-                    } else {
-                        parent.right = Some(new_node_index);
+                    {
+                        let parent = self.node_mut(last_node_index);
+
+                        if left_child {
+                            parent.left = Some(new_node_index);
+                        } else {
+                            parent.right = Some(new_node_index);
+                        }
                     }
 
-                    // TODO(shane) update balances.
-                    // TODO(shane) rotate if imbalanced.
+                    self.re_balance(new_node_index);
                 }
             },
         }
@@ -113,7 +163,7 @@ struct AVLTreeNode<Key: Ord, Value> {
     left: Option<usize>,
     right: Option<usize>,
     parent: Option<usize>,
-    balance: i8,
+    height: usize,
     index: usize,
 }
 
@@ -125,7 +175,7 @@ impl<Key: Ord, Value> AVLTreeNode<Key, Value> {
             left: None,
             right: None,
             parent,
-            balance: 0,
+            height: 1,
             index,
         }
     }

@@ -1,3 +1,5 @@
+use core::data::bst::{BinarySearchTree, AVLTree};
+
 pub struct Interval<T: Ord> {
     start: T,
     end: T,
@@ -16,14 +18,14 @@ impl<T: Ord> Interval<T> {
     }
 }
 
-pub struct IntervalTree<T: Ord> {
-    root: Option<IntervalTreeNode<T>>,
+pub struct IntervalTree<'it, T: 'it + Ord> {
+    tree: Box<BinarySearchTree<T, IntervalTreeNode<T>> + 'it>,
 }
 
-impl<T: Ord> IntervalTree<T> {
+impl<'it, T: 'it + Ord> IntervalTree<'it, T> {
     pub fn new() -> Self {
         IntervalTree {
-            root: None,
+            tree: Box::new(AVLTree::new()),
         }
     }
 
@@ -38,12 +40,7 @@ impl<T: Ord> IntervalTree<T> {
 
 struct IntervalTreeNode<T: Ord> {
     interval: Interval<T>,
-//    left: Option<IntervalTreeNode<T>>,
-//    right: Option<IntervalTreeNode<T>>,
-}
-
-impl<T: Ord> IntervalTreeNode<T> {
-
+    max: T,
 }
 
 #[cfg(test)]
