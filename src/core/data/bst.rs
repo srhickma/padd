@@ -1,87 +1,7 @@
-use std::cell::RefCell;
-
-pub trait BinarySearchTree<Key: Ord, Value, Node: BSTNode<Key, Value>> {
+pub trait BinarySearchTree<Key: Ord, Value> {
     fn insert(&mut self, key: Key, value: Value);
-    fn root(&self) -> Option<&Node>;
-    fn root_mut(&mut self) -> Option<&mut Node>;
-
-    fn search<'scope>(&'scope self, key: &Key) -> Option<&'scope Value> where Node: 'scope {
-        let (ok, last_node) = BinarySearchTree::search_path(self.root(), None, key);
-        if ok {
-            last_node.map(BSTNode::value)
-        } else {
-            None
-        }
-    }
-
-    fn search_mut<'scope>(
-        &'scope mut self,
-        key: &Key
-    ) -> Option<&'scope mut Value> where Node: 'scope {
-        match self.root_mut() {
-            Some(root_node) => {
-                let (ok, last_node) = BinarySearchTree::search_path_mut(root_node, key);
-                if ok {
-                    Some(last_node.value_mut())
-                } else {
-                    None
-                }
-            },
-            None => None,
-        }
-    }
-}
-
-impl<Key: Ord, Value, Node: BSTNode<Key, Value>> BinarySearchTree<Key, Value, Node> {
-    fn search_path<'tree>(
-        node_opt: Option<&'tree Node>,
-        previous: Option<&'tree Node>,
-        key: &Key
-    ) -> (bool, Option<&'tree Node>) {
-        match node_opt {
-            None => (false, previous),
-            Some(node) => {
-                if *key == *node.key() {
-                    (true, node_opt)
-                } else if *key < *node.key() {
-                    BinarySearchTree::search_path(node.left(), node_opt, key)
-                } else {
-                    BinarySearchTree::search_path(node.right(), node_opt, key)
-                }
-            }
-        }
-    }
-
-    fn search_path_mut<'tree>(
-        node: &'tree mut Node,
-        key: &Key
-    ) -> (bool, &'tree mut Node) {
-        if *key == *node.key() {
-            (true, node)
-        } else if *key < *node.key() {
-            match node.left() {
-                None => (false, node),
-                Some(_) => BinarySearchTree::search_path_mut(node.left_mut().unwrap(), key),
-            }
-        } else {
-            match node.right() {
-                None => (false, node),
-                Some(_) => BinarySearchTree::search_path_mut(node.right_mut().unwrap(), key),
-            }
-        }
-    }
-}
-
-pub trait BSTNode<Key: Ord, Value> {
-    fn key(&self) -> &Key;
-    fn value(&self) -> &Value;
-    fn value_mut(&mut self) -> &mut Value;
-    fn left(&self) -> Option<&Self>;
-    fn left_mut(&mut self) -> Option<&mut Self>;
-    fn right(&self) -> Option<&Self>;
-    fn right_mut(&mut self) -> Option<&mut Self>;
-    fn parent(&self) -> Option<&Self>;
-    fn parent_mut(&mut self) -> Option<&mut Self>;
+    fn search(&self, key: &Key) -> Option<&Value>;
+    fn search_mut(&mut self, key: &Key) -> Option<&mut Value>;
 }
 
 pub struct AVLTree<Key: Ord, Value> {
@@ -96,36 +16,93 @@ impl<Key: Ord, Value> AVLTree<Key, Value> {
             root_index: None,
         }
     }
+
+    fn node(&self, index: usize) -> &AVLTreeNode<Key, Value> {
+        &self.nodes[index]
+    }
+
+    fn node_mut(&mut self, index: usize) -> &mut AVLTreeNode<Key, Value> {
+        &mut self.nodes[index]
+    }
+
+    fn add_node(&mut self, key: Key, value: Value, parent: Option<usize>) -> usize {
+        let index = self.nodes.len();
+        self.nodes.push(AVLTreeNode::new(key, value, parent, index));
+        index
+    }
+
+    // TODO(shane) can we simplify these match statements?
+    fn search_path(
+        &self,
+        node: &AVLTreeNode<Key, Value>,
+        key: &Key
+    ) -> (bool, usize) {
+        if *key == node.key {
+            (true, node.index)
+        } else if *key < node.key {
+            match node.left {
+                None => (false, node.index),
+                Some(_) => self.search_path(self.node(node.left.unwrap()), key),
+            }
+        } else {
+            match node.right {
+                None => (false, node.index),
+                Some(_) => self.search_path(self.node(node.right.unwrap()), key),
+            }
+        }
+    }
 }
 
-impl<Key: Ord, Value> BinarySearchTree<Key, Value, AVLTreeNode<Key, Value>> for AVLTree<Key, Value> {
+impl<Key: Ord, Value> BinarySearchTree<Key, Value> for AVLTree<Key, Value> {
     fn insert(&mut self, key: Key, value: Value) {
-        match self.root {
-            None => self.root = Some(AVLTreeNode::root(key, value)),
-            Some(_) => {
-                let (ok, last_node) = BinarySearchTree::search_path_mut(self.root.as_mut().unwrap(), &key);
+        match self.root_index {
+            None => self.root_index = Some(self.add_node(key, value, None)),
+            Some(root_index) => {
+                let (ok, last_node_index) = self.search_path(self.node(root_index), &key);
                 if !ok {
-                    let parent: &mut AVLTreeNode<Key, Value> = last_node;
-                    if key < *parent.key() {
-                        parent.left = Some(Box::new(AVLTreeNode::root(key, value)));
-                        parent.balance -= 1;
+                    let left_child = key < self.node(last_node_index).key;
+                    let new_node_index = self.add_node(key, value, Some(last_node_index));
+                    let parent = self.node_mut(last_node_index);
+
+                    if left_child {
+                        parent.left = Some(new_node_index);
                     } else {
-                        parent.right = Some(Box::new(AVLTreeNode::root(key, value)));
-                        parent.balance += 1;
+                        parent.right = Some(new_node_index);
                     }
 
+                    // TODO(shane) update balances.
                     // TODO(shane) rotate if imbalanced.
                 }
             },
         }
     }
 
-    fn root(&self) -> Option<&AVLTreeNode<Key, Value>> {
-        self.root.as_ref()
+    fn search(&self, key: &Key) -> Option<&Value> {
+        match self.root_index {
+            Some(root_index) => {
+                let (ok, last_node_index) = self.search_path(self.node(root_index), key);
+                if ok {
+                    Some(&self.node(last_node_index).value)
+                } else {
+                    None
+                }
+            },
+            None => None,
+        }
     }
 
-    fn root_mut(&mut self) -> Option<&mut AVLTreeNode<Key, Value>> {
-        self.root.as_mut()
+    fn search_mut(&mut self, key: &Key) -> Option<&mut Value> {
+        match self.root_index {
+            Some(root_index) => {
+                let (ok, last_node_index) = self.search_path(self.node(root_index), key);
+                if ok {
+                    Some(&mut self.node_mut(last_node_index).value)
+                } else {
+                    None
+                }
+            },
+            None => None,
+        }
     }
 }
 
@@ -133,61 +110,24 @@ impl<Key: Ord, Value> BinarySearchTree<Key, Value, AVLTreeNode<Key, Value>> for 
 struct AVLTreeNode<Key: Ord, Value> {
     key: Key,
     value: Value,
-    left: Option<Box<AVLTreeNode<Key, Value>>>,
-    right: Option<Box<AVLTreeNode<Key, Value>>>,
-    parent: Option<Box<RefCell<AVLTreeNode<Key, Value>>>>,
+    left: Option<usize>,
+    right: Option<usize>,
+    parent: Option<usize>,
     balance: i8,
     index: usize,
 }
 
 impl<Key: Ord, Value> AVLTreeNode<Key, Value> {
-    fn root(key: Key, value: Value) -> Self {
+    fn new(key: Key, value: Value, parent: Option<usize>, index: usize) -> Self {
         AVLTreeNode {
             key,
             value,
             left: None,
             right: None,
-            parent: None,
+            parent,
             balance: 0,
+            index,
         }
-    }
-}
-
-impl<Key: Ord, Value> BSTNode<Key, Value> for AVLTreeNode<Key, Value> {
-    fn key(&self) -> &Key {
-        &self.key
-    }
-
-    fn value(&self) -> &Value {
-        &self.value
-    }
-
-    fn value_mut(&mut self) -> &mut Value {
-        &mut self.value
-    }
-
-    fn left(&self) -> Option<&AVLTreeNode<Key, Value>> {
-        self.left.as_ref().map(|boxed_node| &**boxed_node)
-    }
-
-    fn left_mut(&mut self) -> Option<&mut AVLTreeNode<Key, Value>> {
-        self.left.as_mut().map(|boxed_node| &mut **boxed_node)
-    }
-
-    fn right(&self) -> Option<&AVLTreeNode<Key, Value>> {
-        self.right.as_ref().map(|boxed_node| &**boxed_node)
-    }
-
-    fn right_mut(&mut self) -> Option<&mut AVLTreeNode<Key, Value>> {
-        self.right.as_mut().map(|boxed_node| &mut **boxed_node)
-    }
-
-    fn parent(&self) -> Option<&Self> {
-        self.parent.as_ref().map(|rc_node| &**rc_node)
-    }
-
-    fn parent_mut(&mut self) -> Option<&mut Self> {
-        self.parent.as_mut().map(|rc_node| &mut **rc_node)
     }
 }
 
