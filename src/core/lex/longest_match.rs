@@ -1,6 +1,6 @@
 use core::{
     data::Data,
-    lex::{self, Lexer, Token, CDFA, FAIL_SEQUENCE_LENGTH},
+    lex::{self, Lexer, Token, TransitionResult, CDFA, FAIL_SEQUENCE_LENGTH},
     parse::grammar::GrammarSymbol,
 };
 
@@ -57,41 +57,40 @@ impl<State: Data, Symbol: GrammarSymbol> Lexer<State, Symbol> for LongestMatchLe
             loop {
                 let res = cdfa.transition(&state, remaining);
 
-                consumed += res.consumed;
+                match res {
+                    TransitionResult::Fail => break,
+                    TransitionResult::Ok(dest) => {
+                        consumed += dest.consumed;
 
-                for c in remaining.iter().take(res.consumed) {
-                    character += 1;
-                    if *c == '\n' {
-                        line += 1;
-                        character = 1;
-                    }
+                        for c in remaining.iter().take(dest.consumed) {
+                            character += 1;
+                            if *c == '\n' {
+                                line += 1;
+                                character = 1;
+                            }
 
-                    if !cdfa.alphabet_contains(*c) {
-                        return Err(lex::Error::AlphabetErr(*c));
-                    }
-                }
+                            if !cdfa.alphabet_contains(*c) {
+                                return Err(lex::Error::AlphabetErr(*c));
+                            }
+                        }
 
-                match res.state {
-                    None => break,
-                    Some(next) => {
-                        if cdfa.accepts(&next) {
+                        if cdfa.accepts(&dest.state) {
                             last_accepting = ScanOneResult {
                                 consumed,
-                                end_state: Some(next.clone()),
-                                next_start: match res.acceptor_destination {
+                                end_state: Some(dest.state.clone()),
+                                next_start: match dest.acceptor_destination {
                                     Some(destination) => Some(destination),
-                                    None => cdfa.default_acceptor_destination(&next),
+                                    None => cdfa.default_acceptor_destination(&dest.state),
                                 },
                                 line,
                                 character,
                             };
                         }
 
-                        state = next;
+                        state = dest.state;
+                        remaining = &remaining[dest.consumed..];
                     }
                 }
-
-                remaining = &remaining[res.consumed..];
             }
 
             Ok(last_accepting)

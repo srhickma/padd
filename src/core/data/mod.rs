@@ -2,7 +2,6 @@ use std::{fmt, hash::Hash};
 
 pub mod map;
 pub mod interval;
-pub mod bst;
 
 /// A trait encapsulating some piece of data, with useful requirements for equality, comparison, and debugging.
 pub trait Data: PartialEq + Eq + Hash + Clone + fmt::Debug + Send + Sync {

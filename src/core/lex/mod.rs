@@ -1,5 +1,8 @@
 use {
-    core::{data::Data, parse::grammar::GrammarSymbol},
+    core::{
+        data::{Data, interval},
+        parse::grammar::GrammarSymbol,
+    },
     std::{error, fmt},
 };
 
@@ -125,37 +128,34 @@ pub enum ConsumerStrategy {
     None,
 }
 
-pub struct TransitionResult<State: Data> {
-    state: Option<State>,
-    consumed: usize,
-    acceptor_destination: Option<State>,
+pub enum TransitionResult<State: Data> {
+    Fail,
+    Ok(TransitionDestination<State>),
 }
 
 impl<State: Data> TransitionResult<State> {
-    pub fn fail() -> Self {
-        TransitionResult {
-            state: None,
-            consumed: 0,
-            acceptor_destination: None,
-        }
-    }
-
     pub fn direct(transit: &Transit<State>) -> Self {
-        TransitionResult::new(transit, 1)
+        TransitionResult::ok(transit, 1)
     }
 
-    pub fn new(transit: &Transit<State>, traversed: usize) -> Self {
+    pub fn ok(transit: &Transit<State>, traversed: usize) -> Self {
         let consumed = match transit.consumer {
             ConsumerStrategy::All => traversed,
             ConsumerStrategy::None => 0,
         };
 
-        TransitionResult {
-            state: Some(transit.dest.clone()),
+        TransitionResult::Ok(TransitionDestination {
+            state: transit.dest.clone(),
             consumed,
             acceptor_destination: transit.acceptor_destination.clone(),
-        }
+        })
     }
+}
+
+pub struct TransitionDestination<State: Data> {
+    state: State,
+    consumed: usize,
+    acceptor_destination: Option<State>,
 }
 
 #[derive(Debug)]
@@ -182,6 +182,12 @@ impl error::Error for CDFAError {
 impl From<String> for CDFAError {
     fn from(err: String) -> CDFAError {
         CDFAError::BuildErr(err)
+    }
+}
+
+impl From<interval::Error> for CDFAError {
+    fn from(err: interval::Error) -> CDFAError {
+        CDFAError::BuildErr(format!("Range matcher error: {}", err))
     }
 }
 

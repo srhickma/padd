@@ -26,17 +26,6 @@ impl Alphabet for HashedAlphabet {
     }
 }
 
-pub fn get_range(start: char, end: char) -> Vec<char> {
-    let start = start as u32;
-    let end = end as u32;
-
-    (start..=end)
-        .map(std::char::from_u32)
-        .filter(Option::is_some)
-        .map(Option::unwrap)
-        .collect()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -62,6 +51,4 @@ mod tests {
         assert!(alphabet.contains('c'));
         assert!(alphabet.contains('e'));
     }
-
-    // TODO(shane) add range tests.
 }

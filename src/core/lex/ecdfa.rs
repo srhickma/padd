@@ -1,17 +1,18 @@
 use {
     core::{
         data::{
+            interval::{Bound, Interval, IntervalMap},
             map::{CEHashMap, CEHashMapIterator},
             Data,
         },
         lex::{
-            alphabet::{self, Alphabet, HashedAlphabet},
+            alphabet::{Alphabet, HashedAlphabet},
             CDFABuilder, CDFAError, Transit, TransitBuilder, TransitionResult, CDFA,
         },
         parse::grammar::GrammarSymbol,
         util::encoder::Encoder,
     },
-    std::{collections::HashMap, usize},
+    std::{collections::HashMap, ops::{RangeInclusive}, usize},
 };
 
 pub struct EncodedCDFABuilder<State: Data, Symbol: GrammarSymbol> {
@@ -155,10 +156,12 @@ impl<State: Data, Symbol: GrammarSymbol> CDFABuilder<State, Symbol, EncodedCDFA<
         start: char,
         end: char,
     ) -> Result<&mut Self, CDFAError> {
-        let to_mark = alphabet::get_range(start, end);
+        let from_encoded = self.encoder.encode(from);
+        let transit_encoded = self.encode_transit(transit);
 
-        for c in &to_mark {
-            self.mark_trans(from, transit.clone(), *c)?;
+        {
+            let t_trie = self.get_transition_trie(from_encoded);
+            t_trie.insert_range((start as u32)..=(end as u32), transit_encoded)?;
         }
 
         Ok(self)
@@ -174,12 +177,8 @@ impl<State: Data, Symbol: GrammarSymbol> CDFABuilder<State, Symbol, EncodedCDFA<
     where
         State: 'state_o,
     {
-        let to_mark = alphabet::get_range(start, end);
-
         for source in sources {
-            for c in &to_mark {
-                self.mark_trans(&source, transit.clone(), *c)?;
-            }
+            self.mark_range(&source, transit.clone(), start, end)?;
         }
 
         Ok(self)
@@ -290,13 +289,16 @@ impl<Symbol: GrammarSymbol> EncodedCDFA<Symbol> {
 impl<Symbol: GrammarSymbol> CDFA<usize, Symbol> for EncodedCDFA<Symbol> {
     fn transition(&self, state: &usize, input: &[char]) -> TransitionResult<usize> {
         match self.t_delta.get(*state) {
-            None => TransitionResult::fail(),
+            None => TransitionResult::Fail,
             Some(t_trie) => t_trie.transition(input),
         }
     }
 
     fn has_transition(&self, state: &usize, input: &[char]) -> bool {
-        self.transition(state, input).state.is_some()
+        match self.transition(state, input) {
+            TransitionResult::Fail => false,
+            TransitionResult::Ok(_) => true,
+        }
     }
 
     fn alphabet_contains(&self, c: char) -> bool {
@@ -331,7 +333,14 @@ impl<Symbol: GrammarSymbol> CDFA<usize, Symbol> for EncodedCDFA<Symbol> {
 
 struct TransitionTrie {
     root: TransitionNode,
+    ranges: IntervalMap<u32, Transit<usize>>,
     default: Option<Transit<usize>>,
+}
+
+impl Bound for u32 {
+    fn predecessor(&self) -> Self {
+        self - 1
+    }
 }
 
 impl TransitionTrie {
@@ -341,31 +350,37 @@ impl TransitionTrie {
                 children: HashMap::new(),
                 transit: None,
             },
+            ranges: IntervalMap::new(),
             default: None,
         }
     }
 
     fn transition(&self, input: &[char]) -> TransitionResult<usize> {
+        if input.is_empty() {
+            return TransitionResult::Fail;
+        }
+
+        match self.transition_explicit(input) {
+            TransitionResult::Fail => match self.transition_range(input) {
+                TransitionResult::Fail => self.transition_default(),
+                result => result,
+            },
+            result => result,
+        }
+    }
+
+    fn transition_explicit(&self, input: &[char]) -> TransitionResult<usize> {
         let mut curr: &TransitionNode = &self.root;
 
         if curr.children.is_empty() {
-            match self.default {
-                None => TransitionResult::fail(),
-                Some(ref dest) => match input.first() {
-                    None => TransitionResult::fail(),
-                    Some(_) => TransitionResult::direct(dest),
-                },
-            }
+            TransitionResult::Fail
         } else {
             let mut cursor: usize = 0;
             while !curr.leaf() {
                 curr = match input.get(cursor) {
-                    None => return TransitionResult::fail(),
+                    None => return TransitionResult::Fail,
                     Some(c) => match curr.get_child(*c) {
-                        None => match self.default {
-                            None => return TransitionResult::fail(),
-                            Some(ref dest) => return TransitionResult::direct(dest),
-                        },
+                        None => return TransitionResult::Fail,
                         Some(child) => child,
                     },
                 };
@@ -373,7 +388,22 @@ impl TransitionTrie {
                 cursor += 1;
             }
 
-            TransitionResult::new(curr.transit.as_ref().unwrap(), cursor)
+            TransitionResult::ok(curr.transit.as_ref().unwrap(), cursor)
+        }
+    }
+
+    fn transition_range(&self, input: &[char]) -> TransitionResult<usize> {
+        let value = input[0] as u32;
+        match self.ranges.get(&value) {
+            None => TransitionResult::Fail,
+            Some(transit) => TransitionResult::direct(transit),
+        }
+    }
+
+    fn transition_default(&self) -> TransitionResult<usize> {
+        match self.default {
+            None => TransitionResult::Fail,
+            Some(ref dest) => TransitionResult::direct(dest),
         }
     }
 
@@ -383,6 +413,19 @@ impl TransitionTrie {
 
     fn insert_chain(&mut self, chars: &[char], transit: Transit<usize>) -> Result<(), CDFAError> {
         TransitionTrie::insert_chain_internal(0, &mut self.root, chars, transit)
+    }
+
+    fn insert_range(
+        &mut self,
+        range: RangeInclusive<u32>,
+        transit: Transit<usize>,
+    ) -> Result<(), CDFAError> {
+//        if self.ranges.find(range.clone()).next().is_some() {
+//            return Err(CDFAError::BuildErr("Overlapping transition ranges".to_string()));
+//        }
+
+        self.ranges.insert(Interval::from(range), transit)?;
+        return Ok(());
     }
 
     fn insert_chain_internal(
@@ -1244,6 +1287,43 @@ A <- 'a'
 B <- 'b'
 "
         );
+    }
+
+    #[test]
+    fn large_range_transition() {
+        //setup
+        #[derive(PartialEq, Eq, Hash, Clone, Debug)]
+        enum S {
+            Start,
+        }
+
+        impl Data for S {
+            fn to_string(&self) -> String {
+                format!("{:?}", self)
+            }
+        }
+
+        let mut builder: EncodedCDFABuilder<S, String> = EncodedCDFABuilder::new();
+        builder.mark_start(&S::Start);
+        builder
+            .state(&S::Start)
+            .mark_range(Transit::to(S::Start), '\0', '嶲')
+            .unwrap()
+            .accept()
+            .tokenize(&"START".to_string());
+
+        let cdfa: EncodedCDFA<String> = builder.build().unwrap();
+
+        let input = "1234567890".to_string();
+        let chars: Vec<char> = input.chars().collect();
+
+        let lexer = lex::def_lexer();
+
+        //exercise
+        let tokens = lexer.lex(&chars[..], &cdfa).unwrap();
+
+        //verify
+        assert_eq!(tokens_string(&tokens), "START <- '1234567890'\n");
     }
 
     fn tokens_string<Kind: Data>(tokens: &Vec<Token<Kind>>) -> String {

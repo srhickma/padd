@@ -495,20 +495,19 @@ grammar {
         assert_eq!(
             format!("{}", err),
             "Failed to generate specification: ECDFA generation error: Failed to build CDFA: \
-             Transition trie is not prefix free on character 'l'"
+             Range matcher error: Intervals overlap"
         );
 
         err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
-            "ECDFA generation error: Failed to build CDFA: \
-             Transition trie is not prefix free on character 'l'"
+            "ECDFA generation error: Failed to build CDFA: Range matcher error: Intervals overlap"
         );
 
         err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
-            "Failed to build CDFA: Transition trie is not prefix free on character 'l'"
+            "Failed to build CDFA: Range matcher error: Intervals overlap"
         );
 
         assert!(err.source().is_none());
