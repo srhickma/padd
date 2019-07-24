@@ -396,7 +396,7 @@ mod tests {
         let mut map: IntervalMap<u32, u32> = IntervalMap::new();
         map.insert(Interval::from(43..=99), 12).unwrap();
 
-        //execute
+        //exercise
         let res = map.insert(Interval::from(25..67), 11);
 
         //verify
@@ -410,7 +410,7 @@ mod tests {
         let mut map: IntervalMap<u32, u32> = IntervalMap::new();
         map.insert(Interval::from(43..=99), 12).unwrap();
 
-        //execute
+        //exercise
         let res = map.insert(Interval::from(50..100), 11);
 
         //verify
@@ -424,7 +424,7 @@ mod tests {
         let mut map: IntervalMap<u32, u32> = IntervalMap::new();
         map.insert(Interval::from(43..=99), 12).unwrap();
 
-        //execute
+        //exercise
         let res = map.insert(Interval::from(44..50), 11);
 
         //verify
@@ -438,7 +438,7 @@ mod tests {
         let mut map: IntervalMap<u32, u32> = IntervalMap::new();
         map.insert(Interval::from(43..=99), 12).unwrap();
 
-        //execute
+        //exercise
         let res = map.insert(Interval::from(20..101), 11);
 
         //verify
@@ -452,7 +452,7 @@ mod tests {
         let mut map: IntervalMap<u32, u32> = IntervalMap::new();
         map.insert(Interval::from(43..=99), 12).unwrap();
 
-        //execute
+        //exercise
         let res = map.insert(Interval::from(43..=99), 11);
 
         //verify
@@ -467,7 +467,7 @@ mod tests {
         map.insert(Interval::from(4..=4), 12).unwrap();
         map.insert(Interval::from(20..=25), 12).unwrap();
 
-        //execute/verify
+        //exercise/verify
         assert!(map.insert(Interval::from(3..=6), 11).is_err());
         assert!(map.insert(Interval::from(4..=4), 11).is_err());
         assert!(map.insert(Interval::from(4..=6), 11).is_err());

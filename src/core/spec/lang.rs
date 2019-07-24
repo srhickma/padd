@@ -123,7 +123,7 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<SpecSymbol>, lex::CDFAError> {
         .state(&S::CilEscaped)
         .default_to(Transit::to(S::CilPartial))?;
 
-    builder //_0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ
+    builder
         .state(&S::Id)
         .mark_range(Transit::to(S::Id), 'a', 'z')?
         .mark_range(Transit::to(S::Id), 'A', 'Z')?
