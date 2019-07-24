@@ -1,6 +1,6 @@
 use {
     core::{
-        data::{Data, interval},
+        data::{interval, Data},
         parse::grammar::GrammarSymbol,
     },
     std::{error, fmt},

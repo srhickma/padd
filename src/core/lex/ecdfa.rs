@@ -12,7 +12,7 @@ use {
         parse::grammar::GrammarSymbol,
         util::encoder::Encoder,
     },
-    std::{collections::HashMap, ops::{RangeInclusive}, usize},
+    std::{collections::HashMap, ops::RangeInclusive, usize},
 };
 
 pub struct EncodedCDFABuilder<State: Data, Symbol: GrammarSymbol> {
@@ -420,12 +420,8 @@ impl TransitionTrie {
         range: RangeInclusive<u32>,
         transit: Transit<usize>,
     ) -> Result<(), CDFAError> {
-//        if self.ranges.find(range.clone()).next().is_some() {
-//            return Err(CDFAError::BuildErr("Overlapping transition ranges".to_string()));
-//        }
-
         self.ranges.insert(Interval::from(range), transit)?;
-        return Ok(());
+        Ok(())
     }
 
     fn insert_chain_internal(
