@@ -21,7 +21,7 @@ lazy_static! {
 
 pub fn traverse(
     regions_node: &Tree<SpecSymbol>,
-    handler: &mut FnMut(&Tree<SpecSymbol>, &RegionType) -> Result<(), spec::GenError>,
+    handler: &mut dyn FnMut(&Tree<SpecSymbol>, &RegionType) -> Result<(), spec::GenError>,
 ) -> Result<(), spec::GenError> {
     let mut region_types: HashSet<RegionType> = HashSet::new();
 
@@ -40,7 +40,7 @@ pub fn traverse(
 
 fn traverse_regions_node(
     regions_node: &Tree<SpecSymbol>,
-    handler: &mut FnMut(&Tree<SpecSymbol>, &RegionType) -> Result<(), spec::GenError>,
+    handler: &mut dyn FnMut(&Tree<SpecSymbol>, &RegionType) -> Result<(), spec::GenError>,
     region_types: &mut HashSet<RegionType>,
 ) -> Result<(), spec::GenError> {
     if regions_node.children.len() == 2 {
@@ -52,7 +52,7 @@ fn traverse_regions_node(
 
 fn traverse_region_node(
     region_node: &Tree<SpecSymbol>,
-    handler: &mut FnMut(&Tree<SpecSymbol>, &RegionType) -> Result<(), spec::GenError>,
+    handler: &mut dyn FnMut(&Tree<SpecSymbol>, &RegionType) -> Result<(), spec::GenError>,
     region_types: &mut HashSet<RegionType>,
 ) -> Result<(), spec::GenError> {
     let inner_node = region_node.get_child(0);

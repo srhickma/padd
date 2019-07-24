@@ -13,10 +13,10 @@ pub mod longest_match;
 static FAIL_SEQUENCE_LENGTH: usize = 10;
 
 pub trait Lexer<State: Data, Symbol: GrammarSymbol>: 'static + Send + Sync {
-    fn lex(&self, input: &[char], cdfa: &CDFA<State, Symbol>) -> Result<Vec<Token<Symbol>>, Error>;
+    fn lex(&self, input: &[char], cdfa: &dyn CDFA<State, Symbol>) -> Result<Vec<Token<Symbol>>, Error>;
 }
 
-pub fn def_lexer<State: Data, Symbol: GrammarSymbol>() -> Box<Lexer<State, Symbol>> {
+pub fn def_lexer<State: Data, Symbol: GrammarSymbol>() -> Box<dyn Lexer<State, Symbol>> {
     Box::new(longest_match::LongestMatchLexer)
 }
 

@@ -32,11 +32,11 @@ type StateType = usize;
 type SymbolType = usize;
 
 pub struct FormatJobRunner {
-    cdfa: Box<CDFA<StateType, SymbolType>>,
-    grammar: Box<Grammar<SymbolType>>,
+    cdfa: Box<dyn CDFA<StateType, SymbolType>>,
+    grammar: Box<dyn Grammar<SymbolType>>,
     formatter: Formatter<SymbolType>,
-    lexer: Box<Lexer<StateType, SymbolType>>,
-    parser: Box<Parser<SymbolType>>,
+    lexer: Box<dyn Lexer<StateType, SymbolType>>,
+    parser: Box<dyn Parser<SymbolType>>,
 }
 
 impl FormatJobRunner {

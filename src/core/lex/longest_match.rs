@@ -10,7 +10,7 @@ impl<State: Data, Symbol: GrammarSymbol> Lexer<State, Symbol> for LongestMatchLe
     fn lex<'cdfa>(
         &self,
         input: &[char],
-        cdfa: &'cdfa CDFA<State, Symbol>,
+        cdfa: &'cdfa dyn CDFA<State, Symbol>,
     ) -> Result<Vec<Token<Symbol>>, lex::Error> {
         struct ScanOneResult<State> {
             consumed: usize,
@@ -25,7 +25,7 @@ impl<State: Data, Symbol: GrammarSymbol> Lexer<State, Symbol> for LongestMatchLe
             start: State,
             line: usize,
             character: usize,
-            cdfa: &CDFA<State, Symbol>,
+            cdfa: &dyn CDFA<State, Symbol>,
         ) -> Result<ScanOneResult<State>, lex::Error> {
             let mut remaining = input;
             let mut state: State = start;

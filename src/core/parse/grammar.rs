@@ -304,7 +304,7 @@ impl<SymbolIn: GrammarSymbol> GrammarBuilder<SymbolIn, usize, EncodedGrammar<Sym
 
 fn check_grammar<Symbol: GrammarSymbol>(
     grammar: &SimpleGrammar<Symbol>,
-    symbol_decoder: &Fn(&Symbol) -> String,
+    symbol_decoder: &dyn Fn(&Symbol) -> String,
 ) -> Result<(), BuildError> {
     for ignored in &grammar.ignorable {
         if grammar.non_terminals.contains(ignored) {
@@ -390,7 +390,7 @@ pub struct NonTerminalBuilder<
     SymbolOut: GrammarSymbol,
     GrammarType,
 > {
-    grammar_builder: &'builder mut GrammarBuilder<SymbolIn, SymbolOut, GrammarType>,
+    grammar_builder: &'builder mut dyn GrammarBuilder<SymbolIn, SymbolOut, GrammarType>,
     lhs: SymbolIn,
 }
 
@@ -398,7 +398,7 @@ impl<'builder, SymbolIn: GrammarSymbol, SymbolOut: GrammarSymbol, GrammarType>
     NonTerminalBuilder<'builder, SymbolIn, SymbolOut, GrammarType>
 {
     fn new(
-        grammar_builder: &'builder mut GrammarBuilder<SymbolIn, SymbolOut, GrammarType>,
+        grammar_builder: &'builder mut dyn GrammarBuilder<SymbolIn, SymbolOut, GrammarType>,
         lhs: SymbolIn,
     ) -> Self {
         NonTerminalBuilder {

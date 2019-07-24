@@ -21,8 +21,8 @@ lazy_static! {
 }
 
 type SpecGenResult<Symbol> = (
-    Box<CDFA<usize, Symbol>>,
-    Box<Grammar<Symbol>>,
+    Box<dyn CDFA<usize, Symbol>>,
+    Box<dyn Grammar<Symbol>>,
     Formatter<Symbol>,
 );
 
