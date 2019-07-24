@@ -58,7 +58,7 @@ macro_rules! catch_fatal {
                 $catch
 
                 #[allow(unreachable_code)] {
-                    panic::take_hook();
+                    let _ = panic::take_hook();
                 }
             } else {
                 panic::resume_unwind(err)
