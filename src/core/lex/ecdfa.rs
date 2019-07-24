@@ -294,13 +294,6 @@ impl<Symbol: GrammarSymbol> CDFA<usize, Symbol> for EncodedCDFA<Symbol> {
         }
     }
 
-    fn has_transition(&self, state: &usize, input: &[char]) -> bool {
-        match self.transition(state, input) {
-            TransitionResult::Fail => false,
-            TransitionResult::Ok(_) => true,
-        }
-    }
-
     fn alphabet_contains(&self, c: char) -> bool {
         match self.alphabet {
             Some(ref alphabet) => alphabet.contains(c),

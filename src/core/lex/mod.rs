@@ -13,7 +13,11 @@ pub mod longest_match;
 static FAIL_SEQUENCE_LENGTH: usize = 10;
 
 pub trait Lexer<State: Data, Symbol: GrammarSymbol>: 'static + Send + Sync {
-    fn lex(&self, input: &[char], cdfa: &dyn CDFA<State, Symbol>) -> Result<Vec<Token<Symbol>>, Error>;
+    fn lex(
+        &self,
+        input: &[char],
+        cdfa: &dyn CDFA<State, Symbol>,
+    ) -> Result<Vec<Token<Symbol>>, Error>;
 }
 
 pub fn def_lexer<State: Data, Symbol: GrammarSymbol>() -> Box<dyn Lexer<State, Symbol>> {
@@ -22,7 +26,6 @@ pub fn def_lexer<State: Data, Symbol: GrammarSymbol>() -> Box<dyn Lexer<State, S
 
 pub trait CDFA<State: Data, Symbol: GrammarSymbol>: Send + Sync {
     fn transition(&self, state: &State, input: &[char]) -> TransitionResult<State>;
-    fn has_transition(&self, state: &State, input: &[char]) -> bool;
     fn alphabet_contains(&self, c: char) -> bool;
     fn accepts(&self, state: &State) -> bool;
     fn default_acceptor_destination(&self, state: &State) -> Option<State>;
