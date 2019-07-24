@@ -1,5 +1,8 @@
 use {
-    core::{data::Data, parse::grammar::GrammarSymbol},
+    core::{
+        data::{interval, Data},
+        parse::grammar::GrammarSymbol,
+    },
     std::{error, fmt},
 };
 
@@ -10,16 +13,20 @@ pub mod longest_match;
 static FAIL_SEQUENCE_LENGTH: usize = 10;
 
 pub trait Lexer<State: Data, Symbol: GrammarSymbol>: 'static + Send + Sync {
-    fn lex(&self, input: &[char], cdfa: &CDFA<State, Symbol>) -> Result<Vec<Token<Symbol>>, Error>;
+    fn lex(
+        &self,
+        input: &[char],
+        cdfa: &dyn CDFA<State, Symbol>,
+    ) -> Result<Vec<Token<Symbol>>, Error>;
 }
 
-pub fn def_lexer<State: Data, Symbol: GrammarSymbol>() -> Box<Lexer<State, Symbol>> {
+pub fn def_lexer<State: Data, Symbol: GrammarSymbol>() -> Box<dyn Lexer<State, Symbol>> {
     Box::new(longest_match::LongestMatchLexer)
 }
 
 pub trait CDFA<State: Data, Symbol: GrammarSymbol>: Send + Sync {
     fn transition(&self, state: &State, input: &[char]) -> TransitionResult<State>;
-    fn has_transition(&self, state: &State, input: &[char]) -> bool;
+    fn alphabet_contains(&self, c: char) -> bool;
     fn accepts(&self, state: &State) -> bool;
     fn default_acceptor_destination(&self, state: &State) -> Option<State>;
     fn tokenize(&self, state: &State) -> Option<Symbol>;
@@ -124,37 +131,34 @@ pub enum ConsumerStrategy {
     None,
 }
 
-pub struct TransitionResult<State: Data> {
-    state: Option<State>,
-    consumed: usize,
-    acceptor_destination: Option<State>,
+pub enum TransitionResult<State: Data> {
+    Fail,
+    Ok(TransitionDestination<State>),
 }
 
 impl<State: Data> TransitionResult<State> {
-    pub fn fail() -> Self {
-        TransitionResult {
-            state: None,
-            consumed: 0,
-            acceptor_destination: None,
-        }
-    }
-
     pub fn direct(transit: &Transit<State>) -> Self {
-        TransitionResult::new(transit, 1)
+        TransitionResult::ok(transit, 1)
     }
 
-    pub fn new(transit: &Transit<State>, traversed: usize) -> Self {
+    pub fn ok(transit: &Transit<State>, traversed: usize) -> Self {
         let consumed = match transit.consumer {
             ConsumerStrategy::All => traversed,
             ConsumerStrategy::None => 0,
         };
 
-        TransitionResult {
-            state: Some(transit.dest.clone()),
+        TransitionResult::Ok(TransitionDestination {
+            state: transit.dest.clone(),
             consumed,
             acceptor_destination: transit.acceptor_destination.clone(),
-        }
+        })
     }
+}
+
+pub struct TransitionDestination<State: Data> {
+    state: State,
+    consumed: usize,
+    acceptor_destination: Option<State>,
 }
 
 #[derive(Debug)]
@@ -181,6 +185,12 @@ impl error::Error for CDFAError {
 impl From<String> for CDFAError {
     fn from(err: String) -> CDFAError {
         CDFAError::BuildErr(err)
+    }
+}
+
+impl From<interval::Error> for CDFAError {
+    fn from(err: interval::Error) -> CDFAError {
+        CDFAError::BuildErr(format!("Range matcher error: {}", err))
     }
 }
 
@@ -248,19 +258,23 @@ impl<Symbol: Data> Data for Token<Symbol> {
 }
 
 #[derive(Debug)]
-pub struct Error {
-    sequence: String,
-    character: usize,
-    line: usize,
+pub enum Error {
+    UnacceptedErr(UnacceptedError),
+    AlphabetErr(char),
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "No accepting tokens after ({},{}): {}...",
-            self.line, self.character, self.sequence
-        )
+        match self {
+            Error::UnacceptedErr(ref err) => write!(
+                f,
+                "No accepting tokens after ({},{}): {}...",
+                err.line, err.character, err.sequence,
+            ),
+            Error::AlphabetErr(c) => {
+                write!(f, "Consuming character outside lexer alphabet: '{}'", c,)
+            }
+        }
     }
 }
 
@@ -268,4 +282,17 @@ impl error::Error for Error {
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         None
     }
+}
+
+impl From<UnacceptedError> for Error {
+    fn from(err: UnacceptedError) -> Error {
+        Error::UnacceptedErr(err)
+    }
+}
+
+#[derive(Debug)]
+pub struct UnacceptedError {
+    sequence: String,
+    character: usize,
+    line: usize,
 }

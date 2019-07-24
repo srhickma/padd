@@ -22,7 +22,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
     fn parse(
         &self,
         lex: Vec<Token<Symbol>>,
-        grammar: &Grammar<Symbol>,
+        grammar: &dyn Grammar<Symbol>,
     ) -> Result<Tree<Symbol>, parse::Error> {
         let mut chart: RChart<Symbol> = RChart::new();
         let mut parse_chart: PChart<Symbol> = PChart::new();
@@ -63,7 +63,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
 
         fn complete_full<'inner, 'grammar: 'inner, Symbol: GrammarSymbol>(
             cursor: usize,
-            grammar: &'grammar Grammar<Symbol>,
+            grammar: &'grammar dyn Grammar<Symbol>,
             chart: &'inner mut RChart<'grammar, Symbol>,
         ) {
             let mut i = 0;
@@ -98,7 +98,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
         }
 
         fn predict_full<'inner, 'grammar: 'inner, Symbol: GrammarSymbol>(
-            grammar: &'grammar Grammar<Symbol>,
+            grammar: &'grammar dyn Grammar<Symbol>,
             chart: &'inner mut RChart<'grammar, Symbol>,
         ) {
             let cursor = chart.len() - 1;
@@ -151,7 +151,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
             cursor: usize,
             final_required_token: usize,
             lex: &[Token<Symbol>],
-            grammar: &'grammar Grammar<Symbol>,
+            grammar: &'grammar dyn Grammar<Symbol>,
             chart: &'inner mut RChart<'grammar, Symbol>,
             parse_chart: &mut PChart<'grammar, Symbol>,
         ) {
@@ -196,7 +196,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
             cursor: usize,
             depth: usize,
             symbol: &Symbol,
-            grammar: &'grammar Grammar<Symbol>,
+            grammar: &'grammar dyn Grammar<Symbol>,
             chart: &'inner mut RChart<'grammar, Symbol>,
         ) {
             let mut items_to_add = Vec::new();
@@ -226,7 +226,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
         fn cross<'inner, 'grammar: 'inner, Symbol: GrammarSymbol>(
             src: impl Iterator<Item = &'inner Item<'grammar, Symbol>>,
             symbol: &Symbol,
-            grammar: &'grammar Grammar<Symbol>,
+            grammar: &'grammar dyn Grammar<Symbol>,
         ) -> Vec<Item<'grammar, Symbol>> {
             let mut dest: Vec<Item<Symbol>> = Vec::new();
 
@@ -247,7 +247,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
             spm: SymbolParseMethod,
             affinity: &InjectionAffinity,
             more_required_tokens: bool,
-            grammar: &'grammar Grammar<Symbol>,
+            grammar: &'grammar dyn Grammar<Symbol>,
         ) -> Vec<Item<'grammar, Symbol>> {
             let mut dest: Vec<Item<Symbol>> = Vec::new();
 
@@ -285,7 +285,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
         fn advance_past_symbol<'inner, 'grammar: 'inner, Symbol: GrammarSymbol>(
             item: &'inner Item<'grammar, Symbol>,
             dest: &mut Vec<Item<'grammar, Symbol>>,
-            grammar: &'grammar Grammar<Symbol>,
+            grammar: &'grammar dyn Grammar<Symbol>,
         ) {
             let mut next_item = item.clone();
             next_item.advance();
@@ -299,7 +299,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
             affinity: &InjectionAffinity,
             dest: &mut Vec<Item<'grammar, Symbol>>,
             more_required_tokens: bool,
-            grammar: &'grammar Grammar<Symbol>,
+            grammar: &'grammar dyn Grammar<Symbol>,
         ) {
             let ignore_next = *affinity != InjectionAffinity::Left;
             let mut weight = item.weight + 1;
@@ -372,7 +372,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
         fn advance_over_nullable_nts<'grammar, Symbol: GrammarSymbol>(
             item: Item<'grammar, Symbol>,
             dest: &mut Vec<Item<'grammar, Symbol>>,
-            grammar: &'grammar Grammar<Symbol>,
+            grammar: &'grammar dyn Grammar<Symbol>,
         ) {
             let mut last_item = item;
 
@@ -410,7 +410,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
         }
 
         fn recognized<Symbol: GrammarSymbol>(
-            grammar: &Grammar<Symbol>,
+            grammar: &dyn Grammar<Symbol>,
             chart: &RChart<Symbol>,
         ) -> bool {
             chart
@@ -454,7 +454,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
         };
 
         fn parse_tree<'scope, Symbol: GrammarSymbol>(
-            grammar: &'scope Grammar<Symbol>,
+            grammar: &'scope dyn Grammar<Symbol>,
             lex: &'scope [Token<Symbol>],
             chart: PChart<'scope, Symbol>,
         ) -> Tree<Symbol> {
@@ -466,7 +466,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
         }
 
         fn parse_bottom_up<'scope, Symbol: GrammarSymbol>(
-            grammar: &'scope Grammar<Symbol>,
+            grammar: &'scope dyn Grammar<Symbol>,
             lex: &'scope [Token<Symbol>],
             chart: PChart<'scope, Symbol>,
         ) -> Tree<Symbol> {
@@ -534,7 +534,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
 
             fn link_shallow_paths<'scope, Symbol: GrammarSymbol>(
                 edge: &Edge<Symbol>,
-                grammar: &'scope Grammar<Symbol>,
+                grammar: &'scope dyn Grammar<Symbol>,
                 lex: &'scope [Token<Symbol>],
                 nlp_map: &HashMap<&Edge<Symbol>, ParsePath<Symbol>>,
             ) -> Tree<Symbol> {
@@ -580,7 +580,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
             fn optimal_next_level_path<'scope, Symbol: GrammarSymbol>(
                 edge: &Edge<'scope, Symbol>,
                 weight_map: &HashMap<&'scope Edge<Symbol>, usize>,
-                grammar: &'scope Grammar<Symbol>,
+                grammar: &'scope dyn Grammar<Symbol>,
                 chart: &'scope PChart<'scope, Symbol>,
             ) -> WeightedParsePath<'scope, Symbol> {
                 fn df_search<'scope, Symbol: GrammarSymbol>(
@@ -589,7 +589,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                     bottom: usize,
                     root_edge: &Edge<'scope, Symbol>,
                     weight_map: &HashMap<&'scope Edge<Symbol>, usize>,
-                    grammar: &'scope Grammar<Symbol>,
+                    grammar: &'scope dyn Grammar<Symbol>,
                     chart: &'scope PChart<'scope, Symbol>,
                 ) -> Option<WeightedParsePath<'scope, Symbol>> {
                     if depth == bottom {
@@ -679,13 +679,13 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
         }
 
         fn parse_top_down<'scope, Symbol: GrammarSymbol>(
-            grammar: &'scope Grammar<Symbol>,
+            grammar: &'scope dyn Grammar<Symbol>,
             lex: &'scope [Token<Symbol>],
             chart: PChart<'scope, Symbol>,
         ) -> Tree<Symbol> {
             fn recur<'scope, Symbol: GrammarSymbol>(
                 edge: &Edge<Symbol>,
-                grammar: &'scope Grammar<Symbol>,
+                grammar: &'scope dyn Grammar<Symbol>,
                 lex: &'scope [Token<Symbol>],
                 chart: &PChart<Symbol>,
             ) -> Tree<Symbol> {
@@ -723,7 +723,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
 
             fn top_list<'scope, Symbol: GrammarSymbol>(
                 edge: &Edge<Symbol>,
-                grammar: &'scope Grammar<Symbol>,
+                grammar: &'scope dyn Grammar<Symbol>,
                 chart: &'scope PChart<'scope, Symbol>,
             ) -> ParsePath<'scope, Symbol> {
                 let bottom: usize = edge.symbols_len();
@@ -756,8 +756,8 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                 };
 
                 fn df_search<'scope, Symbol: GrammarSymbol>(
-                    edges: &Fn(usize, Node) -> Vec<Edge<'scope, Symbol>>,
-                    leaf: &Fn(usize, Node) -> bool,
+                    edges: &dyn Fn(usize, Node) -> Vec<Edge<'scope, Symbol>>,
+                    leaf: &dyn Fn(usize, Node) -> bool,
                     depth: usize,
                     root: Node,
                 ) -> Option<ParsePath<'scope, Symbol>> {
@@ -1088,7 +1088,7 @@ impl<'prod, Symbol: GrammarSymbol + 'prod> Edge<'prod, Symbol> {
         }
     }
 
-    fn is_terminal(&self, grammar: &Grammar<Symbol>) -> bool {
+    fn is_terminal(&self, grammar: &dyn Grammar<Symbol>) -> bool {
         self.rule.unwrap().rhs.len() == 1
             && !grammar.is_non_terminal(&self.rule.unwrap().rhs[0])
             && self.shadow.is_none()

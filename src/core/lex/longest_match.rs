@@ -1,6 +1,6 @@
 use core::{
     data::Data,
-    lex::{self, Lexer, Token, CDFA, FAIL_SEQUENCE_LENGTH},
+    lex::{self, Lexer, Token, TransitionResult, CDFA, FAIL_SEQUENCE_LENGTH},
     parse::grammar::GrammarSymbol,
 };
 
@@ -10,7 +10,7 @@ impl<State: Data, Symbol: GrammarSymbol> Lexer<State, Symbol> for LongestMatchLe
     fn lex<'cdfa>(
         &self,
         input: &[char],
-        cdfa: &'cdfa CDFA<State, Symbol>,
+        cdfa: &'cdfa dyn CDFA<State, Symbol>,
     ) -> Result<Vec<Token<Symbol>>, lex::Error> {
         struct ScanOneResult<State> {
             consumed: usize,
@@ -25,8 +25,8 @@ impl<State: Data, Symbol: GrammarSymbol> Lexer<State, Symbol> for LongestMatchLe
             start: State,
             line: usize,
             character: usize,
-            cdfa: &CDFA<State, Symbol>,
-        ) -> ScanOneResult<State> {
+            cdfa: &dyn CDFA<State, Symbol>,
+        ) -> Result<ScanOneResult<State>, lex::Error> {
             let mut remaining = input;
             let mut state: State = start;
             let mut line: usize = line;
@@ -57,40 +57,43 @@ impl<State: Data, Symbol: GrammarSymbol> Lexer<State, Symbol> for LongestMatchLe
             loop {
                 let res = cdfa.transition(&state, remaining);
 
-                consumed += res.consumed;
+                match res {
+                    TransitionResult::Fail => break,
+                    TransitionResult::Ok(dest) => {
+                        consumed += dest.consumed;
 
-                for c in remaining.iter().take(res.consumed) {
-                    character += 1;
-                    if *c == '\n' {
-                        line += 1;
-                        character = 1;
-                    }
-                }
+                        for c in remaining.iter().take(dest.consumed) {
+                            character += 1;
+                            if *c == '\n' {
+                                line += 1;
+                                character = 1;
+                            }
 
-                match res.state {
-                    None => break,
-                    Some(next) => {
-                        if cdfa.accepts(&next) {
+                            if !cdfa.alphabet_contains(*c) {
+                                return Err(lex::Error::AlphabetErr(*c));
+                            }
+                        }
+
+                        if cdfa.accepts(&dest.state) {
                             last_accepting = ScanOneResult {
                                 consumed,
-                                end_state: Some(next.clone()),
-                                next_start: match res.acceptor_destination {
+                                end_state: Some(dest.state.clone()),
+                                next_start: match dest.acceptor_destination {
                                     Some(destination) => Some(destination),
-                                    None => cdfa.default_acceptor_destination(&next),
+                                    None => cdfa.default_acceptor_destination(&dest.state),
                                 },
                                 line,
                                 character,
                             };
                         }
 
-                        state = next;
+                        state = dest.state;
+                        remaining = &remaining[dest.consumed..];
                     }
                 }
-
-                remaining = &remaining[res.consumed..];
             }
 
-            last_accepting
+            Ok(last_accepting)
         }
 
         let mut remaining = input;
@@ -101,7 +104,7 @@ impl<State: Data, Symbol: GrammarSymbol> Lexer<State, Symbol> for LongestMatchLe
 
         loop {
             let res: ScanOneResult<State> =
-                scan_one(remaining, next_start.clone(), line, character, cdfa);
+                scan_one(remaining, next_start.clone(), line, character, cdfa)?;
 
             next_start = match res.next_start {
                 None => next_start,
@@ -120,11 +123,11 @@ impl<State: Data, Symbol: GrammarSymbol> Lexer<State, Symbol> for LongestMatchLe
                             .map(Option::unwrap)
                             .collect();
 
-                        return Err(lex::Error {
+                        return Err(lex::Error::from(lex::UnacceptedError {
                             sequence,
                             line,
                             character,
-                        });
+                        }));
                     }
 
                     break;

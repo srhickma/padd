@@ -58,7 +58,7 @@ macro_rules! catch_fatal {
                 $catch
 
                 #[allow(unreachable_code)] {
-                    panic::take_hook();
+                    let _ = panic::take_hook();
                 }
             } else {
                 panic::resume_unwind(err)
@@ -179,7 +179,7 @@ pub fn fmt_check_err(string: &str) {
 
 #[derive(Debug)]
 struct SanitizedEncoder {
-    encoder: Box<Encode>,
+    encoder: Box<dyn Encode>,
 }
 
 impl SanitizedEncoder {
@@ -193,7 +193,7 @@ impl SanitizedEncoder {
 impl Encode for SanitizedEncoder {
     fn encode(
         &self,
-        w: &mut LogWrite,
+        w: &mut dyn LogWrite,
         record: &Record,
     ) -> Result<(), Box<dyn Error + Sync + Send>> {
         let mut writer = SanitizedLogWriter::new();
@@ -214,7 +214,7 @@ impl SanitizedLogWriter {
         }
     }
 
-    fn sanitize_write(&mut self, w: &mut LogWrite) -> Result<usize, std::io::Error> {
+    fn sanitize_write(&mut self, w: &mut dyn LogWrite) -> Result<usize, std::io::Error> {
         let mut buf = Vec::new();
         self.cursor.seek(SeekFrom::Start(0))?;
         self.cursor.read_to_end(&mut buf)?;

@@ -26,11 +26,10 @@ cdfa {
         'Int' -> ^INT
         'if' -> ^IF
         'else' -> ^ELSE
-        _ -> ^ID;
+        _ -> id;
 
-    ID
-        '<' .. '\n' -> fail
-        _ -> ID;
+    id      ^ ID
+        'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' -> id;
 
     num     ^NUM
         '0' .. '9' -> num;

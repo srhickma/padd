@@ -32,11 +32,11 @@ type StateType = usize;
 type SymbolType = usize;
 
 pub struct FormatJobRunner {
-    cdfa: Box<CDFA<StateType, SymbolType>>,
-    grammar: Box<Grammar<SymbolType>>,
+    cdfa: Box<dyn CDFA<StateType, SymbolType>>,
+    grammar: Box<dyn Grammar<SymbolType>>,
     formatter: Formatter<SymbolType>,
-    lexer: Box<Lexer<StateType, SymbolType>>,
-    parser: Box<Parser<SymbolType>>,
+    lexer: Box<dyn Lexer<StateType, SymbolType>>,
+    parser: Box<dyn Parser<SymbolType>>,
 }
 
 impl FormatJobRunner {
@@ -176,6 +176,45 @@ grammar {
 
         err = err.source().unwrap();
         assert_eq!(format!("{}", err), "No accepting tokens after (1,1): b...");
+
+        assert!(err.source().is_none());
+    }
+
+    #[test]
+    fn failed_lex_alphabet() {
+        //setup
+        let spec = "
+alphabet 'a'
+
+cdfa {
+    start _ -> ^_;
+}
+
+grammar {
+    s |;
+}
+        "
+        .to_string();
+
+        let fjr = FormatJobRunner::build(&spec).unwrap();
+
+        //exercise
+        let res = fjr.format(FormatJob::from_text("b".to_string()));
+
+        //verify
+        assert!(res.is_err());
+
+        let mut err: &Error = &res.err().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "Failed to lex input: Consuming character outside lexer alphabet: 'b'"
+        );
+
+        err = err.source().unwrap();
+        assert_eq!(
+            format!("{}", err),
+            "Consuming character outside lexer alphabet: 'b'"
+        );
 
         assert!(err.source().is_none());
     }
@@ -456,20 +495,19 @@ grammar {
         assert_eq!(
             format!("{}", err),
             "Failed to generate specification: ECDFA generation error: Failed to build CDFA: \
-             Transition trie is not prefix free on character 'l'"
+             Range matcher error: Intervals overlap"
         );
 
         err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
-            "ECDFA generation error: Failed to build CDFA: \
-             Transition trie is not prefix free on character 'l'"
+            "ECDFA generation error: Failed to build CDFA: Range matcher error: Intervals overlap"
         );
 
         err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
-            "Failed to build CDFA: Transition trie is not prefix free on character 'l'"
+            "Failed to build CDFA: Range matcher error: Intervals overlap"
         );
 
         assert!(err.source().is_none());

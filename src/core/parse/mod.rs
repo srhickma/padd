@@ -14,11 +14,11 @@ pub trait Parser<Symbol: GrammarSymbol>: 'static + Send + Sync {
     fn parse(
         &self,
         lex: Vec<Token<Symbol>>,
-        grammar: &Grammar<Symbol>,
+        grammar: &dyn Grammar<Symbol>,
     ) -> Result<Tree<Symbol>, Error>;
 }
 
-pub fn def_parser<Symbol: GrammarSymbol>() -> Box<Parser<Symbol>> {
+pub fn def_parser<Symbol: GrammarSymbol>() -> Box<dyn Parser<Symbol>> {
     Box::new(earley::EarleyParser)
 }
 
@@ -57,7 +57,7 @@ impl<Symbol: GrammarSymbol> Tree<Symbol> {
     }
 
     #[allow(dead_code)]
-    pub fn decode(&self, grammar: &Grammar<Symbol>) -> Tree<String> {
+    pub fn decode(&self, grammar: &dyn Grammar<Symbol>) -> Tree<String> {
         let lhs = match self.lhs.kind_opt() {
             Some(ref symbol) => {
                 Token::leaf(grammar.symbol_string(symbol), self.lhs.lexeme().clone())
@@ -156,7 +156,7 @@ impl<Symbol: GrammarSymbol> Production<Symbol> {
         }
     }
 
-    pub fn decode(&self, grammar: &Grammar<Symbol>) -> Production<String> {
+    pub fn decode(&self, grammar: &dyn Grammar<Symbol>) -> Production<String> {
         Production {
             lhs: self.lhs.to_string(),
             rhs: self
@@ -613,10 +613,7 @@ mod tests {
         let tree = parser.parse(lex, &grammar);
 
         //verify
-        assert_eq!(
-            tree.unwrap().to_string(),
-            "└── s\n    └──  <- 'NULL'"
-        );
+        assert_eq!(tree.unwrap().to_string(), "└── s\n    └──  <- 'NULL'");
     }
 
     #[test]

@@ -1,5 +1,3 @@
-alphabet '<>=+-*/\\%(){}[],.;:#!?^$@&|"\'`~ \t\n\r_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
-
 cdfa {
     start_empty_line
         '//' -> prefix_lcom
@@ -180,8 +178,7 @@ cdfa {
     #
 
     char_lit    ^LIT
-        '<' .. '\n' -> fail
-        _ -> id;
+        _ ->> possible_id;
 
     string
         '"' -> ^LIT
@@ -240,23 +237,19 @@ cdfa {
 
     do      ^DO
         'uble' -> ^PRIM
-        '<' .. '\n' -> fail
-        _ -> id;
+        _ ->> possible_id;
 
     throw   ^THROW
         's' -> ^THROWS
-        '<' .. '\n' -> fail
-        _ -> id;
+        _ ->> possible_id;
 
     int     ^PRIM
         'erface' -> ^INTERFACE
-        '<' .. '\n' -> fail
-        _ -> id;
+        _ ->> possible_id;
 
     final   ^FINAL
         'ly' -> ^FINALLY
-        '<' .. '\n' -> fail
-        _ -> id;
+        _ ->> possible_id;
 
     colon   ^COLON
         ':' -> ^M_REF;
@@ -267,11 +260,15 @@ cdfa {
     MOD | ASSERT | PRIM | BREAK | CASE | CATCH | ENUM | CLASS | CONTINUE | DEFAULT | DO | ELSE | EXTENDS | FINALLY | FOR
         | IF | IMPLEMENTS | IMPORT | INSTANCEOF | NEW | PACKAGE | RETURN | SUPER | SWITCH | THIS | THROWS | TRY | VOID
         | WHILE | INTERFACE | SYNCHRONIZED | STATIC
-        '<' .. '\n' -> fail
-         _ -> id;
+        _ ->> possible_id;
+
+    possible_id
+        '\t' | '\n' | '\r' | ' ' .. '#' | '%' .. '/' | ':' .. '@' | '[' .. '^' | '`' | '{' .. '~' -> fail
+        _ -> id;
 
     id      ^ID
-        '_' .. '9' | '$' -> id;
+        '\t' | '\n' | '\r' | ' ' .. '#' | '%' .. '/' | ':' .. '@' | '[' .. '^' | '`' | '{' .. '~' -> fail
+        _ -> id;
 
     #
     # COMMENTS

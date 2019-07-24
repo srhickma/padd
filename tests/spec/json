@@ -1,5 +1,3 @@
-alphabet '<>=+-*/\\%(){}[],.;:#!?^$@&|"\'`~ \t\n\r_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789' #TODO(shane) support full alphabet
-
 cdfa {
     start
         ' ' | '\t' | '\n' | '\r' -> ^_

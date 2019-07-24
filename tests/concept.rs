@@ -801,3 +801,33 @@ grammar {
     //verify
     assert_eq!(res, "1A1 2A2 3A3");
 }
+
+#[test]
+fn test_optional_alphabet() {
+    //setup
+    let spec = "
+cdfa {
+    start
+        'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' -> ^ALPHA_NUMERIC
+        _ -> ^OTHER;
+}
+
+grammar {
+    s
+        | s ALPHA_NUMERIC
+        | s OTHER `{}\\\\[{}\\\\]`
+        |;
+}
+    "
+    .to_string();
+
+    let input = "as234AB_!@##^*&^&aΩs°Cb+".to_string();
+
+    let fjr = FormatJobRunner::build(&spec).unwrap();
+
+    //exercise
+    let res = fjr.format(FormatJob::from_text(input)).unwrap();
+
+    //verify
+    assert_eq!(res, "as234AB[_][!][@][#][#][^][*][&][^][&]a[Ω]s[°]Cb[+]");
+}

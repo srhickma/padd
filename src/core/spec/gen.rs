@@ -53,7 +53,7 @@ where
 fn traverse_spec_regions<CDFABuilderType, CDFAType, Symbol: GrammarSymbol, GrammarType>(
     regions_node: &Tree<SpecSymbol>,
     cdfa_builder: &mut CDFABuilderType,
-    grammar_builder: &mut GrammarBuilder<String, Symbol, GrammarType>,
+    grammar_builder: &mut dyn GrammarBuilder<String, Symbol, GrammarType>,
     formatter_builder: &mut FormatterBuilder<Symbol>,
 ) -> Result<(), spec::GenError>
 where
@@ -82,7 +82,7 @@ where
 
 fn traverse_injectable_region<Symbol: GrammarSymbol, GrammarType>(
     injectable_node: &Tree<SpecSymbol>,
-    grammar_builder: &mut GrammarBuilder<String, Symbol, GrammarType>,
+    grammar_builder: &mut dyn GrammarBuilder<String, Symbol, GrammarType>,
     formatter_builder: &mut FormatterBuilder<Symbol>,
 ) -> Result<(), spec::GenError>
 where
@@ -119,7 +119,7 @@ where
 
 fn traverse_ignorable_region<Symbol: GrammarSymbol, GrammarType>(
     ignorable_node: &Tree<SpecSymbol>,
-    grammar_builder: &mut GrammarBuilder<String, Symbol, GrammarType>,
+    grammar_builder: &mut dyn GrammarBuilder<String, Symbol, GrammarType>,
 ) where
     GrammarType: Grammar<Symbol>,
 {
@@ -143,7 +143,7 @@ fn traverse_alphabet_region<CDFABuilderType, CDFAType, Symbol: GrammarSymbol>(
 fn traverse_cdfa_region<CDFABuilderType, CDFAType, Symbol: GrammarSymbol, GrammarType>(
     cdfa_node: &Tree<SpecSymbol>,
     cdfa_builder: &mut CDFABuilderType,
-    grammar_builder: &mut GrammarBuilder<String, Symbol, GrammarType>,
+    grammar_builder: &mut dyn GrammarBuilder<String, Symbol, GrammarType>,
 ) -> Result<(), spec::GenError>
 where
     CDFAType: CDFA<usize, Symbol>,
@@ -155,7 +155,7 @@ where
 
 fn traverse_grammar_region<Symbol: GrammarSymbol, GrammarType>(
     grammar_node: &Tree<SpecSymbol>,
-    grammar_builder: &mut GrammarBuilder<String, Symbol, GrammarType>,
+    grammar_builder: &mut dyn GrammarBuilder<String, Symbol, GrammarType>,
     formatter_builder: &mut FormatterBuilder<Symbol>,
 ) -> Result<(), spec::GenError>
 where
@@ -171,7 +171,7 @@ where
 fn generate_cdfa_states<CDFABuilderType, CDFAType, Symbol: GrammarSymbol, GrammarType>(
     states_node: &Tree<SpecSymbol>,
     builder: &mut CDFABuilderType,
-    grammar_builder: &mut GrammarBuilder<String, Symbol, GrammarType>,
+    grammar_builder: &mut dyn GrammarBuilder<String, Symbol, GrammarType>,
 ) -> Result<(), spec::GenError>
 where
     CDFAType: CDFA<usize, Symbol>,
@@ -241,7 +241,7 @@ fn generate_cdfa_trans<CDFABuilderType, CDFAType, Symbol: GrammarSymbol, Grammar
     trans_node: &Tree<SpecSymbol>,
     sources: &[&String],
     builder: &mut CDFABuilderType,
-    grammar_builder: &mut GrammarBuilder<String, Symbol, GrammarType>,
+    grammar_builder: &mut dyn GrammarBuilder<String, Symbol, GrammarType>,
 ) -> Result<(), spec::GenError>
 where
     CDFAType: CDFA<usize, Symbol>,
@@ -399,7 +399,7 @@ fn add_cdfa_state_tokenizer<CDFABuilderType, CDFAType, Symbol: GrammarSymbol, Gr
     state: &String,
     kind: &Symbol,
     builder: &mut CDFABuilderType,
-    grammar_builder: &mut GrammarBuilder<String, Symbol, GrammarType>,
+    grammar_builder: &mut dyn GrammarBuilder<String, Symbol, GrammarType>,
 ) -> Result<(), spec::GenError>
 where
     CDFAType: CDFA<usize, Symbol>,
@@ -422,7 +422,7 @@ where
 
 fn generate_grammar_prods<Symbol: GrammarSymbol, GrammarType>(
     prods_node: &Tree<SpecSymbol>,
-    grammar_builder: &mut GrammarBuilder<String, Symbol, GrammarType>,
+    grammar_builder: &mut dyn GrammarBuilder<String, Symbol, GrammarType>,
     formatter_builder: &mut FormatterBuilder<Symbol>,
 ) -> Result<(), spec::GenError>
 where
@@ -452,7 +452,7 @@ fn generate_grammar_rhss<Symbol: GrammarSymbol, GrammarType>(
     rhss_node: &Tree<SpecSymbol>,
     lhs: &String,
     def_pattern_node: &Tree<SpecSymbol>,
-    grammar_builder: &mut GrammarBuilder<String, Symbol, GrammarType>,
+    grammar_builder: &mut dyn GrammarBuilder<String, Symbol, GrammarType>,
     formatter_builder: &mut FormatterBuilder<Symbol>,
 ) -> Result<(), spec::GenError>
 where
@@ -501,7 +501,7 @@ where
 fn generate_grammar_ids<Symbol: GrammarSymbol, GrammarType>(
     ids_node: &Tree<SpecSymbol>,
     ids_accumulator: &mut Vec<String>,
-    grammar_builder: &mut GrammarBuilder<String, Symbol, GrammarType>,
+    grammar_builder: &mut dyn GrammarBuilder<String, Symbol, GrammarType>,
 ) where
     GrammarType: Grammar<Symbol>,
 {
@@ -529,7 +529,7 @@ fn generate_grammar_ids<Symbol: GrammarSymbol, GrammarType>(
 
 fn orphan_check<Symbol: GrammarSymbol>(
     ecdfa: &EncodedCDFA<Symbol>,
-    grammar: &Grammar<Symbol>,
+    grammar: &dyn Grammar<Symbol>,
 ) -> Result<(), spec::GenError> {
     let mut ecdfa_products: HashSet<&Symbol> = HashSet::new();
     for product in ecdfa.produces() {
