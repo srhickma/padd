@@ -16,9 +16,6 @@ use {
     std::{error, fmt},
 };
 
-static PATTERN_ALPHABET: &'static str =
-    "{}[];=0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ \n\t\r`~!@#$%^&*()_-+:'\"<>,.?/\\|";
-
 /// S: An enum whose elements are the states of the CDFA for lexing a pattern.
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
 enum S {
@@ -52,9 +49,7 @@ thread_local! {
 fn build_pattern_ecdfa() -> Result<EncodedCDFA<PatternSymbol>, lex::CDFAError> {
     let mut builder: EncodedCDFABuilder<S, PatternSymbol> = EncodedCDFABuilder::new();
 
-    builder
-        .set_alphabet(PATTERN_ALPHABET.chars())
-        .mark_start(&S::Start);
+    builder.mark_start(&S::Start);
 
     builder
         .state(&S::Start)

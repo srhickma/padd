@@ -13,8 +13,6 @@ use core::{
     spec,
 };
 
-static SPEC_ALPHABET: &'static str = "`-=~!@#$%^&*()+{}|[]\\;':\"<>?,./_0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ \n\t\r";
-
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
 enum S {
     Start,
@@ -74,9 +72,7 @@ thread_local! {
 fn build_spec_ecdfa() -> Result<EncodedCDFA<SpecSymbol>, lex::CDFAError> {
     let mut builder: EncodedCDFABuilder<S, SpecSymbol> = EncodedCDFABuilder::new();
 
-    builder
-        .set_alphabet(SPEC_ALPHABET.chars())
-        .mark_start(&S::Start);
+    builder.mark_start(&S::Start);
 
     builder
         .state(&S::Start)
