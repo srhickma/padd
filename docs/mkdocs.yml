@@ -13,4 +13,6 @@ nav:
   - 'Pattern': spec/pattern.md
   - 'Ignoreable': spec/ignoreable.md
   - 'Injectable': spec/injectable.md
-
+- Architecture: architecture.md
+- Testing: testing.md
+- Contributing: contributing.md
