@@ -1,0 +1,16 @@
+site_name: padd
+theme: readthedocs
+nav:
+- Home: index.md
+- Getting Started: getting_started.md
+- Cli: cli/index.md
+- Library: lib/index.md
+- Specification:
+  - 'Specification': spec/index.md
+  - 'Alphabet': spec/alphabet.md
+  - 'CDFA': spec/cdfa.md
+  - 'Grammar': spec/grammar.md
+  - 'Pattern': spec/pattern.md
+  - 'Ignoreable': spec/ignoreable.md
+  - 'Injectable': spec/injectable.md
+
