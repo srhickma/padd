@@ -613,7 +613,10 @@ mod tests {
         let tree = parser.parse(lex, &grammar);
 
         //verify
-        assert_eq!(tree.unwrap().to_string(), "└── s\n    └──  <- 'NULL'");
+        assert_eq!(
+            tree.unwrap().to_string(),
+            "└── s\n    └──  <- 'NULL'"
+        );
     }
 
     #[test]
