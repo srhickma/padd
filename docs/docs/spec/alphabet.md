@@ -6,7 +6,7 @@ scan error is emitted if a character outside the alphabet is consumed. Alphabets
 `alphabet 'SOME_CHARACTERS'`, where `SOME_CHARACTERS` are the characters included in the alphabet.
 
 **Example:** The following alphabet allows only alphanumeric characters to be scanned:
-```
+```text
 alphabet 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
 ```
 
@@ -33,6 +33,6 @@ formatted.
 
 ### Example
 The following is an alphabet which could be used for a simple programming language:
-```
+```text
 alphabet '<>=+-*/%(){},;:! \t\nABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
 ```
