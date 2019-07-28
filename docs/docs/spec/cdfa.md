@@ -175,10 +175,69 @@ The same input in the same state will result in the same transition taken.
 ---
 
 ## Transitions
+There are two types of transitions which can be used in a state definition, consume-all and consume-none, which differ
+in how they advance the scan cursor after taking the transition.
 
 ### Consume All
+Consume-all transitions, denoted by `->`, are the standard form of transition.
+When a consume-all transition is taken, the scan cursor is advanced past the input prefix which was matched, and the
+next iteration matches the remaining input.
+
+**Example:**
+```text
+my_state
+    'a' -> other_state;
+```
+In this example, if the input in `my_state` is `abc`, the transition to `other_state` will be taken and the remaining
+input will now be `bc`.
 
 ### Consume None
+Consume-none transitions, denoted by `->>`, are used to perform a transition without consuming any of the input
+(i.e. the scan cursor is not advanced).
+
+**Example:**
+```text
+my_state
+    'a' ->> other_state;
+```
+In this example, if the input in `my_state` is `abc`, we will transition to `other_state` and the remaining input will
+still be `abc`.
+
+This type of consumer is less common, however a typical use of consume-none transitions is to effectively "import" the
+transitions of one state into another, avoiding duplication.
+
+**Example:** Consider the following two state definition:
+```text
+my_state
+    'a' -> got_a_overridden
+    'b' -> got_b
+    'c' -> got_c
+    'd' -> got_d;
+
+other_state
+    'a' -> got_a
+    'b' -> got_b
+    'c' -> got_c
+    'd' -> got_d;
+```
+Using a consume-none transition, this can be simplified to:
+```text
+my_state
+    'a' -> got_a_overridden
+    _ ->> other_state;
+
+other_state
+    'a' -> got_a
+    'b' -> got_b
+    'c' -> got_c
+    'd' -> got_d;
+```
+
+**Note:** It is possible to create an infinite loop using consume-none transitions, so care must be taken when writing
+a CDFA to avoid these scenarios.
+Currently, these loops are not detected during specification parsing or at runtime, so loops will cause the formatter to
+hang.
+While it is non-trivial to detect loops at parse time, it is on the road-map to enable loop detection during lexing.
 
 ---
 
