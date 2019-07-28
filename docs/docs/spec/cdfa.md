@@ -4,7 +4,7 @@ Compressed deterministic finite automata (CDFAs) are a modified version of a tra
 (DFA), with modifications to make language specification less verbose and more powerful (hence "compressed"), without
 losing any of the performance benefits of traditional DFAs over regular expressions and non-deterministic finite
 automata (NFAs).
-In fact, the internal CDFA implementation (called an Encoded Compressed Deterministic Finite Automata, or ECDFA), is 
+In fact, the internal CDFA implementation (called an Encoded Compressed Deterministic Finite Automata, or ECDFA), is
 actually _more efficient_ than a simple DFA for representing complex structures like character ranges and chains
 (e.g. keywords).
 A more in-depth overview of the ECDFA implementation and design decisions is given in the
