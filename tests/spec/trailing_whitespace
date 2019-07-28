@@ -1,0 +1,30 @@
+cdfa {
+    start
+        ' ' | '\t' | '\r' -> start
+        '\n' -> ^NEWLINE
+        _ -> line;
+
+    line ^LINE
+        ' ' | '\t' | '\r' -> after_line
+        '\n' -> fail
+        _ -> line;
+
+    after_line
+        ' ' | '\t' | '\r' -> after_line
+        '\n' -> fail
+        _ -> line;
+}
+
+grammar {
+    file
+        | lines;
+
+    #TODO replace with inline list
+    lines
+        | lines line
+        |;
+
+    line
+        | LINE
+        | NEWLINE `\n`;
+}
