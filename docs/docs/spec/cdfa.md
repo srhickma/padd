@@ -76,6 +76,32 @@ my_state
 In this example `MATCHERS` represents the location where input matchers would be specified, determining under which
 conditions each transition should be taken.
 
+Multiple state definitions can be used for a single state, in which case the transitions across all definitions will be
+combined.
+
+**Example:** The following specification is equivalent to the previous example:
+```text
+my_state
+    MATCHERS -> dest_state1
+    MATCHERS -> dest_state2;
+
+my_state
+    MATCHERS -> dest_state3;
+```
+
+Multiple states can share transitions by separating their names using the pipe character `|`.
+
+**Example:**
+```text
+my_state | other_state
+    MATCHERS -> dest_state1
+    MATCHERS -> dest_state2
+    MATCHERS -> dest_state3;
+```
+
+**Note:** when transitions are applied to multiple states, so are any state acceptors and state acceptor destinations.
+See the section on [acceptors](#acceptors) for more information.
+
 ---
 
 ## Matchers
@@ -175,6 +201,7 @@ The same input in the same state will result in the same transition taken.
 ---
 
 ## Transitions
+
 There are two types of transitions which can be used in a state definition, consume-all and consume-none, which differ
 in how they advance the scan cursor after taking the transition.
 
@@ -243,10 +270,125 @@ While it is non-trivial to detect loops at parse time, it is on the road-map to 
 
 ## Acceptors
 
+Acceptors are used to specify which states are accepting, as well as how accepting states should be tokenized.
+
 ### State Acceptors
+The simplest form of acceptor is a state acceptor, which can be used to mark a state as accepting.
+State acceptors have the form `^TOKEN` where `TOKEN` is the token which will be produced when the state is tokenized.
+The convention for naming token kinds is to use uppercase snake-case.
+
+**Example:**
+```text
+my_state ^MY_STATE
+    'a' -> other_state;
+```
+In this example, `my_state` is marked as accepting, and when it is tokenized, a `MY_STATE` token will be produced.
 
 ### Transition Acceptors
+Transition acceptors are syntactic sugar around state acceptors which is useful for allowing the acceptance of states
+with no outbound transitions to be inlined into a transition.
+The same `^TOKEN` syntax is used, however it is written in the destination of the transition itself, in place of a
+destination state.
+
+**Example:**
+```text
+my_state
+    'a' -> ^TOKEN;
+```
+In this example (assuming no explicit definition of `TOKEN`), when the transition is taken a token of kind `TOKEN` will
+be produced, and the lexer will return to the start state.
+
+Under the hood, the specification generator will translate the above specification into:
+```text
+my_state
+    'a' -> TOKEN;
+
+TOKEN ^TOKEN;
+```
+Due to this, one can use `TOKEN` as they would any other state, even though it has not been explicitly declared.
 
 ### Default Acceptor
+If a state should be accepted but not tokenized, then a default acceptor should be used.
+Default acceptors have the form `^_`.
+
+**Example:** If your formatter ignores whitespace, the following can be used to avoid sending whitespace tokens to the
+parser (and over-complicating your grammar):
+```text
+start
+    ' ' | '\t' | '\r' | '\n' -> ^_;
+    ...
+```
 
 ### Acceptor Destinations
+To allow lexers to scan regions of input which are syntactically different, without an over-simplified scanner and a
+overworked parser (which is much slower), it is useful to allow different regions of text to be scanned using different
+starting states.
+Acceptor destinations enable this behaviour by allowing a "destination" state to be specified after an acceptor, which
+determines the next start state after the acceptor is used.
+If no acceptor destination is specified, the current start state is re-used, so "sub-states" like identifier lexers can
+be re-used in multiple regions without changing the start state.
+The syntax for acceptor destinations is `^TOKEN -> DEST`, where `^TOKEN` is the acceptor, and `DEST` is the destination
+state.
+
+**Example:**
+```text
+my_state
+    'a' -> ^A -> start_after_a
+    'b' -> ^B -> start_after_b;
+```
+
+**Note:** acceptor destinations can be used for both state and transition acceptors, as well as default acceptors.
+
+Acceptor destinations are used heavily in the internal specification lexer, allowing the lexer to scan each region type
+using tailored logic.
+
+**Example:** The following is a simple example of how acceptor destinations can be used to scan logical "regions" of
+the input:
+```text
+cdfa {
+    start
+        'region1' -> ^R1 -> r1_dec
+        'region2' -> ^R2 -> r2_dec;
+
+    r1_dec
+       '{' -> ^LBRACE -> r1_body;
+
+    r2_dec
+       '{' -> ^LBRACE -> r2_body;
+
+    r1_body
+        'a' -> ^A
+        'b' -> ^B
+        '}' -> ^RBRACE -> start;
+
+    r2_body
+        '0' .. '9' -> num
+        '}' -> ^RBRACE -> start;
+
+    num ^NUM
+        '0' .. '9' -> num;
+}
+```
+This example uses two regions, `region1` and `region2` which can internally contain the characters `{'a', 'b'}` and
+numbers, respectively.
+So the following input would be scanned successfully (ignoring whitespace):
+```text
+region1 {
+    abba
+}
+region2 {
+    1234567890
+}
+```
+However the following input would result in a lexing error (ignoring whitespace):
+```text
+region1 {
+    1234567890
+}
+region2 {
+    abba
+}
+```
+
+From the above example, it becomes obvious how powerful acceptor destinations can be.
+Many context-aware checks can be performed in the (faster) scanning phase, allowing for a simpler and faster parser grammar.
