@@ -152,7 +152,7 @@ impl<Symbol: GrammarSymbol> GrammarBuilder<Symbol, Symbol, SimpleGrammar<Symbol>
                 vec![
                     Production::from(
                         opt_state.clone(),
-                        vec![ProductionSymbol::symbol(dest_state.clone())]
+                        vec![ProductionSymbol::symbol(dest_state.clone())],
                     ),
                     Production::epsilon(opt_state.clone()),
                 ],
@@ -277,7 +277,7 @@ impl<SymbolIn: GrammarSymbol> GrammarBuilder<SymbolIn, usize, EncodedGrammar<Sym
             .iter()
             .map(|sym| ProductionSymbol {
                 symbol: self.encoder.encode(&sym.symbol),
-                list: sym.list,
+                is_list: sym.is_list,
             })
             .collect();
 
@@ -347,7 +347,7 @@ fn build_terminals<Symbol: GrammarSymbol>(
 ) -> HashSet<Symbol> {
     let mut terminals: HashSet<Symbol> = HashSet::new();
 
-    for (_, prods) in prods_by_lhs {
+    for prods in prods_by_lhs.values() {
         for prod in prods {
             for sym in &prod.rhs {
                 let symbol = &sym.symbol;
@@ -373,7 +373,10 @@ fn build_nss<Symbol: GrammarSymbol>(
         .flat_map(|(_, prods)| prods)
         .for_each(|prod| {
             for sym in &prod.rhs {
-                prods_by_rhs.entry(&sym.symbol).or_insert_with(Vec::new).push(prod);
+                prods_by_rhs
+                    .entry(&sym.symbol)
+                    .or_insert_with(Vec::new)
+                    .push(prod);
             }
 
             if prod.rhs.is_empty() {
@@ -428,9 +431,7 @@ impl<'builder, SymbolIn: GrammarSymbol, SymbolOut: GrammarSymbol, GrammarType>
     }
 
     pub fn to(&mut self, rhs: Vec<SymbolIn>) -> &mut Self {
-        let rhs = rhs.into_iter()
-            .map(|symbol| ProductionSymbol::symbol(symbol))
-            .collect();
+        let rhs = rhs.into_iter().map(ProductionSymbol::symbol).collect();
 
         self.grammar_builder
             .add_production(Production::from(self.lhs.clone(), rhs));

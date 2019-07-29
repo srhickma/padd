@@ -114,7 +114,7 @@ impl<Symbol: GrammarSymbol> FormatterBuilder<Symbol> {
             Some(pattern_string) => {
                 let production = Production::from(
                     injection.terminal.clone(),
-                    vec![ProductionSymbol::symbol(injection.terminal.clone())]
+                    vec![ProductionSymbol::symbol(injection.terminal.clone())],
                 );
 
                 Some(pattern::generate_pattern(

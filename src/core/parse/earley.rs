@@ -6,7 +6,7 @@ use {
         parse::{
             self,
             grammar::{Grammar, GrammarSymbol},
-            Parser, Production, Tree,
+            Parser, Production, ProductionSymbol, Tree,
         },
     },
     std::{
@@ -231,9 +231,13 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
             let mut dest: Vec<Item<Symbol>> = Vec::new();
 
             for item in src {
-                if let Some(sym) = item.next_symbol() {
-                    if sym == symbol {
-                        advance_past_symbol(item, &mut dest, grammar);
+                if let Some(sym) = item.next_prod_symbol() {
+                    if sym.symbol == *symbol {
+                        if sym.is_list {
+                            advance_list_via_shadow(item, symbol, &mut dest, grammar);
+                        } else {
+                            advance_past_symbol(item, &mut dest, grammar);
+                        }
                     }
                 }
             }
@@ -252,8 +256,14 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
             let mut dest: Vec<Item<Symbol>> = Vec::new();
 
             for item in &src.incomplete.items {
-                if item.next_symbol().unwrap() == symbol {
-                    advance_past_symbol(item, &mut dest, grammar);
+                // TODO(shane) conglomerate with above.
+                let sym = item.next_prod_symbol().unwrap();
+                if sym.symbol == *symbol {
+                    if sym.is_list {
+                        advance_list_via_shadow(item, symbol, &mut dest, grammar);
+                    } else {
+                        advance_past_symbol(item, &mut dest, grammar);
+                    }
                 } else {
                     advance_via_shadow(
                         item,
@@ -289,7 +299,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
         ) {
             let mut next_item = item.clone();
             next_item.advance();
-            advance_over_nullable_nts(next_item, dest, grammar);
+            advance_over_nullable_symbols(next_item, dest, grammar);
         }
 
         fn advance_via_shadow<'inner, 'grammar: 'inner, Symbol: GrammarSymbol>(
@@ -348,12 +358,14 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                 shadow_vec.push(ShadowSymbol {
                     symbol: item.rule.rhs[i].symbol.clone(),
                     spm: SymbolParseMethod::Standard,
+                    reps: 1,
                 });
             }
 
             shadow_vec.push(ShadowSymbol {
                 symbol: symbol.clone(),
                 spm,
+                reps: 1,
             });
 
             let new_item = Item {
@@ -366,10 +378,10 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                 ignore_next,
                 weight,
             };
-            advance_over_nullable_nts(new_item, dest, grammar);
+            advance_over_nullable_symbols(new_item, dest, grammar);
         }
 
-        fn advance_over_nullable_nts<'grammar, Symbol: GrammarSymbol>(
+        fn advance_over_nullable_symbols<'grammar, Symbol: GrammarSymbol>(
             item: Item<'grammar, Symbol>,
             dest: &mut Vec<Item<'grammar, Symbol>>,
             grammar: &'grammar dyn Grammar<Symbol>,
@@ -379,10 +391,83 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
             loop {
                 dest.push(last_item.clone());
 
-                match last_item.next_symbol() {
+                match last_item.next_prod_symbol() {
                     None => break,
                     Some(sym) => {
-                        if !grammar.is_nullable_nt(sym) {
+                        if !grammar.is_nullable_nt(&sym.symbol) {
+                            break;
+                        }
+                    }
+                }
+
+                last_item.advance();
+            }
+        }
+
+        fn advance_list_via_shadow<'inner, 'grammar: 'inner, Symbol: GrammarSymbol>(
+            item: &'inner Item<'grammar, Symbol>,
+            symbol: &Symbol,
+            dest: &mut Vec<Item<'grammar, Symbol>>,
+            grammar: &'grammar dyn Grammar<Symbol>,
+        ) {
+            // TODO(shane) conglomerate with advance_via_shadow.
+            let mut shadow_vec = match item.shadow {
+                Some(ref shadow_vec) => shadow_vec.clone(),
+                None => Vec::new(),
+            };
+
+            let mut extended_list = false;
+            if item.shadow_top == item.next && item.shadow.is_some() {
+                let previous = shadow_vec.last_mut().unwrap();
+                if previous.symbol == *symbol && previous.spm == SymbolParseMethod::Repeated {
+                    previous.reps += 1;
+                    extended_list = true;
+                }
+            }
+
+            if !extended_list {
+                for i in item.shadow_top..item.next {
+                    shadow_vec.push(ShadowSymbol {
+                        symbol: item.rule.rhs[i].symbol.clone(),
+                        spm: SymbolParseMethod::Standard,
+                        reps: 1,
+                    });
+                }
+
+                shadow_vec.push(ShadowSymbol {
+                    symbol: symbol.clone(),
+                    spm: SymbolParseMethod::Repeated,
+                    reps: 1,
+                });
+            }
+
+            let new_item = Item {
+                rule: item.rule,
+                shadow: Some(shadow_vec),
+                shadow_top: item.next,
+                start: item.start,
+                next: item.next,
+                depth: item.depth,
+                ignore_next: false,
+                weight: 0,
+            };
+            advance_over_list(new_item, dest, grammar);
+        }
+
+        fn advance_over_list<'grammar, Symbol: GrammarSymbol>(
+            item: Item<'grammar, Symbol>,
+            dest: &mut Vec<Item<'grammar, Symbol>>,
+            grammar: &'grammar dyn Grammar<Symbol>,
+        ) {
+            let mut last_item = item;
+
+            loop {
+                dest.push(last_item.clone());
+
+                match last_item.next_prod_symbol() {
+                    None => break,
+                    Some(sym) => {
+                        if !sym.is_list && !grammar.is_nullable_nt(&sym.symbol) {
                             break;
                         }
                     }
@@ -401,6 +486,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                 rule: Some(item.rule),
                 shadow: item.shadow.clone(),
                 shadow_top: item.shadow_top,
+                shadow_len: Edge::shadow_len(&item.shadow),
                 start: item.start,
                 finish,
                 spm: SymbolParseMethod::Standard,
@@ -606,6 +692,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                                 rule: None,
                                 shadow: None,
                                 shadow_top: 0,
+                                shadow_len: 0,
                                 start: root,
                                 finish: root + 1,
                                 spm,
@@ -722,62 +809,75 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
             }
 
             fn top_list<'scope, Symbol: GrammarSymbol>(
-                edge: &Edge<Symbol>,
+                edge: &'scope Edge<Symbol>,
                 grammar: &'scope dyn Grammar<Symbol>,
                 chart: &'scope PChart<'scope, Symbol>,
             ) -> ParsePath<'scope, Symbol> {
-                let bottom: usize = edge.symbols_len();
-                let leaf = |depth: usize, node: Node| depth == bottom && node == edge.finish;
-                let edges = |depth: usize, node: Node| -> Vec<Edge<Symbol>> {
-                    if depth < bottom {
-                        let (symbol, spm) = edge.symbol_at(depth);
+                fn df_search<'scope, Symbol: GrammarSymbol>(
+                    depth: usize,
+                    root: Node,
+                    bottom: usize,
+                    root_edge: &Edge<'scope, Symbol>,
+                    grammar: &'scope dyn Grammar<Symbol>,
+                    chart: &'scope PChart<'scope, Symbol>,
+                ) -> Option<ParsePath<'scope, Symbol>> {
+                    if depth == bottom {
+                        if root == root_edge.finish {
+                            Some(ParsePath::new())
+                        } else {
+                            None
+                        }
+                    } else {
+                        let (symbol, spm) = root_edge.symbol_at(depth);
+
                         if !grammar.is_non_terminal(symbol) {
-                            return vec![Edge {
+                            let edge = Edge {
                                 rule: None,
                                 shadow: None,
                                 shadow_top: 0,
-                                start: node,
-                                finish: node + 1,
+                                shadow_len: 0,
+                                start: root,
+                                finish: root + 1,
                                 spm,
                                 weight: 0,
                                 depth: 0,
-                            }];
-                        } else if node < chart.len() {
-                            return chart
-                                .row(node)
-                                .edges
-                                .iter()
-                                .filter(|edge| edge.rule.unwrap().lhs == *symbol)
-                                .cloned()
-                                .collect();
-                        }
-                    }
-                    Vec::new()
-                };
+                            };
 
-                fn df_search<'scope, Symbol: GrammarSymbol>(
-                    edges: &dyn Fn(usize, Node) -> Vec<Edge<'scope, Symbol>>,
-                    leaf: &dyn Fn(usize, Node) -> bool,
-                    depth: usize,
-                    root: Node,
-                ) -> Option<ParsePath<'scope, Symbol>> {
-                    if leaf(depth, root) {
-                        Some(ParsePath::new())
-                    } else {
-                        for edge in edges(depth, root) {
-                            if let Some(mut path) = df_search(edges, leaf, depth + 1, edge.finish) {
+                            if let Some(mut path) =
+                                df_search(depth + 1, edge.finish, bottom, root_edge, grammar, chart)
+                            {
                                 path.push(edge);
-                                return Some(path);
+                                Some(path)
+                            } else {
+                                None
                             }
+                        } else if root < chart.len() {
+                            for edge in &chart.row(root).edges {
+                                if edge.rule.unwrap().lhs == *symbol {
+                                    if let Some(mut path) = df_search(
+                                        depth + 1,
+                                        edge.finish,
+                                        bottom,
+                                        root_edge,
+                                        grammar,
+                                        chart,
+                                    ) {
+                                        path.push(edge.clone());
+                                        return Some(path);
+                                    }
+                                }
+                            }
+
+                            None
+                        } else {
+                            None
                         }
-                        None
                     }
                 }
 
-                match df_search(&edges, &leaf, 0, edge.start) {
-                    None => panic!("Failed to decompose parse edge of recognized lex"),
-                    Some(path) => path,
-                }
+                let bottom = edge.symbols_len();
+                df_search(0, edge.start, bottom, edge, grammar, chart)
+                    .expect("Failed to decompose parse edge of recognized lex")
             }
 
             let finish: Node = chart.len() - 1;
@@ -973,6 +1073,14 @@ impl<'rule, Symbol: GrammarSymbol + 'rule> Item<'rule, Symbol> {
         }
     }
 
+    fn next_prod_symbol<'scope>(&'scope self) -> Option<&'rule ProductionSymbol<Symbol>> {
+        if self.next < self.rule.rhs.len() {
+            Some(&self.rule.rhs[self.next])
+        } else {
+            None
+        }
+    }
+
     fn is_complete(&self) -> bool {
         self.next >= self.rule.rhs.len()
     }
@@ -1054,6 +1162,7 @@ struct Edge<'prod, Symbol: GrammarSymbol + 'prod> {
     rule: Option<&'prod Production<Symbol>>,
     shadow: Option<Vec<ShadowSymbol<Symbol>>>,
     shadow_top: usize,
+    shadow_len: usize,
     start: usize,
     finish: usize,
     spm: SymbolParseMethod,
@@ -1064,28 +1173,57 @@ struct Edge<'prod, Symbol: GrammarSymbol + 'prod> {
 impl<'prod, Symbol: GrammarSymbol + 'prod> Edge<'prod, Symbol> {
     fn symbols_len(&self) -> usize {
         match self.rule {
-            Some(rule) => match self.shadow {
-                Some(ref shadow) => shadow.len() + rule.rhs.len() - self.shadow_top,
-                None => rule.rhs.len(),
-            },
+            Some(rule) => self.shadow_len + rule.rhs.len() - self.shadow_top,
+            None => 0,
+        }
+    }
+
+    fn shadow_len(shadow: &Option<Vec<ShadowSymbol<Symbol>>>) -> usize {
+        match shadow {
+            Some(ref shadow) => {
+                let mut lists = 0;
+                let mut repeated = 0;
+                for item in shadow {
+                    if item.spm == SymbolParseMethod::Repeated {
+                        lists += 1;
+                        repeated += (item.reps - 1) as usize;
+                    }
+                }
+
+                shadow.len() + repeated - lists
+            }
             None => 0,
         }
     }
 
     fn symbol_at(&self, index: usize) -> (&Symbol, SymbolParseMethod) {
-        if let Some(ref shadow) = self.shadow {
-            if index < shadow.len() {
-                let shadow_symbol = &shadow[index];
-                (&shadow_symbol.symbol, shadow_symbol.spm.clone())
-            } else {
-                (
-                    &self.rule.unwrap().rhs[index - shadow.len() + self.shadow_top].symbol,
-                    SymbolParseMethod::Standard,
-                )
-            }
+        if index < self.shadow_len {
+            self.shadow_symbol_at(index)
         } else {
-            (&self.rule.unwrap().rhs[index].symbol, SymbolParseMethod::Standard)
+            (
+                &self.rule.unwrap().rhs[index - self.shadow_len + self.shadow_top].symbol,
+                SymbolParseMethod::Standard,
+            )
         }
+    }
+
+    fn shadow_symbol_at(&self, index: usize) -> (&Symbol, SymbolParseMethod) {
+        let shadow = self.shadow.as_ref().unwrap();
+
+        let mut expanded_index = 0;
+        for (real_index, item) in shadow.iter().enumerate() {
+            expanded_index += item.reps;
+
+            if expanded_index > index {
+                let shadow_symbol = &shadow[real_index];
+                return (&shadow_symbol.symbol, shadow_symbol.spm.clone());
+            }
+        }
+
+        panic!(
+            "Shadow symbol index {} out of bounds, length is {}",
+            index, self.shadow_len
+        );
     }
 
     fn is_terminal(&self, grammar: &dyn Grammar<Symbol>) -> bool {
@@ -1134,6 +1272,7 @@ impl<'prod, Symbol: GrammarSymbol + 'prod> Data for Edge<'prod, Symbol> {
 struct ShadowSymbol<Symbol: GrammarSymbol> {
     symbol: Symbol,
     spm: SymbolParseMethod,
+    reps: usize,
 }
 
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
@@ -1141,6 +1280,7 @@ enum SymbolParseMethod {
     Standard,
     Ignored,
     Injected,
+    Repeated,
 }
 
 type Node = usize;

@@ -519,13 +519,13 @@ fn generate_grammar_ids<Symbol: GrammarSymbol, GrammarType>(
                 grammar_builder.add_optional_state(&opt_state, dest);
 
                 ProductionSymbol::symbol(opt_state)
-            },
+            }
             SpecSymbol::TListId => {
                 let lex = &id_node.lhs.lexeme()[..];
                 let target = lex[1..lex.len() - 1].to_string();
 
                 ProductionSymbol::symbol_list(target)
-            },
+            }
             _ => panic!("Unexpected production identifier type"),
         };
 
