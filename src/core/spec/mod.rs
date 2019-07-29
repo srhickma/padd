@@ -1384,6 +1384,16 @@ grammar {
         )
     }
 
+    #[test]
+    fn inline_list_terminal() {
+        // TODO(shane)
+    }
+
+    #[test]
+    fn inline_list_non_terminal() {
+        // TODO(shane)
+    }
+
     fn tokens_string(tokens: Vec<Token<String>>) -> String {
         let mut res_string = String::new();
         for token in tokens {

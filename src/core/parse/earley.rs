@@ -346,7 +346,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
 
             for i in item.shadow_top..item.next {
                 shadow_vec.push(ShadowSymbol {
-                    symbol: item.rule.rhs[i].clone(),
+                    symbol: item.rule.rhs[i].symbol.clone(),
                     spm: SymbolParseMethod::Standard,
                 });
             }
@@ -959,7 +959,7 @@ impl<'rule, Symbol: GrammarSymbol + 'rule> Item<'rule, Symbol> {
 
     fn next_symbol<'scope>(&'scope self) -> Option<&'rule Symbol> {
         if self.next < self.rule.rhs.len() {
-            Some(&self.rule.rhs[self.next])
+            Some(&self.rule.rhs[self.next].symbol)
         } else {
             None
         }
@@ -967,7 +967,7 @@ impl<'rule, Symbol: GrammarSymbol + 'rule> Item<'rule, Symbol> {
 
     fn prev_symbol<'scope>(&'scope self) -> Option<&'rule Symbol> {
         if self.next > 0 {
-            self.rule.rhs.get(self.next - 1)
+            self.rule.rhs.get(self.next - 1).map(|sym| &sym.symbol)
         } else {
             None
         }
@@ -1079,18 +1079,18 @@ impl<'prod, Symbol: GrammarSymbol + 'prod> Edge<'prod, Symbol> {
                 (&shadow_symbol.symbol, shadow_symbol.spm.clone())
             } else {
                 (
-                    &self.rule.unwrap().rhs[index - shadow.len() + self.shadow_top],
+                    &self.rule.unwrap().rhs[index - shadow.len() + self.shadow_top].symbol,
                     SymbolParseMethod::Standard,
                 )
             }
         } else {
-            (&self.rule.unwrap().rhs[index], SymbolParseMethod::Standard)
+            (&self.rule.unwrap().rhs[index].symbol, SymbolParseMethod::Standard)
         }
     }
 
     fn is_terminal(&self, grammar: &dyn Grammar<Symbol>) -> bool {
         self.rule.unwrap().rhs.len() == 1
-            && !grammar.is_non_terminal(&self.rule.unwrap().rhs[0])
+            && !grammar.is_non_terminal(&self.rule.unwrap().rhs[0].symbol)
             && self.shadow.is_none()
     }
 

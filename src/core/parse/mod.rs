@@ -135,13 +135,35 @@ impl error::Error for Error {
 }
 
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
+pub struct ProductionSymbol<Symbol: GrammarSymbol> {
+    pub symbol: Symbol,
+    pub list: bool,
+}
+
+impl<Symbol: GrammarSymbol> ProductionSymbol<Symbol> {
+    pub fn symbol(symbol: Symbol) -> Self {
+        ProductionSymbol {
+            symbol,
+            list: false,
+        }
+    }
+
+    pub fn symbol_list(symbol: Symbol) -> Self {
+        ProductionSymbol {
+            symbol,
+            list: true,
+        }
+    }
+}
+
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub struct Production<Symbol: GrammarSymbol> {
     pub lhs: Symbol,
-    pub rhs: Vec<Symbol>,
+    pub rhs: Vec<ProductionSymbol<Symbol>>,
 }
 
 impl<Symbol: GrammarSymbol> Production<Symbol> {
-    pub fn from(lhs: Symbol, rhs: Vec<Symbol>) -> Self {
+    pub fn from(lhs: Symbol, rhs: Vec<ProductionSymbol<Symbol>>) -> Self {
         Production { lhs, rhs }
     }
 
@@ -152,7 +174,14 @@ impl<Symbol: GrammarSymbol> Production<Symbol> {
     pub fn string_production(&self) -> Production<String> {
         Production {
             lhs: self.lhs.to_string(),
-            rhs: self.rhs.iter().map(Data::to_string).collect(),
+            rhs: self
+                .rhs
+                .iter()
+                .map(|sym| ProductionSymbol {
+                    symbol: sym.symbol.to_string(),
+                    list: sym.list,
+                })
+                .collect(),
         }
     }
 
@@ -162,7 +191,10 @@ impl<Symbol: GrammarSymbol> Production<Symbol> {
             rhs: self
                 .rhs
                 .iter()
-                .map(|symbol| grammar.symbol_string(symbol))
+                .map(|sym| ProductionSymbol {
+                    symbol: grammar.symbol_string(&sym.symbol),
+                    list: sym.list,
+                })
                 .collect(),
         }
     }
@@ -172,8 +204,8 @@ impl<Symbol: GrammarSymbol> Data for Production<Symbol> {
     fn to_string(&self) -> String {
         let mut res_string = self.lhs.to_string();
 
-        for symbol in &self.rhs {
-            res_string = format!("{} {}", res_string, symbol.to_string());
+        for sym in &self.rhs {
+            res_string = format!("{} {}", res_string, sym.symbol.to_string());
         }
 
         res_string
@@ -817,13 +849,16 @@ mod tests {
     fn production_from_string(string: &str) -> Production<String> {
         let mut i = 0;
         let mut lhs = String::new();
-        let mut rhs: Vec<String> = vec![];
+        let mut rhs: Vec<ProductionSymbol<String>> = vec![];
 
         for s in string.split_whitespace() {
             if i == 0 {
                 lhs = s.to_string();
             } else {
-                rhs.push(s.to_string());
+                rhs.push(ProductionSymbol {
+                    symbol: s.to_string(),
+                    list: false,
+                });
             }
             i += 1;
         }

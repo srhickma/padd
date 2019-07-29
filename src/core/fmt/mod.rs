@@ -2,7 +2,7 @@ use {
     core::{
         data::map::CEHashMap,
         fmt::pattern::{Capture, Pattern, Segment},
-        parse::{grammar::GrammarSymbol, Production, Tree},
+        parse::{grammar::GrammarSymbol, Production, ProductionSymbol, Tree},
     },
     std::{collections::HashMap, error, fmt},
 };
@@ -112,8 +112,10 @@ impl<Symbol: GrammarSymbol> FormatterBuilder<Symbol> {
         let pattern = match injection.pattern_string {
             None => None,
             Some(pattern_string) => {
-                let production =
-                    Production::from(injection.terminal.clone(), vec![injection.terminal.clone()]);
+                let production = Production::from(
+                    injection.terminal.clone(),
+                    vec![ProductionSymbol::symbol(injection.terminal.clone())]
+                );
 
                 Some(pattern::generate_pattern(
                     &pattern_string,
