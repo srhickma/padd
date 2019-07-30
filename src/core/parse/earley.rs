@@ -1197,6 +1197,12 @@ impl<'prod, Symbol: GrammarSymbol + 'prod> Edge<'prod, Symbol> {
     fn shadow_symbol_at(&self, index: usize) -> (&Symbol, SymbolParseMethod) {
         let shadow = self.shadow.as_ref().unwrap();
 
+        // Fast-path when no repeating symbols.
+        if shadow.len() == self.shadow_len {
+            let shadow_symbol = &shadow[index];
+            return (&shadow_symbol.symbol, shadow_symbol.spm.clone());
+        }
+
         let mut expanded_index = 0;
         for (real_index, item) in shadow.iter().enumerate() {
             expanded_index += item.reps;
