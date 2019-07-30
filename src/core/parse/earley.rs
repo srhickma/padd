@@ -354,6 +354,14 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                 None => Vec::new(),
             };
 
+            if item.shadow_top >= item.next && item.shadow.is_some() {
+                let previous = shadow_vec.last_mut().unwrap();
+                if previous.symbol == *symbol && previous.spm == SymbolParseMethod::Repeated {
+                    // Never inject when an inline list can (and will) be extended.
+                    return;
+                }
+            }
+
             for i in item.shadow_top..item.next {
                 shadow_vec.push(ShadowSymbol {
                     symbol: item.rule.rhs[i].symbol.clone(),
@@ -378,30 +386,8 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                 ignore_next,
                 weight,
             };
+
             advance_over_nullable_symbols(new_item, dest, grammar);
-        }
-
-        fn advance_over_nullable_symbols<'grammar, Symbol: GrammarSymbol>(
-            item: Item<'grammar, Symbol>,
-            dest: &mut Vec<Item<'grammar, Symbol>>,
-            grammar: &'grammar dyn Grammar<Symbol>,
-        ) {
-            let mut last_item = item;
-
-            loop {
-                dest.push(last_item.clone());
-
-                match last_item.next_prod_symbol() {
-                    None => break,
-                    Some(sym) => {
-                        if !grammar.is_nullable_nt(&sym.symbol) {
-                            break;
-                        }
-                    }
-                }
-
-                last_item.advance();
-            }
         }
 
         fn advance_list_via_shadow<'inner, 'grammar: 'inner, Symbol: GrammarSymbol>(
@@ -417,7 +403,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
             };
 
             let mut extended_list = false;
-            if item.shadow_top == item.next && item.shadow.is_some() {
+            if item.shadow_top >= item.next && item.shadow.is_some() {
                 let previous = shadow_vec.last_mut().unwrap();
                 if previous.symbol == *symbol && previous.spm == SymbolParseMethod::Repeated {
                     previous.reps += 1;
@@ -441,20 +427,23 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                 });
             }
 
-            let new_item = Item {
+            let mut new_item = Item {
                 rule: item.rule,
                 shadow: Some(shadow_vec),
-                shadow_top: item.next,
+                shadow_top: item.next + 1,
                 start: item.start,
                 next: item.next,
                 depth: item.depth,
                 ignore_next: false,
                 weight: 0,
             };
-            advance_over_list(new_item, dest, grammar);
+
+            dest.push(new_item.clone());
+            new_item.advance();
+            advance_over_nullable_symbols(new_item, dest, grammar);
         }
 
-        fn advance_over_list<'grammar, Symbol: GrammarSymbol>(
+        fn advance_over_nullable_symbols<'grammar, Symbol: GrammarSymbol>(
             item: Item<'grammar, Symbol>,
             dest: &mut Vec<Item<'grammar, Symbol>>,
             grammar: &'grammar dyn Grammar<Symbol>,
@@ -467,7 +456,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                 match last_item.next_prod_symbol() {
                     None => break,
                     Some(sym) => {
-                        if !sym.is_list && !grammar.is_nullable_nt(&sym.symbol) {
+                        if !grammar.is_nullable_nt(&sym.symbol) {
                             break;
                         }
                     }
@@ -1181,16 +1170,14 @@ impl<'prod, Symbol: GrammarSymbol + 'prod> Edge<'prod, Symbol> {
     fn shadow_len(shadow: &Option<Vec<ShadowSymbol<Symbol>>>) -> usize {
         match shadow {
             Some(ref shadow) => {
-                let mut lists = 0;
                 let mut repeated = 0;
                 for item in shadow {
                     if item.spm == SymbolParseMethod::Repeated {
-                        lists += 1;
                         repeated += (item.reps - 1) as usize;
                     }
                 }
 
-                shadow.len() + repeated - lists
+                shadow.len() + repeated
             }
             None => 0,
         }

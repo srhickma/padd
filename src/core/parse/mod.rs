@@ -839,6 +839,7 @@ mod tests {
 
     #[test]
     fn inline_list() {
+        //setup
         let mut grammar_builder = SimpleGrammarBuilder::new();
 
         grammar_builder.add_production(Production::from(
@@ -875,6 +876,7 @@ mod tests {
 
     #[test]
     fn pinned_inline_list() {
+        //setup
         let mut grammar_builder = SimpleGrammarBuilder::new();
 
         grammar_builder.add_production(Production::from(
@@ -918,32 +920,8 @@ mod tests {
     }
 
     #[test]
-    fn repeated_inline_lists() {
-        // TODO(shane)
-    }
-
-    #[test]
-    fn inline_list_before_optional() {
-        // TODO(shane)
-    }
-
-    #[test]
-    fn inline_list_after_optional() {
-        // TODO(shane)
-    }
-
-    #[test]
-    fn inline_list_of_injectable_terminals() {
-        // TODO(shane)
-    }
-
-    #[test]
-    fn inline_list_between_injectable_terminals() {
-        // TODO(shane)
-    }
-
-    #[test]
     fn non_terminal_inline_list() {
+        //setup
         let mut grammar_builder = SimpleGrammarBuilder::new();
 
         grammar_builder.add_production(Production::from(
@@ -989,6 +967,7 @@ mod tests {
 
     #[test]
     fn pinned_non_terminal_inline_list() {
+        //setup
         let mut grammar_builder = SimpleGrammarBuilder::new();
 
         grammar_builder.add_production(Production::from(
@@ -1042,6 +1021,7 @@ mod tests {
 
     #[test]
     fn push_down_nested_inline_lists() {
+        //setup
         let mut grammar_builder = SimpleGrammarBuilder::new();
 
         grammar_builder.add_production(Production::from(
@@ -1079,6 +1059,380 @@ mod tests {
         ├── T <- 'b'
         ├── T <- 'c'
         └── T <- 'd'"
+        );
+    }
+
+    #[test]
+    fn inline_lists_non_empty() {
+        //setup
+        let mut grammar_builder = SimpleGrammarBuilder::new();
+
+        grammar_builder.add_production(Production::from(
+            "s".to_string(),
+            vec![
+                ProductionSymbol::symbol_list("X".to_string()),
+                ProductionSymbol::symbol_list("Y".to_string()),
+                ProductionSymbol::symbol_list("Z".to_string()),
+            ],
+        ));
+
+        grammar_builder.try_mark_start(&"s".to_string());
+
+        let grammar = grammar_builder.build().unwrap();
+
+        let parser = def_parser();
+
+        //exercise/verify
+        let res = parser.parse(
+            vec![
+                Token::leaf("Y".to_string(), "2".to_string()),
+                Token::leaf("Z".to_string(), "3".to_string()),
+            ],
+            &grammar,
+        );
+
+        assert!(res.is_err());
+        assert_eq!(
+            format!("{}", res.err().unwrap()),
+            "Recognition failed at token 1: Y <- '2'"
+        );
+
+        let res = parser.parse(
+            vec![
+                Token::leaf("X".to_string(), "1".to_string()),
+                Token::leaf("Z".to_string(), "3".to_string()),
+            ],
+            &grammar,
+        );
+
+        assert!(res.is_err());
+        assert_eq!(
+            format!("{}", res.err().unwrap()),
+            "Recognition failed at token 2: Z <- '3'"
+        );
+
+        let res = parser.parse(
+            vec![
+                Token::leaf("X".to_string(), "1".to_string()),
+                Token::leaf("Y".to_string(), "2".to_string()),
+            ],
+            &grammar,
+        );
+
+        assert!(res.is_err());
+        assert_eq!(
+            format!("{}", res.err().unwrap()),
+            "Recognition failed after consuming all tokens"
+        );
+    }
+
+    #[test]
+    fn repeated_inline_lists() {
+        //setup
+        let mut grammar_builder = SimpleGrammarBuilder::new();
+
+        grammar_builder.add_production(Production::from(
+            "s".to_string(),
+            vec![
+                ProductionSymbol::symbol_list("X".to_string()),
+                ProductionSymbol::symbol_list("Y".to_string()),
+                ProductionSymbol::symbol_list("Z".to_string()),
+            ],
+        ));
+
+        grammar_builder.try_mark_start(&"s".to_string());
+
+        let grammar = grammar_builder.build().unwrap();
+
+        let lex = vec![
+            Token::leaf("X".to_string(), "z".to_string()),
+            Token::leaf("Y".to_string(), "a".to_string()),
+            Token::leaf("Y".to_string(), "b".to_string()),
+            Token::leaf("Z".to_string(), "1".to_string()),
+            Token::leaf("Z".to_string(), "2".to_string()),
+            Token::leaf("Z".to_string(), "3".to_string()),
+        ];
+
+        let parser = def_parser();
+
+        //exercise
+        let tree = parser.parse(lex, &grammar).unwrap();
+
+        //verify
+        assert_eq!(
+            tree.to_string(),
+            "└── s
+    ├── X <- 'z'
+    ├── Y <- 'a'
+    ├── Y <- 'b'
+    ├── Z <- '1'
+    ├── Z <- '2'
+    └── Z <- '3'"
+        );
+    }
+
+    #[test]
+    fn inline_list_before_optional_list() {
+        //setup
+        let mut grammar_builder = SimpleGrammarBuilder::new();
+
+        grammar_builder.add_production(Production::from(
+            "s".to_string(),
+            vec![
+                ProductionSymbol::symbol_list("X".to_string()),
+                ProductionSymbol::symbol("t_opt".to_string()),
+            ],
+        ));
+
+        grammar_builder.add_production(Production::from(
+            "t_opt".to_string(),
+            vec![ProductionSymbol::symbol_list("T".to_string())],
+        ));
+        grammar_builder.add_production(Production::from("t_opt".to_string(), Vec::new()));
+
+        grammar_builder.try_mark_start(&"s".to_string());
+
+        let grammar = grammar_builder.build().unwrap();
+
+        let parser = def_parser();
+
+        //exercise/verify
+        let lex = vec![
+            Token::leaf("X".to_string(), "a".to_string()),
+            Token::leaf("X".to_string(), "b".to_string()),
+            Token::leaf("T".to_string(), "1".to_string()),
+            Token::leaf("T".to_string(), "2".to_string()),
+        ];
+
+        let tree = parser.parse(lex, &grammar).unwrap();
+
+        assert_eq!(
+            tree.to_string(),
+            "└── s
+    ├── X <- 'a'
+    ├── X <- 'b'
+    └── t_opt
+        ├── T <- '1'
+        └── T <- '2'"
+        );
+
+        let lex = vec![
+            Token::leaf("X".to_string(), "a".to_string()),
+            Token::leaf("X".to_string(), "b".to_string()),
+        ];
+
+        let tree = parser.parse(lex, &grammar).unwrap();
+
+        assert_eq!(
+            tree.to_string(),
+            "└── s
+    ├── X <- 'a'
+    ├── X <- 'b'
+    └── t_opt
+        └──  <- 'NULL'"
+        );
+    }
+
+    #[test]
+    fn inline_list_after_optional_list() {
+        //setup
+        let mut grammar_builder = SimpleGrammarBuilder::new();
+
+        grammar_builder.add_production(Production::from(
+            "s".to_string(),
+            vec![
+                ProductionSymbol::symbol("t_opt".to_string()),
+                ProductionSymbol::symbol_list("X".to_string()),
+            ],
+        ));
+
+        grammar_builder.add_production(Production::from(
+            "t_opt".to_string(),
+            vec![ProductionSymbol::symbol_list("T".to_string())],
+        ));
+        grammar_builder.add_production(Production::from("t_opt".to_string(), Vec::new()));
+
+        grammar_builder.try_mark_start(&"s".to_string());
+
+        let grammar = grammar_builder.build().unwrap();
+
+        let parser = def_parser();
+
+        //exercise/verify
+        let lex = vec![
+            Token::leaf("T".to_string(), "1".to_string()),
+            Token::leaf("T".to_string(), "2".to_string()),
+            Token::leaf("X".to_string(), "a".to_string()),
+            Token::leaf("X".to_string(), "b".to_string()),
+        ];
+
+        let tree = parser.parse(lex, &grammar).unwrap();
+
+        assert_eq!(
+            tree.to_string(),
+            "└── s
+    ├── t_opt
+    │   ├── T <- '1'
+    │   └── T <- '2'
+    ├── X <- 'a'
+    └── X <- 'b'"
+        );
+
+        let lex = vec![
+            Token::leaf("X".to_string(), "a".to_string()),
+            Token::leaf("X".to_string(), "b".to_string()),
+        ];
+
+        let tree = parser.parse(lex, &grammar).unwrap();
+
+        assert_eq!(
+            tree.to_string(),
+            "└── s
+    ├── t_opt
+    │   └──  <- 'NULL'
+    ├── X <- 'a'
+    └── X <- 'b'"
+        );
+    }
+
+    #[test]
+    fn inline_list_of_injectable_terminals() {
+        //setup
+        let mut grammar_builder = SimpleGrammarBuilder::new();
+
+        grammar_builder.add_production(Production::from(
+            "s".to_string(),
+            vec![
+                ProductionSymbol::symbol("A".to_string()),
+                ProductionSymbol::symbol_list("T".to_string()),
+                ProductionSymbol::symbol("A".to_string()),
+            ],
+        ));
+
+        grammar_builder.mark_injectable(&"T".to_string(), InjectionAffinity::Right);
+
+        grammar_builder.try_mark_start(&"s".to_string());
+
+        let grammar = grammar_builder.build().unwrap();
+
+        let lex = vec![
+            Token::leaf("T".to_string(), "a".to_string()),
+            Token::leaf("A".to_string(), "1".to_string()),
+            Token::leaf("T".to_string(), "b".to_string()),
+            Token::leaf("T".to_string(), "c".to_string()),
+            Token::leaf("A".to_string(), "2".to_string()),
+            Token::leaf("T".to_string(), "d".to_string()),
+        ];
+
+        let parser = def_parser();
+
+        //exercise
+        let tree = parser.parse(lex, &grammar).unwrap();
+
+        //verify
+        assert_eq!(
+            tree.to_string(),
+            "└── s
+    ├── << T <- 'a'
+    ├── A <- '1'
+    ├── T <- 'b'
+    ├── T <- 'c'
+    ├── A <- '2'
+    └── << T <- 'd'"
+        );
+    }
+
+    #[test]
+    fn inline_list_between_injectable_terminals() {
+        //setup
+        let mut grammar_builder = SimpleGrammarBuilder::new();
+
+        grammar_builder.add_production(Production::from(
+            "s".to_string(),
+            vec![ProductionSymbol::symbol_list("T".to_string())],
+        ));
+
+        grammar_builder.mark_injectable(&"A".to_string(), InjectionAffinity::Right);
+
+        grammar_builder.try_mark_start(&"s".to_string());
+
+        let grammar = grammar_builder.build().unwrap();
+
+        let lex = vec![
+            Token::leaf("A".to_string(), "1".to_string()),
+            Token::leaf("T".to_string(), "a".to_string()),
+            Token::leaf("T".to_string(), "b".to_string()),
+            Token::leaf("A".to_string(), "2".to_string()),
+        ];
+
+        let parser = def_parser();
+
+        //exercise
+        let tree = parser.parse(lex, &grammar).unwrap();
+
+        println!("{}", tree.to_string());
+
+        //verify
+        assert_eq!(
+            tree.to_string(),
+            "└── s
+    ├── << A <- '1'
+    ├── T <- 'a'
+    ├── T <- 'b'
+    └── << A <- '2'"
+        );
+    }
+
+    #[test]
+    fn injections_intersecting_inline_list() {
+        //setup
+        let mut grammar_builder = SimpleGrammarBuilder::new();
+
+        grammar_builder.add_production(Production::from(
+            "s".to_string(),
+            vec![ProductionSymbol::symbol_list("T".to_string())],
+        ));
+
+        grammar_builder.mark_injectable(&"A".to_string(), InjectionAffinity::Right);
+
+        grammar_builder.try_mark_start(&"s".to_string());
+
+        let grammar = grammar_builder.build().unwrap();
+
+        let lex = vec![
+            Token::leaf("A".to_string(), "1".to_string()),
+            Token::leaf("T".to_string(), "a".to_string()),
+            Token::leaf("A".to_string(), "2".to_string()),
+            Token::leaf("A".to_string(), "3".to_string()),
+            Token::leaf("T".to_string(), "b".to_string()),
+            Token::leaf("T".to_string(), "c".to_string()),
+            Token::leaf("T".to_string(), "d".to_string()),
+            Token::leaf("A".to_string(), "4".to_string()),
+            Token::leaf("A".to_string(), "5".to_string()),
+            Token::leaf("T".to_string(), "e".to_string()),
+        ];
+
+        let parser = def_parser();
+
+        //exercise
+        let tree = parser.parse(lex, &grammar).unwrap();
+
+        println!("{}", tree.to_string());
+
+        //verify
+        assert_eq!(
+            tree.to_string(),
+            "└── s
+    ├── << A <- '1'
+    ├── T <- 'a'
+    ├── << A <- '2'
+    ├── << A <- '3'
+    ├── T <- 'b'
+    ├── T <- 'c'
+    ├── T <- 'd'
+    ├── << A <- '4'
+    ├── << A <- '5'
+    └── T <- 'e'"
         );
     }
 
