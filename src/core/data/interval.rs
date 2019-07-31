@@ -3,10 +3,13 @@ use std::{
     ops::{Range, RangeInclusive},
 };
 
+/// Bound: Trait representing an inclusive bound.
 pub trait Bound: Ord + Clone {
+    /// Returns the preceding bound in the ordering.
     fn predecessor(&self) -> Self;
 }
 
+/// Returns the larger of the two passed bounds.
 fn max_bound<B: Bound>(b1: &B, b2: &B) -> B {
     if *b1 > *b2 {
         b1.clone()
@@ -15,6 +18,16 @@ fn max_bound<B: Bound>(b1: &B, b2: &B) -> B {
     }
 }
 
+/// Interval: Represents an interval over some ordered set.
+///
+/// # Type Parameters
+///
+/// * `B` - the type of the interval bounds.
+///
+/// # Fields
+///
+/// * `start` - the lower bound (inclusive) of the interval.
+/// * `end` - the upper bound (inclusive) of the interval.
 pub struct Interval<B: Bound> {
     start: B,
     end: B,
@@ -38,15 +51,34 @@ impl<B: Bound> From<RangeInclusive<B>> for Interval<B> {
     }
 }
 
+/// Interval Map: A balanced tree-map from intervals of keys to values.
+///
+/// `IntervalMap` is represented internally as an AVL tree.
+///
+/// # Type Parameters
+///
+/// * `Key` - the type of map keys.
+/// * `Value` - the type of map values.
+///
+/// # Fields
+///
+/// * `root` - the root node in the tree, or `None` if the tree is empty.
 pub struct IntervalMap<Key: Bound, Value> {
     root: Option<HeapNode<Key, Value>>,
 }
 
 impl<Key: Bound, Value> IntervalMap<Key, Value> {
+    /// Returns a new empty `IntervalMap`.
     pub fn new() -> Self {
         IntervalMap { root: None }
     }
 
+    /// Returns the value of the stored interval which contains `key`, or `None` if no such interval
+    /// exists.
+    ///
+    /// # Parameters
+    ///
+    /// * `key` - the key to search for in the map.
     pub fn get(&self, key: &Key) -> Option<&Value> {
         match self.root {
             None => None,
@@ -54,6 +86,13 @@ impl<Key: Bound, Value> IntervalMap<Key, Value> {
         }
     }
 
+    /// Inserts `value` into the map for all keys in interval `keys`.
+    /// Returns an error if `keys` overlaps another interval in the map.
+    ///
+    /// # Parameters
+    ///
+    /// * `keys` - the range of keys to map to `value`.
+    /// * `value` - the value to store in the map.
     pub fn insert(&mut self, keys: Interval<Key>, value: Value) -> Result<(), Error> {
         if let Some(root) = &self.root {
             if root.overlaps(&keys) {
@@ -65,6 +104,14 @@ impl<Key: Bound, Value> IntervalMap<Key, Value> {
         Ok(())
     }
 
+    /// Inserts `value` into the map whose root node is `node` for all keys in interval `keys`.
+    /// Returns the new root of the tree initially rooted at `node`, after insertion and balancing.
+    ///
+    /// # Parameters
+    ///
+    /// * `node` - the root node of the tree to insert into.
+    /// * `keys` - the range of keys to map to `value`.
+    /// * `value` - the value to store in the map.
     fn insert_rec(
         mut node: HeapNode<Key, Value>,
         keys: Interval<Key>,
@@ -83,6 +130,17 @@ impl<Key: Bound, Value> IntervalMap<Key, Value> {
         node
     }
 
+    /// Inserts `value` into the map whose root node is `node_opt` for all keys in interval `keys`.
+    /// Returns the new root of the tree initially rooted at `node_opt`, after insertion and
+    /// balancing.
+    ///
+    /// If `node_opt` is `None`, then the inserted node is returned as the root.
+    ///
+    /// # Parameters
+    ///
+    /// * `node_opt` - the optional root node of the tree to insert into.
+    /// * `keys` - the range of keys to map to `value`.
+    /// * `value` - the value to store in the map.
     fn insert_rec_opt(
         node_opt: Option<HeapNode<Key, Value>>,
         keys: Interval<Key>,
@@ -95,6 +153,12 @@ impl<Key: Bound, Value> IntervalMap<Key, Value> {
         }
     }
 
+    /// Balances a node in an interval tree-map, following the AVL tree rotation algorithm.
+    /// Returns the new root node of the tree after balancing.
+    ///
+    /// # Parameters
+    ///
+    /// * `node` - the root node of the tree to balance.
     fn balance(mut node: HeapNode<Key, Value>) -> HeapNode<Key, Value> {
         enum Rotation {
             Right,
@@ -131,6 +195,12 @@ impl<Key: Bound, Value> IntervalMap<Key, Value> {
         }
     }
 
+    /// Performs an AVL right rotation around `node`.
+    /// Returns the new root node after rotating.
+    ///
+    /// # Parameters
+    ///
+    /// * `node` - the root node around which to rotate.
     fn right_rotation(mut node: HeapNode<Key, Value>) -> HeapNode<Key, Value> {
         let mut left = node.left.take().unwrap();
 
@@ -142,6 +212,12 @@ impl<Key: Bound, Value> IntervalMap<Key, Value> {
         left
     }
 
+    /// Performs an AVL left rotation around `node`.
+    /// Returns the new root node after rotating.
+    ///
+    /// # Parameters
+    ///
+    /// * `node` - the root node around which to rotate.
     fn left_rotation(mut node: HeapNode<Key, Value>) -> HeapNode<Key, Value> {
         let mut right = node.right.take().unwrap();
 
@@ -154,12 +230,29 @@ impl<Key: Bound, Value> IntervalMap<Key, Value> {
     }
 }
 
+/// Wrapper around a boxed node.
 type HeapNode<Key, Value> = Box<Node<Key, Value>>;
 
+/// Helper function to create `HeapNode` objects (can implement `new` for type alias).
 fn new_node<Key: Bound, Value>(keys: Interval<Key>, value: Value) -> HeapNode<Key, Value> {
     Box::new(Node::new(keys, value))
 }
 
+/// Node: Represents a node in an interval tree-map.
+///
+/// # Type Parameters
+///
+/// * `Key` - the type of map keys.
+/// * `Value` - the type of map values.
+///
+/// # Fields
+///
+/// * `keys` - the range of keys which map to `value`.
+/// * `value` - the value stored at this node.
+/// * `left` - the left child of this node.
+/// * `right` - the right child of this node.
+/// * `max_end` - the largest upper bound of any interval in the subtree rooted at this node.
+/// * `height` - the height of the subtree rooted at this node.
 struct Node<Key: Bound, Value> {
     keys: Interval<Key>,
     value: Value,
@@ -170,6 +263,12 @@ struct Node<Key: Bound, Value> {
 }
 
 impl<Key: Bound, Value> Node<Key, Value> {
+    /// Returns a new leaf `Node` given a key range and a value.
+    ///
+    /// # Parameters
+    ///
+    /// * `keys` - the range of keys which map to `value`.
+    /// * `value` - the value to store in the node.
     fn new(keys: Interval<Key>, value: Value) -> Self {
         Node {
             max_end: keys.end.clone(),
@@ -181,6 +280,7 @@ impl<Key: Bound, Value> Node<Key, Value> {
         }
     }
 
+    /// Updates the `height` and `max_end` of this node from that of its children.
     fn update_from_children(&mut self) {
         self.height = cmp::max(self.left_height(), self.right_height()) + 1;
 
@@ -192,6 +292,12 @@ impl<Key: Bound, Value> Node<Key, Value> {
         }
     }
 
+    /// Returns the value which `key` maps to in the subtree rooted at this node, or `None` if `key`
+    /// is not in the domain of the subtree rooted at this node.
+    ///
+    /// # Parameters
+    ///
+    /// * `key` - the map key to search for.
     fn get(&self, key: &Key) -> Option<&Value> {
         if *key > self.max_end {
             return None;
@@ -212,6 +318,12 @@ impl<Key: Bound, Value> Node<Key, Value> {
         self.right.as_ref().and_then(|right| right.get(key))
     }
 
+    /// Returns true if any key interval in the subtree rooted at this node overlaps the passed
+    /// interval.
+    ///
+    /// # Parameters
+    ///
+    /// * `keys` - the range of map keys to search for.
     fn overlaps(&self, keys: &Interval<Key>) -> bool {
         if keys.start > self.max_end {
             return false;
@@ -234,20 +346,28 @@ impl<Key: Bound, Value> Node<Key, Value> {
             .map_or(false, |right| right.overlaps(keys))
     }
 
+    /// Returns true if the subtree rooted at this node requires balancing (under AVL).
     fn needs_balance(&self) -> bool {
         let diff = i64::from(self.left_height()) - i64::from(self.right_height());
         diff * diff == 4
     }
 
+    /// Returns the height of this node's left child.
     fn left_height(&self) -> u32 {
         self.left.as_ref().map_or(0, |left| left.height)
     }
 
+    /// Returns the height of this node's right child.
     fn right_height(&self) -> u32 {
         self.right.as_ref().map_or(0, |right| right.height)
     }
 }
 
+/// Error: Represents an error encountered while using an `IntervalMap`.
+///
+/// # Types
+///
+/// * `OverlapErr` - Indicates that a key interval being inserted overlaps an existing interval.
 #[derive(Debug)]
 pub enum Error {
     OverlapErr,
