@@ -92,6 +92,11 @@ fn test_json_complex() {
     test_fjr("json_complex", "json");
 }
 
+#[test]
+fn trailing_whitespace() {
+    test_fjr("trailing_whitespace", "trailing_whitespace");
+}
+
 fn test_fjr(case_name: &str, spec_name: &str) {
     //setup
     let fjr = FormatJobRunner::build(&load_spec(spec_name)).unwrap();
