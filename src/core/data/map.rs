@@ -34,7 +34,7 @@ impl<V: Default> CEHashMap<V> {
 
     /// Removes and returns the value associated with a key in the map, if one exists.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `key` - the key at which to remove the value from the map.
     pub fn remove(&mut self, key: usize) -> Option<V> {
