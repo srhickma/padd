@@ -67,7 +67,7 @@ inject left B `<{}[x]>`
 
 grammar {
     s | A t `{;x=1} {;x=2}`;
-    
+
     t | C `{;x=3}`;
 }
 ```
