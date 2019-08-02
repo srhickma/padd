@@ -7,7 +7,6 @@ the symbol as leaves versus those which ignore it.
 Therefore ignorable symbols are useful if a certain type of token should be formatted in certain cases, but removed in
 all other cases.
 
-
 Ignorable tokens are specified by including `ignore TOKEN` anywhere in the top-level of a specification, where `TOKEN`
 is the token kind that should be ignored.
 
@@ -35,7 +34,7 @@ grammar {
 ## Explicit Parsing
 
 As mentioned above, parse trees which include ignorable terminal symbols as leaves are favoured over those which do not.
-To be specific, the number of tokens which are ignored by a parse tree is added to the overall weight of the parse tree,
+To be specific, the number of tokens which are ignored by a parse tree is added to the overall weight of the tree,
 and the lowest weight parse tree is always chosen for formatting.
 
 **Note:** Ignorable tokens should not be defined unless they are explicitly used in the grammar at least once.
@@ -49,7 +48,7 @@ the [default acceptor](cdfa.md#default-acceptor).
 Using ignorable terminal symbols adds ambiguity to a parse (proportional to the number of ignorable tokens in the lex),
 and thus makes parse recognition slower.
 Due to the preference for non-ignored terminals, parse trees using ignorable tokens must be weighted, which adds
-computational complexity to the parse tree construction phase as well.
+computational complexity to the parse tree construction phase as well (even if no ignorable tokens are scanned).
 
 For these reasons, it is best to use ignorable tokens when such tokens occur relatively infrequently compared to other
 tokens (e.g. code comments).
