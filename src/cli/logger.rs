@@ -151,7 +151,7 @@ pub fn err(string: &str) {
     error!("{}", string);
 }
 
-pub fn fatal(string: &str) {
+pub fn fatal(string: &str) -> ! {
     println!("{}: {}", *PREFIX_FATAL, string);
     error!("{}", string);
     panic!(Fatal::Error);

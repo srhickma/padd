@@ -122,6 +122,17 @@ mod tests {
                 panic!("Temp file did not match output file")
             }
         }
+
+        fn assert_does_not_match_output(&self) {
+            let output_path = path_from_name(&OUTPUT_DIR, &self.file_name);
+            let temp_path = path_from_name(self.temp_dir, &self.file_name);
+
+            let expected = read_to_string(output_path.as_path());
+            let actual = read_to_string(temp_path.as_path());
+            if expected == actual {
+                panic!("Expected temp file to not match output file")
+            }
+        }
     }
 
     #[derive(PartialEq)]
@@ -1539,6 +1550,41 @@ mod tests {
 
         //teardown
         fs::remove_dir_all(&temp_dir).unwrap();
+    }
+
+    #[test]
+    fn test_pwd_shorthand() {
+        //setup
+        let temp_dir1 = create_temp_dir();
+        let file1 = TestableFile::new("balanced_brackets".to_string(), &temp_dir1);
+        file1.copy_to_temp();
+
+        let temp_dir2 = create_temp_dir();
+        let file2 = TestableFile::new("balanced_brackets".to_string(), &temp_dir2);
+        file2.copy_to_temp();
+
+        let usr_dir = env::current_dir().unwrap();
+        env::set_current_dir(&temp_dir1).unwrap();
+
+        parallel!({
+            //exercise
+            cli::run(vec![
+                &format!("../../{}", EXECUTABLE),
+                "fmt",
+                "../spec/balanced_brackets",
+                "-t",
+                ".",
+            ]);
+        });
+
+        //verify
+        env::set_current_dir(&usr_dir).unwrap();
+        file1.assert_matches_output();
+        file2.assert_does_not_match_output();
+
+        //teardown
+        fs::remove_dir_all(&temp_dir1).unwrap();
+        fs::remove_dir_all(&temp_dir2).unwrap();
     }
 
     fn assert_modifies_file(file_path: &str, modifier: &Fn()) {
