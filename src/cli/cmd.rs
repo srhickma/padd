@@ -8,7 +8,11 @@ use {
         formatter::{self, FormatCommand, FormatMetrics},
         logger, server, tracker,
     },
-    std::{path::Path, process::Command},
+    std::{
+        env,
+        path::{Path, PathBuf},
+        process::Command,
+    },
 };
 
 use self::{
@@ -30,21 +34,23 @@ pub fn fmt(matches: &ArgMatches) {
                 "Error loading specification {}: {}",
                 &spec_path, err
             ));
-            return;
         }
         Ok(formatter) => formatter,
     };
 
-    let target_path = Path::new(matches.value_of("target").unwrap());
+    let target_path = match matches.value_of("target").unwrap() {
+        "." => match env::current_dir() {
+            Ok(path) => path,
+            Err(err) => logger::fatal(&format!("Failed to get pwd: {}", err)),
+        },
+        path_str => PathBuf::from(path_str),
+    };
 
     let file_regex: Option<Regex> = match matches.value_of("matching") {
         None => None,
         Some(regex) => match Regex::new(regex) {
             Ok(fn_regex) => Some(fn_regex),
-            Err(err) => {
-                logger::fatal(&format!("Failed to build file name regex: {}", err));
-                None
-            }
+            Err(err) => logger::fatal(&format!("Failed to build file name regex: {}", err)),
         },
     };
 
@@ -81,7 +87,7 @@ pub fn fmt(matches: &ArgMatches) {
 
     let metrics = formatter::format(FormatCommand {
         formatter,
-        target_path,
+        target_path: target_path.as_path(),
         file_regex,
         thread_count,
         no_skip,
