@@ -89,31 +89,99 @@ mod tests {
         };
     }
 
-    struct TestableFile<'scope> {
-        file_name: String,
-        temp_dir: &'scope Path,
+    struct TestDir {
+        path_buf: PathBuf,
+        path_str: String,
+        released: bool,
     }
 
-    impl<'scope> TestableFile<'scope> {
-        fn new(file_name: String, temp_dir: &'scope str) -> Self {
-            TestableFile {
-                file_name,
-                temp_dir: Path::new(temp_dir),
+    impl TestDir {
+        fn new() -> Self {
+            let path_str = format!("tests/temp-{}", Uuid::new_v4().to_string());
+            let path_buf = PathBuf::from(&path_str);
+            fs::create_dir(path_buf.as_path()).unwrap();
+
+            TestDir {
+                path_buf,
+                path_str,
+                released: false,
             }
         }
 
-        fn copy_to_temp(&self) -> String {
-            let input_path = path_from_name(&INPUT_DIR, &self.file_name);
-            let temp_path = path_from_name(self.temp_dir, &self.file_name);
+        fn path(&self) -> &Path {
+            self.path_buf.as_path()
+        }
 
-            fs::copy(input_path, &temp_path).unwrap();
+        fn path_str(&self) -> &str {
+            &self.path_str
+        }
 
-            temp_path.as_path().to_string_lossy().to_string()
+        fn release(&mut self) {
+            self.released = true;
+            fs::remove_dir_all(self.path()).unwrap();
+        }
+    }
+
+    impl Drop for TestDir {
+        fn drop(&mut self) {
+            if !self.released {
+                self.release();
+            }
+        }
+    }
+
+    struct TestableFile<'scope> {
+        file_name: String,
+        path_str: String,
+        test_dir: &'scope TestDir,
+    }
+
+    impl<'scope> TestableFile<'scope> {
+        fn new(file_name: String, test_dir: &'scope TestDir) -> Self {
+            let input_path = path_from_name(&INPUT_DIR, &file_name);
+            let test_path = path_from_name(test_dir.path(), &file_name);
+            fs::copy(input_path, &test_path).unwrap();
+
+            TestableFile {
+                file_name,
+                path_str: test_path.as_path().to_string_lossy().to_string(),
+                test_dir,
+            }
+        }
+
+        fn path_str(&self) -> &str {
+            &self.path_str
+        }
+
+        fn assert_modified_by(&self, modifier: &Fn()) {
+            assert!(self.modified_by(modifier));
+        }
+
+        fn assert_not_modified_by(&self, modifier: &Fn()) {
+            assert!(!self.modified_by(modifier));
+        }
+
+        fn modified_by(&self, modifier: &Fn()) -> bool {
+            let initially_modified_at = Path::new(&self.path_str)
+                .metadata()
+                .unwrap()
+                .modified()
+                .unwrap();
+
+            modifier();
+
+            let finally_modified_at = Path::new(&self.path_str)
+                .metadata()
+                .unwrap()
+                .modified()
+                .unwrap();
+
+            initially_modified_at != finally_modified_at
         }
 
         fn assert_matches_output(&self) {
             let output_path = path_from_name(&OUTPUT_DIR, &self.file_name);
-            let temp_path = path_from_name(self.temp_dir, &self.file_name);
+            let temp_path = path_from_name(self.test_dir.path(), &self.file_name);
 
             let expected = read_to_string(output_path.as_path());
             let actual = read_to_string(temp_path.as_path());
@@ -125,7 +193,7 @@ mod tests {
 
         fn assert_does_not_match_output(&self) {
             let output_path = path_from_name(&OUTPUT_DIR, &self.file_name);
-            let temp_path = path_from_name(self.temp_dir, &self.file_name);
+            let temp_path = path_from_name(self.test_dir.path(), &self.file_name);
 
             let expected = read_to_string(output_path.as_path());
             let actual = read_to_string(temp_path.as_path());
@@ -202,11 +270,10 @@ mod tests {
     #[test]
     fn test_fmt_all_java8() {
         //setup
-        let temp_dir = create_temp_dir();
+        let test_dir = TestDir::new();
 
         for file_name in files_with_prefix("java8") {
-            let file = TestableFile::new(file_name, &temp_dir);
-            let temp_file = file.copy_to_temp();
+            let file = TestableFile::new(file_name, &test_dir);
 
             //exercise
             parallel!({
@@ -215,34 +282,36 @@ mod tests {
                     "fmt",
                     "tests/spec/java8",
                     "-t",
-                    &temp_file,
+                    file.path_str(),
                 ]);
             });
 
             //verify
             file.assert_matches_output();
         }
-
-        //teardown
-        fs::remove_dir_all(&temp_dir).unwrap();
     }
 
     #[test]
     fn test_format_directory() {
         //setup
-        let temp_dir = create_temp_dir();
+        let test_dir = TestDir::new();
 
         let mut testable_files: Vec<TestableFile> = Vec::new();
 
         for file_name in files_with_prefix("json") {
-            let file = TestableFile::new(file_name, &temp_dir);
-            file.copy_to_temp();
+            let file = TestableFile::new(file_name, &test_dir);
             testable_files.push(file);
         }
 
         //exercise
         parallel!({
-            cli::run(vec![EXECUTABLE, "fmt", "tests/spec/json", "-t", &temp_dir]);
+            cli::run(vec![
+                EXECUTABLE,
+                "fmt",
+                "tests/spec/json",
+                "-t",
+                test_dir.path_str(),
+            ]);
         });
 
         //verify
@@ -250,9 +319,6 @@ mod tests {
         for file in testable_files {
             file.assert_matches_output();
         }
-
-        //teardown
-        fs::remove_dir_all(&temp_dir).unwrap();
     }
 
     #[test]
@@ -290,13 +356,12 @@ mod tests {
     #[test]
     fn test_many_threads() {
         //setup
-        let temp_dir = create_temp_dir();
+        let test_dir = TestDir::new();
 
         let mut testable_files: Vec<TestableFile> = Vec::new();
 
         for file_name in files_with_prefix("java8") {
-            let file = TestableFile::new(file_name, &temp_dir);
-            file.copy_to_temp();
+            let file = TestableFile::new(file_name, &test_dir);
             testable_files.push(file);
         }
 
@@ -307,7 +372,7 @@ mod tests {
                 "fmt",
                 "tests/spec/java8",
                 "-t",
-                &temp_dir,
+                test_dir.path_str(),
                 "--threads",
                 "16",
             ]);
@@ -318,21 +383,17 @@ mod tests {
         for file in testable_files {
             file.assert_matches_output();
         }
-
-        //teardown
-        fs::remove_dir_all(&temp_dir).unwrap();
     }
 
     #[test]
     fn test_invalid_threads_zero() {
         //setup
-        let temp_dir = create_temp_dir();
+        let test_dir = TestDir::new();
 
         let mut testable_files: Vec<TestableFile> = Vec::new();
 
         for file_name in files_with_prefix("json") {
-            let file = TestableFile::new(file_name, &temp_dir);
-            file.copy_to_temp();
+            let file = TestableFile::new(file_name, &test_dir);
             testable_files.push(file);
         }
 
@@ -343,7 +404,7 @@ mod tests {
                 "fmt",
                 "tests/spec/json",
                 "-t",
-                &temp_dir,
+                test_dir.path_str(),
                 "--threads",
                 "0",
             ]);
@@ -354,21 +415,17 @@ mod tests {
         for file in testable_files {
             file.assert_matches_output();
         }
-
-        //teardown
-        fs::remove_dir_all(&temp_dir).unwrap();
     }
 
     #[test]
     fn test_invalid_threads_character() {
         //setup
-        let temp_dir = create_temp_dir();
+        let test_dir = TestDir::new();
 
         let mut testable_files: Vec<TestableFile> = Vec::new();
 
         for file_name in files_with_prefix("json") {
-            let file = TestableFile::new(file_name, &temp_dir);
-            file.copy_to_temp();
+            let file = TestableFile::new(file_name, &test_dir);
             testable_files.push(file);
         }
 
@@ -379,7 +436,7 @@ mod tests {
                 "fmt",
                 "tests/spec/json",
                 "-t",
-                &temp_dir,
+                test_dir.path_str(),
                 "--threads",
                 "a",
             ]);
@@ -390,21 +447,17 @@ mod tests {
         for file in testable_files {
             file.assert_matches_output();
         }
-
-        //teardown
-        fs::remove_dir_all(&temp_dir).unwrap();
     }
 
     #[test]
     fn test_file_regex() {
         //setup
-        let temp_dir = create_temp_dir();
+        let test_dir = TestDir::new();
 
         let mut testable_files: Vec<TestableFile> = Vec::new();
 
         for file_name in files_with_prefix("") {
-            let file = TestableFile::new(file_name, &temp_dir);
-            file.copy_to_temp();
+            let file = TestableFile::new(file_name, &test_dir);
             testable_files.push(file);
         }
 
@@ -415,7 +468,7 @@ mod tests {
                 "fmt",
                 "tests/spec/lacs",
                 "-t",
-                &temp_dir,
+                test_dir.path_str(),
                 "-m",
                 "lacs_.*",
             ]);
@@ -432,82 +485,97 @@ mod tests {
         }
 
         assert_eq!(formatted, 3);
-
-        //teardown
-        fs::remove_dir_all(&temp_dir).unwrap();
     }
 
     #[test]
     fn test_diff_tracking_unchanged() {
         //setup
-        let temp_dir = create_temp_dir();
-
-        let file = TestableFile::new("json_simple".to_string(), &temp_dir);
-        let temp_path = file.copy_to_temp();
+        let test_dir = TestDir::new();
+        let file = TestableFile::new("json_simple".to_string(), &test_dir);
 
         parallel!({
-            cli::run(vec![EXECUTABLE, "fmt", "tests/spec/json", "-t", &temp_path]);
+            cli::run(vec![
+                EXECUTABLE,
+                "fmt",
+                "tests/spec/json",
+                "-t",
+                file.path_str(),
+            ]);
         });
 
         //exercise/verify
-        assert_does_not_modify_file(&temp_path, &|| {
+        file.assert_not_modified_by(&|| {
             parallel!({
-                cli::run(vec![EXECUTABLE, "fmt", "tests/spec/json", "-t", &temp_path]);
+                cli::run(vec![
+                    EXECUTABLE,
+                    "fmt",
+                    "tests/spec/json",
+                    "-t",
+                    file.path_str(),
+                ]);
             });
         });
 
         file.assert_matches_output();
-
-        //teardown
-        fs::remove_dir_all(&temp_dir).unwrap();
     }
 
     #[test]
     fn test_diff_tracking_file_modified() {
         //setup
-        let temp_dir = create_temp_dir();
-
-        let file = TestableFile::new("json_simple".to_string(), &temp_dir);
-        let temp_path = file.copy_to_temp();
+        let test_dir = TestDir::new();
+        let file = TestableFile::new("json_simple".to_string(), &test_dir);
 
         parallel!({
-            cli::run(vec![EXECUTABLE, "fmt", "tests/spec/json", "-t", &temp_path]);
+            cli::run(vec![
+                EXECUTABLE,
+                "fmt",
+                "tests/spec/json",
+                "-t",
+                file.path_str(),
+            ]);
         });
 
         // Modify the file at a strictly later system time (allowing for fluctuation)
         thread::sleep(Duration::from_millis(10));
-        fs::write(&temp_path, "{\"modified\":\"value\"}").unwrap();
+        fs::write(file.path_str(), "{\"modified\":\"value\"}").unwrap();
 
         //exercise/verify
-        assert_modifies_file(&temp_path, &|| {
+        file.assert_modified_by(&|| {
             parallel!({
-                cli::run(vec![EXECUTABLE, "fmt", "tests/spec/json", "-t", &temp_path]);
+                cli::run(vec![
+                    EXECUTABLE,
+                    "fmt",
+                    "tests/spec/json",
+                    "-t",
+                    file.path_str(),
+                ]);
             });
         });
 
-        let result = fs::read_to_string(&temp_path).unwrap();
+        let result = fs::read_to_string(file.path_str()).unwrap();
         assert_eq!(result, "{\n    \"modified\": \"value\"\n}\n");
-
-        //teardown
-        fs::remove_dir_all(&temp_dir).unwrap();
     }
 
     #[test]
     fn test_diff_tracking_spec_modified() {
         //setup
-        let temp_dir = create_temp_dir();
-
-        let file = TestableFile::new("json_simple".to_string(), &temp_dir);
-        let temp_path = file.copy_to_temp();
+        let test_dir = TestDir::new();
+        let file = TestableFile::new("json_simple".to_string(), &test_dir);
 
         parallel!({
-            cli::run(vec![EXECUTABLE, "fmt", "tests/spec/json", "-t", &temp_path]);
+            cli::run(vec![
+                EXECUTABLE,
+                "fmt",
+                "tests/spec/json",
+                "-t",
+                file.path_str(),
+            ]);
         });
 
         // Sleep to allow for SystemTime fluctuations
         thread::sleep(Duration::from_millis(10));
 
-        let new_spec_path = path_from_name(Path::new(&temp_dir), "spec");
+        let new_spec_path = path_from_name(test_dir.path(), "spec");
         fs::copy("tests/spec/json", &new_spec_path).unwrap();
 
         let mut spec_file = OpenOptions::new()
@@ -519,82 +587,93 @@ mod tests {
         writeln!(spec_file, " ").unwrap();
 
         //exercise/verify
-        assert_modifies_file(&temp_path, &|| {
+        file.assert_modified_by(&|| {
             parallel!({
                 cli::run(vec![
                     EXECUTABLE,
                     "fmt",
                     &new_spec_path.to_string_lossy().to_string(),
                     "-t",
-                    &temp_path,
+                    file.path_str(),
                 ]);
             });
         });
 
         file.assert_matches_output();
-
-        //teardown
-        fs::remove_dir_all(&temp_dir).unwrap();
     }
 
     #[test]
     fn test_clear_tracking_file() {
         //setup
-        let temp_dir = create_temp_dir();
-
-        let file = TestableFile::new("json_simple".to_string(), &temp_dir);
-        let temp_path = file.copy_to_temp();
+        let test_dir = TestDir::new();
+        let file = TestableFile::new("json_simple".to_string(), &test_dir);
 
         parallel!({
-            cli::run(vec![EXECUTABLE, "fmt", "tests/spec/json", "-t", &temp_path]);
+            cli::run(vec![
+                EXECUTABLE,
+                "fmt",
+                "tests/spec/json",
+                "-t",
+                file.path_str(),
+            ]);
         });
 
         //exercise
         parallel!({
-            cli::run(vec![EXECUTABLE, "forget", &temp_path]);
+            cli::run(vec![EXECUTABLE, "forget", file.path_str()]);
         });
 
         //verify
-        assert_modifies_file(&temp_path, &|| {
+        file.assert_modified_by(&|| {
             parallel!({
-                cli::run(vec![EXECUTABLE, "fmt", "tests/spec/json", "-t", &temp_path]);
+                cli::run(vec![
+                    EXECUTABLE,
+                    "fmt",
+                    "tests/spec/json",
+                    "-t",
+                    file.path_str(),
+                ]);
             });
         });
 
         file.assert_matches_output();
-
-        //teardown
-        fs::remove_dir_all(&temp_dir).unwrap();
     }
 
     #[test]
     fn test_clear_tracking_dir() {
         //setup
-        let temp_dir = create_temp_dir();
-
-        let file = TestableFile::new("json_simple".to_string(), &temp_dir);
-        let temp_path = file.copy_to_temp();
+        let test_dir = TestDir::new();
+        let file = TestableFile::new("json_simple".to_string(), &test_dir);
 
         parallel!({
-            cli::run(vec![EXECUTABLE, "fmt", "tests/spec/json", "-t", &temp_path]);
+            cli::run(vec![
+                EXECUTABLE,
+                "fmt",
+                "tests/spec/json",
+                "-t",
+                file.path_str(),
+            ]);
         });
 
         //exercise
         parallel!({
-            cli::run(vec![EXECUTABLE, "forget", &temp_dir]);
+            cli::run(vec![EXECUTABLE, "forget", test_dir.path_str()]);
         });
 
         //verify
-        assert_modifies_file(&temp_path, &|| {
+        file.assert_modified_by(&|| {
             parallel!({
-                cli::run(vec![EXECUTABLE, "fmt", "tests/spec/json", "-t", &temp_path]);
+                cli::run(vec![
+                    EXECUTABLE,
+                    "fmt",
+                    "tests/spec/json",
+                    "-t",
+                    file.path_str(),
+                ]);
             });
         });
 
         file.assert_matches_output();
-
-        //teardown
-        fs::remove_dir_all(&temp_dir).unwrap();
     }
 
     #[test]
@@ -613,42 +692,41 @@ mod tests {
     #[test]
     fn test_no_skip() {
         //setup
-        let temp_dir = create_temp_dir();
-
-        let file = TestableFile::new("json_simple".to_string(), &temp_dir);
-        let temp_path = file.copy_to_temp();
+        let test_dir = TestDir::new();
+        let file = TestableFile::new("json_simple".to_string(), &test_dir);
 
         parallel!({
-            cli::run(vec![EXECUTABLE, "fmt", "tests/spec/json", "-t", &temp_path]);
+            cli::run(vec![
+                EXECUTABLE,
+                "fmt",
+                "tests/spec/json",
+                "-t",
+                file.path_str(),
+            ]);
         });
 
         //exercise/verify
-        assert_modifies_file(&temp_path, &|| {
+        file.assert_modified_by(&|| {
             parallel!({
                 cli::run(vec![
                     EXECUTABLE,
                     "fmt",
                     "tests/spec/json",
                     "-t",
-                    &temp_path,
+                    file.path_str(),
                     "--no-skip",
                 ]);
             });
         });
 
         file.assert_matches_output();
-
-        //teardown
-        fs::remove_dir_all(&temp_dir).unwrap();
     }
 
     #[test]
     fn test_no_track() {
         //setup
-        let temp_dir = create_temp_dir();
-
-        let file = TestableFile::new("json_simple".to_string(), &temp_dir);
-        let temp_path = file.copy_to_temp();
+        let test_dir = TestDir::new();
+        let file = TestableFile::new("json_simple".to_string(), &test_dir);
 
         //exercise
         parallel!({
@@ -657,57 +735,56 @@ mod tests {
                 "fmt",
                 "tests/spec/json",
                 "-t",
-                &temp_path,
+                file.path_str(),
                 "--no-track",
             ]);
         });
 
         //verify
-        assert_modifies_file(&temp_path, &|| {
-            parallel!({
-                cli::run(vec![EXECUTABLE, "fmt", "tests/spec/json", "-t", &temp_path]);
-            });
-        });
-
-        file.assert_matches_output();
-
-        //teardown
-        fs::remove_dir_all(&temp_dir).unwrap();
-    }
-
-    #[test]
-    fn test_no_write() {
-        //setup
-        let temp_dir = create_temp_dir();
-
-        let file = TestableFile::new("json_simple".to_string(), &temp_dir);
-        let temp_path = file.copy_to_temp();
-
-        //exercise/verify
-        assert_does_not_modify_file(&temp_path, &|| {
+        file.assert_modified_by(&|| {
             parallel!({
                 cli::run(vec![
                     EXECUTABLE,
                     "fmt",
                     "tests/spec/json",
                     "-t",
-                    &temp_path,
+                    file.path_str(),
+                ]);
+            });
+        });
+
+        file.assert_matches_output();
+    }
+
+    #[test]
+    fn test_no_write() {
+        //setup
+        let mut test_dir = TestDir::new();
+        let file = TestableFile::new("json_simple".to_string(), &test_dir);
+
+        //exercise/verify
+        file.assert_not_modified_by(&|| {
+            parallel!({
+                cli::run(vec![
+                    EXECUTABLE,
+                    "fmt",
+                    "tests/spec/json",
+                    "-t",
+                    file.path_str(),
                     "--no-write",
                 ]);
             });
         });
 
-        //teardown
-        fs::remove_dir_all(&temp_dir).unwrap();
+        // Prevent early destruction of test directory
+        test_dir.release();
     }
 
     #[test]
     fn test_log_to_file_new() {
         //setup
-        let temp_dir = create_temp_dir();
-
-        let file = TestableFile::new("json_simple".to_string(), &temp_dir);
-        let temp_path = file.copy_to_temp();
+        let test_dir = TestDir::new();
+        let file = TestableFile::new("json_simple".to_string(), &test_dir);
 
         serial!({
             let _ = fs::remove_file(&&*LOG_PATH);
@@ -722,7 +799,7 @@ mod tests {
                 "fmt",
                 "tests/spec/json",
                 "-t",
-                &temp_path,
+                file.path_str(),
             ]);
 
             //verify
@@ -734,17 +811,13 @@ mod tests {
             log::set_max_level(LevelFilter::Off);
             let _ = fs::remove_file(&&*LOG_PATH);
         });
-
-        fs::remove_dir_all(&temp_dir).unwrap();
     }
 
     #[test]
     fn test_log_to_file_existing() {
         //setup
-        let temp_dir = create_temp_dir();
-
-        let file = TestableFile::new("json_simple".to_string(), &temp_dir);
-        let temp_path = file.copy_to_temp();
+        let test_dir = TestDir::new();
+        let file = TestableFile::new("json_simple".to_string(), &test_dir);
 
         serial!({
             let _ = fs::remove_file(&&*LOG_PATH);
@@ -760,7 +833,7 @@ mod tests {
                     "fmt",
                     "tests/spec/json",
                     "-t",
-                    &temp_path,
+                    file.path_str(),
                 ]);
             }
 
@@ -772,15 +845,12 @@ mod tests {
             log::set_max_level(LevelFilter::Off);
             let _ = fs::remove_file(&&*LOG_PATH);
         });
-
-        fs::remove_dir_all(&temp_dir).unwrap();
     }
 
     #[test]
     fn test_set_log_level() {
         //setup
-        let temp_dir = create_temp_dir();
-
+        let test_dir = TestDir::new();
         let levels = vec!["trace", "debug", "info", "warn", "error"];
 
         serial!({
@@ -797,7 +867,7 @@ mod tests {
                     "fmt",
                     "tests/spec/json",
                     "-t",
-                    &temp_dir,
+                    test_dir.path_str(),
                 ]);
 
                 trace!("");
@@ -835,14 +905,12 @@ mod tests {
             log::set_max_level(LevelFilter::Off);
             let _ = fs::remove_file(&&*LOG_PATH);
         });
-
-        fs::remove_dir_all(&temp_dir).unwrap();
     }
 
     #[test]
     fn test_default_log_level() {
         //setup
-        let temp_dir = create_temp_dir();
+        let test_dir = TestDir::new();
 
         serial!({
             let _ = fs::remove_file(&&*LOG_PATH);
@@ -855,7 +923,7 @@ mod tests {
                 "fmt",
                 "tests/spec/json",
                 "-t",
-                &temp_dir,
+                test_dir.path_str(),
             ]);
 
             trace!("");
@@ -873,8 +941,6 @@ mod tests {
             log::set_max_level(LevelFilter::Off);
             let _ = fs::remove_file(&&*LOG_PATH);
         });
-
-        fs::remove_dir_all(&temp_dir).unwrap();
     }
 
     #[test]
@@ -903,10 +969,8 @@ mod tests {
     #[test]
     fn test_formatting_passed() {
         //setup
-        let temp_dir = create_temp_dir();
-
-        let file = TestableFile::new("json_simple".to_string(), &temp_dir);
-        let temp_path = file.copy_to_temp();
+        let test_dir = TestDir::new();
+        let file = TestableFile::new("json_simple".to_string(), &test_dir);
 
         serial!({
             let _ = fs::remove_file(&&*LOG_PATH);
@@ -921,7 +985,7 @@ mod tests {
                 "fmt",
                 "tests/spec/json",
                 "-t",
-                &temp_path,
+                file.path_str(),
             ]);
 
             //verify
@@ -936,25 +1000,20 @@ mod tests {
             assert!(logged_results.failed.is_empty());
 
             assert!(logged_results.formatted.contains(&FormattedFJ {
-                file_name: temp_path,
+                file_name: file.path_str().to_string(),
             }));
 
             //teardown
             log::set_max_level(LevelFilter::Off);
             let _ = fs::remove_file(&&*LOG_PATH);
         });
-
-        fs::remove_dir_all(&temp_dir).unwrap();
     }
 
     #[test]
     fn test_formatting_failed() {
         //setup
-        let temp_dir = create_temp_dir();
-        let _ = fs::remove_file(&&*LOG_PATH);
-
-        let file = TestableFile::new("java8_simple".to_string(), &temp_dir);
-        let temp_path = file.copy_to_temp();
+        let test_dir = TestDir::new();
+        let file = TestableFile::new("java8_simple".to_string(), &test_dir);
 
         serial!({
             let _ = fs::remove_file(&&*LOG_PATH);
@@ -969,7 +1028,7 @@ mod tests {
                 "fmt",
                 "tests/spec/json",
                 "-t",
-                &temp_path,
+                file.path_str(),
             ]);
 
             //verify
@@ -984,7 +1043,7 @@ mod tests {
             assert!(logged_results.formatted.is_empty());
 
             assert!(logged_results.failed.contains(&FailedFJ {
-                file_name: temp_path,
+                file_name: file.path_str().to_string(),
                 error_message: String::from(
                     "Failed to lex input: No accepting tokens after (1,1): class Simp..."
                 )
@@ -994,20 +1053,22 @@ mod tests {
             log::set_max_level(LevelFilter::Off);
             let _ = fs::remove_file(&&*LOG_PATH);
         });
-
-        fs::remove_dir_all(&temp_dir).unwrap();
     }
 
     #[test]
     fn test_formatting_unchanged() {
         //setup
-        let temp_dir = create_temp_dir();
-
-        let file = TestableFile::new("json_simple".to_string(), &temp_dir);
-        let temp_path = file.copy_to_temp();
+        let test_dir = TestDir::new();
+        let file = TestableFile::new("json_simple".to_string(), &test_dir);
 
         serial!({
-            cli::run(vec![EXECUTABLE, "fmt", "tests/spec/json", "-t", &temp_path]);
+            cli::run(vec![
+                EXECUTABLE,
+                "fmt",
+                "tests/spec/json",
+                "-t",
+                file.path_str(),
+            ]);
 
             let _ = fs::remove_file(&&*LOG_PATH);
 
@@ -1021,7 +1082,7 @@ mod tests {
                 "fmt",
                 "tests/spec/json",
                 "-t",
-                &temp_path,
+                file.path_str(),
             ]);
 
             //verify
@@ -1040,20 +1101,22 @@ mod tests {
             log::set_max_level(LevelFilter::Off);
             let _ = fs::remove_file(&&*LOG_PATH);
         });
-
-        fs::remove_dir_all(&temp_dir).unwrap();
     }
 
     #[test]
     fn test_check_formatting_ok() {
         //setup
-        let temp_dir = create_temp_dir();
-
-        let file = TestableFile::new("json_simple".to_string(), &temp_dir);
-        let temp_path = file.copy_to_temp();
+        let test_dir = TestDir::new();
+        let file = TestableFile::new("json_simple".to_string(), &test_dir);
 
         serial!({
-            cli::run(vec![EXECUTABLE, "fmt", "tests/spec/json", "-t", &temp_path]);
+            cli::run(vec![
+                EXECUTABLE,
+                "fmt",
+                "tests/spec/json",
+                "-t",
+                file.path_str(),
+            ]);
 
             let _ = fs::remove_file(&&*LOG_PATH);
 
@@ -1067,7 +1130,7 @@ mod tests {
                 "fmt",
                 "tests/spec/json",
                 "-t",
-                &temp_path,
+                file.path_str(),
                 "--check",
             ]);
 
@@ -1086,17 +1149,13 @@ mod tests {
             log::set_max_level(LevelFilter::Off);
             let _ = fs::remove_file(&&*LOG_PATH);
         });
-
-        fs::remove_dir_all(&temp_dir).unwrap();
     }
 
     #[test]
     fn test_check_formatting_failed() {
         //setup
-        let temp_dir = create_temp_dir();
-
-        let file = TestableFile::new("json_simple".to_string(), &temp_dir);
-        let temp_path = file.copy_to_temp();
+        let test_dir = TestDir::new();
+        let file = TestableFile::new("json_simple".to_string(), &test_dir);
 
         serial!({
             let _ = fs::remove_file(&&*LOG_PATH);
@@ -1114,7 +1173,7 @@ mod tests {
                         "fmt",
                         "tests/spec/json",
                         "-t",
-                        &temp_path,
+                        file.path_str(),
                         "--check",
                     ]);
                 },
@@ -1135,24 +1194,20 @@ mod tests {
             assert_eq!(logged_results.num_unchanged, 0);
 
             assert!(logged_results.check_failed.contains(&CheckFailedFJ {
-                file_name: temp_path,
+                file_name: file.path_str().to_string(),
             }));
 
             //teardown
             log::set_max_level(LevelFilter::Off);
             let _ = fs::remove_file(&&*LOG_PATH);
         });
-
-        fs::remove_dir_all(&temp_dir).unwrap();
     }
 
     #[test]
     fn test_check_formatting_error() {
         //setup
-        let temp_dir = create_temp_dir();
-
-        let file = TestableFile::new("java8_simple".to_string(), &temp_dir);
-        let temp_path = file.copy_to_temp();
+        let test_dir = TestDir::new();
+        let file = TestableFile::new("java8_simple".to_string(), &test_dir);
 
         serial!({
             let _ = fs::remove_file(&&*LOG_PATH);
@@ -1170,7 +1225,7 @@ mod tests {
                         "fmt",
                         "tests/spec/json",
                         "-t",
-                        &temp_path,
+                        file.path_str(),
                         "--check",
                     ]);
                 },
@@ -1193,7 +1248,7 @@ mod tests {
             println!("{}", logged_results.failed[0].error_message);
 
             assert!(logged_results.failed.contains(&FailedFJ {
-                file_name: temp_path,
+                file_name: file.path_str().to_string(),
                 error_message: String::from(
                     "Failed to lex input: No accepting tokens after (1,1): class Simp..."
                 )
@@ -1203,8 +1258,6 @@ mod tests {
             log::set_max_level(LevelFilter::Off);
             let _ = fs::remove_file(&&*LOG_PATH);
         });
-
-        fs::remove_dir_all(&temp_dir).unwrap();
     }
 
     #[test]
@@ -1317,31 +1370,37 @@ mod tests {
 
     #[test]
     fn test_execute_on_server() {
-        //setup
-        let temp_dir = create_temp_dir();
-
-        let file = TestableFile::new("json_simple".to_string(), &temp_dir);
-        let temp_path = file.copy_to_temp();
-
         serial!({
+            //setup
             server::kill();
             assert!(!server::running());
 
             thread::spawn(move || {
+                let test_dir = TestDir::new();
+                let file = TestableFile::new("json_simple".to_string(), &test_dir);
+
                 // Allow time for the server to start
                 thread::sleep(Duration::from_millis(20));
 
                 assert!(server::running());
 
                 //exercise/verify
-                assert_does_not_modify_file(&temp_path, &|| {
-                    cli::run(vec![EXECUTABLE, "fmt", "tests/spec/json", "-t", &temp_path]);
+                file.assert_not_modified_by(&|| {
+                    cli::run(vec![
+                        EXECUTABLE,
+                        "fmt",
+                        "tests/spec/json",
+                        "-t",
+                        file.path_str(),
+                    ]);
                 });
 
-                assert_modifies_file(&temp_path, &|| {
+                file.assert_modified_by(&|| {
                     // Wait long enough for server to format file
                     thread::sleep(Duration::from_millis(500));
                 });
+
+                file.assert_matches_output();
 
                 //teardown
                 server::kill();
@@ -1352,12 +1411,6 @@ mod tests {
             //verify
             assert!(!server::running());
         });
-
-        //verify
-        file.assert_matches_output();
-
-        //teardown
-        fs::remove_dir_all(&temp_dir).unwrap();
     }
 
     #[test]
@@ -1468,10 +1521,9 @@ mod tests {
     #[test]
     fn test_format_via_daemon() {
         //setup
-        let temp_dir = create_temp_dir();
+        let test_dir = TestDir::new();
 
-        let file = TestableFile::new("json_simple".to_string(), &temp_dir);
-        let temp_path = file.copy_to_temp();
+        let file = TestableFile::new("json_simple".to_string(), &test_dir);
 
         serial!({
             server::kill();
@@ -1485,11 +1537,17 @@ mod tests {
             assert!(server::running());
 
             //exercise/verify
-            assert_does_not_modify_file(&temp_path, &|| {
-                cli::run(vec![EXECUTABLE, "fmt", "tests/spec/json", "-t", &temp_path]);
+            file.assert_not_modified_by(&|| {
+                cli::run(vec![
+                    EXECUTABLE,
+                    "fmt",
+                    "tests/spec/json",
+                    "-t",
+                    file.path_str(),
+                ]);
             });
 
-            assert_modifies_file(&temp_path, &|| {
+            file.assert_modified_by(&|| {
                 // Wait long enough for server to format file
                 thread::sleep(Duration::from_millis(500));
             });
@@ -1500,18 +1558,13 @@ mod tests {
 
         //verify
         file.assert_matches_output();
-
-        //teardown
-        fs::remove_dir_all(&temp_dir).unwrap();
     }
 
     #[test]
     fn test_cache_fjr() {
         //setup
-        let temp_dir = create_temp_dir();
-
-        let file = TestableFile::new("balanced_brackets".to_string(), &temp_dir);
-        let temp_path = file.copy_to_temp();
+        let test_dir = TestDir::new();
+        let file = TestableFile::new("balanced_brackets".to_string(), &test_dir);
 
         serial!({
             cli::run(vec![
@@ -1519,7 +1572,7 @@ mod tests {
                 "fmt",
                 "tests/spec/balanced_brackets",
                 "-t",
-                &temp_path,
+                file.path_str(),
             ]);
 
             let _ = fs::remove_file(&&*LOG_PATH);
@@ -1532,7 +1585,7 @@ mod tests {
                 "fmt",
                 "tests/spec/balanced_brackets",
                 "-t",
-                &temp_path,
+                file.path_str(),
                 "--no-skip",
             ]);
 
@@ -1547,27 +1600,22 @@ mod tests {
 
         //verify
         file.assert_matches_output();
-
-        //teardown
-        fs::remove_dir_all(&temp_dir).unwrap();
     }
 
     #[test]
     fn test_pwd_shorthand() {
         //setup
-        let temp_dir1 = create_temp_dir();
-        let file1 = TestableFile::new("balanced_brackets".to_string(), &temp_dir1);
-        file1.copy_to_temp();
+        let test_dir1 = TestDir::new();
+        let file1 = TestableFile::new("balanced_brackets".to_string(), &test_dir1);
 
-        let temp_dir2 = create_temp_dir();
-        let file2 = TestableFile::new("balanced_brackets".to_string(), &temp_dir2);
-        file2.copy_to_temp();
+        let test_dir2 = TestDir::new();
+        let file2 = TestableFile::new("balanced_brackets".to_string(), &test_dir2);
 
         let usr_dir = env::current_dir().unwrap();
-        env::set_current_dir(&temp_dir1).unwrap();
+        env::set_current_dir(test_dir1.path()).unwrap();
 
+        //exercise
         parallel!({
-            //exercise
             cli::run(vec![
                 &format!("../../{}", EXECUTABLE),
                 "fmt",
@@ -1581,34 +1629,6 @@ mod tests {
         env::set_current_dir(&usr_dir).unwrap();
         file1.assert_matches_output();
         file2.assert_does_not_match_output();
-
-        //teardown
-        fs::remove_dir_all(&temp_dir1).unwrap();
-        fs::remove_dir_all(&temp_dir2).unwrap();
-    }
-
-    fn assert_modifies_file(file_path: &str, modifier: &Fn()) {
-        assert!(modifies_file(file_path, modifier));
-    }
-
-    fn assert_does_not_modify_file(file_path: &str, modifier: &Fn()) {
-        assert!(!modifies_file(file_path, modifier));
-    }
-
-    fn modifies_file(file_path: &str, modifier: &Fn()) -> bool {
-        let initially_modified_at = Path::new(file_path).metadata().unwrap().modified().unwrap();
-
-        modifier();
-
-        let finally_modified_at = Path::new(file_path).metadata().unwrap().modified().unwrap();
-
-        initially_modified_at != finally_modified_at
-    }
-
-    fn create_temp_dir() -> String {
-        let temp_dir = format!("tests/temp-{}", Uuid::new_v4().to_string());
-        fs::create_dir(&temp_dir).unwrap();
-        temp_dir
     }
 
     fn read_to_string(path: &Path) -> String {
