@@ -23,8 +23,7 @@ use self::{
 };
 
 pub fn fmt(matches: &ArgMatches) {
-    let mut sw = Stopwatch::new();
-    sw.start();
+    let mut sw = Stopwatch::start_new();
 
     let spec_path = matches.value_of("spec").unwrap();
 
