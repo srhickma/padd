@@ -110,8 +110,7 @@ impl WorkerMux {
                     }
                 }
 
-                let sig = WorkerMux::join_job_queue(&queue_rx);
-                match sig {
+                match WorkerMux::join_job_queue(&queue_rx) {
                     Signal::TERM => break,
                     Signal::JOB(payload) => {
                         let worker_id = idle_workers.pop_back().unwrap();

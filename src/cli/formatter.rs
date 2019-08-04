@@ -124,10 +124,9 @@ pub fn generate_formatter(spec_path: &str) -> Result<Formatter, GenerationError>
 
     let mut spec = String::new();
 
-    let spec_file = File::open(spec_path);
-    match spec_file {
-        Ok(_) => {
-            if let Err(err) = spec_file.unwrap().read_to_string(&mut spec) {
+    match File::open(spec_path) {
+        Ok(mut spec_file) => {
+            if let Err(err) = spec_file.read_to_string(&mut spec) {
                 return Err(GenerationError::FileErr(format!(
                     "Could not read specification file \"{}\": {}",
                     &spec_path, err
@@ -359,8 +358,8 @@ fn check_file(target_path: &Path, fjr: &FormatJobRunner) -> Result<(), Formattin
     let target_file = OpenOptions::new().read(true).write(true).open(&target_path);
     let target_path_string = target_path.to_string_lossy().to_string();
     match target_file {
-        Ok(_) => {
-            let mut target = target_file.unwrap();
+        Ok(target_file) => {
+            let mut target = target_file;
 
             let mut text = String::new();
 
