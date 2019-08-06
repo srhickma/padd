@@ -21,7 +21,7 @@ script:
 - cargo build
 - cargo clippy -- -D warnings
 - cargo fmt --all -- --check
-- cargo test
+- RUST_BACKTRACE=1 cargo test
 
 env:
   global:
