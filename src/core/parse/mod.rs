@@ -23,11 +23,19 @@ pub fn def_parser<Symbol: GrammarSymbol>() -> Box<dyn Parser<Symbol>> {
 }
 
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
+pub enum SymbolParseMethod {
+    Standard,
+    Ignored,
+    Injected,
+    Repeated,
+}
+
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub struct Tree<Symbol: GrammarSymbol> {
     pub lhs: Token<Symbol>,
     pub children: Vec<Tree<Symbol>>,
     pub production: Option<Production<Symbol>>,
-    pub injected: bool,
+    pub spm: SymbolParseMethod,
 }
 
 impl<Symbol: GrammarSymbol> Tree<Symbol> {
@@ -52,7 +60,7 @@ impl<Symbol: GrammarSymbol> Tree<Symbol> {
             lhs: Token::null(),
             children: vec![],
             production: None,
-            injected: false,
+            spm: SymbolParseMethod::Standard,
         }
     }
 
@@ -80,7 +88,7 @@ impl<Symbol: GrammarSymbol> Tree<Symbol> {
             lhs,
             children,
             production,
-            injected: self.injected,
+            spm: self.spm.clone(),
         }
     }
 
@@ -90,16 +98,25 @@ impl<Symbol: GrammarSymbol> Tree<Symbol> {
                 "{}{}{}{}",
                 prefix,
                 if is_tail { "└── " } else { "├── " },
-                if self.injected { "<< " } else { "" },
+                if self.spm == SymbolParseMethod::Injected {
+                    "<< "
+                } else {
+                    ""
+                },
                 self.lhs.to_string()
             )
         } else {
+            let kind_string = match self.lhs.kind_opt() {
+                None => String::from("?"),
+                Some(kind) => kind.to_string(),
+            };
             let mut builder = format!(
                 "{}{}{}",
                 prefix,
                 if is_tail { "└── " } else { "├── " },
-                self.lhs.kind().to_string(),
+                kind_string,
             );
+
             let len = self.children.len();
             for (i, child) in self.children.iter().enumerate() {
                 let margin = format!("{}{}", prefix, if is_tail { "    " } else { "│   " });
@@ -867,10 +884,11 @@ mod tests {
         assert_eq!(
             tree.to_string(),
             "└── s
-    ├── T <- 'a'
-    ├── T <- 'b'
-    ├── T <- 'c'
-    └── T <- 'd'"
+    └── ?
+        ├── T <- 'a'
+        ├── T <- 'b'
+        ├── T <- 'c'
+        └── T <- 'd'"
         );
     }
 
@@ -911,10 +929,11 @@ mod tests {
             tree.to_string(),
             "└── s
     ├── A <- '1'
-    ├── T <- 'a'
-    ├── T <- 'b'
-    ├── T <- 'c'
-    ├── T <- 'd'
+    ├── ?
+    │   ├── T <- 'a'
+    │   ├── T <- 'b'
+    │   ├── T <- 'c'
+    │   └── T <- 'd'
     └── A <- '2'"
         );
     }
@@ -1055,10 +1074,11 @@ mod tests {
             tree.to_string(),
             "└── s
     └── t
-        ├── T <- 'a'
-        ├── T <- 'b'
-        ├── T <- 'c'
-        └── T <- 'd'"
+        └── ?
+            ├── T <- 'a'
+            ├── T <- 'b'
+            ├── T <- 'c'
+            └── T <- 'd'"
         );
     }
 
@@ -1163,11 +1183,13 @@ mod tests {
             tree.to_string(),
             "└── s
     ├── X <- 'z'
-    ├── Y <- 'a'
-    ├── Y <- 'b'
-    ├── Z <- '1'
-    ├── Z <- '2'
-    └── Z <- '3'"
+    ├── ?
+    │   ├── Y <- 'a'
+    │   └── Y <- 'b'
+    └── ?
+        ├── Z <- '1'
+        ├── Z <- '2'
+        └── Z <- '3'"
         );
     }
 
@@ -1209,11 +1231,13 @@ mod tests {
         assert_eq!(
             tree.to_string(),
             "└── s
-    ├── X <- 'a'
-    ├── X <- 'b'
+    ├── ?
+    │   ├── X <- 'a'
+    │   └── X <- 'b'
     └── t_opt
-        ├── T <- '1'
-        └── T <- '2'"
+        └── ?
+            ├── T <- '1'
+            └── T <- '2'"
         );
 
         let lex = vec![
@@ -1226,8 +1250,9 @@ mod tests {
         assert_eq!(
             tree.to_string(),
             "└── s
-    ├── X <- 'a'
-    ├── X <- 'b'
+    ├── ?
+    │   ├── X <- 'a'
+    │   └── X <- 'b'
     └── t_opt
         └──  <- 'NULL'"
         );
@@ -1272,10 +1297,12 @@ mod tests {
             tree.to_string(),
             "└── s
     ├── t_opt
-    │   ├── T <- '1'
-    │   └── T <- '2'
-    ├── X <- 'a'
-    └── X <- 'b'"
+    │   └── ?
+    │       ├── T <- '1'
+    │       └── T <- '2'
+    └── ?
+        ├── X <- 'a'
+        └── X <- 'b'"
         );
 
         let lex = vec![
@@ -1290,8 +1317,9 @@ mod tests {
             "└── s
     ├── t_opt
     │   └──  <- 'NULL'
-    ├── X <- 'a'
-    └── X <- 'b'"
+    └── ?
+        ├── X <- 'a'
+        └── X <- 'b'"
         );
     }
 
@@ -1335,8 +1363,9 @@ mod tests {
             "└── s
     ├── << T <- 'a'
     ├── A <- '1'
-    ├── T <- 'b'
-    ├── T <- 'c'
+    ├── ?
+    │   ├── T <- 'b'
+    │   └── T <- 'c'
     ├── A <- '2'
     └── << T <- 'd'"
         );
@@ -1370,15 +1399,14 @@ mod tests {
         //exercise
         let tree = parser.parse(lex, &grammar).unwrap();
 
-        println!("{}", tree.to_string());
-
         //verify
         assert_eq!(
             tree.to_string(),
             "└── s
     ├── << A <- '1'
-    ├── T <- 'a'
-    ├── T <- 'b'
+    ├── ?
+    │   ├── T <- 'a'
+    │   └── T <- 'b'
     └── << A <- '2'"
         );
     }
@@ -1417,22 +1445,21 @@ mod tests {
         //exercise
         let tree = parser.parse(lex, &grammar).unwrap();
 
-        println!("{}", tree.to_string());
-
         //verify
         assert_eq!(
             tree.to_string(),
             "└── s
     ├── << A <- '1'
-    ├── T <- 'a'
-    ├── << A <- '2'
-    ├── << A <- '3'
-    ├── T <- 'b'
-    ├── T <- 'c'
-    ├── T <- 'd'
-    ├── << A <- '4'
-    ├── << A <- '5'
-    └── T <- 'e'"
+    └── ?
+        ├── T <- 'a'
+        ├── A <- '2'
+        ├── A <- '3'
+        ├── T <- 'b'
+        ├── T <- 'c'
+        ├── T <- 'd'
+        ├── A <- '4'
+        ├── A <- '5'
+        └── T <- 'e'"
         );
     }
 

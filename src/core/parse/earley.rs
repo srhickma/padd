@@ -6,7 +6,7 @@ use {
         parse::{
             self,
             grammar::{Grammar, GrammarSymbol},
-            Parser, Production, ProductionSymbol, Tree,
+            Parser, Production, ProductionSymbol, SymbolParseMethod, Tree,
         },
     },
     std::{
@@ -533,11 +533,69 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
             lex: &'scope [Token<Symbol>],
             chart: PChart<'scope, Symbol>,
         ) -> Tree<Symbol> {
-            if grammar.weighted_parse() {
+            let tree = if grammar.weighted_parse() {
                 parse_bottom_up(grammar, lex, chart)
             } else {
                 parse_top_down(grammar, lex, chart)
+            };
+
+            push_down_inline_lists(tree)
+        }
+
+        fn push_down_inline_lists<Symbol: GrammarSymbol>(mut root: Tree<Symbol>) -> Tree<Symbol> {
+            if root.is_leaf() {
+                return root;
             }
+
+            let mut children: Vec<Tree<Symbol>> = Vec::with_capacity(root.children.len());
+
+            while !root.children.is_empty() {
+                let child = &root.children[root.children.len() - 1];
+
+                if child.spm == SymbolParseMethod::Repeated && root.children.len() > 1 {
+                    let mut top = root.children.len() - 1;
+                    let mut end = top - 1;
+
+                    loop {
+                        let other_child = &root.children[end];
+                        if *other_child.lhs.kind() == *child.lhs.kind()
+                            && other_child.spm == SymbolParseMethod::Repeated
+                        {
+                            top = end;
+                        } else if other_child.spm != SymbolParseMethod::Injected {
+                            break;
+                        }
+
+                        if end == 0 {
+                            break;
+                        }
+
+                        end -= 1;
+                    }
+
+                    let sub_children = root
+                        .children
+                        .drain(top..)
+                        .map(|mut t| {
+                            t.spm = SymbolParseMethod::Standard;
+                            push_down_inline_lists(t)
+                        })
+                        .collect();
+
+                    children.push(Tree {
+                        lhs: Token::null(),
+                        children: sub_children,
+                        production: None,
+                        spm: SymbolParseMethod::Repeated,
+                    });
+                } else {
+                    children.push(push_down_inline_lists(root.children.pop().unwrap()))
+                }
+            }
+
+            children.reverse();
+            root.children = children;
+            root
         }
 
         fn parse_bottom_up<'scope, Symbol: GrammarSymbol>(
@@ -618,7 +676,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                         lhs: lex[edge.start].clone(),
                         children: Vec::new(),
                         production: None,
-                        injected: edge.spm == SymbolParseMethod::Injected,
+                        spm: edge.spm.clone(),
                     },
                     Some(rule) => Tree {
                         lhs: Token::interior(rule.lhs.clone()),
@@ -630,7 +688,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                                     lhs: lex[edge.start].clone(),
                                     children: Vec::new(),
                                     production: None,
-                                    injected: edge.spm == SymbolParseMethod::Injected,
+                                    spm: edge.spm.clone(),
                                 }]
                             } else {
                                 nlp_map
@@ -647,7 +705,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                             Some(production) => Some(production.clone()),
                             None => None,
                         },
-                        injected: false,
+                        spm: SymbolParseMethod::Standard,
                     },
                 }
             }
@@ -771,14 +829,13 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                         lhs: lex[edge.start].clone(),
                         children: Vec::new(),
                         production: None,
-                        injected: false,
+                        spm: edge.spm.clone(),
                     },
                     Some(rule) => Tree {
                         lhs: Token::interior(rule.lhs.clone()),
                         children: {
                             let mut children: Vec<Tree<Symbol>> = top_list(edge, grammar, chart)
                                 .iter()
-                                .filter(|ref edge| edge.spm != SymbolParseMethod::Ignored)
                                 .rev()
                                 .map(|ref edge| recur(&edge, grammar, lex, chart))
                                 .collect();
@@ -792,7 +849,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                             Some(production) => Some(production.clone()),
                             None => None,
                         },
-                        injected: false,
+                        spm: edge.spm.clone(),
                     },
                 }
             }
@@ -1266,14 +1323,6 @@ struct ShadowSymbol<Symbol: GrammarSymbol> {
     symbol: Symbol,
     spm: SymbolParseMethod,
     reps: usize,
-}
-
-#[derive(PartialEq, Eq, Hash, Clone, Debug)]
-enum SymbolParseMethod {
-    Standard,
-    Ignored,
-    Injected,
-    Repeated,
 }
 
 type Node = usize;

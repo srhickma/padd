@@ -2,7 +2,7 @@ use {
     core::{
         data::map::CEHashMap,
         fmt::pattern::{Capture, Pattern, Segment},
-        parse::{grammar::GrammarSymbol, Production, ProductionSymbol, Tree},
+        parse::{grammar::GrammarSymbol, Production, ProductionSymbol, SymbolParseMethod, Tree},
     },
     std::{collections::HashMap, error, fmt},
 };
@@ -251,7 +251,7 @@ impl<'parse, Symbol: GrammarSymbol + 'parse> FormatJob<'parse, Symbol> {
                 // Reconstruct one after the other
                 let mut res = String::new();
                 for child in &node.children {
-                    res = if child.injected {
+                    res = if child.spm == SymbolParseMethod::Injected {
                         let injectable = &self.injection_map[child.lhs.kind()];
                         let injection = Injection {
                             tree: child,
@@ -300,7 +300,7 @@ impl<'parse, Symbol: GrammarSymbol + 'parse> FormatJob<'parse, Symbol> {
         let mut expected_children: Vec<&Tree<Symbol>> = Vec::new();
 
         for child in children {
-            if child.injected {
+            if child.spm == SymbolParseMethod::Injected {
                 let injectable = &self.injection_map[child.lhs.kind()];
 
                 let mut target: i64 = match &injectable.affinity {
