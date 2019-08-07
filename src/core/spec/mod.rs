@@ -1385,13 +1385,40 @@ grammar {
     }
 
     #[test]
-    fn inline_list_terminal() {
-        // TODO(shane)
-    }
+    fn inline_list() {
+        //setup
+        let spec = "
+cdfa {
+    start
+        'a' -> ^A;
+}
 
-    #[test]
-    fn inline_list_non_terminal() {
-        // TODO(shane)
+grammar {
+    s | {A};
+}
+        ";
+
+        let input = "aaa".to_string();
+        let chars: Vec<char> = input.chars().collect();
+
+        let lexer = lex::def_lexer();
+        let tree = lang::parse_spec(spec);
+        let parse = tree.unwrap();
+        let (cdfa, grammar, _) = generate_spec(&parse, SimpleGrammarBuilder::new()).unwrap();
+
+        //exercise
+        let tokens = lexer.lex(&chars[..], &*cdfa).unwrap();
+        let parse = parse::def_parser().parse(tokens, &*grammar).unwrap();
+
+        //verify
+        assert_eq!(
+            parse.to_string(),
+            "└── s
+    └── ?
+        ├── A <- 'a'
+        ├── A <- 'a'
+        └── A <- 'a'"
+        )
     }
 
     fn tokens_string(tokens: Vec<Token<String>>) -> String {

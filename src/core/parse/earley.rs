@@ -435,7 +435,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                 next: item.next,
                 depth: item.depth,
                 ignore_next: false,
-                weight: 0,
+                weight: item.weight,
             };
 
             dest.push(new_item.clone());
@@ -573,21 +573,26 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                         end -= 1;
                     }
 
-                    let sub_children = root
-                        .children
-                        .drain(top..)
-                        .map(|mut t| {
-                            t.spm = SymbolParseMethod::Standard;
-                            push_down_inline_lists(t)
-                        })
-                        .collect();
+                    if top == root.children.len() - 1 {
+                        // Do not push down single nodes
+                        children.push(push_down_inline_lists(root.children.pop().unwrap()))
+                    } else {
+                        let sub_children = root
+                            .children
+                            .drain(top..)
+                            .map(|mut t| {
+                                t.spm = SymbolParseMethod::Standard;
+                                push_down_inline_lists(t)
+                            })
+                            .collect();
 
-                    children.push(Tree {
-                        lhs: Token::null(),
-                        children: sub_children,
-                        production: None,
-                        spm: SymbolParseMethod::Repeated,
-                    });
+                        children.push(Tree {
+                            lhs: Token::null(),
+                            children: sub_children,
+                            production: None,
+                            spm: SymbolParseMethod::Repeated,
+                        });
+                    }
                 } else {
                     children.push(push_down_inline_lists(root.children.pop().unwrap()))
                 }
@@ -667,6 +672,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
 
             fn link_shallow_paths<'scope, Symbol: GrammarSymbol>(
                 edge: &Edge<Symbol>,
+                spm: SymbolParseMethod,
                 grammar: &'scope dyn Grammar<Symbol>,
                 lex: &'scope [Token<Symbol>],
                 nlp_map: &HashMap<&Edge<Symbol>, ParsePath<Symbol>>,
@@ -676,7 +682,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                         lhs: lex[edge.start].clone(),
                         children: Vec::new(),
                         production: None,
-                        spm: edge.spm.clone(),
+                        spm: spm.clone(),
                     },
                     Some(rule) => Tree {
                         lhs: Token::interior(rule.lhs.clone()),
@@ -688,16 +694,21 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                                     lhs: lex[edge.start].clone(),
                                     children: Vec::new(),
                                     production: None,
-                                    spm: edge.spm.clone(),
+                                    spm: spm.clone(),
                                 }]
                             } else {
-                                nlp_map
-                                    .get(edge)
-                                    .unwrap()
-                                    .iter()
-                                    .filter(|ref edge| edge.spm != SymbolParseMethod::Ignored)
-                                    .rev()
-                                    .map(|edge| link_shallow_paths(edge, grammar, lex, nlp_map))
+                                let path = nlp_map.get(edge).unwrap();
+                                let edges = path.len();
+                                path.iter()
+                                    .enumerate()
+                                    .filter(|(_, ref inner_edge)| {
+                                        inner_edge.spm != SymbolParseMethod::Ignored
+                                    })
+                                    .rev() // TODO(shane) reverse first?
+                                    .map(|(i, ref inner_edge)| {
+                                        let (_, spm) = edge.symbol_at(edges - i - 1);
+                                        link_shallow_paths(inner_edge, spm, grammar, lex, nlp_map)
+                                    })
                                     .collect()
                             }
                         },
@@ -705,7 +716,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                             Some(production) => Some(production.clone()),
                             None => None,
                         },
-                        spm: SymbolParseMethod::Standard,
+                        spm: spm.clone(),
                     },
                 }
             }
@@ -809,7 +820,13 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                 }
             }
 
-            link_shallow_paths(best_root_edge, grammar, lex, &nlp_map)
+            link_shallow_paths(
+                best_root_edge,
+                SymbolParseMethod::Standard,
+                grammar,
+                lex,
+                &nlp_map,
+            )
         }
 
         fn parse_top_down<'scope, Symbol: GrammarSymbol>(
@@ -819,6 +836,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
         ) -> Tree<Symbol> {
             fn recur<'scope, Symbol: GrammarSymbol>(
                 edge: &Edge<Symbol>,
+                spm: SymbolParseMethod,
                 grammar: &'scope dyn Grammar<Symbol>,
                 lex: &'scope [Token<Symbol>],
                 chart: &PChart<Symbol>,
@@ -829,15 +847,21 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                         lhs: lex[edge.start].clone(),
                         children: Vec::new(),
                         production: None,
-                        spm: edge.spm.clone(),
+                        spm: spm.clone(),
                     },
                     Some(rule) => Tree {
                         lhs: Token::interior(rule.lhs.clone()),
                         children: {
-                            let mut children: Vec<Tree<Symbol>> = top_list(edge, grammar, chart)
-                                .iter()
-                                .rev()
-                                .map(|ref edge| recur(&edge, grammar, lex, chart))
+                            let path = top_list(edge, grammar, chart);
+                            let edges = path.len();
+                            let mut children: Vec<Tree<Symbol>> = path
+                                .into_iter()
+                                .enumerate()
+                                .rev() // TODO(shane) reverse first?
+                                .map(|(i, ref inner_edge)| {
+                                    let (_, spm) = edge.symbol_at(edges - i - 1);
+                                    recur(&inner_edge, spm, grammar, lex, chart)
+                                })
                                 .collect();
                             if children.is_empty() {
                                 //Empty rhs
@@ -849,7 +873,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                             Some(production) => Some(production.clone()),
                             None => None,
                         },
-                        spm: edge.spm.clone(),
+                        spm: spm.clone(),
                     },
                 }
             }
@@ -884,7 +908,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                                 shadow_len: 0,
                                 start: root,
                                 finish: root + 1,
-                                spm,
+                                spm, // TODO(shane) we may be able to get rid of this!
                                 weight: 0,
                                 depth: 0,
                             };
@@ -935,7 +959,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
 
             match root_edge {
                 None => panic!("Failed to find start item to begin parse"),
-                Some(edge) => recur(edge, grammar, lex, &chart),
+                Some(edge) => recur(edge, SymbolParseMethod::Standard, grammar, lex, &chart),
             }
         }
     }
@@ -1134,7 +1158,7 @@ impl<'rule, Symbol: GrammarSymbol + 'rule> Item<'rule, Symbol> {
 
 impl<'rule, Symbol: GrammarSymbol> Data for Item<'rule, Symbol> {
     fn to_string(&self) -> String {
-        let mut rule_string = format!("{:?} -> ", self.rule.lhs);
+        let mut rule_string = format!("{:?} -{}-> ", self.rule.lhs, self.weight);
         for i in 0..self.rule.rhs.len() {
             if i == self.next {
                 rule_string.push_str(". ");
@@ -1211,7 +1235,7 @@ struct Edge<'prod, Symbol: GrammarSymbol + 'prod> {
     shadow_len: usize,
     start: usize,
     finish: usize,
-    spm: SymbolParseMethod,
+    spm: SymbolParseMethod, // TODO(shane) remove this
     weight: usize,
     depth: usize,
 }
