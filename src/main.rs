@@ -53,18 +53,26 @@ mod tests {
     static EXECUTABLE: &'static str = "target/debug/padd";
 
     lazy_static! {
-        static ref TEMP_DIR: &'static Path = Path::new("tests/temp");
-        static ref INPUT_DIR: &'static Path = Path::new("tests/input");
-        static ref OUTPUT_DIR: &'static Path = Path::new("tests/output");
+        static ref TEST_DIR: PathBuf = fs::canonicalize(Path::new("tests")).unwrap();
+        static ref INPUT_DIR: PathBuf = fs::canonicalize(Path::new("tests/input")).unwrap();
+        static ref OUTPUT_DIR: PathBuf = fs::canonicalize(Path::new("tests/output")).unwrap();
 
         static ref LOG_PATH: String = String::from("tests/test.log");
 
         static ref SERIALIZATION_LOCK: RwLock<()> = RwLock::new(());
 
-        static ref COMPLETION_REGEX: Regex = Regex::new(r"INFO - COMPLETE: \d*ms : (\d*) processed, (\d*) unchanged, (\d*) formatted, (\d*) failed").unwrap();
-        static ref FORMATTED_REGEX: Regex = Regex::new(r"DEBUG - Finished formatting ([^\n]*)").unwrap();
-        static ref FAILED_REGEX: Regex = Regex::new(r"(WARN|ERROR) - Error formatting ([^\n:]*): ([^\n]*)").unwrap();
-        static ref CHECK_FAILED_REGEX: Regex = Regex::new(r"ERROR - Formatting check failed for ([^\n:]*)").unwrap();
+        static ref COMPLETION_REGEX: Regex = Regex::new(
+            r"INFO - COMPLETE: \d*ms : (\d*) processed, (\d*) unchanged, (\d*) formatted, (\d*) failed"
+        ).unwrap();
+        static ref FORMATTED_REGEX: Regex = Regex::new(
+            r"DEBUG - Finished formatting ([^\n]*)"
+        ).unwrap();
+        static ref FAILED_REGEX: Regex = Regex::new(
+            r"(WARN|ERROR) - Error formatting ([^\n:]*): ([^\n]*)"
+        ).unwrap();
+        static ref CHECK_FAILED_REGEX: Regex = Regex::new(
+            r"ERROR - Formatting check failed for ([^\n:]*)"
+        ).unwrap();
     }
 
     macro_rules! serial {
@@ -97,9 +105,11 @@ mod tests {
 
     impl TestDir {
         fn new() -> Self {
-            let path_str = format!("tests/temp-{}", Uuid::new_v4().to_string());
-            let path_buf = PathBuf::from(&path_str);
+            let mut path_buf = TEST_DIR.clone();
+            path_buf.push(format!("temp-{}", Uuid::new_v4().to_string()));
             fs::create_dir(path_buf.as_path()).unwrap();
+
+            let path_str = path_buf.to_string_lossy().to_string();
 
             TestDir {
                 path_buf,
@@ -600,7 +610,9 @@ mod tests {
         thread::sleep(Duration::from_millis(10));
 
         let new_spec_path = path_from_name(test_dir.path(), "spec");
-        fs::copy("tests/spec/json", &new_spec_path).unwrap();
+        parallel!({
+            fs::copy("tests/spec/json", &new_spec_path).unwrap();
+        });
 
         let mut spec_file = OpenOptions::new()
             .append(true)
