@@ -478,7 +478,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                 shadow_len: Edge::shadow_len(&item.shadow),
                 start: item.start,
                 finish,
-                spm: SymbolParseMethod::Standard,
+                ignored: false,
                 weight: item.weight,
                 depth: item.depth,
             });
@@ -701,10 +701,8 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                                 let edges = path.len();
                                 path.iter()
                                     .enumerate()
-                                    .filter(|(_, ref inner_edge)| {
-                                        inner_edge.spm != SymbolParseMethod::Ignored
-                                    })
-                                    .rev() // TODO(shane) reverse first?
+                                    .filter(|(_, ref inner_edge)| !inner_edge.ignored)
+                                    .rev()
                                     .map(|(i, ref inner_edge)| {
                                         let (_, spm) = edge.symbol_at(edges - i - 1);
                                         link_shallow_paths(inner_edge, spm, grammar, lex, nlp_map)
@@ -753,7 +751,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                                 shadow_len: 0,
                                 start: root,
                                 finish: root + 1,
-                                spm,
+                                ignored: spm == SymbolParseMethod::Ignored,
                                 weight: 0,
                                 depth: 0,
                             };
@@ -857,7 +855,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                             let mut children: Vec<Tree<Symbol>> = path
                                 .into_iter()
                                 .enumerate()
-                                .rev() // TODO(shane) reverse first?
+                                .rev()
                                 .map(|(i, ref inner_edge)| {
                                     let (_, spm) = edge.symbol_at(edges - i - 1);
                                     recur(&inner_edge, spm, grammar, lex, chart)
@@ -908,7 +906,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                                 shadow_len: 0,
                                 start: root,
                                 finish: root + 1,
-                                spm, // TODO(shane) we may be able to get rid of this!
+                                ignored: spm == SymbolParseMethod::Ignored,
                                 weight: 0,
                                 depth: 0,
                             };
@@ -1235,7 +1233,7 @@ struct Edge<'prod, Symbol: GrammarSymbol + 'prod> {
     shadow_len: usize,
     start: usize,
     finish: usize,
-    spm: SymbolParseMethod, // TODO(shane) remove this
+    ignored: bool,
     weight: usize,
     depth: usize,
 }
