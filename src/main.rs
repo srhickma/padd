@@ -53,18 +53,26 @@ mod tests {
     static EXECUTABLE: &'static str = "target/debug/padd";
 
     lazy_static! {
-        static ref TEMP_DIR: &'static Path = Path::new("tests/temp");
-        static ref INPUT_DIR: &'static Path = Path::new("tests/input");
-        static ref OUTPUT_DIR: &'static Path = Path::new("tests/output");
+        static ref TEST_DIR: PathBuf = fs::canonicalize(Path::new("tests")).unwrap();
+        static ref INPUT_DIR: PathBuf = fs::canonicalize(Path::new("tests/input")).unwrap();
+        static ref OUTPUT_DIR: PathBuf = fs::canonicalize(Path::new("tests/output")).unwrap();
 
         static ref LOG_PATH: String = String::from("tests/test.log");
 
         static ref SERIALIZATION_LOCK: RwLock<()> = RwLock::new(());
 
-        static ref COMPLETION_REGEX: Regex = Regex::new(r"INFO - COMPLETE: \d*ms : (\d*) processed, (\d*) unchanged, (\d*) formatted, (\d*) failed").unwrap();
-        static ref FORMATTED_REGEX: Regex = Regex::new(r"DEBUG - Finished formatting ([^\n]*)").unwrap();
-        static ref FAILED_REGEX: Regex = Regex::new(r"(WARN|ERROR) - Error formatting ([^\n:]*): ([^\n]*)").unwrap();
-        static ref CHECK_FAILED_REGEX: Regex = Regex::new(r"ERROR - Formatting check failed for ([^\n:]*)").unwrap();
+        static ref COMPLETION_REGEX: Regex = Regex::new(
+            r"INFO - COMPLETE: \d*ms : (\d*) processed, (\d*) unchanged, (\d*) formatted, (\d*) failed"
+        ).unwrap();
+        static ref FORMATTED_REGEX: Regex = Regex::new(
+            r"DEBUG - Finished formatting ([^\n]*)"
+        ).unwrap();
+        static ref FAILED_REGEX: Regex = Regex::new(
+            r"(WARN|ERROR) - Error formatting ([^\n:]*): ([^\n]*)"
+        ).unwrap();
+        static ref CHECK_FAILED_REGEX: Regex = Regex::new(
+            r"ERROR - Formatting check failed for ([^\n:]*)"
+        ).unwrap();
     }
 
     macro_rules! serial {
@@ -97,9 +105,11 @@ mod tests {
 
     impl TestDir {
         fn new() -> Self {
-            let path_str = format!("tests/temp-{}", Uuid::new_v4().to_string());
-            let path_buf = PathBuf::from(&path_str);
+            let mut path_buf = TEST_DIR.clone();
+            path_buf.push(format!("temp-{}", Uuid::new_v4().to_string()));
             fs::create_dir(path_buf.as_path()).unwrap();
+
+            let path_str = path_buf.to_string_lossy().to_string();
 
             TestDir {
                 path_buf,
@@ -270,7 +280,7 @@ mod tests {
     #[test]
     fn test_fmt_all_java8() {
         //setup
-        let test_dir = TestDir::new();
+        let mut test_dir = TestDir::new();
 
         for file_name in files_with_prefix("java8") {
             let file = TestableFile::new(file_name, &test_dir);
@@ -289,12 +299,15 @@ mod tests {
             //verify
             file.assert_matches_output();
         }
+
+        //teardown
+        test_dir.release();
     }
 
     #[test]
     fn test_format_directory() {
         //setup
-        let test_dir = TestDir::new();
+        let mut test_dir = TestDir::new();
 
         let mut testable_files: Vec<TestableFile> = Vec::new();
 
@@ -319,6 +332,9 @@ mod tests {
         for file in testable_files {
             file.assert_matches_output();
         }
+
+        //teardown
+        test_dir.release();
     }
 
     #[test]
@@ -356,7 +372,7 @@ mod tests {
     #[test]
     fn test_many_threads() {
         //setup
-        let test_dir = TestDir::new();
+        let mut test_dir = TestDir::new();
 
         let mut testable_files: Vec<TestableFile> = Vec::new();
 
@@ -383,12 +399,15 @@ mod tests {
         for file in testable_files {
             file.assert_matches_output();
         }
+
+        //teardown
+        test_dir.release();
     }
 
     #[test]
     fn test_invalid_threads_zero() {
         //setup
-        let test_dir = TestDir::new();
+        let mut test_dir = TestDir::new();
 
         let mut testable_files: Vec<TestableFile> = Vec::new();
 
@@ -415,12 +434,15 @@ mod tests {
         for file in testable_files {
             file.assert_matches_output();
         }
+
+        //teardown
+        test_dir.release();
     }
 
     #[test]
     fn test_invalid_threads_character() {
         //setup
-        let test_dir = TestDir::new();
+        let mut test_dir = TestDir::new();
 
         let mut testable_files: Vec<TestableFile> = Vec::new();
 
@@ -447,12 +469,15 @@ mod tests {
         for file in testable_files {
             file.assert_matches_output();
         }
+
+        //teardown
+        test_dir.release();
     }
 
     #[test]
     fn test_file_regex() {
         //setup
-        let test_dir = TestDir::new();
+        let mut test_dir = TestDir::new();
 
         let mut testable_files: Vec<TestableFile> = Vec::new();
 
@@ -485,12 +510,15 @@ mod tests {
         }
 
         assert_eq!(formatted, 3);
+
+        //teardown
+        test_dir.release();
     }
 
     #[test]
     fn test_diff_tracking_unchanged() {
         //setup
-        let test_dir = TestDir::new();
+        let mut test_dir = TestDir::new();
         let file = TestableFile::new("json_simple".to_string(), &test_dir);
 
         parallel!({
@@ -517,12 +545,15 @@ mod tests {
         });
 
         file.assert_matches_output();
+
+        //teardown
+        test_dir.release();
     }
 
     #[test]
     fn test_diff_tracking_file_modified() {
         //setup
-        let test_dir = TestDir::new();
+        let mut test_dir = TestDir::new();
         let file = TestableFile::new("json_simple".to_string(), &test_dir);
 
         parallel!({
@@ -554,12 +585,15 @@ mod tests {
 
         let result = fs::read_to_string(file.path_str()).unwrap();
         assert_eq!(result, "{\n    \"modified\": \"value\"\n}\n");
+
+        //teardown
+        test_dir.release();
     }
 
     #[test]
     fn test_diff_tracking_spec_modified() {
         //setup
-        let test_dir = TestDir::new();
+        let mut test_dir = TestDir::new();
         let file = TestableFile::new("json_simple".to_string(), &test_dir);
 
         parallel!({
@@ -576,7 +610,9 @@ mod tests {
         thread::sleep(Duration::from_millis(10));
 
         let new_spec_path = path_from_name(test_dir.path(), "spec");
-        fs::copy("tests/spec/json", &new_spec_path).unwrap();
+        parallel!({
+            fs::copy("tests/spec/json", &new_spec_path).unwrap();
+        });
 
         let mut spec_file = OpenOptions::new()
             .append(true)
@@ -600,12 +636,15 @@ mod tests {
         });
 
         file.assert_matches_output();
+
+        //teardown
+        test_dir.release();
     }
 
     #[test]
     fn test_clear_tracking_file() {
         //setup
-        let test_dir = TestDir::new();
+        let mut test_dir = TestDir::new();
         let file = TestableFile::new("json_simple".to_string(), &test_dir);
 
         parallel!({
@@ -637,12 +676,15 @@ mod tests {
         });
 
         file.assert_matches_output();
+
+        //teardown
+        test_dir.release();
     }
 
     #[test]
     fn test_clear_tracking_dir() {
         //setup
-        let test_dir = TestDir::new();
+        let mut test_dir = TestDir::new();
         let file = TestableFile::new("json_simple".to_string(), &test_dir);
 
         parallel!({
@@ -674,6 +716,9 @@ mod tests {
         });
 
         file.assert_matches_output();
+
+        //teardown
+        test_dir.release();
     }
 
     #[test]
@@ -692,7 +737,7 @@ mod tests {
     #[test]
     fn test_no_skip() {
         //setup
-        let test_dir = TestDir::new();
+        let mut test_dir = TestDir::new();
         let file = TestableFile::new("json_simple".to_string(), &test_dir);
 
         parallel!({
@@ -720,12 +765,15 @@ mod tests {
         });
 
         file.assert_matches_output();
+
+        //teardown
+        test_dir.release();
     }
 
     #[test]
     fn test_no_track() {
         //setup
-        let test_dir = TestDir::new();
+        let mut test_dir = TestDir::new();
         let file = TestableFile::new("json_simple".to_string(), &test_dir);
 
         //exercise
@@ -754,6 +802,9 @@ mod tests {
         });
 
         file.assert_matches_output();
+
+        //teardown
+        test_dir.release();
     }
 
     #[test]
@@ -776,14 +827,14 @@ mod tests {
             });
         });
 
-        // Prevent early destruction of test directory
+        //teardown
         test_dir.release();
     }
 
     #[test]
     fn test_log_to_file_new() {
         //setup
-        let test_dir = TestDir::new();
+        let mut test_dir = TestDir::new();
         let file = TestableFile::new("json_simple".to_string(), &test_dir);
 
         serial!({
@@ -811,12 +862,15 @@ mod tests {
             log::set_max_level(LevelFilter::Off);
             let _ = fs::remove_file(&&*LOG_PATH);
         });
+
+        //teardown
+        test_dir.release();
     }
 
     #[test]
     fn test_log_to_file_existing() {
         //setup
-        let test_dir = TestDir::new();
+        let mut test_dir = TestDir::new();
         let file = TestableFile::new("json_simple".to_string(), &test_dir);
 
         serial!({
@@ -845,12 +899,15 @@ mod tests {
             log::set_max_level(LevelFilter::Off);
             let _ = fs::remove_file(&&*LOG_PATH);
         });
+
+        //teardown
+        test_dir.release();
     }
 
     #[test]
     fn test_set_log_level() {
         //setup
-        let test_dir = TestDir::new();
+        let mut test_dir = TestDir::new();
         let levels = vec!["trace", "debug", "info", "warn", "error"];
 
         serial!({
@@ -905,6 +962,9 @@ mod tests {
             log::set_max_level(LevelFilter::Off);
             let _ = fs::remove_file(&&*LOG_PATH);
         });
+
+        //teardown
+        test_dir.release();
     }
 
     #[test]
@@ -969,7 +1029,7 @@ mod tests {
     #[test]
     fn test_formatting_passed() {
         //setup
-        let test_dir = TestDir::new();
+        let mut test_dir = TestDir::new();
         let file = TestableFile::new("json_simple".to_string(), &test_dir);
 
         serial!({
@@ -1007,12 +1067,15 @@ mod tests {
             log::set_max_level(LevelFilter::Off);
             let _ = fs::remove_file(&&*LOG_PATH);
         });
+
+        //teardown
+        test_dir.release();
     }
 
     #[test]
     fn test_formatting_failed() {
         //setup
-        let test_dir = TestDir::new();
+        let mut test_dir = TestDir::new();
         let file = TestableFile::new("java8_simple".to_string(), &test_dir);
 
         serial!({
@@ -1053,12 +1116,15 @@ mod tests {
             log::set_max_level(LevelFilter::Off);
             let _ = fs::remove_file(&&*LOG_PATH);
         });
+
+        //teardown
+        test_dir.release();
     }
 
     #[test]
     fn test_formatting_unchanged() {
         //setup
-        let test_dir = TestDir::new();
+        let mut test_dir = TestDir::new();
         let file = TestableFile::new("json_simple".to_string(), &test_dir);
 
         serial!({
@@ -1101,12 +1167,15 @@ mod tests {
             log::set_max_level(LevelFilter::Off);
             let _ = fs::remove_file(&&*LOG_PATH);
         });
+
+        //teardown
+        test_dir.release();
     }
 
     #[test]
     fn test_check_formatting_ok() {
         //setup
-        let test_dir = TestDir::new();
+        let mut test_dir = TestDir::new();
         let file = TestableFile::new("json_simple".to_string(), &test_dir);
 
         serial!({
@@ -1149,12 +1218,15 @@ mod tests {
             log::set_max_level(LevelFilter::Off);
             let _ = fs::remove_file(&&*LOG_PATH);
         });
+
+        //teardown
+        test_dir.release();
     }
 
     #[test]
     fn test_check_formatting_failed() {
         //setup
-        let test_dir = TestDir::new();
+        let mut test_dir = TestDir::new();
         let file = TestableFile::new("json_simple".to_string(), &test_dir);
 
         serial!({
@@ -1201,12 +1273,15 @@ mod tests {
             log::set_max_level(LevelFilter::Off);
             let _ = fs::remove_file(&&*LOG_PATH);
         });
+
+        //teardown
+        test_dir.release();
     }
 
     #[test]
     fn test_check_formatting_error() {
         //setup
-        let test_dir = TestDir::new();
+        let mut test_dir = TestDir::new();
         let file = TestableFile::new("java8_simple".to_string(), &test_dir);
 
         serial!({
@@ -1258,6 +1333,9 @@ mod tests {
             log::set_max_level(LevelFilter::Off);
             let _ = fs::remove_file(&&*LOG_PATH);
         });
+
+        //teardown
+        test_dir.release();
     }
 
     #[test]
@@ -1521,8 +1599,7 @@ mod tests {
     #[test]
     fn test_format_via_daemon() {
         //setup
-        let test_dir = TestDir::new();
-
+        let mut test_dir = TestDir::new();
         let file = TestableFile::new("json_simple".to_string(), &test_dir);
 
         serial!({
@@ -1558,12 +1635,15 @@ mod tests {
 
         //verify
         file.assert_matches_output();
+
+        //teardown
+        test_dir.release();
     }
 
     #[test]
     fn test_cache_fjr() {
         //setup
-        let test_dir = TestDir::new();
+        let mut test_dir = TestDir::new();
         let file = TestableFile::new("balanced_brackets".to_string(), &test_dir);
 
         serial!({
@@ -1600,22 +1680,26 @@ mod tests {
 
         //verify
         file.assert_matches_output();
+
+        //teardown
+        test_dir.release();
     }
 
     #[test]
     fn test_pwd_shorthand() {
         //setup
-        let test_dir1 = TestDir::new();
+        let mut test_dir1 = TestDir::new();
         let file1 = TestableFile::new("balanced_brackets".to_string(), &test_dir1);
 
-        let test_dir2 = TestDir::new();
+        let mut test_dir2 = TestDir::new();
         let file2 = TestableFile::new("balanced_brackets".to_string(), &test_dir2);
 
         let usr_dir = env::current_dir().unwrap();
-        env::set_current_dir(test_dir1.path()).unwrap();
 
-        //exercise
-        parallel!({
+        serial!({
+            env::set_current_dir(test_dir1.path()).unwrap();
+
+            //exercise
             cli::run(vec![
                 &format!("../../{}", EXECUTABLE),
                 "fmt",
@@ -1623,12 +1707,17 @@ mod tests {
                 "-t",
                 ".",
             ]);
+
+            env::set_current_dir(&usr_dir).unwrap();
         });
 
         //verify
-        env::set_current_dir(&usr_dir).unwrap();
         file1.assert_matches_output();
         file2.assert_does_not_match_output();
+
+        //teardown
+        test_dir1.release();
+        test_dir2.release();
     }
 
     fn read_to_string(path: &Path) -> String {
