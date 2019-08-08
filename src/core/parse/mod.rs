@@ -1374,6 +1374,55 @@ mod tests {
     }
 
     #[test]
+    fn non_terminal_inline_list_with_injection() {
+        //setup
+        let mut grammar_builder = SimpleGrammarBuilder::new();
+
+        grammar_builder.add_production(Production::from(
+            "s".to_string(),
+            vec![ProductionSymbol::symbol_list("t".to_string())],
+        ));
+
+        grammar_builder.add_production(Production::from(
+            "t".to_string(),
+            vec![ProductionSymbol::symbol("T".to_string())],
+        ));
+
+        grammar_builder.mark_injectable(&"T".to_string(), InjectionAffinity::Right);
+
+        grammar_builder.try_mark_start(&"s".to_string());
+
+        let grammar = grammar_builder.build().unwrap();
+
+        let lex = vec![
+            Token::leaf("T".to_string(), "a".to_string()),
+            Token::leaf("T".to_string(), "b".to_string()),
+            Token::leaf("T".to_string(), "c".to_string()),
+            Token::leaf("T".to_string(), "d".to_string()),
+        ];
+
+        let parser = def_parser();
+
+        //exercise
+        let tree = parser.parse(lex, &grammar).unwrap();
+
+        //verify
+        assert_eq!(
+            tree.to_string(),
+            "└── s
+    └── ?
+        ├── t
+        │   └── T <- 'a'
+        ├── t
+        │   └── T <- 'b'
+        ├── t
+        │   └── T <- 'c'
+        └── t
+            └── T <- 'd'"
+        );
+    }
+
+    #[test]
     fn inline_list_between_injectable_terminals() {
         //setup
         let mut grammar_builder = SimpleGrammarBuilder::new();

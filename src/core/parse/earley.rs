@@ -11,7 +11,7 @@ use {
     },
     std::{
         cmp::Ordering,
-        collections::{HashMap, HashSet},
+        collections::{HashMap, HashSet, LinkedList},
         usize,
     },
 };
@@ -678,7 +678,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                                     .filter(|(_, ref inner_edge)| !inner_edge.ignored)
                                     .rev()
                                     .map(|(i, ref inner_edge)| {
-                                        let (_, spm) = edge.symbol_at(edges - i - 1);
+                                        let (_, spm, _) = edge.symbol_at(edges - i - 1);
                                         link_shallow_paths(inner_edge, spm, grammar, lex, nlp_map)
                                     })
                                     .collect()
@@ -715,20 +715,96 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                             None
                         }
                     } else {
-                        let (symbol, spm) = root_edge.symbol_at(depth);
+                        let (symbol, spm, reps) = root_edge.symbol_at(depth);
 
-                        if !grammar.is_non_terminal(symbol) {
-                            let edge = Edge {
-                                rule: None,
-                                shadow: None,
-                                shadow_top: 0,
-                                shadow_len: 0,
-                                start: root,
-                                finish: root + 1,
-                                ignored: spm == SymbolParseMethod::Ignored,
-                                weight: 0,
-                                depth: 0,
-                            };
+                        if reps > 1 {
+                            if !grammar.is_non_terminal(symbol) {
+                                let mut edge = Edge::terminal(root + reps, spm);
+
+                                if let Some(mut path) = df_search(
+                                    depth + reps,
+                                    root + reps,
+                                    bottom,
+                                    root_edge,
+                                    weight_map,
+                                    grammar,
+                                    chart,
+                                ) {
+                                    for _ in 0..reps {
+                                        edge.start -= 1;
+                                        edge.finish -= 1;
+                                        path.append(edge.clone(), 0);
+                                    }
+                                    return Some(path);
+                                }
+                            } else if root < chart.len() {
+                                let mut work_stack: LinkedList<(
+                                    usize,
+                                    usize,
+                                    Option<&Edge<Symbol>>,
+                                )> = LinkedList::new();
+                                let mut edge_stack: Vec<&Edge<Symbol>> = Vec::with_capacity(reps);
+
+                                work_stack.push_front((0, root, None));
+
+                                let mut best_path: Option<WeightedParsePath<'scope, Symbol>> = None;
+
+                                while !work_stack.is_empty() {
+                                    let (count, finish, edge_opt) = work_stack.pop_front().unwrap();
+                                    if count <= edge_stack.len() && count > 0 {
+                                        edge_stack.drain(count - 1..);
+                                    }
+                                    if let Some(edge) = edge_opt {
+                                        edge_stack.push(edge);
+                                    }
+
+                                    if count == reps {
+                                        if let Some(mut path) = df_search(
+                                            depth + reps,
+                                            finish,
+                                            bottom,
+                                            root_edge,
+                                            weight_map,
+                                            grammar,
+                                            chart,
+                                        ) {
+                                            let tree_list_weight: usize = edge_stack
+                                                .iter()
+                                                .map(|edge| {
+                                                    *weight_map.get(edge).unwrap_or(&edge.weight)
+                                                })
+                                                .sum();
+
+                                            if best_path.is_none()
+                                                || path.weight + tree_list_weight
+                                                    < best_path.as_ref().unwrap().weight
+                                            {
+                                                edge_stack.reverse();
+                                                for edge in &edge_stack {
+                                                    path.append((*edge).clone(), 0)
+                                                }
+                                                edge_stack.clear();
+                                                path.weight += tree_list_weight;
+                                                best_path = Some(path);
+                                            }
+                                        }
+                                    } else {
+                                        for edge in &chart.row(finish).edges {
+                                            if edge.rule.unwrap().lhs == *symbol {
+                                                work_stack.push_front((
+                                                    count + 1,
+                                                    edge.finish,
+                                                    Some(edge),
+                                                ));
+                                            }
+                                        }
+                                    }
+                                }
+
+                                return best_path;
+                            }
+                        } else if !grammar.is_non_terminal(symbol) {
+                            let edge = Edge::terminal(root, spm);
 
                             if let Some(mut path) = df_search(
                                 depth + 1,
@@ -740,9 +816,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                                 chart,
                             ) {
                                 path.append(edge, 0);
-                                Some(path)
-                            } else {
-                                None
+                                return Some(path);
                             }
                         } else if root < chart.len() {
                             let mut best_path: Option<WeightedParsePath<'scope, Symbol>> = None;
@@ -775,10 +849,10 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                                     }
                                 });
 
-                            best_path
-                        } else {
-                            None
+                            return best_path;
                         }
+
+                        None
                     }
                 }
 
@@ -831,7 +905,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                                 .enumerate()
                                 .rev()
                                 .map(|(i, ref inner_edge)| {
-                                    let (_, spm) = edge.symbol_at(edges - i - 1);
+                                    let (_, spm, _) = edge.symbol_at(edges - i - 1);
                                     recur(&inner_edge, spm, grammar, lex, chart)
                                 })
                                 .collect();
@@ -870,28 +944,80 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                             None
                         }
                     } else {
-                        let (symbol, spm) = root_edge.symbol_at(depth);
+                        let (symbol, spm, reps) = root_edge.symbol_at(depth);
 
-                        if !grammar.is_non_terminal(symbol) {
-                            let edge = Edge {
-                                rule: None,
-                                shadow: None,
-                                shadow_top: 0,
-                                shadow_len: 0,
-                                start: root,
-                                finish: root + 1,
-                                ignored: spm == SymbolParseMethod::Ignored,
-                                weight: 0,
-                                depth: 0,
-                            };
+                        if reps > 1 {
+                            if !grammar.is_non_terminal(symbol) {
+                                let mut edge = Edge::terminal(root + reps, spm);
 
+                                if let Some(mut path) = df_search(
+                                    depth + reps,
+                                    root + reps,
+                                    bottom,
+                                    root_edge,
+                                    grammar,
+                                    chart,
+                                ) {
+                                    for _ in 0..reps {
+                                        edge.start -= 1;
+                                        edge.finish -= 1;
+                                        path.push(edge.clone());
+                                    }
+                                    return Some(path);
+                                }
+                            } else if root < chart.len() {
+                                let mut work_stack: LinkedList<(
+                                    usize,
+                                    usize,
+                                    Option<&Edge<Symbol>>,
+                                )> = LinkedList::new();
+                                let mut edge_stack: Vec<&Edge<Symbol>> = Vec::with_capacity(reps);
+
+                                work_stack.push_front((0, root, None));
+
+                                while !work_stack.is_empty() {
+                                    let (count, finish, edge_opt) = work_stack.pop_front().unwrap();
+                                    if count <= edge_stack.len() && count > 0 {
+                                        edge_stack.drain(count - 1..);
+                                    }
+                                    if let Some(edge) = edge_opt {
+                                        edge_stack.push(edge);
+                                    }
+
+                                    if count == reps {
+                                        if let Some(mut path) = df_search(
+                                            depth + reps,
+                                            finish,
+                                            bottom,
+                                            root_edge,
+                                            grammar,
+                                            chart,
+                                        ) {
+                                            edge_stack.reverse();
+                                            for edge in edge_stack {
+                                                path.push(edge.clone())
+                                            }
+                                            return Some(path);
+                                        }
+                                    } else {
+                                        for edge in &chart.row(finish).edges {
+                                            if edge.rule.unwrap().lhs == *symbol {
+                                                work_stack.push_front((
+                                                    count + 1,
+                                                    edge.finish,
+                                                    Some(edge),
+                                                ));
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        } else if !grammar.is_non_terminal(symbol) {
                             if let Some(mut path) =
-                                df_search(depth + 1, edge.finish, bottom, root_edge, grammar, chart)
+                                df_search(depth + 1, root + 1, bottom, root_edge, grammar, chart)
                             {
-                                path.push(edge);
-                                Some(path)
-                            } else {
-                                None
+                                path.push(Edge::terminal(root, spm));
+                                return Some(path);
                             }
                         } else if root < chart.len() {
                             for edge in &chart.row(root).edges {
@@ -909,11 +1035,9 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                                     }
                                 }
                             }
-
-                            None
-                        } else {
-                            None
                         }
+
+                        None
                     }
                 }
 
@@ -1243,6 +1367,20 @@ struct Edge<'prod, Symbol: GrammarSymbol + 'prod> {
 }
 
 impl<'prod, Symbol: GrammarSymbol + 'prod> Edge<'prod, Symbol> {
+    fn terminal(start: usize, spm: SymbolParseMethod) -> Self {
+        Edge {
+            rule: None,
+            shadow: None,
+            shadow_top: 0,
+            shadow_len: 0,
+            start,
+            finish: start + 1,
+            ignored: spm == SymbolParseMethod::Ignored,
+            weight: 0,
+            depth: 0,
+        }
+    }
+
     fn symbols_len(&self) -> usize {
         match self.rule {
             Some(rule) => self.shadow_len + rule.rhs.len() - self.shadow_top,
@@ -1266,24 +1404,29 @@ impl<'prod, Symbol: GrammarSymbol + 'prod> Edge<'prod, Symbol> {
         }
     }
 
-    fn symbol_at(&self, index: usize) -> (&Symbol, SymbolParseMethod) {
+    fn symbol_at(&self, index: usize) -> (&Symbol, SymbolParseMethod, usize) {
         if index < self.shadow_len {
             self.shadow_symbol_at(index)
         } else {
             (
                 &self.rule.unwrap().rhs[index - self.shadow_len + self.shadow_top].symbol,
                 SymbolParseMethod::Standard,
+                1,
             )
         }
     }
 
-    fn shadow_symbol_at(&self, index: usize) -> (&Symbol, SymbolParseMethod) {
+    fn shadow_symbol_at(&self, index: usize) -> (&Symbol, SymbolParseMethod, usize) {
         let shadow = self.shadow.as_ref().unwrap();
 
         // Fast-path when no repeating symbols.
         if shadow.len() == self.shadow_len {
             let shadow_symbol = &shadow[index];
-            return (&shadow_symbol.symbol, shadow_symbol.spm.clone());
+            return (
+                &shadow_symbol.symbol,
+                shadow_symbol.spm.clone(),
+                shadow_symbol.reps,
+            );
         }
 
         let mut expanded_index = 0;
@@ -1292,7 +1435,11 @@ impl<'prod, Symbol: GrammarSymbol + 'prod> Edge<'prod, Symbol> {
 
             if expanded_index > index {
                 let shadow_symbol = &shadow[real_index];
-                return (&shadow_symbol.symbol, shadow_symbol.spm.clone());
+                return (
+                    &shadow_symbol.symbol,
+                    shadow_symbol.spm.clone(),
+                    shadow_symbol.reps,
+                );
             }
         }
 

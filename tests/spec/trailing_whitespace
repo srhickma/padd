@@ -17,11 +17,7 @@ cdfa {
 
 grammar {
     file
-        | lines;
-
-    #TODO replace with inline list
-    lines
-        | lines line
+        | {line}
         |;
 
     line
