@@ -233,11 +233,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
             for item in src {
                 if let Some(sym) = item.next_prod_symbol() {
                     if sym.symbol == *symbol {
-                        if sym.is_list {
-                            advance_list_via_shadow(item, symbol, &mut dest, grammar);
-                        } else {
-                            advance_past_symbol(item, &mut dest, grammar);
-                        }
+                        advance_on_matching_symbol(item, sym, &mut dest, grammar);
                     }
                 }
             }
@@ -256,14 +252,9 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
             let mut dest: Vec<Item<Symbol>> = Vec::new();
 
             for item in &src.incomplete.items {
-                // TODO(shane) conglomerate with above.
                 let sym = item.next_prod_symbol().unwrap();
                 if sym.symbol == *symbol {
-                    if sym.is_list {
-                        advance_list_via_shadow(item, symbol, &mut dest, grammar);
-                    } else {
-                        advance_past_symbol(item, &mut dest, grammar);
-                    }
+                    advance_on_matching_symbol(item, sym, &mut dest, grammar);
                 } else {
                     advance_via_shadow(
                         item,
@@ -290,6 +281,19 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
             }
 
             dest
+        }
+
+        fn advance_on_matching_symbol<'inner, 'grammar: 'inner, Symbol: GrammarSymbol>(
+            item: &'inner Item<'grammar, Symbol>,
+            sym: &ProductionSymbol<Symbol>,
+            dest: &mut Vec<Item<'grammar, Symbol>>,
+            grammar: &'grammar dyn Grammar<Symbol>,
+        ) {
+            if sym.is_list {
+                advance_list_via_shadow(item, &sym.symbol, dest, grammar);
+            } else {
+                advance_past_symbol(item, dest, grammar);
+            }
         }
 
         fn advance_past_symbol<'inner, 'grammar: 'inner, Symbol: GrammarSymbol>(
@@ -349,26 +353,13 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                 return;
             }
 
-            let mut shadow_vec = match item.shadow {
-                Some(ref shadow_vec) => shadow_vec.clone(),
-                None => Vec::new(),
-            };
-
-            if item.shadow_top >= item.next && item.shadow.is_some() {
-                let previous = shadow_vec.last_mut().unwrap();
-                if previous.symbol == *symbol && previous.spm == SymbolParseMethod::Repeated {
-                    // Never inject when an inline list can (and will) be extended.
-                    return;
-                }
+            if item.can_extend_list(symbol) {
+                // Never inject when an inline list can (and will) be extended.
+                return;
             }
 
-            for i in item.shadow_top..item.next {
-                shadow_vec.push(ShadowSymbol {
-                    symbol: item.rule.rhs[i].symbol.clone(),
-                    spm: SymbolParseMethod::Standard,
-                    reps: 1,
-                });
-            }
+            let mut shadow_vec = item.shadow_copy();
+            item.extend_shadow(&mut shadow_vec);
 
             shadow_vec.push(ShadowSymbol {
                 symbol: symbol.clone(),
@@ -396,29 +387,12 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
             dest: &mut Vec<Item<'grammar, Symbol>>,
             grammar: &'grammar dyn Grammar<Symbol>,
         ) {
-            // TODO(shane) conglomerate with advance_via_shadow.
-            let mut shadow_vec = match item.shadow {
-                Some(ref shadow_vec) => shadow_vec.clone(),
-                None => Vec::new(),
-            };
+            let mut shadow_vec = item.shadow_copy();
 
-            let mut extended_list = false;
-            if item.shadow_top >= item.next && item.shadow.is_some() {
-                let previous = shadow_vec.last_mut().unwrap();
-                if previous.symbol == *symbol && previous.spm == SymbolParseMethod::Repeated {
-                    previous.reps += 1;
-                    extended_list = true;
-                }
-            }
-
-            if !extended_list {
-                for i in item.shadow_top..item.next {
-                    shadow_vec.push(ShadowSymbol {
-                        symbol: item.rule.rhs[i].symbol.clone(),
-                        spm: SymbolParseMethod::Standard,
-                        reps: 1,
-                    });
-                }
+            if item.can_extend_list(symbol) {
+                shadow_vec.last_mut().unwrap().reps += 1;
+            } else {
+                item.extend_shadow(&mut shadow_vec);
 
                 shadow_vec.push(ShadowSymbol {
                     symbol: symbol.clone(),
@@ -1151,6 +1125,36 @@ impl<'rule, Symbol: GrammarSymbol + 'rule> Item<'rule, Symbol> {
 
     fn is_complete(&self) -> bool {
         self.next >= self.rule.rhs.len()
+    }
+
+    fn shadow_copy(&self) -> Vec<ShadowSymbol<Symbol>> {
+        match self.shadow {
+            Some(ref shadow_vec) => shadow_vec.clone(),
+            None => Vec::new(),
+        }
+    }
+
+    fn extend_shadow(&self, shadow: &mut Vec<ShadowSymbol<Symbol>>) {
+        for i in self.shadow_top..self.next {
+            shadow.push(ShadowSymbol {
+                symbol: self.rule.rhs[i].symbol.clone(),
+                spm: SymbolParseMethod::Standard,
+                reps: 1,
+            });
+        }
+    }
+
+    fn can_extend_list(&self, symbol: &Symbol) -> bool {
+        if self.shadow_top >= self.next && self.shadow.is_some() {
+            if let Some(shadow_vec) = &self.shadow {
+                let previous = shadow_vec.last().unwrap();
+                if previous.symbol == *symbol && previous.spm == SymbolParseMethod::Repeated {
+                    return true;
+                }
+            }
+        }
+
+        false
     }
 }
 
