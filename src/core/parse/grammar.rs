@@ -1,5 +1,10 @@
 use {
-    core::{data::Data, fmt::InjectionAffinity, parse::Production, util::encoder::Encoder},
+    core::{
+        data::Data,
+        fmt::InjectionAffinity,
+        parse::{Production, ProductionSymbol},
+        util::encoder::Encoder,
+    },
     std::{
         collections::{HashMap, HashSet},
         error, fmt,
@@ -145,7 +150,10 @@ impl<Symbol: GrammarSymbol> GrammarBuilder<Symbol, Symbol, SimpleGrammar<Symbol>
             self.prods_by_lhs.insert(
                 opt_state.clone(),
                 vec![
-                    Production::from(opt_state.clone(), vec![dest_state.clone()]),
+                    Production::from(
+                        opt_state.clone(),
+                        vec![ProductionSymbol::symbol(dest_state.clone())],
+                    ),
                     Production::epsilon(opt_state.clone()),
                 ],
             );
@@ -264,10 +272,13 @@ impl<SymbolIn: GrammarSymbol> GrammarBuilder<SymbolIn, usize, EncodedGrammar<Sym
     }
 
     fn add_production(&mut self, production: Production<SymbolIn>) -> Production<usize> {
-        let rhs: Vec<usize> = production
+        let rhs: Vec<ProductionSymbol<usize>> = production
             .rhs
             .iter()
-            .map(|sym| self.encoder.encode(sym))
+            .map(|sym| ProductionSymbol {
+                symbol: self.encoder.encode(&sym.symbol),
+                is_list: sym.is_list,
+            })
             .collect();
 
         let encoded_production = Production::from(self.encoder.encode(&production.lhs), rhs);
@@ -334,13 +345,20 @@ fn build_terminals<Symbol: GrammarSymbol>(
     prods_by_lhs: &HashMap<Symbol, Vec<Production<Symbol>>>,
     non_terminals: &HashSet<Symbol>,
 ) -> HashSet<Symbol> {
-    prods_by_lhs
-        .iter()
-        .flat_map(|(_, prods)| prods)
-        .flat_map(|prod| &prod.rhs)
-        .filter(|symbol| !non_terminals.contains(*symbol))
-        .cloned()
-        .collect()
+    let mut terminals: HashSet<Symbol> = HashSet::new();
+
+    for prods in prods_by_lhs.values() {
+        for prod in prods {
+            for sym in &prod.rhs {
+                let symbol = &sym.symbol;
+                if !non_terminals.contains(symbol) {
+                    terminals.insert(symbol.clone());
+                }
+            }
+        }
+    }
+
+    terminals
 }
 
 fn build_nss<Symbol: GrammarSymbol>(
@@ -354,8 +372,11 @@ fn build_nss<Symbol: GrammarSymbol>(
         .iter()
         .flat_map(|(_, prods)| prods)
         .for_each(|prod| {
-            for s in &prod.rhs {
-                prods_by_rhs.entry(s).or_insert_with(Vec::new).push(prod);
+            for sym in &prod.rhs {
+                prods_by_rhs
+                    .entry(&sym.symbol)
+                    .or_insert_with(Vec::new)
+                    .push(prod);
             }
 
             if prod.rhs.is_empty() {
@@ -370,7 +391,8 @@ fn build_nss<Symbol: GrammarSymbol>(
             Some(work_symbol) => {
                 if let Some(prods) = prods_by_rhs.get(work_symbol) {
                     for prod in prods {
-                        if !nss.contains(&prod.lhs) && prod.rhs.iter().all(|sym| nss.contains(sym))
+                        if !nss.contains(&prod.lhs)
+                            && prod.rhs.iter().all(|sym| nss.contains(&sym.symbol))
                         {
                             nss.insert(prod.lhs.clone());
                             work_stack.push(&prod.lhs);
@@ -394,6 +416,7 @@ pub struct NonTerminalBuilder<
     lhs: SymbolIn,
 }
 
+// TODO(shane) support inline lists here as well.
 impl<'builder, SymbolIn: GrammarSymbol, SymbolOut: GrammarSymbol, GrammarType>
     NonTerminalBuilder<'builder, SymbolIn, SymbolOut, GrammarType>
 {
@@ -408,6 +431,8 @@ impl<'builder, SymbolIn: GrammarSymbol, SymbolOut: GrammarSymbol, GrammarType>
     }
 
     pub fn to(&mut self, rhs: Vec<SymbolIn>) -> &mut Self {
+        let rhs = rhs.into_iter().map(ProductionSymbol::symbol).collect();
+
         self.grammar_builder
             .add_production(Production::from(self.lhs.clone(), rhs));
 

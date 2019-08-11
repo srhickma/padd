@@ -7,7 +7,7 @@ use {
         },
         parse::{
             grammar::{Grammar, GrammarBuilder, GrammarSymbol},
-            Production, Tree,
+            Production, ProductionSymbol, Tree,
         },
         spec::{
             self,
@@ -460,7 +460,7 @@ where
 {
     let rhs_node = rhss_node.get_child(rhss_node.children.len() - 1);
 
-    let mut ids: Vec<String> = Vec::new();
+    let mut ids: Vec<ProductionSymbol<String>> = Vec::new();
     generate_grammar_ids(rhs_node.get_child(1), &mut ids, grammar_builder);
 
     grammar_builder.try_mark_start(lhs);
@@ -500,7 +500,7 @@ where
 
 fn generate_grammar_ids<Symbol: GrammarSymbol, GrammarType>(
     ids_node: &Tree<SpecSymbol>,
-    ids_accumulator: &mut Vec<String>,
+    ids_accumulator: &mut Vec<ProductionSymbol<String>>,
     grammar_builder: &mut dyn GrammarBuilder<String, Symbol, GrammarType>,
 ) where
     GrammarType: Grammar<Symbol>,
@@ -509,8 +509,8 @@ fn generate_grammar_ids<Symbol: GrammarSymbol, GrammarType>(
         generate_grammar_ids(ids_node.get_child(0), ids_accumulator, grammar_builder);
 
         let id_node = ids_node.get_child(1);
-        let id = match id_node.lhs.kind() {
-            SpecSymbol::TId => id_node.lhs.lexeme().clone(),
+        let symbol = match id_node.lhs.kind() {
+            SpecSymbol::TId => ProductionSymbol::symbol(id_node.lhs.lexeme().clone()),
             SpecSymbol::TOptId => {
                 let lex = &id_node.lhs.lexeme()[..];
                 let dest = &lex[1..lex.len() - 1].to_string();
@@ -518,12 +518,18 @@ fn generate_grammar_ids<Symbol: GrammarSymbol, GrammarType>(
 
                 grammar_builder.add_optional_state(&opt_state, dest);
 
-                opt_state
+                ProductionSymbol::symbol(opt_state)
             }
-            _ => panic!("Production identifier is neither a TId nor a TOptId"),
+            SpecSymbol::TListId => {
+                let lex = &id_node.lhs.lexeme()[..];
+                let target = lex[1..lex.len() - 1].to_string();
+
+                ProductionSymbol::symbol_list(target)
+            }
+            _ => panic!("Unexpected production identifier type"),
         };
 
-        ids_accumulator.push(id);
+        ids_accumulator.push(symbol);
     }
 }
 

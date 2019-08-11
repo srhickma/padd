@@ -544,6 +544,8 @@ impl From<parse::Error> for BuildError {
 mod tests {
     use super::*;
 
+    use core::parse::ProductionSymbol;
+
     #[test]
     fn parse_pattern_simple() {
         //setup
@@ -648,11 +650,11 @@ mod tests {
         let prod = Production {
             lhs: PatternSymbol::Pattern,
             rhs: vec![
-                PatternSymbol::Pattern,
-                PatternSymbol::Pattern,
-                PatternSymbol::Pattern,
-                PatternSymbol::Pattern,
-                PatternSymbol::Pattern,
+                ProductionSymbol::symbol(PatternSymbol::Pattern),
+                ProductionSymbol::symbol(PatternSymbol::Pattern),
+                ProductionSymbol::symbol(PatternSymbol::Pattern),
+                ProductionSymbol::symbol(PatternSymbol::Pattern),
+                ProductionSymbol::symbol(PatternSymbol::Pattern),
             ],
         };
 
@@ -710,11 +712,11 @@ mod tests {
         let prod = Production {
             lhs: PatternSymbol::Pattern,
             rhs: vec![
-                PatternSymbol::Pattern,
-                PatternSymbol::Pattern,
-                PatternSymbol::Pattern,
-                PatternSymbol::Pattern,
-                PatternSymbol::Pattern,
+                ProductionSymbol::symbol(PatternSymbol::Pattern),
+                ProductionSymbol::symbol(PatternSymbol::Pattern),
+                ProductionSymbol::symbol(PatternSymbol::Pattern),
+                ProductionSymbol::symbol(PatternSymbol::Pattern),
+                ProductionSymbol::symbol(PatternSymbol::Pattern),
             ],
         };
 
@@ -771,7 +773,10 @@ mod tests {
         let input = "\t \n\r[a]{1}  {} [prefix] ";
         let prod = Production {
             lhs: PatternSymbol::Pattern,
-            rhs: vec![PatternSymbol::Pattern, PatternSymbol::Pattern],
+            rhs: vec![
+                ProductionSymbol::symbol(PatternSymbol::Pattern),
+                ProductionSymbol::symbol(PatternSymbol::Pattern),
+            ],
         };
 
         //exercise
@@ -827,7 +832,7 @@ mod tests {
         let input = "1234567890abcdefghijklmnopqrstuvwxyz \n\t`~!@#$%^&*()_-+:'\"<>,.?/|{}\\{\\}\\[\\]\\;\\=\\\\";
         let prod = Production {
             lhs: PatternSymbol::Pattern,
-            rhs: vec![PatternSymbol::Pattern],
+            rhs: vec![ProductionSymbol::symbol(PatternSymbol::Pattern)],
         };
 
         //exercise
@@ -908,7 +913,7 @@ mod tests {
         let input = "{1}";
         let prod = Production {
             lhs: PatternSymbol::Pattern,
-            rhs: vec![PatternSymbol::TSemi],
+            rhs: vec![ProductionSymbol::symbol(PatternSymbol::TSemi)],
         };
 
         //exercise

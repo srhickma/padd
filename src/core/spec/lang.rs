@@ -56,6 +56,8 @@ enum S {
     Id,
     OptIdPartial,
     OptId,
+    ListIdPartial,
+    ListId,
     Fail,
 }
 
@@ -363,6 +365,7 @@ fn build_grammar_region(
         .mark_range(Transit::to(S::Id), 'A', 'Z')?
         .mark_range(Transit::to(S::Id), '0', '9')?
         .mark_trans(Transit::to(S::OptIdPartial), '[')?
+        .mark_trans(Transit::to(S::ListIdPartial), '{')?
         .mark_trans(Transit::to(S::PatternPartial), '`')?
         .mark_trans(Transit::to(S::RegionExitBrace), '}')?
         .mark_trans(Transit::to(S::Comment), '#')?
@@ -383,6 +386,19 @@ fn build_grammar_region(
         .state(&S::OptId)
         .accept()
         .tokenize(&SpecSymbol::TOptId);
+
+    builder
+        .state(&S::ListIdPartial)
+        .mark_trans(Transit::to(S::ListId), '}')?
+        .mark_range(Transit::to(S::ListIdPartial), 'a', 'z')?
+        .mark_range(Transit::to(S::ListIdPartial), 'A', 'Z')?
+        .mark_range(Transit::to(S::ListIdPartial), '0', '9')?
+        .mark_trans(Transit::to(S::ListIdPartial), '_')?;
+
+    builder
+        .state(&S::ListId)
+        .accept()
+        .tokenize(&SpecSymbol::TListId);
 
     Ok(())
 }
@@ -433,6 +449,7 @@ pub enum SpecSymbol {
     TGrammar,
     TPattern,
     TOptId,
+    TListId,
     TDef,
     TIgnorable,
     TInjectable,
@@ -614,6 +631,7 @@ fn build_spec_grammar() -> Result<SimpleGrammar<SpecSymbol>, grammar::BuildError
         .from(SpecSymbol::Ids)
         .to(vec![SpecSymbol::Ids, SpecSymbol::TId])
         .to(vec![SpecSymbol::Ids, SpecSymbol::TOptId])
+        .to(vec![SpecSymbol::Ids, SpecSymbol::TListId])
         .epsilon();
 
     builder

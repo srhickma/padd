@@ -831,3 +831,106 @@ grammar {
     //verify
     assert_eq!(res, "as234AB[_][!][@][#][#][^][*][&][^][&]a[Ω]s[°]Cb[+]");
 }
+
+#[test]
+fn test_inline_lists_simple() {
+    //setup
+    let spec = "
+cdfa {
+    start
+        'a' -> ^A
+        'b' -> ^B;
+}
+
+grammar {
+    s
+        | {A} s {B} `<{}>{}<{}>`
+        |;
+}
+    "
+    .to_string();
+
+    let input = "aaaaabbbbbbbbbb".to_string();
+
+    let fjr = FormatJobRunner::build(&spec).unwrap();
+
+    //exercise
+    let res = fjr.format(FormatJob::from_text(input)).unwrap();
+
+    //verify
+    assert_eq!(res, "<aaaaa><bbbbbbbbbb>");
+}
+
+#[test]
+fn test_inline_lists_complex() {
+    //setup
+    let spec = "
+cdfa {
+    start
+        'a' -> ^A
+        'b' -> ^B
+        'c' -> ^C
+        'd' -> ^D
+        'e' -> ^E;
+}
+
+grammar {
+    s
+        | {A} [A] {B} B {s} `\\\\{{}\\\\} \\\\[{}\\\\] \\\\{{}\\\\} {} \\\\{{}\\\\}`
+        | C {c} D e `_{}{} {} {}_`;
+
+    c | C `, {}`;
+
+    e | {E} `\\\\{{}\\\\}`;
+}
+    "
+    .to_string();
+
+    let input = "aaabbcccdeeccde".to_string();
+
+    let fjr = FormatJobRunner::build(&spec).unwrap();
+
+    //exercise
+    let res = fjr.format(FormatJob::from_text(input)).unwrap();
+
+    //verify
+    assert_eq!(res, "{aaa} [] {b} b {_c, c, c d {ee}__c, c d {e}_}");
+}
+
+#[test]
+fn test_inline_lists_complex_injection() {
+    //setup
+    let spec = "
+cdfa {
+    start
+        'a' -> ^A
+        'b' -> ^B
+        'c' -> ^C
+        'd' -> ^D
+        'e' -> ^E;
+}
+
+inject right E
+
+grammar {
+    s
+        | {A} [A] {B} B {s} `\\\\{{}\\\\} \\\\[{}\\\\] \\\\{{}\\\\} {} \\\\{{}\\\\}`
+        | C {c} D e `_{}{} {} {}_`;
+
+    c | C `, {}`;
+
+    e | {E} `\\\\{{}\\\\}`;
+}
+    "
+    .to_string();
+
+    let input = "aaabbcccdeeccde".to_string();
+
+    let fjr = FormatJobRunner::build(&spec).unwrap();
+
+    //exercise
+    let res = fjr.format(FormatJob::from_text(input)).unwrap();
+
+    //verify
+    assert_eq!(res, "{aa} [a] {b} b {_c, c, c d {ee}__c, c d {e}_}");
+}
