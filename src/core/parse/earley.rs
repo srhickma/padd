@@ -718,6 +718,8 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                         let (symbol, spm, reps) = root_edge.symbol_at(depth);
 
                         if reps > 1 {
+                            // For repeated symbols, perform the DFS iteratively to avoid stack
+                            // overflow on long lists.
                             if !grammar.is_non_terminal(symbol) {
                                 let mut edge = Edge::terminal(root + reps, spm);
 
@@ -947,6 +949,8 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                         let (symbol, spm, reps) = root_edge.symbol_at(depth);
 
                         if reps > 1 {
+                            // For repeated symbols, perform the DFS iteratively to avoid stack
+                            // overflow on long lists.
                             if !grammar.is_non_terminal(symbol) {
                                 let mut edge = Edge::terminal(root + reps, spm);
 
