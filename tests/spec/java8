@@ -414,8 +414,10 @@ grammar {
     inline_class_body
         | LBRACE [class_body_decs] RBRACE ` {}\n{;prefix=[prefix][indent]}[prefix]{}`;
     class_body_decs
-        | class_body_dec class_body_decs `[prefix]{}\n{}`
+        | {class_body_dec_lem} class_body_dec `{}[prefix]{}`
         | class_body_dec `[prefix]{}`;
+    class_body_dec_lem
+        | class_body_dec `[prefix]{}\n`;
     class_body_dec
         | class_member_dec
         | block `{}\n`
@@ -445,13 +447,9 @@ grammar {
         | expr COMMA expr `{}{} {}`
         | expr;
     long_argument_list
-        | inline_argument_list COMMA expr COMMA expr `{}{}\n[prefix]{}{}\n[prefix]{}`;
-    inline_argument_list #TODO replace with inline list
-        | inline_argument_list COMMA inline_argument COMMA inline_argument COMMA inline_argument COMMA inline_argument
-        | inline_argument COMMA inline_argument COMMA inline_argument COMMA inline_argument
-        | inline_argument COMMA inline_argument COMMA inline_argument
-        | inline_argument COMMA inline_argument
-        | inline_argument;
+        | {inline_argument_lem} expr COMMA expr `{}\n[prefix]{}{}\n[prefix]{}`;
+    inline_argument_lem
+        | inline_argument COMMA;
     inline_argument
         | expr `\n[prefix]{}`;
 
@@ -765,8 +763,10 @@ grammar {
         | isolated_statement_no_if;
 
     grouped_statements
-        | grouped_statement grouped_statements `{}\n[prefix]{}`
+        | {grouped_statement_lem} grouped_statement
         | grouped_statement;
+    grouped_statement_lem
+        | grouped_statement `{}\n[prefix]`;
     grouped_statement
         | labeled_statement
         | SEMI
