@@ -11,7 +11,7 @@ nav:
   - 'CDFA': spec/cdfa.md
   - 'Grammar': spec/grammar.md
   - 'Pattern': spec/pattern.md
-  - 'Ignoreable': spec/ignoreable.md
+  - 'Ignorable': spec/ignorable.md
   - 'Injectable': spec/injectable.md
 - Architecture: architecture.md
 - Testing: testing.md
