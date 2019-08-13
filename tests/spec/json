@@ -46,17 +46,21 @@ grammar {
         | LBRACKET members RBRACKET `{}\n{;prefix=[prefix][indent]}\n[prefix]{}`;
 
     members
-        | member `[prefix]{}`
-        | members COMMA member `{}{}\n[prefix]{}`;
+        | member
+        | member {member_lem};
+    member_lem
+        | COMMA member `{}\n{}`;
     member
-        | STRING COLON element `{}{} {}`;
+        | STRING COLON element `[prefix]{}{} {}`;
 
     array
         | LARRI [elements] RARRI;
 
     elements
         | element
-        | elements COMMA element `{}{} {}`;
+        | element {element_lem};
+    element_lem
+        | COMMA element `{} {}`;
     element
         | value;
 }
