@@ -1,0 +1,237 @@
+cdfa {
+    start
+        'inject' -> ^INJECTABLE -> injectable_pre_affinity
+        'ignore' -> ^IGNORABLE -> ignorable
+        'alphabet' -> ^ALPHABET -> alphabet
+        'cdfa' -> ^CDFA -> cdfa
+        'grammar' -> ^GRAMMAR -> grammar
+        '#' -> comment
+        ' ' | '\t' | '\n' | '\r' -> ^_;
+
+    #
+    # INJECTABLE
+    #
+
+    injectable_pre_affinity
+        'left' | 'right' -> ^INJECTION_AFFINITY -> injectable_pre_id
+        '#' -> comment
+        ' ' | '\t' | '\n' | '\r' -> ^_;
+
+    injectable_pre_id
+        'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' -> injectable_id
+        '#' -> comment
+        ' ' | '\t' | '\n' | '\r' -> ^_;
+
+    injectable_id ^ID -> injectable_pre_complete
+        'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '_' -> injectable_id;
+
+    injectable_pre_complete ^_ -> start
+        '`' -> pattern_partial
+        '#' -> comment
+        ' ' | '\t' | '\n' | '\r' -> ^_;
+
+    #
+    # IGNORABLE
+    #
+
+    ignorable
+        'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' -> ignorable_id
+        '#' -> comment
+        ' ' | '\t' | '\n' | '\r' -> ^_;
+
+    ignorable_id ^ID -> start
+        'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '_' -> ignorable_id;
+
+    #
+    # ALPHABET
+    #
+
+    alphabet
+        '\'' -> alphabet_string_partial
+        '#' -> comment
+        ' ' | '\t' | '\n' | '\r' -> ^_;
+
+    alphabet_string_partial
+        '\'' -> ^CIL -> start
+        '\\' -> alphabet_string_escaped
+        _ -> alphabet_string_partial;
+
+    alphabet_string_escaped
+        _ -> alphabet_string_partial;
+
+    #
+    # CDFA
+    #
+
+    cdfa
+        '{' -> ^LEFT_BRACE -> cdfa_body
+        '#' -> comment
+        ' ' | '\t' | '\n' | '\r' -> ^_;
+
+    cdfa_body
+        '|' -> ^OR
+        ';' -> ^SEMI
+        '\'' -> cil_partial
+        'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' -> id
+        '^' -> ^HAT
+        '->' -> arrow
+        '..' -> ^RANGE
+        '_' -> ^DEF
+        '}' -> region_exit_brace
+        '#' -> comment
+        ' ' | '\t' | '\n' | '\r' -> ^_;
+
+    arrow ^ARROW
+        '>' -> ^DOUBLE_ARROW;
+
+    #
+    # GRAMMAR
+    #
+
+    grammar
+        '{' -> ^LEFT_BRACE -> grammar_body
+        '#' -> comment
+        ' ' | '\t' | '\n' | '\r' -> ^_;
+
+    grammar_body
+        '|' -> ^OR
+        ';' -> ^SEMI
+        'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' -> id
+        '[' -> opt_id_partial
+        '{' -> list_id_partial
+        '`' -> pattern_partial
+        '}' -> region_exit_brace
+        '#' -> comment
+        ' ' | '\t' | '\n' | '\r' -> ^_;
+
+    opt_id_partial
+        ']' -> ^OPT_ID
+        'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '_' -> opt_id_partial;
+
+    list_id_partial
+        '}' -> ^LIST_ID
+        'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '_' -> list_id_partial;
+
+    #
+    # MISC
+    #
+
+    region_exit_brace ^RIGHT_BRACE -> start;
+
+    cil_partial
+        '\'' -> ^CIL
+        '\\' -> cil_escaped
+        _ -> cil_partial;
+
+    cil_escaped
+        _ -> cil_partial;
+
+    id ^ID
+        'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '_' -> id;
+
+    pattern_partial
+        '`' -> ^PATTERN
+        _ -> pattern_partial;
+
+    comment ^_ # TODO add support for comments.
+        '\n' -> fail
+        _ -> comment;
+}
+
+grammar {
+    spec | {region};
+
+    region
+        | injectable
+        | ignorable
+        | alphabet
+        | cdfa
+        | grammar;
+
+    injectable
+        | INJECTABLE INJECTION_AFFINITY ID [PATTERN];
+
+    ignorable
+        | IGNORABLE ID;
+
+    alphabet
+        | ALPHABET CIL;
+
+    #
+    # CDFA
+    #
+
+    cdfa
+        | CDFA LEFT_BRACE {state} RIGHT_BRACE;
+
+    state
+        | state_declarator [transitions] SEMI;
+
+    state_declarator
+        | targets [acceptor];
+
+    acceptor
+        | HAT id_or_def [acceptor_destination];
+
+    acceptor_destination
+        | ARROW ID;
+
+    targets
+        | ID
+        | targets OR ID;
+
+    transitions
+        | {transition};
+
+    transition
+        | transition_pattern transition_method transition_destination;
+
+    transition_pattern
+        | matchers
+        | DEF;
+
+    transition_method
+        | ARROW
+        | DOUBLE_ARROW;
+
+    transition_destination
+        | ID
+        | acceptor;
+
+    matchers
+        | matcher {matcher_lem}
+        | matcher;
+
+    matcher_lem
+        | OR matcher;
+
+    matcher
+        | CIL
+        | CIL RANGE CIL;
+
+    #
+    # GRAMMAR
+    #
+
+    grammar
+        | GRAMMAR LEFT_BRACE {production} RIGHT_BRACE;
+
+    production
+        | ID [PATTERN] {right_hand_side} SEMI;
+
+    right_hand_side
+        | OR ids [PATTERN];
+
+    ids
+        | {id}
+        |;
+
+    id
+        | ID
+        | OPT_ID
+        | LIST_ID;
+
+    id_or_def
+        | ID
+        | DEF;
+}
