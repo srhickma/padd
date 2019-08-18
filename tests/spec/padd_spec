@@ -139,9 +139,17 @@ cdfa {
 }
 
 grammar {
-    spec | {region};
+    spec
+        | regions `{;indent=    }`;
 
-    region
+    regions
+        | {region_lem} region
+        | region;
+
+    region_lem
+        | region `{}\n`;
+
+    region `{;prefix=[indent]}\n`
         | injectable
         | ignorable
         | alphabet
@@ -149,42 +157,54 @@ grammar {
         | grammar;
 
     injectable
-        | INJECTABLE INJECTION_AFFINITY ID [PATTERN];
+        | INJECTABLE INJECTION_AFFINITY ID pattern_opt `{} {} {}{}`;
 
     ignorable
-        | IGNORABLE ID;
+        | IGNORABLE ID `{} {}`;
 
     alphabet
-        | ALPHABET CIL;
+        | ALPHABET CIL `{} {}`;
 
     #
     # CDFA
     #
 
     cdfa
-        | CDFA LEFT_BRACE {state} RIGHT_BRACE;
+        | CDFA LEFT_BRACE states RIGHT_BRACE `{} {}\n{}{}`;
+
+    states
+        | {state_lem} state
+        | state;
+
+    state_lem
+        | state `{}\n`;
 
     state
-        | state_declarator [transitions] SEMI;
+        | state_declarator [transitions] SEMI `[prefix]{}\n{;prefix=[prefix][indent]}{}\n`;
 
     state_declarator
-        | targets [acceptor];
+        | targets acceptor `{} {}`
+        | targets;
 
     acceptor
         | HAT id_or_def [acceptor_destination];
 
     acceptor_destination
-        | ARROW ID;
+        | ARROW ID ` {} {}`;
 
     targets
         | ID
-        | targets OR ID;
+        | targets OR ID `{} {} {}`;
 
     transitions
-        | {transition};
+        | {transition_lem} transition
+        | transition;
+
+    transition_lem
+        | transition `{}\n`;
 
     transition
-        | transition_pattern transition_method transition_destination;
+        | transition_pattern transition_method transition_destination `[prefix]{} {} {}`;
 
     transition_pattern
         | matchers
@@ -203,11 +223,11 @@ grammar {
         | matcher;
 
     matcher_lem
-        | OR matcher;
+        | OR matcher ` {} {}`;
 
     matcher
         | CIL
-        | CIL RANGE CIL;
+        | CIL RANGE CIL `{} {} {}`;
 
     #
     # GRAMMAR
@@ -217,16 +237,16 @@ grammar {
         | GRAMMAR LEFT_BRACE {production} RIGHT_BRACE;
 
     production
-        | ID [PATTERN] {right_hand_side} SEMI;
+        | ID pattern_opt {right_hand_side} SEMI;
 
     right_hand_side
-        | OR ids [PATTERN];
+        | OR ids pattern_opt `{}{}{}`;
 
     ids
         | {id}
         |;
 
-    id
+    id ` {}`
         | ID
         | OPT_ID
         | LIST_ID;
@@ -234,4 +254,8 @@ grammar {
     id_or_def
         | ID
         | DEF;
+
+    pattern_opt
+        | PATTERN ` {}`
+        |;
 }
