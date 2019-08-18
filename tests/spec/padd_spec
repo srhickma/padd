@@ -149,7 +149,7 @@ grammar {
     region_lem
         | region `{}\n`;
 
-    region `{;prefix=[indent]}\n`
+    region `{}\n`
         | injectable
         | ignorable
         | alphabet
@@ -170,7 +170,7 @@ grammar {
     #
 
     cdfa
-        | CDFA LEFT_BRACE states RIGHT_BRACE `{} {}\n{}{}`;
+        | CDFA LEFT_BRACE states RIGHT_BRACE `{} {}\n{;prefix=[indent]}{}`;
 
     states
         | {state_lem} state
@@ -234,13 +234,27 @@ grammar {
     #
 
     grammar
-        | GRAMMAR LEFT_BRACE {production} RIGHT_BRACE;
+        | GRAMMAR LEFT_BRACE productions RIGHT_BRACE `{} {}\n{;prefix=[indent]}{}`;
+
+    productions
+        | {production_lem} production
+        | production;
+
+    production_lem
+        | production `{}\n`;
 
     production
-        | ID pattern_opt {right_hand_side} SEMI;
+        | ID pattern_opt rhss SEMI `[prefix]{}{}\n{;prefix=[prefix][indent]}{}\n`;
 
-    right_hand_side
-        | OR ids pattern_opt `{}{}{}`;
+    rhss
+        | {rhs_lem} rhs
+        | rhs;
+
+    rhs_lem
+        | rhs `{}\n`;
+
+    rhs
+        | OR ids pattern_opt `[prefix]{}{}{}`;
 
     ids
         | {id}
