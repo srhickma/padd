@@ -368,20 +368,26 @@ impl TransitionTrie {
         if curr.children.is_empty() {
             TransitionResult::Fail
         } else {
+            let mut best_result = TransitionResult::Fail;
+
             let mut cursor: usize = 0;
             while !curr.leaf() {
                 curr = match input.get(cursor) {
-                    None => return TransitionResult::Fail,
+                    None => return best_result,
                     Some(c) => match curr.get_child(*c) {
-                        None => return TransitionResult::Fail,
+                        None => return best_result,
                         Some(child) => child,
                     },
                 };
 
                 cursor += 1;
+
+                if let Some(transit) = &curr.transit {
+                    best_result = TransitionResult::ok(transit, cursor);
+                }
             }
 
-            TransitionResult::ok(curr.transit.as_ref().unwrap(), cursor)
+            best_result
         }
     }
 
@@ -445,10 +451,14 @@ impl TransitionTrie {
             };
             node.add_child(c, child);
         } else if last {
-            return Err(CDFAError::BuildErr(format!(
-                "Transition trie is not prefix free on character '{}'",
-                c
-            )));
+            let child = node.get_child_mut(c).unwrap();
+            if child.transit.is_some() {
+                return Err(CDFAError::BuildErr(
+                    "Transition trie contains duplicate matchers".to_string()
+                ));
+            } else {
+                child.transit = Some(transit);
+            }
         }
         Ok(())
     }
@@ -1313,6 +1323,69 @@ B <- 'b'
 
         //verify
         assert_eq!(tokens_string(&tokens), "START <- '1234567890'\n");
+    }
+
+    #[test]
+    fn non_prefix_free_transitions() {
+        //setup
+        #[derive(PartialEq, Eq, Hash, Clone, Debug)]
+        enum S {
+            Start,
+            A,
+            AB,
+            ABC,
+        }
+
+        impl Data for S {
+            fn to_string(&self) -> String {
+                format!("{:?}", self)
+            }
+        }
+
+        let mut builder: EncodedCDFABuilder<S, String> = EncodedCDFABuilder::new();
+        builder.mark_start(&S::Start);
+        builder
+            .state(&S::Start)
+            .mark_trans(Transit::to(S::A), 'a')
+            .unwrap()
+            .mark_chain(Transit::to(S::AB), "ab".chars())
+            .unwrap()
+            .mark_chain(Transit::to(S::ABC), "abc".chars())
+            .unwrap();
+
+        builder
+            .state(&S::A)
+            .accept()
+            .tokenize(&"A".to_string());
+
+        builder
+            .state(&S::AB)
+            .accept()
+            .tokenize(&"AB".to_string());
+
+        builder
+            .state(&S::ABC)
+            .accept()
+            .tokenize(&"ABC".to_string());
+
+        let cdfa: EncodedCDFA<String> = builder.build().unwrap();
+
+        let input = "aababca".to_string();
+        let chars: Vec<char> = input.chars().collect();
+
+        let lexer = lex::def_lexer();
+
+        //exercise
+        let tokens = lexer.lex(&chars[..], &cdfa).unwrap();
+
+        //verify
+        assert_eq!(tokens_string(&tokens), "\
+A <- 'a'
+AB <- 'ab'
+ABC <- 'abc'
+A <- 'a'
+"
+        );
     }
 
     fn tokens_string<Kind: Data>(tokens: &Vec<Token<Kind>>) -> String {

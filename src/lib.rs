@@ -421,15 +421,15 @@ grammar {
     }
 
     #[test]
-    fn failed_cdfa_non_prefix_free() {
+    fn failed_cdfa_duplicate_matcher() {
         //setup
         let spec = "
 alphabet ''
 
 cdfa {
     start
-        'a' -> ^A
-        'ab' -> ^B;
+        'abc' -> ^A
+        'abc' -> ^B;
 }
 
 grammar {
@@ -448,20 +448,20 @@ grammar {
         assert_eq!(
             format!("{}", err),
             "Failed to generate specification: ECDFA generation error: Failed to build CDFA: \
-             Transition trie is not prefix free on character 'a'"
+             Transition trie contains duplicate matchers"
         );
 
         err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
             "ECDFA generation error: Failed to build CDFA: \
-             Transition trie is not prefix free on character 'a'"
+             Transition trie contains duplicate matchers"
         );
 
         err = err.source().unwrap();
         assert_eq!(
             format!("{}", err),
-            "Failed to build CDFA: Transition trie is not prefix free on character 'a'"
+            "Failed to build CDFA: Transition trie contains duplicate matchers"
         );
 
         assert!(err.source().is_none());
