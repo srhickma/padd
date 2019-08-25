@@ -959,7 +959,7 @@ grammar {
         | OTHER;
 }
     "
-        .to_string();
+    .to_string();
 
     let input = "intointerfaceiiinto".to_string();
 

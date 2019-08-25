@@ -454,7 +454,7 @@ impl TransitionTrie {
             let child = node.get_child_mut(c).unwrap();
             if child.transit.is_some() {
                 return Err(CDFAError::BuildErr(
-                    "Transition trie contains duplicate matchers".to_string()
+                    "Transition trie contains duplicate matchers".to_string(),
                 ));
             } else {
                 child.transit = Some(transit);
@@ -1353,20 +1353,11 @@ B <- 'b'
             .mark_chain(Transit::to(S::ABC), "abc".chars())
             .unwrap();
 
-        builder
-            .state(&S::A)
-            .accept()
-            .tokenize(&"A".to_string());
+        builder.state(&S::A).accept().tokenize(&"A".to_string());
 
-        builder
-            .state(&S::AB)
-            .accept()
-            .tokenize(&"AB".to_string());
+        builder.state(&S::AB).accept().tokenize(&"AB".to_string());
 
-        builder
-            .state(&S::ABC)
-            .accept()
-            .tokenize(&"ABC".to_string());
+        builder.state(&S::ABC).accept().tokenize(&"ABC".to_string());
 
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
 
@@ -1379,7 +1370,9 @@ B <- 'b'
         let tokens = lexer.lex(&chars[..], &cdfa).unwrap();
 
         //verify
-        assert_eq!(tokens_string(&tokens), "\
+        assert_eq!(
+            tokens_string(&tokens),
+            "\
 A <- 'a'
 AB <- 'ab'
 ABC <- 'abc'
