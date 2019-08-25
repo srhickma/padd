@@ -14,10 +14,14 @@ cdfa {
         ';' -> ^SEMI
         ':' -> ^COLON
         ' ' | '\t' | '\n' -> ws
-        '=' -> eq
+        '=' -> ^BECOMES
+        '==' -> ^EQ
+        '=>' -> ^ARROW
         '!=' -> ^NE
-        '<' -> lt
-        '>' -> gt
+        '<' -> ^LT
+        '<=' -> ^LE
+        '>' -> ^GT
+        '>=' -> ^GE
         '/' -> slash
         '0' -> num
         '1' .. '9' -> num
@@ -40,16 +44,6 @@ cdfa {
     comment ^COMMENT
         '\n' -> fail
         _ -> comment;
-
-    eq      ^BECOMES
-        '=' -> ^EQ
-        '>' -> ^ARROW;
-
-    lt      ^LT
-        '=' -> ^LE;
-
-    gt      ^GT
-        '=' -> ^GE;
 
     ws      ^WHITESPACE
         ' ' | '\t' | '\n' -> ws;

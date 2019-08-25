@@ -934,3 +934,40 @@ grammar {
     //verify
     assert_eq!(res, "{aa} [a] {b} b {_c, c, c d {ee}__c, c d {e}_}");
 }
+
+#[test]
+fn test_non_prefix_free_cdfa_transitions() {
+    //setup
+    let spec = "
+cdfa {
+    start
+        'int' -> ^INT
+        'interface' -> ^INTERFACE
+        'i' -> ^SQRT_N_ONE
+        _ -> ^OTHER;
+}
+
+grammar {
+    s
+        | s elem `{} {}`
+        | elem;
+
+    elem
+        | INT
+        | INTERFACE
+        | SQRT_N_ONE
+        | OTHER;
+}
+    "
+    .to_string();
+
+    let input = "intointerfaceiiinto".to_string();
+
+    let fjr = FormatJobRunner::build(&spec).unwrap();
+
+    //exercise
+    let res = fjr.format(FormatJob::from_text(input)).unwrap();
+
+    //verify
+    assert_eq!(res, "int o interface i i int o");
+}
