@@ -168,7 +168,7 @@ grammar {
         //verify
         assert!(res.is_err());
 
-        let mut err: &Error = &res.err().unwrap();
+        let mut err: &dyn Error = &res.err().unwrap();
         assert_eq!(
             format!("{}", err),
             "Failed to lex input: No accepting tokens after (1,1): b..."
@@ -204,7 +204,7 @@ grammar {
         //verify
         assert!(res.is_err());
 
-        let mut err: &Error = &res.err().unwrap();
+        let mut err: &dyn Error = &res.err().unwrap();
         assert_eq!(
             format!("{}", err),
             "Failed to lex input: Consuming character outside lexer alphabet: 'b'"
@@ -245,7 +245,7 @@ grammar {
         //verify
         assert!(res.is_err());
 
-        let mut err: &Error = &res.err().unwrap();
+        let mut err: &dyn Error = &res.err().unwrap();
         assert_eq!(
             format!("{}", err),
             "Failed to parse input: Recognition failed at token 1: ACC <- 'a'"
@@ -282,7 +282,7 @@ grammar {
         //verify
         assert!(res.is_err());
 
-        let mut err: &Error = &res.err().unwrap();
+        let mut err: &dyn Error = &res.err().unwrap();
         assert_eq!(
             format!("{}", err),
             "Failed to parse specification: Lex error: No accepting tokens after (2,14): \
@@ -359,7 +359,7 @@ grammar {
         //verify
         assert!(res.is_err());
 
-        let mut err: &Error = &res.err().unwrap();
+        let mut err: &dyn Error = &res.err().unwrap();
         assert_eq!(
             format!("{}", err),
             "Failed to parse specification: Parse error: No symbols tokenized"
@@ -398,7 +398,7 @@ grammar {
         //verify
         assert!(res.is_err());
 
-        let mut err: &Error = &res.err().unwrap();
+        let mut err: &dyn Error = &res.err().unwrap();
         assert_eq!(
             format!("{}", err),
             "Failed to generate specification: ECDFA generation error: Failed to build CDFA: \
@@ -444,7 +444,7 @@ grammar {
         //verify
         assert!(res.is_err());
 
-        let mut err: &Error = &res.err().unwrap();
+        let mut err: &dyn Error = &res.err().unwrap();
         assert_eq!(
             format!("{}", err),
             "Failed to generate specification: ECDFA generation error: Failed to build CDFA: \
@@ -491,7 +491,7 @@ grammar {
         //verify
         assert!(res.is_err());
 
-        let mut err: &Error = &res.err().unwrap();
+        let mut err: &dyn Error = &res.err().unwrap();
         assert_eq!(
             format!("{}", err),
             "Failed to generate specification: ECDFA generation error: Failed to build CDFA: \
@@ -536,7 +536,7 @@ grammar {
         //verify
         assert!(res.is_err());
 
-        let mut err: &Error = &res.err().unwrap();
+        let mut err: &dyn Error = &res.err().unwrap();
         assert_eq!(
             format!("{}", err),
             "Failed to generate specification: Matcher definition error: \
@@ -575,7 +575,7 @@ grammar {
         //verify
         assert!(res.is_err());
 
-        let mut err: &Error = &res.err().unwrap();
+        let mut err: &dyn Error = &res.err().unwrap();
         assert_eq!(
             format!("{}", err),
             "Failed to generate specification: Matcher definition error: \
@@ -615,7 +615,7 @@ grammar {
         //verify
         assert!(res.is_err());
 
-        let mut err: &Error = &res.err().unwrap();
+        let mut err: &dyn Error = &res.err().unwrap();
         assert_eq!(
             format!("{}", err),
             "Failed to generate specification: ECDFA to grammar mapping error: \
@@ -650,7 +650,7 @@ grammar {
         //verify
         assert!(res.is_err());
 
-        let mut err: &Error = &res.err().unwrap();
+        let mut err: &dyn Error = &res.err().unwrap();
         assert_eq!(
             format!("{}", err),
             "Failed to generate specification: Region error: Missing required region: 'CDFA'"
@@ -690,7 +690,7 @@ grammar {
         //verify
         assert!(res.is_err());
 
-        let mut err: &Error = &res.err().unwrap();
+        let mut err: &dyn Error = &res.err().unwrap();
         assert_eq!(
             format!("{}", err),
             "Failed to generate specification: Formatter build error: Pattern build error: \
@@ -744,7 +744,7 @@ grammar {
         //verify
         assert!(res.is_err());
 
-        let mut err: &Error = &res.err().unwrap();
+        let mut err: &dyn Error = &res.err().unwrap();
         assert_eq!(
             format!("{}", err),
             "Failed to generate specification: Formatter build error: Pattern build error: \
@@ -801,7 +801,7 @@ grammar {
         //verify
         assert!(res.is_err());
 
-        let mut err: &Error = &res.err().unwrap();
+        let mut err: &dyn Error = &res.err().unwrap();
         assert_eq!(
             format!("{}", err),
             "Failed to generate specification: Formatter build error: Pattern build error: \
@@ -858,7 +858,7 @@ grammar {
         //verify
         assert!(res.is_err());
 
-        let mut err: &Error = &res.err().unwrap();
+        let mut err: &dyn Error = &res.err().unwrap();
         assert_eq!(
             format!("{}", err),
             "Failed to generate specification: Grammar build error: Ignored symbol 's' is \
@@ -902,7 +902,7 @@ grammar {
         //verify
         assert!(res.is_err());
 
-        let mut err: &Error = &res.err().unwrap();
+        let mut err: &dyn Error = &res.err().unwrap();
         assert_eq!(
             format!("{}", err),
             "Failed to generate specification: Grammar build error: Injected symbol 's' is \
@@ -948,7 +948,7 @@ grammar {
         //verify
         assert!(res.is_err());
 
-        let mut err: &Error = &res.err().unwrap();
+        let mut err: &dyn Error = &res.err().unwrap();
         assert_eq!(
             format!("{}", err),
             "Formatter build error: Injection specified multiple times for symbol \'S\'"
@@ -989,7 +989,7 @@ grammar {
         //verify
         assert!(res.is_err());
 
-        let mut err: &Error = &res.err().unwrap();
+        let mut err: &dyn Error = &res.err().unwrap();
         assert_eq!(
             format!("{}", err),
             "Failed to generate specification: Grammar build error: \

@@ -163,15 +163,15 @@ mod tests {
             &self.path_str
         }
 
-        fn assert_modified_by(&self, modifier: &Fn()) {
+        fn assert_modified_by(&self, modifier: &dyn Fn()) {
             assert!(self.modified_by(modifier));
         }
 
-        fn assert_not_modified_by(&self, modifier: &Fn()) {
+        fn assert_not_modified_by(&self, modifier: &dyn Fn()) {
             assert!(!self.modified_by(modifier));
         }
 
-        fn modified_by(&self, modifier: &Fn()) -> bool {
+        fn modified_by(&self, modifier: &dyn Fn()) -> bool {
             let initially_modified_at = Path::new(&self.path_str)
                 .metadata()
                 .unwrap()

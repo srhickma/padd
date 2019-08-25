@@ -3,12 +3,24 @@ use {
     std::{collections::HashMap, fmt},
 };
 
+/// Encoder: Used to encode and decode structs as `usize`.
+///
+/// # Type Parameters
+///
+/// * `T` - The type to be encoded from and decoded to.
+///
+/// # Fields
+///
+/// * `encoder` - the mapping from decoded to encoded objects.
+/// * `decoder` - the mapping from encoded to decoded objects, where the keys of the mapping are
+/// the vector indices.
 pub struct Encoder<T: Data> {
     encoder: HashMap<T, usize>,
     decoder: Vec<T>,
 }
 
 impl<T: Data> Encoder<T> {
+    /// Returns a new encoder.
     pub fn new() -> Self {
         Encoder {
             encoder: HashMap::new(),
@@ -16,6 +28,11 @@ impl<T: Data> Encoder<T> {
         }
     }
 
+    /// Returns the encoded representation of an object.
+    ///
+    /// # Parameters
+    ///
+    /// * `val` - the object to encode.
     pub fn encode(&mut self, val: &T) -> usize {
         if self.encoder.contains_key(val) {
             self.encoder[val]
@@ -27,8 +44,14 @@ impl<T: Data> Encoder<T> {
         }
     }
 
-    pub fn decode(&self, cipher: usize) -> Option<&T> {
-        self.decoder.get(cipher)
+    /// Returns the decoded representation of a cipher, or `None` if the cipher text does
+    /// not correspond to an encoded object.
+    ///
+    /// # Parameters
+    ///
+    /// * `cipher_text` - the encoded value to decode.
+    pub fn decode(&self, cipher_text: usize) -> Option<&T> {
+        self.decoder.get(cipher_text)
     }
 }
 
