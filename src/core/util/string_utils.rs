@@ -1,6 +1,10 @@
 /// Returns `input` with all backslash-escaped characters replaced, i.e. \n, \t, \\ are
 /// replaced by "newline", "tab", and "\" characters, and all other backslashes are simply
 /// removed.
+///
+/// # Parameters
+///
+/// * `input` - the string to unescape.
 pub fn replace_escapes(input: &str) -> String {
     let mut res = String::with_capacity(input.as_bytes().len());
     let mut last_char: char = ' ';

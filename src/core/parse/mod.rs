@@ -664,7 +664,8 @@ mod tests {
         //verify
         assert_eq!(
             tree.unwrap().to_string(),
-            "└── s\n    └──  <- 'NULL'"
+            "└── s
+    └──  <- 'NULL'"
         );
     }
 
