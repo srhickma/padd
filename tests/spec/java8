@@ -40,26 +40,37 @@ cdfa {
 
         ',' -> ^COMMA
         ';' -> ^SEMI
-        ':' -> colon
+        ':' -> ^COLON
+        '::' -> ^M_REF
 
         '@' -> ^AT
 
         # OPERATORS
-        '=' -> eq
-        '<' -> lt
-        '>' -> gt
-        '!' -> not
-        '+' -> plus
-        '-' -> minus
-        '*' -> star
-        '%' -> pct
-        '/' -> slash
+        '=' | '>>=' | '>>>=' | '<<=' | '+=' | '-=' | '*=' | '%=' | '/=' | '&=' | '^=' | '|='  -> ^ASSN
+        '==' | '!=' -> ^CMP_EQ
+        '<=' | '>=' -> ^CMP_REL
+        '<' -> ^LT
+        '>' -> ^GT
+        '!' -> ^NOT
+        '+' -> ^PLUS
+        '++' -> ^INC
+        '-' -> ^MINUS
+        '->' -> ^ARROW
+        '--' -> ^DEC
+        '*' -> ^STAR
+        '%' -> ^PCT
+        '/' -> ^SLASH
+        '//' -> inline_lcom_prefix
+        '/*' -> inline_lbcom_prefix
         '~' -> ^COMP
-        '&' -> and
-        '^' -> hat
-        '|' -> or
+        '&' -> ^AND
+        '&&' -> ^AND_L
+        '^' -> ^OR_BE
+        '|' -> ^OR_BI
+        '||' -> ^OR_L
         '?' -> ^QST
         '.' -> dot
+        '...' -> ^TRIDOT
 
         # LITERALS
         '"' -> string
@@ -80,18 +91,21 @@ cdfa {
         'class' -> ^CLASS
         'continue' -> ^CONTINUE
         'default' -> ^DEFAULT
-        'do' -> do
+        'do' -> ^DO
+        'double' -> ^PRIM
         'else' -> ^ELSE
         'enum' -> ^ENUM
         'extends' -> ^EXTENDS
-        'final' -> final
+        'final' -> ^FINAL
+        'finally' -> ^FINALLY
         'float' -> ^PRIM
         'for' -> ^FOR
         'if' -> ^IF
         'implements' -> ^IMPLEMENTS
         'import' -> ^IMPORT
         'instanceof' -> ^INSTANCEOF
-        'int' -> int
+        'int' -> ^PRIM
+        'interface' -> ^INTERFACE
         'long' -> ^PRIM
         'native' -> ^MOD
         'new' -> ^NEW
@@ -107,7 +121,8 @@ cdfa {
         'switch' -> ^SWITCH
         'synchronized' -> ^SYNCHRONIZED
         'this' -> ^THIS
-        'throw' -> throw
+        'throw' -> ^THROW
+        'throws' -> ^THROWS
         'transient' -> ^MOD
         'try' -> ^TRY
         'void' -> ^VOID
@@ -119,59 +134,6 @@ cdfa {
         '\n' -> ^_ -> start_empty_line
         '#' | '$' | '`' -> fail
         _ -> id;
-
-    #
-    # OPERATORS
-    #
-
-    eq      ^ASSN
-        '=' -> ^CMP_EQ;
-
-    not     ^NOT
-        '=' -> ^CMP_EQ;
-
-    lt      ^LT
-        '<=' -> ^ASSN
-        '=' -> ^CMP_REL;
-
-    gt      ^GT
-        '>=' | '>>=' -> ^ASSN
-        '=' -> ^CMP_REL;
-
-    plus    ^PLUS
-        '+' -> ^INC
-        '=' -> ^ASSN;
-
-    minus   ^MINUS
-        '>' -> ^ARROW
-        '-' -> ^DEC
-        '=' -> ^ASSN;
-
-    star    ^STAR
-        '=' -> ^ASSN;
-
-    pct     ^PCT
-        '=' -> ^ASSN;
-
-    slash   ^SLASH
-        '/' -> inline_lcom_prefix
-        '*' -> inline_lbcom_prefix
-        '=' -> ^ASSN;
-
-    and     ^AND
-        '=' -> ^ASSN
-        '&' -> ^AND_L;
-
-    or      ^OR_BI
-        '=' -> ^ASSN
-        '|' -> ^OR_L;
-
-    dot     ^DOT
-        '0' .. '9' -> float
-        '..' -> ^TRIDOT;
-
-    hat     ^OR_BE
-        '=' -> ^ASSN;
 
     #
     # LITERALS
@@ -222,6 +184,9 @@ cdfa {
         'L' -> ^LIT
         '0' .. '7' | '_' -> oct;
 
+    dot     ^DOT
+        '0' .. '9' -> float;
+
     float   ^LIT
         '0' .. '9' | '_' -> float
         'e' | 'E' -> floatexp
@@ -234,25 +199,6 @@ cdfa {
     #
     # MISC
     #
-
-    do      ^DO
-        'uble' -> ^PRIM
-        _ ->> possible_id;
-
-    throw   ^THROW
-        's' -> ^THROWS
-        _ ->> possible_id;
-
-    int     ^PRIM
-        'erface' -> ^INTERFACE
-        _ ->> possible_id;
-
-    final   ^FINAL
-        'ly' -> ^FINALLY
-        _ ->> possible_id;
-
-    colon   ^COLON
-        ':' -> ^M_REF;
 
     ws      ^_
         ' ' | '\t' | '\n' | '\r' -> ws;
