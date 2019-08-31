@@ -476,7 +476,7 @@ where
     if !pattopt_node.is_empty() {
         let pattc = &pattopt_node.get_child(0).lhs.lexeme();
         let pattern_string = &pattc[..].trim_matches('`');
-        let pattern = string_utils::replace_escapes(pattern_string);
+        let pattern = string_utils::replace_whitespace_escapes(pattern_string);
 
         formatter_builder.add_pattern(PatternPair {
             production,
