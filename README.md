@@ -1,5 +1,6 @@
 [![Build Status](https://travis-ci.com/srhickma/padd.svg?branch=master)](https://travis-ci.com/srhickma/padd)
 [![Test Coverage](https://codecov.io/gh/srhickma/padd/branch/master/graph/badge.svg)](https://codecov.io/gh/srhickma/padd)
+[![Documentation](https://img.shields.io/badge/docs-mkdocs-blue)](https://padd.srhickma.dev)
 
 # padd
 Fast and Automatic Formatting of Context-Free Languages. Inspired by the automatic formatting of
