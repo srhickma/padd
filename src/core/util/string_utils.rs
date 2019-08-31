@@ -33,48 +33,6 @@ pub fn replace_escapes(input: &str) -> String {
     res
 }
 
-/// Returns `input` with all whitespace-related backslash-escaped characters replaced, i.e. \n, \t,
-/// \r, and \\ are replaced by "newline", "tab", "carriage return", and "\" characters, and all
-/// other backslashes are left unchanged.
-///
-/// # Parameters
-///
-/// * `input` - the string to unescape.
-pub fn replace_whitespace_escapes(input: &str) -> String {
-    let mut res = String::with_capacity(input.as_bytes().len());
-    let mut last_char: char = ' ';
-    for (i, c) in input.chars().enumerate() {
-        let mut hit_double_slash = false;
-        if i != 0 && last_char == '\\' {
-            let mut non_whitespace = false;
-            res.push(match c {
-                'n' => '\n',
-                't' => '\t',
-                'r' => '\r',
-                '\\' => {
-                    last_char = ' '; // Stop \\\\ -> \\\ rather than \\
-                    hit_double_slash = true;
-                    '\\'
-                }
-                _ => {
-                    non_whitespace = true;
-                    '\\'
-                }
-            });
-
-            if non_whitespace {
-                res.push(c);
-            }
-        } else if c != '\\' {
-            res.push(c);
-        }
-        if !hit_double_slash {
-            last_char = c;
-        }
-    }
-    res
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -125,17 +83,5 @@ mod tests {
 
         //verify
         assert_eq!(res, "ffffnt\'ff\n\t\\\\ffffff\'f\'fff\r");
-    }
-
-    #[test]
-    fn replace_whitespace_escapes_full() {
-        //setup
-        let input = "ffffnt\'ff\\n\\t\\\\\\\\ffff\\ff\'\\f\\\'fff\\r";
-
-        //exercise
-        let res = replace_whitespace_escapes(input);
-
-        //verify
-        assert_eq!(res, "ffffnt\'ff\n\t\\\\ffff\\ff\'\\f\\\'fff\r");
     }
 }
