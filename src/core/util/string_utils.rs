@@ -1,6 +1,6 @@
-/// Returns `input` with all backslash-escaped characters replaced, i.e. \n, \t, \\ are
-/// replaced by "newline", "tab", and "\" characters, and all other backslashes are simply
-/// removed.
+/// Returns `input` with all backslash-escaped characters replaced, i.e. \n, \t, \r, and \\ are
+/// replaced by "newline", "tab", "carriage return", and "\" characters, and all other backslashes
+/// are simply removed.
 ///
 /// # Parameters
 ///
@@ -17,7 +17,7 @@ pub fn replace_escapes(input: &str) -> String {
                 'r' => '\r',
                 '\'' => '\'',
                 '\\' => {
-                    last_char = ' '; //Stop \\\\ -> \\\ rather than \\
+                    last_char = ' '; // Stop \\\\ -> \\\ rather than \\
                     hit_double_slash = true;
                     '\\'
                 }

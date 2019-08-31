@@ -679,7 +679,7 @@ cdfa {
 }
 
 grammar {
-    s | `\\\\`;
+    s | `\\`;
 }
         "
         .to_string();

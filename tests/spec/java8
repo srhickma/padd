@@ -698,7 +698,7 @@ grammar {
 
     forced_statement
         | block
-        | inline_statement `\\{\n[prefix][indent]{;prefix=[prefix][indent]}\n[prefix]\\}`;
+        | inline_statement `\{\n[prefix][indent]{;prefix=[prefix][indent]}\n[prefix]\}`;
 
     inline_statement
         | grouped_statement
@@ -842,7 +842,7 @@ grammar {
 
     else_statement
         | block
-        | inline_statement_no_if `\\{\n[prefix][indent]{;prefix=[prefix][indent]}\n[prefix]\\}`
+        | inline_statement_no_if `\{\n[prefix][indent]{;prefix=[prefix][indent]}\n[prefix]\}`
         | if_statement;
 
     while_statement
