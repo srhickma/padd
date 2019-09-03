@@ -16,10 +16,10 @@ The main library source is located under `src/core`, and the cli specific source
 Integration tests and example specifications are located under `tests`.
 
 ## Formatter Specifications
-The padd formatter uses a specification language (defined [here](https://github.com/srhickma/padd/blob/master/src/core/spec/lang.rs)) to specify the alphabet of a language, a compressed DFA ([CDFA](https://github.com/srhickma/padd/wiki/CDFA-Specification)) to lex the language, a [grammar](https://github.com/srhickma/padd/wiki/Grammar-Specification) to parse it, and optional [formatter patterns](https://github.com/srhickma/padd/wiki/Formatter-Patterns) inside the grammar to indicate how the finished parse tree should be reconstructed. Example specifications can be found [here](https://github.com/srhickma/padd/tree/master/tests/spec), and more information about specifications can be found [here](https://github.com/srhickma/padd/wiki/Specifications).
+The padd formatter uses a specification language (defined [here](https://github.com/srhickma/padd/blob/master/src/core/spec/lang.rs)) to specify the alphabet of a language, a compressed DFA ([CDFA](https://padd.srhickma.dev/spec/cdfa/)) to lex the language, a [grammar](https://padd.srhickma.dev/spec/grammar/) to parse it, and optional [formatter patterns](https://padd.srhickma.dev/spec/pattern/) inside the grammar to indicate how the finished parse tree should be reconstructed. Example specifications can be found [here](https://github.com/srhickma/padd/tree/master/tests/spec), and more information about specifications can be found [here](https://padd.srhickma.dev/spec/).
 
 ## CLI Usage
-The `padd` cli can be used to format files or directories in place, overwriting the existing files if formatting is successfull. For more advanced usage information, see [CLI-Usage](https://github.com/srhickma/padd/wiki/CLI-Usage).
+The `padd` cli can be used to format files or directories in place, overwriting the existing files if formatting is successfull. For more advanced usage information, see the [docs](https://padd.srhickma.dev/cli/).
 
 ### Simple Formatting
 ```shell
