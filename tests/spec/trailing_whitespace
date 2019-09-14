@@ -17,10 +17,16 @@ cdfa {
 
 grammar {
     file
-        | {line}
-        |;
+        | [lines] [trailing_nls] `{}\n`;
+
+    lines
+        | {line} LINE
+        | LINE;
 
     line
         | LINE
         | NEWLINE `\n`;
+
+    trailing_nls
+        | {NEWLINE};
 }
