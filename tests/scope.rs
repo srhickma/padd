@@ -93,8 +93,18 @@ fn test_json_complex() {
 }
 
 #[test]
-fn trailing_whitespace() {
-    test_fjr("trailing_whitespace", "trailing_whitespace");
+fn tw_lines() {
+    test_fjr("tw_lines", "trailing_whitespace");
+}
+
+#[test]
+fn tw_no_newline() {
+    test_fjr("tw_no_newline", "trailing_whitespace");
+}
+
+#[test]
+fn tw_only_whitespace() {
+    test_fjr("tw_only_whitespace", "trailing_whitespace");
 }
 
 fn test_fjr(case_name: &str, spec_name: &str) {
