@@ -1,3 +1,4 @@
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/42b5507d0a5949ada8f63c1fcc1021e6)](https://www.codacy.com/manual/srhickma/padd?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=srhickma/padd&amp;utm_campaign=Badge_Grade)
 [![Build Status](https://travis-ci.com/srhickma/padd.svg?branch=master)](https://travis-ci.com/srhickma/padd)
 [![Test Coverage](https://codecov.io/gh/srhickma/padd/branch/master/graph/badge.svg)](https://codecov.io/gh/srhickma/padd)
 [![Documentation](https://img.shields.io/badge/docs-mkdocs-blue)](https://padd.srhickma.dev)
@@ -91,7 +92,7 @@ grammar {
 }
 ```
 The input:
-```
+```txt
   {  {  {{{ }}}
    {} }  }   { {}
     }
