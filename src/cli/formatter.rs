@@ -143,7 +143,7 @@ pub fn generate_formatter(spec_path: &str) -> Result<Formatter, GenerationError>
 
     let mut sha = Sha256::new();
     sha.input_str(&spec[..]);
-    let spec_sha = sha.result_str().to_string();
+    let spec_sha = sha.result_str();
 
     let fjr_arc = {
         let mut fjr_cache = FJR_CACHE.lock().unwrap();

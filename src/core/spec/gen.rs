@@ -480,7 +480,7 @@ where
         formatter_builder.add_pattern(PatternPair {
             production,
             string_production,
-            pattern: pattern_str.to_string(),
+            pattern: (*pattern_str).to_string(),
         })?;
     }
 

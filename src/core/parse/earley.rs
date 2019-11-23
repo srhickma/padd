@@ -656,7 +656,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                         lhs: lex[edge.start].clone(),
                         children: Vec::new(),
                         production: None,
-                        spm: spm.clone(),
+                        spm,
                     },
                     Some(rule) => Tree {
                         lhs: Token::interior(rule.lhs.clone()),
@@ -688,7 +688,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                             Some(production) => Some(production.clone()),
                             None => None,
                         },
-                        spm: spm.clone(),
+                        spm,
                     },
                 }
             }
@@ -895,7 +895,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                         lhs: lex[edge.start].clone(),
                         children: Vec::new(),
                         production: None,
-                        spm: spm.clone(),
+                        spm,
                     },
                     Some(rule) => Tree {
                         lhs: Token::interior(rule.lhs.clone()),
@@ -921,7 +921,7 @@ impl<Symbol: GrammarSymbol> Parser<Symbol> for EarleyParser {
                             Some(production) => Some(production.clone()),
                             None => None,
                         },
-                        spm: spm.clone(),
+                        spm,
                     },
                 }
             }
