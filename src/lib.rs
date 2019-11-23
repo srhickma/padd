@@ -326,7 +326,7 @@ grammar {
         //verify
         assert!(res.is_err());
 
-        let mut err: &Error = &res.err().unwrap();
+        let mut err: &dyn Error = &res.err().unwrap();
         assert_eq!(
             format!("{}", err),
             "Failed to parse specification: Parse error: Recognition failed at token 10: \
