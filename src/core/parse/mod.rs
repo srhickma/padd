@@ -55,8 +55,8 @@ impl<Symbol: GrammarSymbol> Tree<Symbol> {
         self.lhs.is_null()
     }
 
-    pub fn null() -> Tree<Symbol> {
-        Tree {
+    pub fn null() -> Self {
+        Self {
             lhs: Token::null(),
             children: vec![],
             production: None,
@@ -159,14 +159,14 @@ pub struct ProductionSymbol<Symbol: GrammarSymbol> {
 
 impl<Symbol: GrammarSymbol> ProductionSymbol<Symbol> {
     pub fn symbol(symbol: Symbol) -> Self {
-        ProductionSymbol {
+        Self {
             symbol,
             is_list: false,
         }
     }
 
     pub fn symbol_list(symbol: Symbol) -> Self {
-        ProductionSymbol {
+        Self {
             symbol,
             is_list: true,
         }
@@ -181,11 +181,11 @@ pub struct Production<Symbol: GrammarSymbol> {
 
 impl<Symbol: GrammarSymbol> Production<Symbol> {
     pub fn from(lhs: Symbol, rhs: Vec<ProductionSymbol<Symbol>>) -> Self {
-        Production { lhs, rhs }
+        Self { lhs, rhs }
     }
 
     pub fn epsilon(lhs: Symbol) -> Self {
-        Production::from(lhs, Vec::new())
+        Self::from(lhs, Vec::new())
     }
 
     pub fn string_production(&self) -> Production<String> {

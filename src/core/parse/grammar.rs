@@ -101,7 +101,7 @@ pub struct SimpleGrammarBuilder<Symbol: GrammarSymbol> {
 
 impl<Symbol: GrammarSymbol> SimpleGrammarBuilder<Symbol> {
     pub fn new() -> Self {
-        SimpleGrammarBuilder {
+        Self {
             prods_by_lhs: HashMap::new(),
             injectable: HashMap::new(),
             ignorable: HashSet::new(),
@@ -253,7 +253,7 @@ pub struct EncodedGrammarBuilder<SymbolIn: GrammarSymbol> {
 
 impl<SymbolIn: GrammarSymbol> EncodedGrammarBuilder<SymbolIn> {
     pub fn new() -> Self {
-        EncodedGrammarBuilder {
+        Self {
             builder: SimpleGrammarBuilder::new(),
             encoder: Encoder::new(),
         }
@@ -424,7 +424,7 @@ impl<'builder, SymbolIn: GrammarSymbol, SymbolOut: GrammarSymbol, GrammarType>
         grammar_builder: &'builder mut dyn GrammarBuilder<SymbolIn, SymbolOut, GrammarType>,
         lhs: SymbolIn,
     ) -> Self {
-        NonTerminalBuilder {
+        Self {
             grammar_builder,
             lhs,
         }
@@ -457,13 +457,13 @@ pub enum BuildError {
 impl fmt::Display for BuildError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            BuildError::NonTerminalIgnoredErr(ref symbol) => {
+            Self::NonTerminalIgnoredErr(ref symbol) => {
                 write!(f, "Ignored symbol '{}' is non-terminal", symbol)
             }
-            BuildError::NonTerminalInjectedErr(ref symbol) => {
+            Self::NonTerminalInjectedErr(ref symbol) => {
                 write!(f, "Injected symbol '{}' is non-terminal", symbol)
             }
-            BuildError::IgnoredAndInjectedErr(ref symbol) => {
+            Self::IgnoredAndInjectedErr(ref symbol) => {
                 write!(f, "Symbol '{}' is both ignored and injected", symbol)
             }
         }
@@ -473,9 +473,9 @@ impl fmt::Display for BuildError {
 impl error::Error for BuildError {
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match *self {
-            BuildError::NonTerminalIgnoredErr(_) => None,
-            BuildError::NonTerminalInjectedErr(_) => None,
-            BuildError::IgnoredAndInjectedErr(_) => None,
+            Self::NonTerminalIgnoredErr(_) => None,
+            Self::NonTerminalInjectedErr(_) => None,
+            Self::IgnoredAndInjectedErr(_) => None,
         }
     }
 }

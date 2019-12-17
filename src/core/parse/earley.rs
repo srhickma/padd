@@ -1071,7 +1071,7 @@ struct RChart<'item, Symbol: GrammarSymbol + 'item> {
 
 impl<'item, Symbol: GrammarSymbol + 'item> RChart<'item, Symbol> {
     fn new() -> Self {
-        RChart {
+        Self {
             rows: vec![RChartRow::new(Vec::new())],
         }
     }
@@ -1114,7 +1114,7 @@ struct RChartRow<'item, Symbol: GrammarSymbol + 'item> {
 }
 
 impl<'item, Symbol: GrammarSymbol + 'item> RChartRow<'item, Symbol> {
-    fn new(scanned_items: Vec<Item<Symbol>>) -> RChartRow<Symbol> {
+    fn new(scanned_items: Vec<Item<'item, Symbol>>) -> Self {
         let mut incomplete = Items::new();
         let mut complete = Items::new();
 
@@ -1126,7 +1126,7 @@ impl<'item, Symbol: GrammarSymbol + 'item> RChartRow<'item, Symbol> {
             }
         }
 
-        RChartRow {
+        Self {
             incomplete,
             complete,
         }
@@ -1162,8 +1162,8 @@ struct Items<'item, Symbol: GrammarSymbol + 'item> {
 }
 
 impl<'item, Symbol: GrammarSymbol + 'item> Items<'item, Symbol> {
-    fn new() -> Items<'item, Symbol> {
-        Items { items: Vec::new() }
+    fn new() -> Self {
+        Self { items: Vec::new() }
     }
 
     fn len(&self) -> usize {
@@ -1197,7 +1197,7 @@ struct Item<'rule, Symbol: GrammarSymbol + 'rule> {
 
 impl<'rule, Symbol: GrammarSymbol + 'rule> Item<'rule, Symbol> {
     fn start(rule: &'rule Production<Symbol>) -> Self {
-        Item {
+        Self {
             rule,
             shadow: None,
             shadow_top: 0,
@@ -1215,7 +1215,7 @@ impl<'rule, Symbol: GrammarSymbol + 'rule> Item<'rule, Symbol> {
     }
 
     fn advance_new(&self) -> Self {
-        Item {
+        Self {
             rule: self.rule,
             shadow: self.shadow.clone(),
             shadow_top: self.shadow_top,
@@ -1311,7 +1311,7 @@ struct PChart<'rule, Symbol: GrammarSymbol + 'rule> {
 
 impl<'rule, Symbol: GrammarSymbol + 'rule> PChart<'rule, Symbol> {
     fn new() -> Self {
-        PChart {
+        Self {
             rows: vec![PChartRow::new()],
         }
     }
@@ -1349,7 +1349,7 @@ struct PChartRow<'rule, Symbol: GrammarSymbol + 'rule> {
 
 impl<'rule, Symbol: GrammarSymbol + 'rule> PChartRow<'rule, Symbol> {
     fn new() -> Self {
-        PChartRow { edges: Vec::new() }
+        Self { edges: Vec::new() }
     }
 
     fn add_edge(&mut self, edge: Edge<'rule, Symbol>) {
@@ -1372,7 +1372,7 @@ struct Edge<'prod, Symbol: GrammarSymbol + 'prod> {
 
 impl<'prod, Symbol: GrammarSymbol + 'prod> Edge<'prod, Symbol> {
     fn terminal(start: usize, spm: SymbolParseMethod) -> Self {
-        Edge {
+        Self {
             rule: None,
             shadow: None,
             shadow_top: 0,
@@ -1512,7 +1512,7 @@ struct WeightedParsePath<'rule, Symbol: GrammarSymbol> {
 
 impl<'rule, Symbol: GrammarSymbol> WeightedParsePath<'rule, Symbol> {
     fn empty() -> Self {
-        WeightedParsePath {
+        Self {
             path: Vec::new(),
             weight: 0,
         }
