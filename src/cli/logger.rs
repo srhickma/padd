@@ -184,7 +184,7 @@ struct SanitizedEncoder {
 
 impl SanitizedEncoder {
     fn wrap(encoder: impl Encode) -> Self {
-        SanitizedEncoder {
+        Self {
             encoder: Box::new(encoder),
         }
     }
@@ -209,7 +209,7 @@ struct SanitizedLogWriter {
 
 impl SanitizedLogWriter {
     fn new() -> Self {
-        SanitizedLogWriter {
+        Self {
             cursor: Cursor::new(Vec::new()),
         }
     }
