@@ -15,6 +15,10 @@ impl<State: Data, Symbol: GrammarSymbol> Lexer<State, Symbol> for LongestMatchLe
     ) -> Result<Vec<Token<Symbol>>, lex::Error> {
         /// Scan-One Result: The result of scanning a single token.
         ///
+        /// # Type Parameters
+        ///
+        /// * `State` - the state type of the CDFA being used.
+        ///
         /// # Fields
         ///
         /// * `consumed` - the number of input characters consumed by the lex.
@@ -39,7 +43,7 @@ impl<State: Data, Symbol: GrammarSymbol> Lexer<State, Symbol> for LongestMatchLe
         ///
         /// # Type Parameters:
         ///
-        /// * `State` - the type of CDFA state being used.
+        /// * `State` - the state type of the CDFA being used.
         /// * `Symbol` - the type of grammar symbol being tokenized into.
         ///
         /// # Parameters
@@ -64,7 +68,7 @@ impl<State: Data, Symbol: GrammarSymbol> Lexer<State, Symbol> for LongestMatchLe
 
             let next_start = cdfa.default_acceptor_destination(&state);
 
-            // If the start state is already accepting, remember it.
+            // If the start state has an acceptor destination, remember it.
             let end_state = if let Some(ref accd) = next_start {
                 if cdfa.accepts(&state) && state != *accd {
                     Some(state.clone())
