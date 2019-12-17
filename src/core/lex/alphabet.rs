@@ -1,20 +1,25 @@
 use std::collections::HashSet;
 
+// Alphabet: Trait representing a lexing alphabet.
 pub trait Alphabet {
+    // Returns true if the alphabet contains `char`, false otherwise.
     fn contains(&self, c: char) -> bool;
 }
 
+// Hashed Alphabet: Alphabet implementation using a hash-set.
 pub struct HashedAlphabet {
     alphabet: HashSet<char>,
 }
 
 impl HashedAlphabet {
+    // Returns a new empty alphabet.
     pub fn new() -> HashedAlphabet {
         HashedAlphabet {
             alphabet: HashSet::new(),
         }
     }
 
+    // Inserts character `char` into the alphabet.
     pub fn insert(&mut self, c: char) {
         self.alphabet.insert(c);
     }
