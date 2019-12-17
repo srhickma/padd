@@ -249,11 +249,11 @@ pub struct Pattern {
 ///
 /// # Types
 ///
-/// * `Filler` - Stores a literal string of "filler" text, which will be inserted as-is during
+/// * `Filler` - stores a literal string of "filler" text, which will be inserted as-is during
 /// formatting.
-/// * `Substitution` - Stores the variable name for a run-time value substitution into the pattern
+/// * `Substitution` - stores the variable name for a run-time value substitution into the pattern
 /// during formatting.
-/// * `Capture` - Stores a `Capture`, indicating that a child (in the parse tree) should be
+/// * `Capture` - stores a `Capture`, indicating that a child (in the parse tree) should be
 /// formatted and inserted at this position during formatting.
 #[derive(Clone)]
 pub enum Segment {
@@ -498,9 +498,9 @@ fn parse_pattern(input: &str) -> Result<Tree<PatternSymbol>, BuildError> {
 ///
 /// # Types
 ///
-/// * `LexErr` - Indicates that an error occurred while lexing a pattern.
-/// * `ParseErr` - Indicates that an error occurred while parsing a pattern.
-/// * `CaptureErr` - Indicates that an invalid pattern capture is present (e.g. out-of-bounds).
+/// * `LexErr` - indicates that an error occurred while lexing a pattern.
+/// * `ParseErr` - indicates that an error occurred while parsing a pattern.
+/// * `CaptureErr` - indicates that an invalid pattern capture is present (e.g. out-of-bounds).
 #[derive(Debug)]
 pub enum BuildError {
     LexErr(lex::Error),

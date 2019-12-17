@@ -10,9 +10,19 @@ pub mod alphabet;
 pub mod ecdfa;
 pub mod longest_match;
 
+/// The character sequence length to generate when lexing fails.
 static FAIL_SEQUENCE_LENGTH: usize = 10;
 
+/// Lexer: Trait which represents a generic lexer.
+///
+/// # Type Parameters:
+///
+/// * `State` - the state-type of the CDFA used to specify lexing behaviour.
+/// * `Symbol` - the type of tokens produced by the lexer.
 pub trait Lexer<State: Data, Symbol: GrammarSymbol>: 'static + Send + Sync {
+    /// Lexes `input` using `cdfa` to specify the language.
+    ///
+    /// Returns a vector of scanned tokens if the lex is successful, otherwise an error is returned.
     fn lex(
         &self,
         input: &[char],
@@ -20,38 +30,89 @@ pub trait Lexer<State: Data, Symbol: GrammarSymbol>: 'static + Send + Sync {
     ) -> Result<Vec<Token<Symbol>>, Error>;
 }
 
+/// Returns the current default lexer.
+/// This lexer should be used for all non-testing purposes.
 pub fn def_lexer<State: Data, Symbol: GrammarSymbol>() -> Box<dyn Lexer<State, Symbol>> {
     Box::new(longest_match::LongestMatchLexer)
 }
 
+/// Compressed Deterministic Finite Automata (CDFA): Trait representing the operations a CDFA
+/// implementation must provide to support use by a `Lexer`.
+///
+/// # Type Parameters
+///
+/// * `State` - the type used to represent states in the CDFA graph.
+/// * `Symbol` - the type of tokens produced by the CDFA.
 pub trait CDFA<State: Data, Symbol: GrammarSymbol>: Send + Sync {
+    /// Attempts to perform a transition from `state` on `input`, and returns the result.
     fn transition(&self, state: &State, input: &[char]) -> TransitionResult<State>;
+
+    /// Returns true if the alphabet of the CDFA contains `char`.
     fn alphabet_contains(&self, c: char) -> bool;
+
+    /// Returns true if `state` is accepting.
     fn accepts(&self, state: &State) -> bool;
+
+    /// Returns the default acceptor destination of `state`, or `None` if `state` has no acceptor
+    /// destination.
     fn default_acceptor_destination(&self, state: &State) -> Option<State>;
+
+    /// Returns the token associated with `state`, if one exists, otherwise `None` is returned.
     fn tokenize(&self, state: &State) -> Option<Symbol>;
+
+    /// Returns the starting state of the CDFA, where lexing should begin.
     fn start(&self) -> State;
 }
 
+/// CDFA Builder: Trait representing a builder for a CDFA.
+///
+/// # Type Parameters
+///
+/// * `State` - the type used to represent states in the CDFA graph.
+/// * `Symbol` - the type of tokens produced by the CDFA.
+/// * `CDFAType` - the type of CDFA this builder should produce.
 pub trait CDFABuilder<State: Data, Symbol: GrammarSymbol, CDFAType> {
+    /// Returns a new builder.
     fn new() -> Self;
+
+    /// Consumes the builder and returns either a CDFA or an error, if a build failure occurred.
     fn build(self) -> Result<CDFAType, CDFAError>;
+
+    /// Sets `chars` as the alphabet of the CDFA.
     fn set_alphabet(&mut self, chars: impl Iterator<Item = char>) -> &mut Self;
+
+    /// Marks `state` as an accepting state.
     fn accept(&mut self, state: &State) -> &mut Self;
+
+    /// Marks `state` as an accepting state, with acceptor destination `to`.
     fn accept_to(&mut self, state: &State, to: &State) -> &mut Self;
+
+    /// Sets `state` as the default start state of the CDFA.
     fn mark_start(&mut self, state: &State) -> &mut Self;
+
+    /// Adds simple transition `transit` on `on` from `from`.
+    ///
+    /// Returns an error if the transition could not be added.
     fn mark_trans(
         &mut self,
         from: &State,
         transit: Transit<State>,
         on: char,
     ) -> Result<&mut Self, CDFAError>;
+
+    /// Adds chain transition `transit` on `on` from `from`.
+    ///
+    /// Returns an error if the transition could not be added.
     fn mark_chain(
         &mut self,
         from: &State,
         transit: Transit<State>,
         on: impl Iterator<Item = char>,
     ) -> Result<&mut Self, CDFAError>;
+
+    /// Adds character range transition `transit` on range [`start`, `end`] from `from`.
+    ///
+    /// Returns an error if the transition could not be added.
     fn mark_range(
         &mut self,
         from: &State,
@@ -59,6 +120,11 @@ pub trait CDFABuilder<State: Data, Symbol: GrammarSymbol, CDFAType> {
         start: char,
         end: char,
     ) -> Result<&mut Self, CDFAError>;
+
+    /// Adds character range transition `transit` on range [`start`, `end`] from all states in
+    /// `sources`.
+    ///
+    /// Returns an error if the transition could not be added.
     fn mark_range_for_all<'state_o: 'state_i, 'state_i>(
         &mut self,
         sources: impl Iterator<Item = &'state_i &'state_o State>,
@@ -68,11 +134,29 @@ pub trait CDFABuilder<State: Data, Symbol: GrammarSymbol, CDFAType> {
     ) -> Result<&mut Self, CDFAError>
     where
         State: 'state_o;
+
+    /// Adds default transition `transit` from `from`.
+    ///
+    /// Returns an error if the transition could not be added.
     fn default_to(&mut self, from: &State, transit: Transit<State>)
         -> Result<&mut Self, CDFAError>;
+
+    /// Mark that `state` should be tokenized to `token`.
     fn tokenize(&mut self, state: &State, token: &Symbol) -> &mut Self;
 }
 
+/// Transit: Represents the action-phase of a transition.
+///
+/// # Type Parameters
+///
+/// * `State` - the state type of the associated CDFA.
+///
+/// # Fields
+///
+/// * `dest` - the destination state of the transition.
+/// * `consumer` - the input consumption strategy to follow when taking the transition.
+/// * `acceptor_destination` - the acceptor destination associated with this _transition_, not to
+/// be confused with the possibly different acceptor destination of the destination state.
 #[derive(Clone)]
 pub struct Transit<State: Data> {
     dest: State,
@@ -81,6 +165,9 @@ pub struct Transit<State: Data> {
 }
 
 impl<State: Data> Transit<State> {
+    /// Creates a new transit to `dest` which consumes all input and has no acceptor destination.
+    /// This is the default behaviour, and is utilized by most transitions, hence it is included
+    /// here as a shorthand for using the builder.
     pub fn to(dest: State) -> Self {
         Transit {
             dest,
@@ -90,6 +177,8 @@ impl<State: Data> Transit<State> {
     }
 }
 
+/// Transit Builder: Simple builder for `Transit` structs.
+/// Fields and type parameters correspond exactly with those of the target type.
 #[derive(Clone)]
 pub struct TransitBuilder<State: Data> {
     dest: State,
@@ -98,6 +187,8 @@ pub struct TransitBuilder<State: Data> {
 }
 
 impl<State: Data> TransitBuilder<State> {
+    /// Creates a new transit builder, with destination `dest`, consuming all input, and no
+    /// acceptor destination.
     pub fn to(dest: State) -> Self {
         TransitBuilder {
             dest,
@@ -106,16 +197,19 @@ impl<State: Data> TransitBuilder<State> {
         }
     }
 
+    /// Sets the consumer strategy of the transit to `consumer`.
     pub fn consumer(&mut self, consumer: ConsumerStrategy) -> &mut Self {
         self.consumer = consumer;
         self
     }
 
+    /// Sets the acceptor destination of the transit to `acceptor_destination`.
     pub fn accept_to(&mut self, acceptor_destination: State) -> &mut Self {
         self.acceptor_destination = Some(acceptor_destination);
         self
     }
 
+    /// Copies the builder configuration into a new `Transit` struct, without consuming the builder.
     pub fn build(&self) -> Transit<State> {
         Transit {
             dest: self.dest.clone(),
@@ -125,22 +219,42 @@ impl<State: Data> TransitBuilder<State> {
     }
 }
 
+/// Consumer Strategy: Represents a strategy of input consumption to by taken by a CDFA transition.
+///
+/// # Types
+///
+/// * `All` - when a transition is taken, consume all input matched by the transition.
+/// * `None` - when a transition is taken, do not consume any input.
 #[derive(Clone)]
 pub enum ConsumerStrategy {
     All,
     None,
 }
 
+/// Transition Result: Represents the result of a transition attempt.
+///
+/// # Types
+///
+/// * `Fail` - indicates that the transition was unsuccessful.
+/// * `Ok` - indicates that the transition was a success, and stores the destination of the
+/// transition.
+///
+/// # Type Parameters
+///
+/// * `State` - the state type of the associated CDFA.
 pub enum TransitionResult<State: Data> {
     Fail,
     Ok(TransitionDestination<State>),
 }
 
 impl<State: Data> TransitionResult<State> {
+    /// Returns a new successful transition result through `transit` traversing one input character.
     pub fn direct(transit: &Transit<State>) -> Self {
         TransitionResult::ok(transit, 1)
     }
 
+    /// Returns a new successful transition result through `transit` traversing `traversed` input
+    /// characters.
     pub fn ok(transit: &Transit<State>, traversed: usize) -> Self {
         let consumed = match transit.consumer {
             ConsumerStrategy::All => traversed,
@@ -155,12 +269,29 @@ impl<State: Data> TransitionResult<State> {
     }
 }
 
+/// Transition Destination: Represents the destination of a successful state transition.
+///
+/// # Type Parameters
+///
+/// * `State` - the state type of the associated CDFA.
+///
+/// # Fields
+///
+/// * `state` - the destination state.
+/// * `consumed` - the amount of input consumed by the transition.
+/// * `acceptor_destination` - the optional acceptor destination of the transition, not to be
+/// confused with the possibly different acceptor destination of the destination state.
 pub struct TransitionDestination<State: Data> {
     state: State,
     consumed: usize,
     acceptor_destination: Option<State>,
 }
 
+/// CDFA Error: Represents an error encountered while using or constructing a CDFA.
+///
+/// # Types
+///
+/// * `BuildErr` - indicates than an error occurred while building a CDFA.
 #[derive(Debug)]
 pub enum CDFAError {
     BuildErr(String),
@@ -194,12 +325,23 @@ impl From<interval::Error> for CDFAError {
     }
 }
 
+/// Token: A successfully lexed token of input.
+///
+/// # Type Parameters
+///
+/// * `Symbol` - the symbol-type of the token, as referenced by the language grammar.
+///
+/// # Fields
+///
+/// * `kind` - the kind of token, or `None` if the token represents an epsilon value (null).
+/// * `lexeme` - the scanned characters which produced this token.
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub struct Token<Symbol: fmt::Debug> {
     kind: Option<Symbol>,
     lexeme: String,
 }
 
+// TODO(shane) try to achieve better separation between parsing and lexing logic here.
 impl<Symbol: Data> Token<Symbol> {
     pub fn leaf(kind: Symbol, lexeme: String) -> Self {
         Token {

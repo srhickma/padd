@@ -141,8 +141,8 @@ impl<Symbol: GrammarSymbol> FormatterBuilder<Symbol> {
 ///
 /// # Types
 ///
-/// * `PatternBuildErr` - Indicates that an error that occurred while building a pattern.
-/// * `DuplicateInjectionErr` - Indicates that a particular symbol was specified for injection
+/// * `PatternBuildErr` - indicates that an error that occurred while building a pattern.
+/// * `DuplicateInjectionErr` - indicates that a particular symbol was specified for injection
 /// more than once.
 #[derive(Debug)]
 pub enum BuildError {
@@ -542,9 +542,9 @@ pub struct PatternPair<Symbol: GrammarSymbol> {
 ///
 /// # Types
 ///
-/// * `Left` - Indicates that a symbol prefers to be injected immediately after the previous
+/// * `Left` - indicates that a symbol prefers to be injected immediately after the previous
 /// non-terminal symbol.
-/// * `Right` - Indicates that a symbol prefers to be injected immediately before the next
+/// * `Right` - indicates that a symbol prefers to be injected immediately before the next
 /// non-terminal symbol.
 #[derive(Clone, PartialEq)]
 pub enum InjectionAffinity {
