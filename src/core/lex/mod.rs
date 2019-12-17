@@ -47,17 +47,17 @@ pub trait CDFA<State: Data, Symbol: GrammarSymbol>: Send + Sync {
     /// Attempts to perform a transition from `state` on `input`, and returns the result.
     fn transition(&self, state: &State, input: &[char]) -> TransitionResult<State>;
 
-    /// Returns true if the alphabet of the CDFA contains `char`.
+    /// Returns true if the alphabet of the CDFA contains `char`, otherwise false.
     fn alphabet_contains(&self, c: char) -> bool;
 
-    /// Returns true if `state` is accepting.
+    /// Returns true if `state` is accepting, otherwise false.
     fn accepts(&self, state: &State) -> bool;
 
     /// Returns the default acceptor destination of `state`, or `None` if `state` has no acceptor
     /// destination.
     fn default_acceptor_destination(&self, state: &State) -> Option<State>;
 
-    /// Returns the token associated with `state`, if one exists, otherwise `None` is returned.
+    /// Returns the token kind associated with `state`, if one exists, otherwise `None`.
     fn tokenize(&self, state: &State) -> Option<Symbol>;
 
     /// Returns the starting state of the CDFA, where lexing should begin.
@@ -87,7 +87,7 @@ pub trait CDFABuilder<State: Data, Symbol: GrammarSymbol, CDFAType> {
     /// Marks `state` as an accepting state, with acceptor destination `to`.
     fn accept_to(&mut self, state: &State, to: &State) -> &mut Self;
 
-    /// Sets `state` as the default start state of the CDFA.
+    /// Marks `state` as the default start state of the CDFA.
     fn mark_start(&mut self, state: &State) -> &mut Self;
 
     /// Adds simple transition `transit` on `on` from `from`.
@@ -110,7 +110,7 @@ pub trait CDFABuilder<State: Data, Symbol: GrammarSymbol, CDFAType> {
         on: impl Iterator<Item = char>,
     ) -> Result<&mut Self, CDFAError>;
 
-    /// Adds character range transition `transit` on range [`start`, `end`] from `from`.
+    /// Adds range transition `transit` on range [`start`, `end`] from `from`.
     ///
     /// Returns an error if the transition could not be added.
     fn mark_range(
@@ -121,10 +121,10 @@ pub trait CDFABuilder<State: Data, Symbol: GrammarSymbol, CDFAType> {
         end: char,
     ) -> Result<&mut Self, CDFAError>;
 
-    /// Adds character range transition `transit` on range [`start`, `end`] from all states in
+    /// Adds range transition `transit` on range [`start`, `end`] from all states in
     /// `sources`.
     ///
-    /// Returns an error if the transition could not be added.
+    /// Returns an error if any of the transitions could not be added.
     fn mark_range_for_all<'state_o: 'state_i, 'state_i>(
         &mut self,
         sources: impl Iterator<Item = &'state_i &'state_o State>,
@@ -155,7 +155,7 @@ pub trait CDFABuilder<State: Data, Symbol: GrammarSymbol, CDFAType> {
 ///
 /// * `dest` - the destination state of the transition.
 /// * `consumer` - the input consumption strategy to follow when taking the transition.
-/// * `acceptor_destination` - the acceptor destination associated with this _transition_, not to
+/// * `acceptor_destination` - the acceptor destination associated with this transition, not to
 /// be confused with the possibly different acceptor destination of the destination state.
 #[derive(Clone)]
 pub struct Transit<State: Data> {
@@ -167,7 +167,7 @@ pub struct Transit<State: Data> {
 impl<State: Data> Transit<State> {
     /// Creates a new transit to `dest` which consumes all input and has no acceptor destination.
     /// This is the default behaviour, and is utilized by most transitions, hence it is included
-    /// here as a shorthand for using the builder.
+    /// here as a shorthand instead of using the builder.
     pub fn to(dest: State) -> Self {
         Transit {
             dest,
@@ -187,7 +187,7 @@ pub struct TransitBuilder<State: Data> {
 }
 
 impl<State: Data> TransitBuilder<State> {
-    /// Creates a new transit builder, with destination `dest`, consuming all input, and no
+    /// Creates a new transit builder with destination `dest`, which consumes all input and has no
     /// acceptor destination.
     pub fn to(dest: State) -> Self {
         TransitBuilder {
