@@ -57,7 +57,7 @@ impl<State: Data, Symbol: GrammarSymbol> CDFABuilder<State, Symbol, EncodedCDFA<
     for EncodedCDFABuilder<State, Symbol>
 {
     fn new() -> Self {
-        EncodedCDFABuilder {
+        Self {
             encoder: Encoder::new(),
             alphabet: None,
             accepting: HashMap::new(),
@@ -337,8 +337,8 @@ impl Bound for u32 {
 }
 
 impl TransitionTrie {
-    fn new() -> TransitionTrie {
-        TransitionTrie {
+    fn new() -> Self {
+        Self {
             root: TransitionNode {
                 children: HashMap::new(),
                 transit: None,
@@ -476,8 +476,8 @@ impl TransitionTrie {
 }
 
 impl Default for TransitionTrie {
-    fn default() -> TransitionTrie {
-        TransitionTrie::new()
+    fn default() -> Self {
+        Self::new()
     }
 }
 

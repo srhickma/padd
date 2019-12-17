@@ -15,8 +15,8 @@ pub struct CEHashMap<V: Default> {
 #[allow(dead_code)]
 impl<V: Default> CEHashMap<V> {
     /// Returns a new empty CEHashMap.
-    pub fn new() -> CEHashMap<V> {
-        CEHashMap { vector: Vec::new() }
+    pub fn new() -> Self {
+        Self { vector: Vec::new() }
     }
 
     /// Inserts a value into the map at the given key.

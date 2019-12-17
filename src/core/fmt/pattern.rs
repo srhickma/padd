@@ -140,8 +140,8 @@ pub enum PatternSymbol {
 }
 
 impl Default for PatternSymbol {
-    fn default() -> PatternSymbol {
-        PatternSymbol::Pattern
+    fn default() -> Self {
+        Self::Pattern
     }
 }
 
@@ -511,9 +511,9 @@ pub enum BuildError {
 impl fmt::Display for BuildError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            BuildError::LexErr(ref err) => write!(f, "Pattern lex error: {}", err),
-            BuildError::ParseErr(ref err) => write!(f, "Pattern parse error: {}", err),
-            BuildError::CaptureErr(ref err) => write!(f, "Pattern capture error: {}", err),
+            Self::LexErr(ref err) => write!(f, "Pattern lex error: {}", err),
+            Self::ParseErr(ref err) => write!(f, "Pattern parse error: {}", err),
+            Self::CaptureErr(ref err) => write!(f, "Pattern capture error: {}", err),
         }
     }
 }
@@ -521,22 +521,22 @@ impl fmt::Display for BuildError {
 impl error::Error for BuildError {
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match *self {
-            BuildError::LexErr(ref err) => Some(err),
-            BuildError::ParseErr(ref err) => Some(err),
-            BuildError::CaptureErr(_) => None,
+            Self::LexErr(ref err) => Some(err),
+            Self::ParseErr(ref err) => Some(err),
+            Self::CaptureErr(_) => None,
         }
     }
 }
 
 impl From<lex::Error> for BuildError {
-    fn from(err: lex::Error) -> BuildError {
-        BuildError::LexErr(err)
+    fn from(err: lex::Error) -> Self {
+        Self::LexErr(err)
     }
 }
 
 impl From<parse::Error> for BuildError {
-    fn from(err: parse::Error) -> BuildError {
-        BuildError::ParseErr(err)
+    fn from(err: parse::Error) -> Self {
+        Self::ParseErr(err)
     }
 }
 

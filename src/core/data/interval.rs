@@ -35,7 +35,7 @@ pub struct Interval<B: Bound> {
 
 impl<B: Bound> From<Range<B>> for Interval<B> {
     fn from(range: Range<B>) -> Self {
-        Interval {
+        Self {
             start: range.start,
             end: range.end.predecessor(),
         }
@@ -44,7 +44,7 @@ impl<B: Bound> From<Range<B>> for Interval<B> {
 
 impl<B: Bound> From<RangeInclusive<B>> for Interval<B> {
     fn from(range: RangeInclusive<B>) -> Self {
-        Interval {
+        Self {
             start: range.start().clone(),
             end: range.end().clone(),
         }
@@ -70,7 +70,7 @@ pub struct IntervalMap<Key: Bound, Value> {
 impl<Key: Bound, Value> IntervalMap<Key, Value> {
     /// Returns a new empty `IntervalMap`.
     pub fn new() -> Self {
-        IntervalMap { root: None }
+        Self { root: None }
     }
 
     /// Returns the value of the stored interval which contains `key`, or `None` if no such interval
@@ -100,7 +100,7 @@ impl<Key: Bound, Value> IntervalMap<Key, Value> {
             }
         }
 
-        self.root = Some(IntervalMap::insert_rec_opt(self.root.take(), keys, value));
+        self.root = Some(Self::insert_rec_opt(self.root.take(), keys, value));
         Ok(())
     }
 
@@ -118,14 +118,14 @@ impl<Key: Bound, Value> IntervalMap<Key, Value> {
         value: Value,
     ) -> HeapNode<Key, Value> {
         if keys.start <= node.keys.start {
-            node.left = Some(IntervalMap::insert_rec_opt(node.left.take(), keys, value));
+            node.left = Some(Self::insert_rec_opt(node.left.take(), keys, value));
         } else {
-            node.right = Some(IntervalMap::insert_rec_opt(node.right.take(), keys, value));
+            node.right = Some(Self::insert_rec_opt(node.right.take(), keys, value));
         }
 
         node.update_from_children();
         if node.needs_balance() {
-            node = IntervalMap::balance(node)
+            node = Self::balance(node)
         }
         node
     }
@@ -147,7 +147,7 @@ impl<Key: Bound, Value> IntervalMap<Key, Value> {
         value: Value,
     ) -> HeapNode<Key, Value> {
         if let Some(node) = node_opt {
-            IntervalMap::insert_rec(node, keys, value)
+            Self::insert_rec(node, keys, value)
         } else {
             new_node(keys, value)
         }
@@ -182,15 +182,15 @@ impl<Key: Bound, Value> IntervalMap<Key, Value> {
         match rotation {
             Rotation::Right => {
                 if double {
-                    node.left = Some(IntervalMap::left_rotation(node.left.take().unwrap()));
+                    node.left = Some(Self::left_rotation(node.left.take().unwrap()));
                 }
-                IntervalMap::right_rotation(node)
+                Self::right_rotation(node)
             }
             Rotation::Left => {
                 if double {
-                    node.right = Some(IntervalMap::right_rotation(node.right.take().unwrap()));
+                    node.right = Some(Self::right_rotation(node.right.take().unwrap()));
                 }
-                IntervalMap::left_rotation(node)
+                Self::left_rotation(node)
             }
         }
     }
@@ -270,7 +270,7 @@ impl<Key: Bound, Value> Node<Key, Value> {
     /// * `keys` - the range of keys which map to `value`.
     /// * `value` - the value to store in the node.
     fn new(keys: Interval<Key>, value: Value) -> Self {
-        Node {
+        Self {
             max_end: keys.end.clone(),
             keys,
             value,
@@ -376,7 +376,7 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Error::OverlapErr => write!(f, "Intervals overlap"),
+            Self::OverlapErr => write!(f, "Intervals overlap"),
         }
     }
 }

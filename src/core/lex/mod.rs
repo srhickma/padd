@@ -169,7 +169,7 @@ impl<State: Data> Transit<State> {
     /// This is the default behaviour, and is utilized by most transitions, hence it is included
     /// here as a shorthand instead of using the builder.
     pub fn to(dest: State) -> Self {
-        Transit {
+        Self {
             dest,
             consumer: ConsumerStrategy::All,
             acceptor_destination: None,
@@ -190,7 +190,7 @@ impl<State: Data> TransitBuilder<State> {
     /// Creates a new transit builder with destination `dest`, which consumes all input and has no
     /// acceptor destination.
     pub fn to(dest: State) -> Self {
-        TransitBuilder {
+        Self {
             dest,
             consumer: ConsumerStrategy::All,
             acceptor_destination: None,
@@ -250,7 +250,7 @@ pub enum TransitionResult<State: Data> {
 impl<State: Data> TransitionResult<State> {
     /// Returns a new successful transition result through `transit` traversing one input character.
     pub fn direct(transit: &Transit<State>) -> Self {
-        TransitionResult::ok(transit, 1)
+        Self::ok(transit, 1)
     }
 
     /// Returns a new successful transition result through `transit` traversing `traversed` input
@@ -261,7 +261,7 @@ impl<State: Data> TransitionResult<State> {
             ConsumerStrategy::None => 0,
         };
 
-        TransitionResult::Ok(TransitionDestination {
+        Self::Ok(TransitionDestination {
             state: transit.dest.clone(),
             consumed,
             acceptor_destination: transit.acceptor_destination.clone(),
@@ -300,7 +300,7 @@ pub enum CDFAError {
 impl fmt::Display for CDFAError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            CDFAError::BuildErr(ref err) => write!(f, "Failed to build CDFA: {}", err),
+            Self::BuildErr(ref err) => write!(f, "Failed to build CDFA: {}", err),
         }
     }
 }
@@ -308,20 +308,20 @@ impl fmt::Display for CDFAError {
 impl error::Error for CDFAError {
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match *self {
-            CDFAError::BuildErr(_) => None,
+            Self::BuildErr(_) => None,
         }
     }
 }
 
 impl From<String> for CDFAError {
-    fn from(err: String) -> CDFAError {
+    fn from(err: String) -> Self {
         CDFAError::BuildErr(err)
     }
 }
 
 impl From<interval::Error> for CDFAError {
     fn from(err: interval::Error) -> CDFAError {
-        CDFAError::BuildErr(format!("Range matcher error: {}", err))
+        Self::BuildErr(format!("Range matcher error: {}", err))
     }
 }
 
@@ -344,21 +344,21 @@ pub struct Token<Symbol: fmt::Debug> {
 // TODO(shane) try to achieve better separation between parsing and lexing logic here.
 impl<Symbol: Data> Token<Symbol> {
     pub fn leaf(kind: Symbol, lexeme: String) -> Self {
-        Token {
+        Self {
             kind: Some(kind),
             lexeme,
         }
     }
 
     pub fn interior(kind: Symbol) -> Self {
-        Token {
+        Self {
             kind: Some(kind),
             lexeme: String::new(),
         }
     }
 
     pub fn null() -> Self {
-        Token {
+        Self {
             kind: None,
             lexeme: String::from("NULL"),
         }
@@ -408,12 +408,12 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Error::UnacceptedErr(ref err) => write!(
+            Self::UnacceptedErr(ref err) => write!(
                 f,
                 "No accepting tokens after ({},{}): {}...",
                 err.line, err.character, err.sequence,
             ),
-            Error::AlphabetErr(c) => {
+            Self::AlphabetErr(c) => {
                 write!(f, "Consuming character outside lexer alphabet: '{}'", c,)
             }
         }
@@ -427,8 +427,8 @@ impl error::Error for Error {
 }
 
 impl From<UnacceptedError> for Error {
-    fn from(err: UnacceptedError) -> Error {
-        Error::UnacceptedErr(err)
+    fn from(err: UnacceptedError) -> Self {
+        Self::UnacceptedErr(err)
     }
 }
 

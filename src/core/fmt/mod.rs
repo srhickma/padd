@@ -58,8 +58,8 @@ pub struct FormatterBuilder<Symbol: GrammarSymbol> {
 
 impl<Symbol: GrammarSymbol> FormatterBuilder<Symbol> {
     /// Returns a new `FormatterBuilder`.
-    pub fn new() -> FormatterBuilder<Symbol> {
-        FormatterBuilder {
+    pub fn new() -> Self {
+        Self {
             pattern_map: HashMap::new(),
             injection_map: HashMap::new(),
             memory: HashMap::new(),
@@ -153,8 +153,8 @@ pub enum BuildError {
 impl fmt::Display for BuildError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            BuildError::PatternBuildErr(ref err) => write!(f, "Pattern build error: {}", err),
-            BuildError::DuplicateInjectionErr(ref symbol) => write!(
+            Self::PatternBuildErr(ref err) => write!(f, "Pattern build error: {}", err),
+            Self::DuplicateInjectionErr(ref symbol) => write!(
                 f,
                 "Injection specified multiple times for symbol '{}'",
                 symbol
@@ -166,15 +166,15 @@ impl fmt::Display for BuildError {
 impl error::Error for BuildError {
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match *self {
-            BuildError::PatternBuildErr(ref err) => Some(err),
-            BuildError::DuplicateInjectionErr(_) => None,
+            Self::PatternBuildErr(ref err) => Some(err),
+            Self::DuplicateInjectionErr(_) => None,
         }
     }
 }
 
 impl From<pattern::BuildError> for BuildError {
-    fn from(err: pattern::BuildError) -> BuildError {
-        BuildError::PatternBuildErr(err)
+    fn from(err: pattern::BuildError) -> Self {
+        Self::PatternBuildErr(err)
     }
 }
 
@@ -556,8 +556,8 @@ impl InjectionAffinity {
     /// Returns the opposite injection affinity.
     fn opposite(&self) -> Self {
         match self {
-            InjectionAffinity::Left => InjectionAffinity::Right,
-            InjectionAffinity::Right => InjectionAffinity::Left,
+            Self::Left => Self::Right,
+            Self::Right => Self::Left,
         }
     }
 }
