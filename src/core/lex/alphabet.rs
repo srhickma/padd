@@ -17,8 +17,8 @@ pub struct HashedAlphabet {
 
 impl HashedAlphabet {
     /// Returns a new empty alphabet.
-    pub fn new() -> HashedAlphabet {
-        HashedAlphabet {
+    pub fn new() -> Self {
+        Self {
             alphabet: HashSet::new(),
         }
     }

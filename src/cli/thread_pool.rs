@@ -14,11 +14,7 @@ pub struct ThreadPool<Payload: 'static + Send> {
 }
 
 impl<Payload: 'static + Send> ThreadPool<Payload> {
-    pub fn spawn<JobRunner>(
-        size: usize,
-        queue_size: usize,
-        job_runner: JobRunner,
-    ) -> ThreadPool<Payload>
+    pub fn spawn<JobRunner>(size: usize, queue_size: usize, job_runner: JobRunner) -> Self
     where
         JobRunner: Fn(Payload) + 'static + Send + Sync,
     {
@@ -27,7 +23,7 @@ impl<Payload: 'static + Send> ThreadPool<Payload> {
 
         WorkerMux::spawn(size, job_runner, queue_rx, term_tx);
 
-        ThreadPool { queue_tx, term_rx }
+        Self { queue_tx, term_rx }
     }
 
     pub fn enqueue(&self, payload: Payload) -> Result<(), ThreadPoolError> {
@@ -60,8 +56,8 @@ pub enum ThreadPoolError {
 impl fmt::Display for ThreadPoolError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            ThreadPoolError::QueueErr(ref err) => write!(f, "Error enqueuing worker job: {}", err),
-            ThreadPoolError::TermError(ref err) => {
+            Self::QueueErr(ref err) => write!(f, "Error enqueuing worker job: {}", err),
+            Self::TermError(ref err) => {
                 write!(f, "Error enqueuing worker termination signal: {}", err)
             }
         }
@@ -71,8 +67,8 @@ impl fmt::Display for ThreadPoolError {
 impl error::Error for ThreadPoolError {
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match *self {
-            ThreadPoolError::QueueErr(_) => None,
-            ThreadPoolError::TermError(_) => None,
+            Self::QueueErr(_) => None,
+            Self::TermError(_) => None,
         }
     }
 }
@@ -85,7 +81,7 @@ impl WorkerMux {
         job_runner: JobRunner,
         queue_rx: Receiver<Signal<Payload>>,
         term_tx: Sender<()>,
-    ) -> WorkerMux
+    ) -> Self
     where
         JobRunner: Fn(Payload) + 'static + Send + Sync,
     {
@@ -134,7 +130,7 @@ impl WorkerMux {
             term_tx.send(()).unwrap();
         });
 
-        WorkerMux {}
+        Self {}
     }
 
     fn join_worker_report(mux_rx: &Receiver<WorkerReport>) -> WorkerReport {
@@ -163,7 +159,7 @@ impl<Payload: 'static + Send> Worker<Payload> {
         id: WorkerId,
         mux_tx: Sender<WorkerReport>,
         job_runner: Arc<JobRunner>,
-    ) -> Worker<Payload>
+    ) -> Self
     where
         JobRunner: Fn(Payload) + 'static + Send + Sync,
     {
@@ -193,7 +189,7 @@ impl<Payload: 'static + Send> Worker<Payload> {
             mux_tx.send(report).unwrap();
         });
 
-        Worker { tx }
+        Self { tx }
     }
 
     fn run_job(&self, payload: Payload) {

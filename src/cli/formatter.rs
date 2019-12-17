@@ -69,7 +69,7 @@ pub struct FormatMetrics {
 
 impl FormatMetrics {
     fn new() -> Self {
-        FormatMetrics {
+        Self {
             formatted: 0,
             failed: 0,
             total: 0,
@@ -77,7 +77,7 @@ impl FormatMetrics {
     }
 
     fn copy(&self) -> Self {
-        FormatMetrics {
+        Self {
             formatted: self.formatted,
             failed: self.failed,
             total: self.total,
@@ -108,7 +108,7 @@ struct FormatPayload {
 
 impl FormatPayload {
     fn from(path: &Path, instance: &FormatInstance) -> Self {
-        FormatPayload {
+        Self {
             file_path: PathBuf::from(path),
             formatter: instance.formatter.clone(),
             no_track: instance.criteria.no_track,
@@ -179,8 +179,8 @@ pub enum GenerationError {
 impl fmt::Display for GenerationError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            GenerationError::FileErr(ref err) => write!(f, "{}", err),
-            GenerationError::BuildErr(ref err) => write!(f, "{}", err),
+            Self::FileErr(ref err) => write!(f, "{}", err),
+            Self::BuildErr(ref err) => write!(f, "{}", err),
         }
     }
 }
@@ -188,15 +188,15 @@ impl fmt::Display for GenerationError {
 impl error::Error for GenerationError {
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match *self {
-            GenerationError::FileErr(_) => None,
-            GenerationError::BuildErr(ref err) => Some(err),
+            Self::FileErr(_) => None,
+            Self::BuildErr(ref err) => Some(err),
         }
     }
 }
 
 impl From<padd::BuildError> for GenerationError {
-    fn from(err: padd::BuildError) -> GenerationError {
-        GenerationError::BuildErr(err)
+    fn from(err: padd::BuildError) -> Self {
+        Self::BuildErr(err)
     }
 }
 
@@ -400,13 +400,11 @@ pub enum FormattingError {
 impl fmt::Display for FormattingError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            FormattingError::FileErr(ref err) => write!(f, "{}", err),
-            FormattingError::FormatErr(ref err, ref target) => {
+            Self::FileErr(ref err) => write!(f, "{}", err),
+            Self::FormatErr(ref err, ref target) => {
                 write!(f, "Error formatting {}: {}", target, err)
             }
-            FormattingError::CheckErr(ref target) => {
-                write!(f, "Formatting check failed for {}", target)
-            }
+            Self::CheckErr(ref target) => write!(f, "Formatting check failed for {}", target),
         }
     }
 }
@@ -414,9 +412,9 @@ impl fmt::Display for FormattingError {
 impl error::Error for FormattingError {
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match *self {
-            FormattingError::FileErr(_) => None,
-            FormattingError::FormatErr(ref err, _) => Some(err),
-            FormattingError::CheckErr(_) => None,
+            Self::FileErr(_) => None,
+            Self::FormatErr(ref err, _) => Some(err),
+            Self::CheckErr(_) => None,
         }
     }
 }

@@ -22,7 +22,7 @@ pub struct Encoder<T: Data> {
 impl<T: Data> Encoder<T> {
     /// Returns a new encoder.
     pub fn new() -> Self {
-        Encoder {
+        Self {
             encoder: HashMap::new(),
             decoder: Vec::new(),
         }

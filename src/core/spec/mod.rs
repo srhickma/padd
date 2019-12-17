@@ -54,12 +54,12 @@ pub enum GenError {
 impl std::fmt::Display for GenError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
-            GenError::MatcherErr(ref err) => write!(f, "Matcher definition error: {}", err),
-            GenError::MappingErr(ref err) => write!(f, "ECDFA to grammar mapping error: {}", err),
-            GenError::CDFAErr(ref err) => write!(f, "ECDFA generation error: {}", err),
-            GenError::FormatterErr(ref err) => write!(f, "Formatter build error: {}", err),
-            GenError::GrammarBuildErr(ref err) => write!(f, "Grammar build error: {}", err),
-            GenError::RegionErr(ref err) => write!(f, "Region error: {}", err),
+            Self::MatcherErr(ref err) => write!(f, "Matcher definition error: {}", err),
+            Self::MappingErr(ref err) => write!(f, "ECDFA to grammar mapping error: {}", err),
+            Self::CDFAErr(ref err) => write!(f, "ECDFA generation error: {}", err),
+            Self::FormatterErr(ref err) => write!(f, "Formatter build error: {}", err),
+            Self::GrammarBuildErr(ref err) => write!(f, "Grammar build error: {}", err),
+            Self::RegionErr(ref err) => write!(f, "Region error: {}", err),
         }
     }
 }
@@ -67,37 +67,37 @@ impl std::fmt::Display for GenError {
 impl error::Error for GenError {
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match *self {
-            GenError::MatcherErr(_) => None,
-            GenError::MappingErr(_) => None,
-            GenError::CDFAErr(ref err) => Some(err),
-            GenError::FormatterErr(ref err) => Some(err),
-            GenError::GrammarBuildErr(ref err) => Some(err),
-            GenError::RegionErr(ref err) => Some(err),
+            Self::MatcherErr(_) => None,
+            Self::MappingErr(_) => None,
+            Self::CDFAErr(ref err) => Some(err),
+            Self::FormatterErr(ref err) => Some(err),
+            Self::GrammarBuildErr(ref err) => Some(err),
+            Self::RegionErr(ref err) => Some(err),
         }
     }
 }
 
 impl From<lex::CDFAError> for GenError {
-    fn from(err: lex::CDFAError) -> GenError {
-        GenError::CDFAErr(err)
+    fn from(err: lex::CDFAError) -> Self {
+        Self::CDFAErr(err)
     }
 }
 
 impl From<grammar::BuildError> for GenError {
-    fn from(err: grammar::BuildError) -> GenError {
-        GenError::GrammarBuildErr(err)
+    fn from(err: grammar::BuildError) -> Self {
+        Self::GrammarBuildErr(err)
     }
 }
 
 impl From<fmt::BuildError> for GenError {
-    fn from(err: fmt::BuildError) -> GenError {
-        GenError::FormatterErr(err)
+    fn from(err: fmt::BuildError) -> Self {
+        Self::FormatterErr(err)
     }
 }
 
 impl From<region::Error> for GenError {
-    fn from(err: region::Error) -> GenError {
-        GenError::RegionErr(err)
+    fn from(err: region::Error) -> Self {
+        Self::RegionErr(err)
     }
 }
 
@@ -110,8 +110,8 @@ pub enum ParseError {
 impl std::fmt::Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
-            ParseError::LexErr(ref err) => write!(f, "Lex error: {}", err),
-            ParseError::ParseErr(ref err) => write!(f, "Parse error: {}", err),
+            Self::LexErr(ref err) => write!(f, "Lex error: {}", err),
+            Self::ParseErr(ref err) => write!(f, "Parse error: {}", err),
         }
     }
 }
@@ -119,8 +119,8 @@ impl std::fmt::Display for ParseError {
 impl error::Error for ParseError {
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match *self {
-            ParseError::LexErr(ref err) => Some(err),
-            ParseError::ParseErr(ref err) => Some(err),
+            Self::LexErr(ref err) => Some(err),
+            Self::ParseErr(ref err) => Some(err),
         }
     }
 }
@@ -132,8 +132,8 @@ impl From<lex::Error> for ParseError {
 }
 
 impl From<parse::Error> for ParseError {
-    fn from(err: parse::Error) -> ParseError {
-        ParseError::ParseErr(err)
+    fn from(err: parse::Error) -> Self {
+        Self::ParseErr(err)
     }
 }
 
