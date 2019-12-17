@@ -457,8 +457,8 @@ pub enum SpecSymbol {
 }
 
 impl Default for SpecSymbol {
-    fn default() -> SpecSymbol {
-        SpecSymbol::Spec
+    fn default() -> Self {
+        Self::Spec
     }
 }
 
