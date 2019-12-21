@@ -20,6 +20,14 @@ use {
     std::collections::HashSet,
 };
 
+/// Builds a specification from a parse of the specification grammar.
+///
+/// Returns the specification if successful, otherwise an error.
+///
+/// # Parameters
+///
+/// * `parse` - the parse tree generated for the specification.
+/// * `grammar_builder` - a grammar builder with which to construct the specification's grammar.
 pub fn generate_spec<Symbol: 'static + GrammarSymbol, GrammarType, GrammarBuilderType>(
     parse: &Tree<SpecSymbol>,
     mut grammar_builder: GrammarBuilderType,
@@ -50,6 +58,17 @@ where
     ))
 }
 
+/// Recursively traverses the different regions of a specification parse, and calls the associated
+/// region-specific handlers to traverse further.
+///
+/// An error is returned if the traversal of any specification region results in an error.
+///
+/// # Parameters
+///
+/// * `regions_node` - the root `SpecSymbol::Regions` node of the parse tree.
+/// * `cdfa_builder` - the CDFA builder for the specification.
+/// * `grammar_builder` - the grammar builder for the specification.
+/// * `formatter_builder` - the formatter builder for the specification.
 fn traverse_spec_regions<CDFABuilderType, CDFAType, Symbol: GrammarSymbol, GrammarType>(
     regions_node: &Tree<SpecSymbol>,
     cdfa_builder: &mut CDFABuilderType,
@@ -80,6 +99,17 @@ where
     region::traverse(regions_node, &mut region_handler)
 }
 
+/// Traverses an injectable symbol specification region, marking the associated terminal symbol as
+/// injectable in the grammar, parsing its pattern, and storing the injection in the formatter.
+///
+/// An error is returned if the injectable region conflicts with the existing grammar or formatter
+/// specifications.
+///
+/// # Parameters
+///
+/// * `injectable_node` - the `SpecSymbol::Injectable` being traversed.
+/// * `grammar_builder` - the grammar builder for the specification.
+/// * `formatter_builder` - the formatter builder for the specification.
 fn traverse_injectable_region<Symbol: GrammarSymbol, GrammarType>(
     injectable_node: &Tree<SpecSymbol>,
     grammar_builder: &mut dyn GrammarBuilder<String, Symbol, GrammarType>,
@@ -117,6 +147,13 @@ where
     Ok(())
 }
 
+/// Traverses an ignorable symbol specification region, marking the associated terminal symbol as
+/// ignorable in the grammar.
+///
+/// # Parameters
+///
+/// * `ignorable_node` - the `SpecSymbol::Ignorable` being traversed.
+/// * `grammar_builder` - the grammar builder for the specification.
 fn traverse_ignorable_region<Symbol: GrammarSymbol, GrammarType>(
     ignorable_node: &Tree<SpecSymbol>,
     grammar_builder: &mut dyn GrammarBuilder<String, Symbol, GrammarType>,
@@ -127,6 +164,13 @@ fn traverse_ignorable_region<Symbol: GrammarSymbol, GrammarType>(
     grammar_builder.mark_ignorable(terminal);
 }
 
+/// Traverses an alphabet region of a specification parse and extracts the alphabet into the CDFA
+/// being built.
+///
+/// # Parameters
+///
+/// * `alphabet_node` - the `SpecSymbol::Alphabet` node of the parse tree.
+/// * `cdfa_builder` - the CDFA builder for the specification.
 fn traverse_alphabet_region<CDFABuilderType, CDFAType, Symbol: GrammarSymbol>(
     alphabet_node: &Tree<SpecSymbol>,
     cdfa_builder: &mut CDFABuilderType,
@@ -140,6 +184,15 @@ fn traverse_alphabet_region<CDFABuilderType, CDFAType, Symbol: GrammarSymbol>(
     cdfa_builder.set_alphabet(alphabet.chars());
 }
 
+/// Traverses a CDFA specification region.
+///
+/// An error is returned if the CDFA or grammar cannot be built for the region.
+///
+/// # Parameters
+///
+/// * `cdfa_node` - the `SpecSymbol::CDFA` node of the parse tree to traverse.
+/// * `cdfa_builder` - the CDFA builder for the specification.
+/// * `grammar_builder` - the grammar builder for the specification.
 fn traverse_cdfa_region<CDFABuilderType, CDFAType, Symbol: GrammarSymbol, GrammarType>(
     cdfa_node: &Tree<SpecSymbol>,
     cdfa_builder: &mut CDFABuilderType,
@@ -153,6 +206,15 @@ where
     generate_cdfa_states(cdfa_node.get_child(2), cdfa_builder, grammar_builder)
 }
 
+/// Traverses a grammar specification region.
+///
+/// An error is returned if the grammar or formatter cannot be built for the region.
+///
+/// # Parameters
+///
+/// * `grammar_node` - the root `SpecSymbol::Grammar` node of the parse tree.
+/// * `grammar_builder` - the grammar builder for the specification.
+/// * `formatter_builder` - the formatter builder for the specification.
 fn traverse_grammar_region<Symbol: GrammarSymbol, GrammarType>(
     grammar_node: &Tree<SpecSymbol>,
     grammar_builder: &mut dyn GrammarBuilder<String, Symbol, GrammarType>,
@@ -168,6 +230,15 @@ where
     )
 }
 
+/// Recursively traverses `SpecSymbol::States` nodes to build CDFA state definitions.
+///
+/// Returns an error if a state definition cannot be built.
+///
+/// # Parameters
+///
+/// * `states_node` - the `SpecSymbol::States` node of the parse tree to traverse.
+/// * `builder` - the CDFA builder for the specification.
+/// * `grammar_builder` - the grammar builder for the specification.
 fn generate_cdfa_states<CDFABuilderType, CDFAType, Symbol: GrammarSymbol, GrammarType>(
     states_node: &Tree<SpecSymbol>,
     builder: &mut CDFABuilderType,
@@ -222,6 +293,13 @@ where
     }
 }
 
+/// Recursively traverses `SpecSymbol::Targets` nodes to build the list of source CDFA states
+/// to add transitions out of. Target lists are specific to a particular state declaration.
+///
+/// # Parameters
+///
+/// * `targets_node` - the `SpecSymbol::Targets` node of the parse tree to traverse.
+/// * `accumulator` - an accumulator into which discovered targets will be added.
 fn generate_cdfa_targets<'tree>(
     targets_node: &'tree Tree<SpecSymbol>,
     accumulator: &mut Vec<&'tree String>,
@@ -232,6 +310,7 @@ fn generate_cdfa_targets<'tree>(
             .lhs
             .lexeme(),
     );
+
     if targets_node.children.len() == 3 {
         generate_cdfa_targets(targets_node.get_child(0), accumulator);
     }
@@ -532,6 +611,9 @@ fn generate_grammar_ids<Symbol: GrammarSymbol, GrammarType>(
     }
 }
 
+/// Returns an error if there are any terminal symbols in the grammar which are not tokenized by the
+/// CDFA. Such symbols can never be produced, so any productions involving them are meaningless,
+/// and as such they an indicator of possible grammar or CDFA specification errors.
 fn orphan_check<Symbol: GrammarSymbol>(
     ecdfa: &EncodedCDFA<Symbol>,
     grammar: &dyn Grammar<Symbol>,
