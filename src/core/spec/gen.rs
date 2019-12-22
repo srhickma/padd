@@ -126,7 +126,6 @@ where
         aff => panic!("Unexpected injection affinity: '{}'", aff),
     };
 
-    // Mark terminal as injectable in the grammar.
     grammar_builder.mark_injectable(terminal_string, affinity.clone());
 
     let pattopt_node = injectable_node.get_child(3);
@@ -138,7 +137,6 @@ where
         None
     };
 
-    // Add the injection and pattern information to the formatter.
     formatter_builder.add_injection(InjectableString {
         terminal: grammar_builder.kind_for(terminal_string),
         terminal_string: terminal_string.clone(),
@@ -294,14 +292,14 @@ where
     if states_node.children.len() == 2 {
         generate_cdfa_states(states_node.get_child(0), builder, grammar_builder)
     } else {
-        // If this is the last declaration, then we are in the start state.
+        // If this is the last definition, then we are in the start state.
         builder.mark_start(head_state);
         Ok(())
     }
 }
 
 /// Recursively traverses `SpecSymbol::Targets` nodes to build the list of source CDFA states
-/// to add transitions out of. Target lists are specific to a particular state definitions.
+/// to add transitions out of. Target lists are specific to a particular state definition.
 ///
 /// # Parameters
 ///
@@ -325,7 +323,7 @@ fn generate_cdfa_targets<'tree>(
 }
 
 /// Recursively traverses `SpecSymbol::Transitions` nodes to build the set of state transitions
-/// of a CDFA state definitions.
+/// of a CDFA state definition.
 ///
 /// Returns an error if any of the state transitions cannot be built.
 ///
@@ -503,7 +501,7 @@ where
         )?;
     }
 
-    // Recurse if there are more matcher for this transition.
+    // Recurse if there are more matchers for this transition.
     if mtcs_node.children.len() == 3 {
         generate_cdfa_mtcs(mtcs_node.get_child(0), sources, transit_builder, builder)
     } else {
@@ -518,8 +516,8 @@ where
 ///
 /// * `acceptor_node` - the `SpecSymbol::Acceptor` node of the parse tree to traverse.
 /// * `state` - the name of the CDFA state to accept and possibly tokenize.
-/// * `kind` - the grammar symbol to tokenize the state to, or "_" if the state should not produce
-/// a token.
+/// * `kind` - the grammar symbol to tokenize the state to, or the default matcher symbol if the
+/// state should not produce a token.
 /// * `builder` - the CDFA builder for the specification.
 /// * `grammar_builder` - the grammar builder for the specification.
 #[allow(clippy::ptr_arg)]
@@ -587,7 +585,7 @@ where
 }
 
 /// Recursively traverse `SpecSymbol::RightHandSides` nodes to build the set of grammar productions
-/// of a single production definition in the grammar specification.
+/// of a single production definition.
 ///
 /// Returns an error if a production cannot be built.
 ///
@@ -701,7 +699,7 @@ fn generate_grammar_ids<Symbol: GrammarSymbol, GrammarType>(
 
 /// Returns an error if there are any terminal symbols in the grammar which are not tokenized by the
 /// CDFA. Such symbols can never be produced, so any productions involving them are meaningless,
-/// and as such they an indicator of possible grammar or CDFA specification errors.
+/// and as such they are an indicator of possible grammar or CDFA specification errors.
 fn orphan_check<Symbol: GrammarSymbol>(
     ecdfa: &EncodedCDFA<Symbol>,
     grammar: &dyn Grammar<Symbol>,
