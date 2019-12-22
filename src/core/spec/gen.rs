@@ -316,6 +316,15 @@ fn generate_cdfa_targets<'tree>(
     }
 }
 
+/// Recursively traverses `SpecSymbol::Transitions` nodes to build the set of state transitions
+/// of a CDFA state declaration.
+///
+/// # Parameters
+///
+/// * `trans_node` - the `SpecSymbol::Transitions` node of the parse tree to traverse.
+/// * `sources` - the source state names to add the visited transitions out of.
+/// * `builder` - the CDFA builder for the specification.
+/// * `grammar_builder` - the grammar builder for the specification.
 fn generate_cdfa_trans<CDFABuilderType, CDFAType, Symbol: GrammarSymbol, GrammarType>(
     trans_node: &Tree<SpecSymbol>,
     sources: &[&String],
@@ -382,6 +391,15 @@ where
     }
 }
 
+/// Recursively traverses `SpecSymbol::Matchers` nodes to build a set of matcher for a particular
+/// CDFA state transition.
+///
+/// # Parameters
+///
+/// * `mtcs_nodes` - the `SpecSymbol::Matchers` node of the parse tree to traverse.
+/// * `sources` - the source states of the associated transition.
+/// * `transit_builder` - the builder of the associated transition transit.
+/// * `builder` - the CDFA builder for the specification.
 #[allow(clippy::ptr_arg)]
 fn generate_cdfa_mtcs<CDFABuilderType, CDFAType, Symbol: GrammarSymbol>(
     mtcs_node: &Tree<SpecSymbol>,
@@ -472,6 +490,17 @@ where
     }
 }
 
+/// Generates CDFA state or transition acceptance and tokenization information from a
+/// `SpecSymbol::Acceptor` node.
+///
+/// # Parameters
+///
+/// * `acceptor_node` - the `SpecSymbol::Acceptor` node of the parse tree to traverse.
+/// * `state` - the name of the CDFA state to accept and possibly tokenize.
+/// * `kind` - the grammar symbol to tokenize the state to, or "_" if the state should not produce
+/// a token.
+/// * `builder` - the CDFA builder for the specification.
+/// * `grammar_builder` - the grammar builder for the specification.
 #[allow(clippy::ptr_arg)]
 fn add_cdfa_state_tokenizer<CDFABuilderType, CDFAType, Symbol: GrammarSymbol, GrammarType>(
     acceptor_node: &Tree<SpecSymbol>,
@@ -499,6 +528,14 @@ where
     Ok(())
 }
 
+/// Recursively traverse `SpecSymbol::Productions` nodes to build the set of grammar productions
+/// and formatter patterns of a grammar region.
+///
+/// # Parameters
+///
+/// * `prods_node` - the `SpecSymbol::Productions` node of the parse tree to traverse.
+/// * `grammar_builder` - the grammar builder for the specification.
+/// * `formatter_builder` - the formatter builder for the specification.
 fn generate_grammar_prods<Symbol: GrammarSymbol, GrammarType>(
     prods_node: &Tree<SpecSymbol>,
     grammar_builder: &mut dyn GrammarBuilder<String, Symbol, GrammarType>,
@@ -526,6 +563,16 @@ where
     )
 }
 
+/// Recursively traverse `SpecSymbol::RightHandSides` nodes to build the set of grammar productions
+/// of a single production definition in the grammar specification.
+///
+/// # Parameters
+///
+/// * `rhss_node` - the `SpecSymbol::RightHandSides` node of the parse tree to traverse.
+/// * `lhs` - the left-hand-side symbol common to each production in this definition.
+/// * `def_pattern_node` - the default formatter pattern for this production definition.
+/// * `grammar_builder` - the grammar builder for the specification.
+/// * `formatter_builder` - the formatter builder for the specification.
 #[allow(clippy::ptr_arg)]
 fn generate_grammar_rhss<Symbol: GrammarSymbol, GrammarType>(
     rhss_node: &Tree<SpecSymbol>,
@@ -576,6 +623,14 @@ where
     Ok(())
 }
 
+/// Recursively traverse `SpecSymbol::Ids` nodes to build the list of production symbols of a
+/// production right-hand-side.
+///
+/// # Parameters
+///
+/// * `ids_node` - the `SpecSymbol::Ids` node of the parse tree to traverse.
+/// * `ids_accumulator` - a vector to store the discovered production symbols.
+/// * `grammar_builder` - the grammar builder for the specification.
 fn generate_grammar_ids<Symbol: GrammarSymbol, GrammarType>(
     ids_node: &Tree<SpecSymbol>,
     ids_accumulator: &mut Vec<ProductionSymbol<String>>,
