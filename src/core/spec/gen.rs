@@ -128,13 +128,13 @@ where
 
     grammar_builder.mark_injectable(terminal_string, affinity.clone());
 
-    let pattopt_node = injectable_node.get_child(3);
-    let pattern_string = if !pattopt_node.is_empty() {
-        let pattc = &pattopt_node.get_child(0).lhs.lexeme();
-        let pattern_string = &pattc[..].trim_matches('`');
-        Some(string_utils::replace_escapes(pattern_string))
-    } else {
-        None
+    let pattern_string = match injectable_node.get_opt(3) {
+        Some(patt_node) => {
+            let pattc = &patt_node.get_child(0).lhs.lexeme();
+            let pattern_string = &pattc[..].trim_matches('`');
+            Some(string_utils::replace_escapes(pattern_string))
+        }
+        None => None,
     };
 
     formatter_builder.add_injection(InjectableString {
@@ -278,14 +278,8 @@ where
     }
 
     // If the source-states have transitions, build them.
-    let transopt_node = state_node.get_child(1);
-    if !transopt_node.is_empty() {
-        generate_cdfa_trans(
-            transopt_node.get_child(0),
-            &states,
-            builder,
-            grammar_builder,
-        )?;
+    if let Some(trans_node) = state_node.get_opt(1) {
+        generate_cdfa_trans(trans_node.get_child(0), &states, builder, grammar_builder)?;
     }
 
     // Recurse if we have more state definitions.
@@ -357,9 +351,8 @@ where
             builder.accept(dest);
 
             // If the accepted state has an acceptor destination, record it.
-            let accd_opt_node = destination.get_child(2);
-            if !accd_opt_node.is_empty() {
-                let acceptor_destination = &accd_opt_node.get_child(1).lhs.lexeme();
+            if let Some(accd_node) = destination.get_opt(2) {
+                let acceptor_destination = &accd_node.get_child(1).lhs.lexeme();
                 transit_builder.accept_to((*acceptor_destination).clone());
             }
 
@@ -439,16 +432,15 @@ where
             .collect();
         let matcher_cleaned = string_utils::replace_escapes(&matcher_string);
 
-        if matcher_cleaned.len() == 1 {
-            for source in sources {
+        let is_simple = matcher_cleaned.len() == 1;
+        for source in sources {
+            if is_simple {
                 builder.mark_trans(
                     source,
                     transit_builder.build(),
                     matcher_cleaned.chars().next().unwrap(),
                 )?;
-            }
-        } else {
-            for source in sources {
+            } else {
                 builder.mark_chain(source, transit_builder.build(), matcher_cleaned.chars())?;
             }
         }
@@ -532,12 +524,14 @@ fn add_cdfa_state_tokenizer<CDFABuilderType, CDFAType, Symbol: GrammarSymbol, Gr
     CDFABuilderType: CDFABuilder<String, Symbol, CDFAType>,
     GrammarType: Grammar<Symbol>,
 {
-    let accd_opt_node = acceptor_node.get_child(2);
-    if accd_opt_node.is_empty() {
-        builder.accept(state);
-    } else {
-        let acceptor_destination = &accd_opt_node.get_child(1).lhs.lexeme();
-        builder.accept_to(state, acceptor_destination);
+    match acceptor_node.get_opt(2) {
+        Some(accd_node) => {
+            let acceptor_destination = &accd_node.get_child(1).lhs.lexeme();
+            builder.accept_to(state, acceptor_destination);
+        }
+        None => {
+            builder.accept(state);
+        }
     }
 
     // Only tokenize an accepted state if it is not the default matcher.
