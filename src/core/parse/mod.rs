@@ -43,6 +43,10 @@ impl<Symbol: GrammarSymbol> Tree<Symbol> {
         &self.children[i]
     }
 
+    pub fn get_opt(&self) -> Option<&Self> {
+        self.children.first()
+    }
+
     pub fn is_leaf(&self) -> bool {
         self.children.is_empty()
     }
