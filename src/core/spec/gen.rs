@@ -126,6 +126,7 @@ where
         aff => panic!("Unexpected injection affinity: '{}'", aff),
     };
 
+    // Mark terminal as injectable in the grammar.
     grammar_builder.mark_injectable(terminal_string, affinity.clone());
 
     let pattopt_node = injectable_node.get_child(3);
@@ -137,6 +138,7 @@ where
         None
     };
 
+    // Add the injection and pattern information to the formatter.
     formatter_builder.add_injection(InjectableString {
         terminal: grammar_builder.kind_for(terminal_string),
         terminal_string: terminal_string.clone(),
@@ -259,11 +261,13 @@ where
         .lhs
         .lexeme();
 
+    // Generate list of source-states for this state definition.
     let mut states: Vec<&String> = vec![head_state];
     if targets_node.children.len() == 3 {
         generate_cdfa_targets(targets_node.get_child(0), &mut states);
     }
 
+    // Process the source-state acceptor, if it exists.
     if sdec_node.children.len() == 2 {
         let acceptor_node = sdec_node.get_child(1);
         let id_or_def_node = acceptor_node.get_child(1);
@@ -275,6 +279,7 @@ where
         }
     }
 
+    // If the source-states have transitions, build them.
     let transopt_node = state_node.get_child(1);
     if !transopt_node.is_empty() {
         generate_cdfa_trans(
@@ -285,16 +290,18 @@ where
         )?;
     }
 
+    // Recurse if we have more state definitions.
     if states_node.children.len() == 2 {
         generate_cdfa_states(states_node.get_child(0), builder, grammar_builder)
     } else {
+        // If this is the last declaration, then we are in the start state.
         builder.mark_start(head_state);
         Ok(())
     }
 }
 
 /// Recursively traverses `SpecSymbol::Targets` nodes to build the list of source CDFA states
-/// to add transitions out of. Target lists are specific to a particular state declaration.
+/// to add transitions out of. Target lists are specific to a particular state definitions.
 ///
 /// # Parameters
 ///
@@ -311,13 +318,14 @@ fn generate_cdfa_targets<'tree>(
             .lexeme(),
     );
 
+    // Recurse if we have more source-states.
     if targets_node.children.len() == 3 {
         generate_cdfa_targets(targets_node.get_child(0), accumulator);
     }
 }
 
 /// Recursively traverses `SpecSymbol::Transitions` nodes to build the set of state transitions
-/// of a CDFA state declaration.
+/// of a CDFA state definitions.
 ///
 /// # Parameters
 ///
@@ -348,12 +356,14 @@ where
 
             builder.accept(dest);
 
+            // If the accepted state has an acceptor destination, record it.
             let accd_opt_node = destination.get_child(2);
             if !accd_opt_node.is_empty() {
                 let acceptor_destination = &accd_opt_node.get_child(1).lhs.lexeme();
                 transit_builder.accept_to((*acceptor_destination).clone());
             }
 
+            // If the accepted state is not the default matcher, tokenize it.
             if *dest != *spec::DEF_MATCHER {
                 builder.tokenize(dest, &grammar_builder.kind_for(dest));
             }
@@ -384,6 +394,7 @@ where
         _ => panic!("Transition map input is neither Matchers nor TDef"),
     }
 
+    // Recurse if there are more transitions in this state definition.
     if trans_node.children.len() == 2 {
         generate_cdfa_trans(trans_node.get_child(0), sources, builder, grammar_builder)
     } else {
@@ -414,6 +425,8 @@ where
     let mtc_node = mtcs_node.children.last().unwrap();
 
     if mtc_node.children.len() == 1 {
+        // This is a simple or chain matcher.
+
         let matcher = mtc_node.get_child(0);
         let matcher_string: String = matcher
             .lhs
@@ -423,6 +436,7 @@ where
             .take(matcher.lhs.lexeme().len() - 2)
             .collect();
         let matcher_cleaned = string_utils::replace_escapes(&matcher_string);
+
         if matcher_cleaned.len() == 1 {
             for source in sources {
                 builder.mark_trans(
@@ -437,6 +451,8 @@ where
             }
         }
     } else {
+        // This is a range matcher.
+
         let range_start_node = mtc_node.get_child(0);
         let range_end_node = mtc_node.get_child(2);
 
@@ -447,8 +463,8 @@ where
             .skip(1)
             .take(range_start_node.lhs.lexeme().len() - 2)
             .collect();
-
         let range_start_string = string_utils::replace_escapes(&escaped_range_start_string);
+
         if range_start_string.len() > 1 {
             return Err(spec::GenError::MatcherErr(format!(
                 "Range start must be one character, but was '{}'",
@@ -463,8 +479,8 @@ where
             .skip(1)
             .take(range_end_node.lhs.lexeme().len() - 2)
             .collect();
-
         let range_end_string: String = string_utils::replace_escapes(&escaped_range_end_string);
+
         if range_end_string.len() > 1 {
             return Err(spec::GenError::MatcherErr(format!(
                 "Range end must be one character, but was '{}'",
@@ -483,6 +499,7 @@ where
         )?;
     }
 
+    // Recurse if there are more matcher for this transition.
     if mtcs_node.children.len() == 3 {
         generate_cdfa_mtcs(mtcs_node.get_child(0), sources, transit_builder, builder)
     } else {
@@ -522,6 +539,7 @@ where
         builder.accept_to(state, acceptor_destination);
     }
 
+    // Only tokenize an accepted state if it is not the default matcher.
     if *kind != grammar_builder.kind_for(&spec::DEF_MATCHER) {
         builder.tokenize(state, kind);
     }
@@ -544,6 +562,7 @@ fn generate_grammar_prods<Symbol: GrammarSymbol, GrammarType>(
 where
     GrammarType: Grammar<Symbol>,
 {
+    // Recurse if there are more productions in this grammar region.
     if prods_node.children.len() == 2 {
         generate_grammar_prods(prods_node.get_child(0), grammar_builder, formatter_builder)?;
     }
@@ -586,14 +605,18 @@ where
 {
     let rhs_node = rhss_node.get_child(rhss_node.children.len() - 1);
 
+    // Build list of symbols representing the right-hand-side of this production.
     let mut ids: Vec<ProductionSymbol<String>> = Vec::new();
     generate_grammar_ids(rhs_node.get_child(1), &mut ids, grammar_builder);
 
+    // Try to mark this symbol as the start symbol of the grammar.
+    // This will only succeed for the first caller.
     grammar_builder.try_mark_start(lhs);
 
     let string_production = Production::from(lhs.clone(), ids);
     let production = grammar_builder.add_production(string_production.clone());
 
+    // If this production does not have a pattern, use the default one.
     let mut pattopt_node = rhs_node.get_child(2);
     if pattopt_node.is_empty() {
         pattopt_node = def_pattern_node
@@ -610,6 +633,7 @@ where
         })?;
     }
 
+    // Recurse if there are more production right-hand-sides.
     if rhss_node.children.len() == 2 {
         generate_grammar_rhss(
             rhss_node.get_child(0),
@@ -638,32 +662,35 @@ fn generate_grammar_ids<Symbol: GrammarSymbol, GrammarType>(
 ) where
     GrammarType: Grammar<Symbol>,
 {
-    if !ids_node.is_empty() {
-        generate_grammar_ids(ids_node.get_child(0), ids_accumulator, grammar_builder);
-
-        let id_node = ids_node.get_child(1);
-        let symbol = match id_node.lhs.kind() {
-            SpecSymbol::TId => ProductionSymbol::symbol(id_node.lhs.lexeme().clone()),
-            SpecSymbol::TOptId => {
-                let lex = &id_node.lhs.lexeme()[..];
-                let dest = &lex[1..lex.len() - 1].to_string();
-                let opt_state: String = format!("opt#{}", dest);
-
-                grammar_builder.add_optional_state(&opt_state, dest);
-
-                ProductionSymbol::symbol(opt_state)
-            }
-            SpecSymbol::TListId => {
-                let lex = &id_node.lhs.lexeme()[..];
-                let target = lex[1..lex.len() - 1].to_string();
-
-                ProductionSymbol::symbol_list(target)
-            }
-            _ => panic!("Unexpected production identifier type"),
-        };
-
-        ids_accumulator.push(symbol);
+    if ids_node.is_empty() {
+        return;
     }
+
+    generate_grammar_ids(ids_node.get_child(0), ids_accumulator, grammar_builder);
+
+    let id_node = ids_node.get_child(1);
+    let symbol = match id_node.lhs.kind() {
+        SpecSymbol::TId => ProductionSymbol::symbol(id_node.lhs.lexeme().clone()),
+        SpecSymbol::TOptId => {
+            let lex = &id_node.lhs.lexeme()[..];
+            let dest = &lex[1..lex.len() - 1].to_string();
+
+            // Add (hidden) intermediate optional state to grammar.
+            let opt_state: String = format!("opt#{}", dest);
+            grammar_builder.add_optional_state(&opt_state, dest);
+
+            ProductionSymbol::symbol(opt_state)
+        }
+        SpecSymbol::TListId => {
+            let lex = &id_node.lhs.lexeme()[..];
+            let target = lex[1..lex.len() - 1].to_string();
+
+            ProductionSymbol::symbol_list(target)
+        }
+        _ => panic!("Unexpected production identifier type"),
+    };
+
+    ids_accumulator.push(symbol);
 }
 
 /// Returns an error if there are any terminal symbols in the grammar which are not tokenized by the
