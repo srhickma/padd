@@ -275,7 +275,7 @@ where
         let kind = grammar_builder.kind_for(token);
 
         for state in &states {
-            add_cdfa_state_tokenizer(acceptor_node, *state, &kind, builder, grammar_builder)?;
+            add_cdfa_state_tokenizer(acceptor_node, *state, &kind, builder, grammar_builder);
         }
     }
 
@@ -326,6 +326,8 @@ fn generate_cdfa_targets<'tree>(
 
 /// Recursively traverses `SpecSymbol::Transitions` nodes to build the set of state transitions
 /// of a CDFA state definitions.
+///
+/// Returns an error if any of the state transitions cannot be built.
 ///
 /// # Parameters
 ///
@@ -402,8 +404,10 @@ where
     }
 }
 
-/// Recursively traverses `SpecSymbol::Matchers` nodes to build a set of matcher for a particular
+/// Recursively traverses `SpecSymbol::Matchers` nodes to build a set of matchers for a particular
 /// CDFA state transition.
+///
+/// Returns an error if the matchers cannot be built.
 ///
 /// # Parameters
 ///
@@ -525,8 +529,7 @@ fn add_cdfa_state_tokenizer<CDFABuilderType, CDFAType, Symbol: GrammarSymbol, Gr
     kind: &Symbol,
     builder: &mut CDFABuilderType,
     grammar_builder: &mut dyn GrammarBuilder<String, Symbol, GrammarType>,
-) -> Result<(), spec::GenError>
-where
+) where
     CDFAType: CDFA<usize, Symbol>,
     CDFABuilderType: CDFABuilder<String, Symbol, CDFAType>,
     GrammarType: Grammar<Symbol>,
@@ -543,11 +546,12 @@ where
     if *kind != grammar_builder.kind_for(&spec::DEF_MATCHER) {
         builder.tokenize(state, kind);
     }
-    Ok(())
 }
 
 /// Recursively traverse `SpecSymbol::Productions` nodes to build the set of grammar productions
 /// and formatter patterns of a grammar region.
+///
+/// Returns an error if a production cannot be built.
 ///
 /// # Parameters
 ///
@@ -584,6 +588,8 @@ where
 
 /// Recursively traverse `SpecSymbol::RightHandSides` nodes to build the set of grammar productions
 /// of a single production definition in the grammar specification.
+///
+/// Returns an error if a production cannot be built.
 ///
 /// # Parameters
 ///
