@@ -93,7 +93,7 @@ fn type_from_node(region_node: &Tree<SpecSymbol>) -> RegionType {
     }
 }
 
-/// Error: Represents an error encountered when traversing specification regions.
+/// Error: Represents an error encountered while traversing specification regions.
 ///
 /// # Types
 ///

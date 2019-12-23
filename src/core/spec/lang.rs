@@ -13,7 +13,7 @@ use core::{
     spec,
 };
 
-// S: an enum whose elements are the states of the CDFA for lexing a specification.
+// S: An enum whose elements are the states of the CDFA for lexing a specification.
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
 enum S {
     Start,
@@ -152,7 +152,7 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<SpecSymbol>, lex::CDFAError> {
     builder.build()
 }
 
-/// Returns the ECDFA to lex injectable specification regions, or an error if it cannot be built.
+/// Augments `builder` to lex injectable specification regions, or an error if it cannot be built.
 fn build_injectable_region(
     builder: &mut EncodedCDFABuilder<S, SpecSymbol>,
 ) -> Result<(), lex::CDFAError> {
@@ -209,7 +209,7 @@ fn build_injectable_region(
     Ok(())
 }
 
-/// Returns the ECDFA to lex ignorable specification regions, or an error if it cannot be built.
+/// Augments `builder` to lex ignorable specification regions, or an error if it cannot be built.
 fn build_ignorable_region(
     builder: &mut EncodedCDFABuilder<S, SpecSymbol>,
 ) -> Result<(), lex::CDFAError> {
@@ -241,7 +241,7 @@ fn build_ignorable_region(
     Ok(())
 }
 
-/// Returns the ECDFA to lex alphabet specification regions, or an error if it cannot be built.
+/// Augments `builder` to lex alphabet specification regions, or an error if it cannot be built.
 fn build_alphabet_region(
     builder: &mut EncodedCDFABuilder<S, SpecSymbol>,
 ) -> Result<(), lex::CDFAError> {
@@ -277,7 +277,7 @@ fn build_alphabet_region(
     Ok(())
 }
 
-/// Returns the ECDFA to lex CDFA specification regions, or an error if it cannot be built.
+/// Augments `builder` to lex CDFA specification regions, or an error if it cannot be built.
 fn build_cdfa_region(
     builder: &mut EncodedCDFABuilder<S, SpecSymbol>,
 ) -> Result<(), lex::CDFAError> {
@@ -342,7 +342,7 @@ fn build_cdfa_region(
     Ok(())
 }
 
-/// Returns the ECDFA to lex grammar specification regions, or an error if it cannot be built.
+/// Augments `builder` to lex grammar specification regions, or an error if it cannot be built.
 fn build_grammar_region(
     builder: &mut EncodedCDFABuilder<S, SpecSymbol>,
 ) -> Result<(), lex::CDFAError> {
@@ -484,7 +484,8 @@ lazy_static! {
     static ref SPEC_GRAMMAR: SimpleGrammar<SpecSymbol> = build_spec_grammar().unwrap();
 }
 
-/// Returns the grammar to parse specifications.
+/// Returns the grammar to parse specifications, or an error if there is an issue with the grammar
+/// definition.
 fn build_spec_grammar() -> Result<SimpleGrammar<SpecSymbol>, grammar::BuildError> {
     let mut builder = SimpleGrammarBuilder::new();
     builder.try_mark_start(&SpecSymbol::Spec);
