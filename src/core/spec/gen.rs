@@ -321,8 +321,6 @@ fn generate_cdfa_targets<'tree>(
 ///
 /// Returns an error if any of the state transitions cannot be built.
 ///
-/// Returns an error if any of the state transitions cannot be built.
-///
 /// # Parameters
 ///
 /// * `trans_node` - the `SpecSymbol::Transitions` node of the parse tree to traverse.
@@ -582,8 +580,6 @@ where
 
 /// Recursively traverse `SpecSymbol::RightHandSides` nodes to build the set of grammar productions
 /// of a single production definition.
-///
-/// Returns an error if a production cannot be built.
 ///
 /// Returns an error if a production cannot be built.
 ///
