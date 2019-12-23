@@ -13,6 +13,7 @@ use core::{
     spec,
 };
 
+// S: An enum whose elements are the states of the CDFA for lexing a specification.
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
 enum S {
     Start,
@@ -71,6 +72,8 @@ thread_local! {
     static SPEC_ECDFA: EncodedCDFA<SpecSymbol> = build_spec_ecdfa().unwrap();
 }
 
+/// Returns the ECDFA to lex specifications, or an error if there is an issue with the ECDFA
+/// definition (e.g. ambiguity).
 fn build_spec_ecdfa() -> Result<EncodedCDFA<SpecSymbol>, lex::CDFAError> {
     let mut builder: EncodedCDFABuilder<S, SpecSymbol> = EncodedCDFABuilder::new();
 
@@ -149,6 +152,7 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<SpecSymbol>, lex::CDFAError> {
     builder.build()
 }
 
+/// Augments `builder` to lex injectable specification regions, or an error if it cannot be built.
 fn build_injectable_region(
     builder: &mut EncodedCDFABuilder<S, SpecSymbol>,
 ) -> Result<(), lex::CDFAError> {
@@ -205,6 +209,7 @@ fn build_injectable_region(
     Ok(())
 }
 
+/// Augments `builder` to lex ignorable specification regions, or an error if it cannot be built.
 fn build_ignorable_region(
     builder: &mut EncodedCDFABuilder<S, SpecSymbol>,
 ) -> Result<(), lex::CDFAError> {
@@ -236,6 +241,7 @@ fn build_ignorable_region(
     Ok(())
 }
 
+/// Augments `builder` to lex alphabet specification regions, or an error if it cannot be built.
 fn build_alphabet_region(
     builder: &mut EncodedCDFABuilder<S, SpecSymbol>,
 ) -> Result<(), lex::CDFAError> {
@@ -271,6 +277,7 @@ fn build_alphabet_region(
     Ok(())
 }
 
+/// Augments `builder` to lex CDFA specification regions, or an error if it cannot be built.
 fn build_cdfa_region(
     builder: &mut EncodedCDFABuilder<S, SpecSymbol>,
 ) -> Result<(), lex::CDFAError> {
@@ -335,6 +342,7 @@ fn build_cdfa_region(
     Ok(())
 }
 
+/// Augments `builder` to lex grammar specification regions, or an error if it cannot be built.
 fn build_grammar_region(
     builder: &mut EncodedCDFABuilder<S, SpecSymbol>,
 ) -> Result<(), lex::CDFAError> {
@@ -403,6 +411,8 @@ fn build_grammar_region(
     Ok(())
 }
 
+/// Spec Symbol: An enum whose elements are the symbols in the grammar of a specification.
+/// Symbols prefixed with `T` represent terminal symbols in the grammar.
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub enum SpecSymbol {
     Spec,
@@ -474,6 +484,8 @@ lazy_static! {
     static ref SPEC_GRAMMAR: SimpleGrammar<SpecSymbol> = build_spec_grammar().unwrap();
 }
 
+/// Returns the grammar to parse specifications, or an error if there is an issue with the grammar
+/// definition.
 fn build_spec_grammar() -> Result<SimpleGrammar<SpecSymbol>, grammar::BuildError> {
     let mut builder = SimpleGrammarBuilder::new();
     builder.try_mark_start(&SpecSymbol::Spec);
@@ -642,6 +654,10 @@ fn build_spec_grammar() -> Result<SimpleGrammar<SpecSymbol>, grammar::BuildError
     builder.build()
 }
 
+/// Parses a specification from the string `input`.
+///
+/// Returns the root node of the parse tree, or an error if a specification could not be parsed
+/// from the input.
 pub fn parse_spec(input: &str) -> Result<Tree<SpecSymbol>, spec::ParseError> {
     SPEC_ECDFA.with(|cdfa| -> Result<Tree<SpecSymbol>, spec::ParseError> {
         let chars: Vec<char> = input.chars().collect();

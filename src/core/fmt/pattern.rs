@@ -115,6 +115,7 @@ fn build_pattern_ecdfa() -> Result<EncodedCDFA<PatternSymbol>, lex::CDFAError> {
 }
 
 /// Pattern Symbol: An enum whose elements are the symbols in the grammar of a pattern.
+/// Symbols prefixed with `T` represent terminal symbols in the grammar.
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub enum PatternSymbol {
     Pattern,
@@ -476,14 +477,10 @@ fn parse_decl<Symbol: GrammarSymbol>(
     })
 }
 
-/// Parses a pattern from an input string.
+/// Parses a pattern from the string `input`.
 ///
 /// Returns the root node of the parse tree, or an error if a pattern could not be parsed from the
 /// input.
-///
-/// # Parameters
-///
-/// * `input` - the input string from which to parse the pattern.
 fn parse_pattern(input: &str) -> Result<Tree<PatternSymbol>, BuildError> {
     PATTERN_ECDFA.with(|cdfa| -> Result<Tree<PatternSymbol>, BuildError> {
         let chars: Vec<char> = input.chars().collect();
