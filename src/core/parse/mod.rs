@@ -43,6 +43,15 @@ impl<Symbol: GrammarSymbol> Tree<Symbol> {
         &self.children[i]
     }
 
+    pub fn get_opt(&self, i: usize) -> Option<&Self> {
+        let opt_child = self.get_child(i);
+        if opt_child.is_empty() {
+            None
+        } else {
+            Some(opt_child)
+        }
+    }
+
     pub fn is_leaf(&self) -> bool {
         self.children.is_empty()
     }
