@@ -17,19 +17,31 @@ mod lang;
 mod region;
 
 lazy_static! {
+    /// The default transition matcher for CDFA specification.
     pub static ref DEF_MATCHER: String = String::from("_");
 }
 
+/// Spec Gen Result: Stores the CDFA, grammar, and formatter produced during specification
+/// generation
 type SpecGenResult<Symbol> = (
     Box<dyn CDFA<usize, Symbol>>,
     Box<dyn Grammar<Symbol>>,
     Formatter<Symbol>,
 );
 
+/// Parses a specification from the `input` string, returning the result or an error if `input` is
+/// not a valid specification.
 pub fn parse_spec(input: &str) -> Result<Tree<SpecSymbol>, ParseError> {
     lang::parse_spec(input)
 }
 
+/// Generates a specification from a parse tree, returning the result or an error if `input` is not
+/// a valid specification.
+///
+/// # Parameters
+///
+/// * `parse` - the specification parse tree.
+/// * `grammar_builder` - a builder for the specification grammar.
 pub fn generate_spec<Symbol: 'static + GrammarSymbol, GrammarType, GrammarBuilderType>(
     parse: &Tree<SpecSymbol>,
     grammar_builder: GrammarBuilderType,
@@ -41,6 +53,16 @@ where
     gen::generate_spec(parse, grammar_builder)
 }
 
+/// Gen Error: Represents and error encountered while generating a specification.
+///
+/// # Types
+///
+/// * `MatcherErr` - indicates an error in a CDFA transition matcher definition.
+/// * `MappingErr` - indicates an error between the CDFA to grammar symbol mapping.
+/// * `CDFAErr` - indicates an internal error encountered while generating a CDFA.
+/// * `FormatterErr` - indicates an error encountered while building a formatter.
+/// * `GrammarBuildErr` - indicates an error encountered while building a grammar.
+/// * `RegionErr` - indicates and error encountered while traversing specification regions.
 #[derive(Debug)]
 pub enum GenError {
     MatcherErr(String),
@@ -101,6 +123,12 @@ impl From<region::Error> for GenError {
     }
 }
 
+/// Parse Error: Represents an error encountered while parsing a specification.
+///
+/// # Types
+///
+/// * `LexErr` - indicates an error in the lexing stage.
+/// * `ParseErr` - indicates an error in the parsing stage.
 #[derive(Debug)]
 pub enum ParseError {
     LexErr(lex::Error),
