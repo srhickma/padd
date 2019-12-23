@@ -161,5 +161,33 @@ impl error::Error for Error {
 mod tests {
     use super::*;
 
-    // TODO
+    #[test]
+    fn test_simple_operations() {
+        // TODO
+    }
+
+    #[test]
+    fn test_many_inserts() {
+        // TODO
+    }
+
+    #[test]
+    fn test_exhaustive_searching() {
+        // TODO
+    }
+
+    #[test]
+    fn test_insert_duplicate() {
+        // TODO
+    }
+
+    #[test]
+    fn test_removal() {
+        // TODO
+    }
+
+    #[test]
+    fn test_heavy_usage() {
+        // TODO
+    }
 }
