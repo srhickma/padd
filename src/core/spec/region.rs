@@ -16,9 +16,15 @@ pub enum RegionType {
 }
 
 lazy_static! {
+    /// The list of required regions in a specification.
     static ref REQUIRED_REGIONS: Vec<RegionType> = vec![RegionType::CDFA, RegionType::Grammar];
 }
 
+/// Recursively traverses the specification regions under `regions_node`, calling `handler` with
+/// the `SpecSymbol::Region` node and type of each region.
+///
+/// Returns an error if a required specification region is missing, or if `handler` returns an
+/// error for any traversed region.
 pub fn traverse(
     regions_node: &Tree<SpecSymbol>,
     handler: &mut dyn FnMut(&Tree<SpecSymbol>, &RegionType) -> Result<(), spec::GenError>,
@@ -38,6 +44,11 @@ pub fn traverse(
     Ok(())
 }
 
+/// Recursively traverses the specification regions under `regions_node`, calling `handler` with
+/// the `SpecSymbol::Region` node and type of each region, and storing the types of visited regions
+/// in the `region_types` accumulator.
+///
+/// Returns an error if `handler` returns an error for any traversed region.
 fn traverse_regions_node(
     regions_node: &Tree<SpecSymbol>,
     handler: &mut dyn FnMut(&Tree<SpecSymbol>, &RegionType) -> Result<(), spec::GenError>,
@@ -50,6 +61,11 @@ fn traverse_regions_node(
     traverse_region_node(regions_node.children.last().unwrap(), handler, region_types)
 }
 
+/// Traverses a single specification region represented by `region_node`, calling `handler` with
+/// the associated `SpecSymbol::Region` node and type of the region, and storing the type in the
+/// `region_types` accumulator.
+///
+/// Returns an error if `handler` returns an error for the traversed region.
 fn traverse_region_node(
     region_node: &Tree<SpecSymbol>,
     handler: &mut dyn FnMut(&Tree<SpecSymbol>, &RegionType) -> Result<(), spec::GenError>,
@@ -64,6 +80,7 @@ fn traverse_region_node(
     Ok(())
 }
 
+/// Returns the region type associated with the `SpecSymbol::Regions` node `regions_node`.
 fn type_from_node(region_node: &Tree<SpecSymbol>) -> RegionType {
     let region_symbol = &region_node.get_child(0).lhs.kind();
     match region_symbol {
@@ -76,6 +93,11 @@ fn type_from_node(region_node: &Tree<SpecSymbol>) -> RegionType {
     }
 }
 
+/// Error: Represents an error encountered when traversing specification regions.
+///
+/// # Types
+///
+/// * `MissingRequired` - indicates that a required region is not present.
 #[derive(Debug)]
 pub enum Error {
     MissingRequired(RegionType),
