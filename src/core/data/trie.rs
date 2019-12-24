@@ -8,9 +8,7 @@ pub struct Trie<Value> {
 impl<Value> Trie<Value> {
     /// TODO
     pub fn new() -> Self {
-        Self {
-            root: new_node(None),
-        }
+        Self { root: new_node() }
     }
 
     /// TODO
@@ -33,8 +31,8 @@ impl<Value> Trie<Value> {
 type HeapNode<Value> = Box<Node<Value>>;
 
 /// Helper function to create `HeapNode` objects (can't implement `new` for type alias).
-fn new_node<Value>(value: Option<Value>) -> HeapNode<Value> {
-    Box::new(Node::new(value))
+fn new_node<Value>() -> HeapNode<Value> {
+    Box::new(Node::new(None))
 }
 
 /// Node: Represents a tree-node in a trie.
@@ -76,7 +74,7 @@ impl<Value> Node<Value> {
 
         let shift_offset = 7 - key_idx;
         let mask = 1 << shift_offset;
-        let bit = key[0] ^ mask;
+        let bit = (key[0] & mask) >> shift_offset;
 
         let mut key_suffix = key;
         if key_idx == 7 {
@@ -85,13 +83,13 @@ impl<Value> Node<Value> {
 
         let next_node = if bit == 1 {
             if self.left.is_none() {
-                self.left = Some(new_node(None));
+                self.left = Some(new_node());
             }
 
             self.left.as_mut().unwrap()
         } else {
             if self.right.is_none() {
-                self.right = Some(new_node(None));
+                self.right = Some(new_node());
             }
 
             self.right.as_mut().unwrap()
@@ -114,7 +112,7 @@ impl<Value> Node<Value> {
 
         let shift_offset = 7 - key_idx;
         let mask = 1 << shift_offset;
-        let bit = key[0] ^ mask;
+        let bit = (key[0] & mask) >> shift_offset;
 
         let mut key_suffix = key;
         if key_idx == 7 {
@@ -159,35 +157,76 @@ impl error::Error for Error {
 
 #[cfg(test)]
 mod tests {
+    extern crate uuid;
+
     use super::*;
 
+    use {self::uuid::Uuid, std::collections::HashMap};
+
     #[test]
-    fn test_simple_operations() {
+    fn simple_inserts() {
+        //setup
+        let mut trie: Trie<u32> = Trie::new();
+
+        //exercise
+        trie.insert("something".as_bytes(), 1).unwrap();
+        trie.insert("something else".as_bytes(), 2).unwrap();
+        trie.insert("sab".as_bytes(), 3).unwrap();
+
+        //verify
+        assert_eq!(trie.search("something".as_bytes()), Some(&1));
+        assert_eq!(trie.search("something else".as_bytes()), Some(&2));
+        assert_eq!(trie.search("sab".as_bytes()), Some(&3));
+        assert_eq!(trie.search("something else more".as_bytes()), None);
+        assert_eq!(trie.search("some".as_bytes()), None);
+        assert_eq!(trie.search("s".as_bytes()), None);
+        assert_eq!(trie.search("a".as_bytes()), None);
+        assert_eq!(trie.search("project".as_bytes()), None);
+    }
+
+    #[test]
+    fn many_inserts() {
+        //setup
+        let mut trie: Trie<u32> = Trie::new();
+        let mut map: HashMap<String, u32> = HashMap::new();
+
+        //exercise
+        for i in 0..10000 {
+            let key = Uuid::new_v4().to_string();
+
+            trie.insert(key.as_bytes(), i).unwrap();
+            map.insert(key, i);
+        }
+
+        //verify
+        for (key, val) in map.iter() {
+            assert_eq!(trie.search(key.as_bytes()), Some(val));
+        }
+
+        for _ in 0..10000 {
+            let key = Uuid::new_v4().to_string();
+
+            assert_eq!(trie.search(key.as_bytes()), None);
+        }
+    }
+
+    #[test]
+    fn exhaustive_searching() {
         // TODO
     }
 
     #[test]
-    fn test_many_inserts() {
+    fn insert_duplicate() {
         // TODO
     }
 
     #[test]
-    fn test_exhaustive_searching() {
+    fn removal() {
         // TODO
     }
 
     #[test]
-    fn test_insert_duplicate() {
-        // TODO
-    }
-
-    #[test]
-    fn test_removal() {
-        // TODO
-    }
-
-    #[test]
-    fn test_heavy_usage() {
+    fn heavy_usage() {
         // TODO
     }
 }
