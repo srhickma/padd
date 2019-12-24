@@ -161,19 +161,19 @@ mod tests {
 
     use super::*;
 
-    use {self::uuid::Uuid, std::collections::HashMap};
+    use {
+        self::uuid::Uuid,
+        std::{collections::HashMap, str},
+    };
 
     #[test]
     fn simple_inserts() {
-        //setup
         let mut trie: Trie<u32> = Trie::new();
 
-        //exercise
         trie.insert("something".as_bytes(), 1).unwrap();
         trie.insert("something else".as_bytes(), 2).unwrap();
         trie.insert("sab".as_bytes(), 3).unwrap();
 
-        //verify
         assert_eq!(trie.search("something".as_bytes()), Some(&1));
         assert_eq!(trie.search("something else".as_bytes()), Some(&2));
         assert_eq!(trie.search("sab".as_bytes()), Some(&3));
@@ -186,11 +186,9 @@ mod tests {
 
     #[test]
     fn many_inserts() {
-        //setup
         let mut trie: Trie<u32> = Trie::new();
         let mut map: HashMap<String, u32> = HashMap::new();
 
-        //exercise
         for i in 0..10000 {
             let key = Uuid::new_v4().to_string();
 
@@ -198,7 +196,6 @@ mod tests {
             map.insert(key, i);
         }
 
-        //verify
         for (key, val) in map.iter() {
             assert_eq!(trie.search(key.as_bytes()), Some(val));
         }
@@ -212,7 +209,49 @@ mod tests {
 
     #[test]
     fn exhaustive_searching() {
-        // TODO
+        let mut trie: Trie<usize> = Trie::new();
+        let mut map: HashMap<String, usize> = HashMap::new();
+
+        // Insert some 8-bit values.
+        for i in 32..=126 {
+            let key = [i as u8];
+
+            trie.insert(&key, i).unwrap();
+            map.insert(str::from_utf8(&key).unwrap().to_string(), i);
+        }
+
+        // Insert some random values of differing lengths.
+        for length in 6..15 {
+            for i in 1..length * length * length {
+                let mut key = Uuid::new_v4().to_string();
+                key = key.chars().rev().collect();
+                key.truncate(length);
+
+                trie.insert(key.as_bytes(), i).unwrap();
+                map.insert(key, i);
+            }
+        }
+
+        // Trie contains correct values for all inserted pairs.
+        for (key, val) in map.iter() {
+            assert_eq!(trie.search(key.as_bytes()), Some(val));
+        }
+
+        // Trie does not contain any 16-bit entries.
+        for i in 0..255 {
+            for j in 0..255 {
+                let key = [i as u8, j as u8];
+
+                assert_eq!(trie.search(&key), None);
+            }
+        }
+
+        // Trie does not contain arbitrary random values.
+        for _ in 0..10000 {
+            let key = Uuid::new_v4().to_string();
+
+            assert_eq!(trie.search(key.as_bytes()), None);
+        }
     }
 
     #[test]
@@ -227,6 +266,11 @@ mod tests {
 
     #[test]
     fn heavy_usage() {
+        // TODO
+    }
+
+    #[test]
+    fn non_prefix_free() {
         // TODO
     }
 }
