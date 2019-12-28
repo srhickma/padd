@@ -660,9 +660,7 @@ fn build_spec_grammar() -> Result<SimpleGrammar<SpecSymbol>, grammar::BuildError
 /// from the input.
 pub fn parse_spec(input: &str) -> Result<Tree<SpecSymbol>, spec::ParseError> {
     SPEC_ECDFA.with(|cdfa| -> Result<Tree<SpecSymbol>, spec::ParseError> {
-        let chars: Vec<char> = input.chars().collect();
-
-        let tokens = lex::def_lexer().lex(&chars[..], cdfa)?;
+        let tokens = lex::def_lexer().lex(input, cdfa)?;
         let parse = parse::def_parser().parse(tokens, &*SPEC_GRAMMAR)?;
         Ok(parse)
     })

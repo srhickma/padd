@@ -54,9 +54,7 @@ impl FormatJobRunner {
     }
 
     pub fn format(&self, job: FormatJob) -> Result<String, FormatError> {
-        let chars: Vec<char> = job.text.chars().collect();
-
-        let tokens = self.lexer.lex(&chars[..], &*self.cdfa)?;
+        let tokens = self.lexer.lex(&job.text[..], &*self.cdfa)?;
         let parse = self.parser.parse(tokens, &*self.grammar)?;
         Ok(self.formatter.format(&parse))
     }

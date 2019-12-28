@@ -483,9 +483,7 @@ fn parse_decl<Symbol: GrammarSymbol>(
 /// input.
 fn parse_pattern(input: &str) -> Result<Tree<PatternSymbol>, BuildError> {
     PATTERN_ECDFA.with(|cdfa| -> Result<Tree<PatternSymbol>, BuildError> {
-        let chars: Vec<char> = input.chars().collect();
-
-        let tokens = lex::def_lexer().lex(&chars[..], cdfa)?;
+        let tokens = lex::def_lexer().lex(input, cdfa)?;
         let parse = parse::def_parser().parse(tokens, &*PATTERN_GRAMMAR)?;
         Ok(parse)
     })

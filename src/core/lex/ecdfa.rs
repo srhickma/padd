@@ -287,7 +287,7 @@ impl<Symbol: GrammarSymbol> EncodedCDFA<Symbol> {
 }
 
 impl<Symbol: GrammarSymbol> CDFA<usize, Symbol> for EncodedCDFA<Symbol> {
-    fn transition(&self, state: &usize, input: &[char]) -> TransitionResult<usize> {
+    fn transition(&self, state: &usize, input: &str) -> TransitionResult<usize> {
         match self.t_delta.get(*state) {
             None => TransitionResult::Fail,
             Some(t_trie) => t_trie.transition(input),
@@ -348,13 +348,13 @@ impl TransitionTrie {
         }
     }
 
-    fn transition(&self, input: &[char]) -> TransitionResult<usize> {
+    fn transition(&self, input: &str) -> TransitionResult<usize> {
         if input.is_empty() {
             return TransitionResult::Fail;
         }
 
         match self.transition_explicit(input) {
-            TransitionResult::Fail => match self.transition_range(input) {
+            TransitionResult::Fail => match self.transition_range(input.chars().next().unwrap()) {
                 TransitionResult::Fail => self.transition_default(),
                 result => result,
             },
@@ -362,7 +362,7 @@ impl TransitionTrie {
         }
     }
 
-    fn transition_explicit(&self, input: &[char]) -> TransitionResult<usize> {
+    fn transition_explicit(&self, input: &str) -> TransitionResult<usize> {
         let mut curr: &TransitionNode = &self.root;
 
         if curr.children.is_empty() {
@@ -371,10 +371,11 @@ impl TransitionTrie {
             let mut best_result = TransitionResult::Fail;
 
             let mut cursor: usize = 0;
+            let mut chars = input.chars();
             while !curr.leaf() {
-                curr = match input.get(cursor) {
+                curr = match chars.next() {
                     None => return best_result,
-                    Some(c) => match curr.get_child(*c) {
+                    Some(c) => match curr.get_child(c) {
                         None => return best_result,
                         Some(child) => child,
                     },
@@ -391,8 +392,8 @@ impl TransitionTrie {
         }
     }
 
-    fn transition_range(&self, input: &[char]) -> TransitionResult<usize> {
-        let value = input[0] as u32;
+    fn transition_range(&self, input: char) -> TransitionResult<usize> {
+        let value = input as u32;
         match self.ranges.get(&value) {
             None => TransitionResult::Fail,
             Some(transit) => TransitionResult::direct(transit),
