@@ -23,11 +23,8 @@ pub trait Lexer<State: Data, Symbol: GrammarSymbol>: 'static + Send + Sync {
     /// Lexes `input` using `cdfa` to specify the language.
     ///
     /// Returns a vector of scanned tokens if the lex is successful, otherwise an error is returned.
-    fn lex(
-        &self,
-        input: &[char],
-        cdfa: &dyn CDFA<State, Symbol>,
-    ) -> Result<Vec<Token<Symbol>>, Error>;
+    fn lex(&self, input: &str, cdfa: &dyn CDFA<State, Symbol>)
+        -> Result<Vec<Token<Symbol>>, Error>;
 }
 
 /// Returns the current default lexer.
@@ -45,7 +42,7 @@ pub fn def_lexer<State: Data, Symbol: GrammarSymbol>() -> Box<dyn Lexer<State, S
 /// * `Symbol` - the type of tokens produced by the CDFA.
 pub trait CDFA<State: Data, Symbol: GrammarSymbol>: Send + Sync {
     /// Attempts to perform a transition from `state` on `input`, and returns the result.
-    fn transition(&self, state: &State, input: &[char]) -> TransitionResult<State>;
+    fn transition(&self, state: &State, input: &str) -> TransitionResult<State>;
 
     /// Returns true if the alphabet of the CDFA contains `char`, otherwise false.
     fn alphabet_contains(&self, c: char) -> bool;

@@ -10,7 +10,7 @@ pub struct LongestMatchLexer;
 impl<State: Data, Symbol: GrammarSymbol> Lexer<State, Symbol> for LongestMatchLexer {
     fn lex<'cdfa>(
         &self,
-        input: &[char],
+        input: &str,
         cdfa: &'cdfa dyn CDFA<State, Symbol>,
     ) -> Result<Vec<Token<Symbol>>, lex::Error> {
         /// Scan-One Result: The result of scanning a single token.
@@ -55,7 +55,7 @@ impl<State: Data, Symbol: GrammarSymbol> Lexer<State, Symbol> for LongestMatchLe
         /// * `character` - the current character number (on the current line).
         /// * `cdfa` - the CDFA to use when lexing the input.
         fn scan_one<State: Data, Symbol: GrammarSymbol>(
-            input: &[char],
+            input: &str,
             start: State,
             line: usize,
             character: usize,
@@ -98,17 +98,17 @@ impl<State: Data, Symbol: GrammarSymbol> Lexer<State, Symbol> for LongestMatchLe
                     TransitionResult::Ok(dest) => {
                         consumed += dest.consumed;
 
-                        for c in remaining.iter().take(dest.consumed) {
+                        for c in remaining.chars().take(dest.consumed) {
                             // Update calculation of current character and line.
                             character += 1;
-                            if *c == '\n' {
+                            if c == '\n' {
                                 line += 1;
                                 character = 1;
                             }
 
                             // Error out if we see an unexpected character.
-                            if !cdfa.alphabet_contains(*c) {
-                                return Err(lex::Error::AlphabetErr(*c));
+                            if !cdfa.alphabet_contains(c) {
+                                return Err(lex::Error::AlphabetErr(c));
                             }
                         }
 
@@ -128,7 +128,12 @@ impl<State: Data, Symbol: GrammarSymbol> Lexer<State, Symbol> for LongestMatchLe
                         }
 
                         state = dest.state;
-                        remaining = &remaining[dest.consumed..];
+
+                        let next_index = match remaining.char_indices().nth(dest.consumed) {
+                            Some((next_index, _)) => next_index,
+                            None => remaining.len(),
+                        };
+                        remaining = &remaining[next_index..];
                     }
                 }
             }
@@ -159,11 +164,8 @@ impl<State: Data, Symbol: GrammarSymbol> Lexer<State, Symbol> for LongestMatchLe
                 None => {
                     // If more input remains after a failed token scan, return a lexing error.
                     if !remaining.is_empty() {
-                        let sequence: String = (0..FAIL_SEQUENCE_LENGTH)
-                            .map(|i| remaining.get(i))
-                            .filter(Option::is_some)
-                            .map(Option::unwrap)
-                            .collect();
+                        let sequence: String =
+                            remaining.chars().take(FAIL_SEQUENCE_LENGTH).collect();
 
                         return Err(lex::Error::from(lex::UnacceptedError {
                             sequence,
@@ -179,13 +181,17 @@ impl<State: Data, Symbol: GrammarSymbol> Lexer<State, Symbol> for LongestMatchLe
                     if let Some(kind) = cdfa.tokenize(&state) {
                         tokens.push(Token::leaf(
                             kind,
-                            (&remaining[0..res.consumed]).iter().collect(),
+                            remaining.chars().take(res.consumed).collect(),
                         ));
                     }
                 }
             }
 
-            remaining = &remaining[res.consumed..];
+            let next_index = match remaining.char_indices().nth(res.consumed) {
+                Some((next_index, _)) => next_index,
+                None => remaining.len(),
+            };
+            remaining = &remaining[next_index..];
         }
 
         Ok(tokens)
