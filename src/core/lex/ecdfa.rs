@@ -543,13 +543,12 @@ mod tests {
 
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
 
-        let input = "000011010101".to_string();
-        let chars: Vec<char> = input.chars().collect();
+        let input = "000011010101";
 
         let lexer = lex::def_lexer();
 
         //exercise
-        let tokens = lexer.lex(&chars[..], &cdfa).unwrap();
+        let tokens = lexer.lex(input, &cdfa).unwrap();
 
         //verify
         assert_eq!(
@@ -601,13 +600,12 @@ NZ <- '11010101'
 
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
 
-        let input = "  {{\n}{}{} \t{} \t{}}".to_string();
-        let chars: Vec<char> = input.chars().collect();
+        let input = "  {{\n}{}{} \t{} \t{}}";
 
         let lexer = lex::def_lexer();
 
         //exercise
-        let tokens = lexer.lex(&chars[..], &cdfa).unwrap();
+        let tokens = lexer.lex(input, &cdfa).unwrap();
 
         //verify
         assert_eq!(
@@ -669,13 +667,12 @@ RBR <- '}'
 
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
 
-        let input = "  {{\n}{}{} \t{} \t{}}".to_string();
-        let chars: Vec<char> = input.chars().collect();
+        let input = "  {{\n}{}{} \t{} \t{}}";
 
         let lexer = lex::def_lexer();
 
         //exercise
-        let tokens = lexer.lex(&chars[..], &cdfa).unwrap();
+        let tokens = lexer.lex(input, &cdfa).unwrap();
 
         //verify
         assert_eq!(
@@ -733,13 +730,12 @@ RBR <- '}'
 
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
 
-        let input = "  {{\n}{}{} \tx{} \t{}}".to_string();
-        let chars: Vec<char> = input.chars().collect();
+        let input = "  {{\n}{}{} \tx{} \t{}}";
 
         let lexer = lex::def_lexer();
 
         //exercise
-        let result = lexer.lex(&chars[..], &cdfa);
+        let result = lexer.lex(input, &cdfa);
 
         //verify
         assert!(result.is_err());
@@ -789,13 +785,12 @@ RBR <- '}'
 
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
 
-        let input = "   {  {  {{{\t}}}\n {} }  }   { {}\n }   {  {  {{{\t}}}\n {} }  } xyz  { {}\n }   {  {  {{{\t}}}\n {} }  }   { {}\n } ".to_string();
-        let chars: Vec<char> = input.chars().collect();
+        let input = "   {  {  {{{\t}}}\n {} }  }   { {}\n }   {  {  {{{\t}}}\n {} }  } xyz  { {}\n }   {  {  {{{\t}}}\n {} }  }   { {}\n } ";
 
         let lexer = lex::def_lexer();
 
         //exercise
-        let result = lexer.lex(&chars[..], &cdfa);
+        let result = lexer.lex(input, &cdfa);
 
         //verify
         assert!(result.is_err());
@@ -830,13 +825,12 @@ RBR <- '}'
 
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
 
-        let input = "fivefourfourfourfivefivefourfive".to_string();
-        let chars: Vec<char> = input.chars().collect();
+        let input = "fivefourfourfourfivefivefourfive";
 
         let lexer = lex::def_lexer();
 
         //exercise
-        let tokens = lexer.lex(&chars[..], &cdfa).unwrap();
+        let tokens = lexer.lex(input, &cdfa).unwrap();
 
         //verify
         assert_eq!(
@@ -878,13 +872,12 @@ FIVE <- 'five'
 
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
 
-        let input = "fdk".to_string();
-        let chars: Vec<char> = input.chars().collect();
+        let input = "fdk";
 
         let lexer = lex::def_lexer();
 
         //exercise
-        let tokens = lexer.lex(&chars[..], &cdfa).unwrap();
+        let tokens = lexer.lex(input, &cdfa).unwrap();
 
         //verify
         assert_eq!(
@@ -948,13 +941,12 @@ ID <- 'fdk'
 
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
 
-        let input = "!!aaa!!a!49913!a".to_string();
-        let chars: Vec<char> = input.chars().collect();
+        let input = "!!aaa!!a!49913!a";
 
         let lexer = lex::def_lexer();
 
         //exercise
-        let tokens = lexer.lex(&chars[..], &cdfa).unwrap();
+        let tokens = lexer.lex(input, &cdfa).unwrap();
 
         //verify
         assert_eq!(
@@ -1014,13 +1006,12 @@ A <- 'a'
 
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
 
-        let input = "aaaa".to_string();
-        let chars: Vec<char> = input.chars().collect();
+        let input = "aaaa";
 
         let lexer = lex::def_lexer();
 
         //exercise
-        let tokens = lexer.lex(&chars[..], &cdfa).unwrap();
+        let tokens = lexer.lex(input, &cdfa).unwrap();
 
         //verify
         assert_eq!(
@@ -1061,13 +1052,12 @@ A <- 'a'
 
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
 
-        let input = "aa".to_string();
-        let chars: Vec<char> = input.chars().collect();
+        let input = "aa";
 
         let lexer = lex::def_lexer();
 
         //exercise
-        let tokens = lexer.lex(&chars[..], &cdfa).unwrap();
+        let tokens = lexer.lex(input, &cdfa).unwrap();
 
         //verify
         assert_eq!(
@@ -1126,13 +1116,12 @@ A <- 'a'
 
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
 
-        let input = "1a2a1a".to_string();
-        let chars: Vec<char> = input.chars().collect();
+        let input = "1a2a1a";
 
         let lexer = lex::def_lexer();
 
         //exercise
-        let tokens = lexer.lex(&chars[..], &cdfa).unwrap();
+        let tokens = lexer.lex(input, &cdfa).unwrap();
 
         //verify
         assert_eq!(
@@ -1198,13 +1187,12 @@ A1 <- 'a'
 
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
 
-        let input = "1a2a1a".to_string();
-        let chars: Vec<char> = input.chars().collect();
+        let input = "1a2a1a";
 
         let lexer = lex::def_lexer();
 
         //exercise
-        let tokens = lexer.lex(&chars[..], &cdfa).unwrap();
+        let tokens = lexer.lex(input, &cdfa).unwrap();
 
         //verify
         assert_eq!(
@@ -1271,13 +1259,12 @@ A1 <- 'a'
 
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
 
-        let input = "ab".to_string();
-        let chars: Vec<char> = input.chars().collect();
+        let input = "ab";
 
         let lexer = lex::def_lexer();
 
         //exercise
-        let tokens = lexer.lex(&chars[..], &cdfa).unwrap();
+        let tokens = lexer.lex(input, &cdfa).unwrap();
 
         //verify
         assert_eq!(
@@ -1314,13 +1301,12 @@ B <- 'b'
 
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
 
-        let input = "1234567890".to_string();
-        let chars: Vec<char> = input.chars().collect();
+        let input = "1234567890";
 
         let lexer = lex::def_lexer();
 
         //exercise
-        let tokens = lexer.lex(&chars[..], &cdfa).unwrap();
+        let tokens = lexer.lex(input, &cdfa).unwrap();
 
         //verify
         assert_eq!(tokens_string(&tokens), "START <- '1234567890'\n");
@@ -1362,13 +1348,12 @@ B <- 'b'
 
         let cdfa: EncodedCDFA<String> = builder.build().unwrap();
 
-        let input = "aababca".to_string();
-        let chars: Vec<char> = input.chars().collect();
+        let input = "aababca";
 
         let lexer = lex::def_lexer();
 
         //exercise
-        let tokens = lexer.lex(&chars[..], &cdfa).unwrap();
+        let tokens = lexer.lex(input, &cdfa).unwrap();
 
         //verify
         assert_eq!(

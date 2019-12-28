@@ -739,8 +739,7 @@ grammar {
 }
         ";
 
-        let input = "  {  {  {{{\t}}}\n\r {} } \r }   { {}\n } ".to_string();
-        let chars: Vec<char> = input.chars().collect();
+        let input = "  {  {  {{{\t}}}\n\r {} } \r }   { {}\n } ";
 
         let lexer = lex::def_lexer();
         let parser = parse::def_parser();
@@ -752,7 +751,7 @@ grammar {
             generate_spec(&parse, SimpleGrammarBuilder::new()).unwrap();
 
         //input
-        let tokens = lexer.lex(&chars[..], &*cdfa);
+        let tokens = lexer.lex(input, &*cdfa);
         let tree = parser.parse(tokens.unwrap(), &*grammar);
         let parse = tree.unwrap();
 
@@ -818,8 +817,7 @@ grammar {
 }
         ";
 
-        let input = "i ij ijjjijijiji inj in iii".to_string();
-        let chars: Vec<char> = input.chars().collect();
+        let input = "i ij ijjjijijiji inj in iii";
 
         let lexer = lex::def_lexer();
 
@@ -828,7 +826,7 @@ grammar {
         let (cdfa, _, _) = generate_spec(&parse, SimpleGrammarBuilder::new()).unwrap();
 
         //exercise
-        let tokens = lexer.lex(&chars[..], &*cdfa).unwrap();
+        let tokens = lexer.lex(input, &*cdfa).unwrap();
 
         let mut result = String::new();
         for token in tokens {
@@ -870,8 +868,7 @@ grammar {
 }
         ";
 
-        let input = "c c".to_string();
-        let chars: Vec<char> = input.chars().collect();
+        let input = "c c";
 
         let lexer = lex::def_lexer();
 
@@ -880,7 +877,7 @@ grammar {
         let (cdfa, _, _) = generate_spec(&parse, SimpleGrammarBuilder::new()).unwrap();
 
         //exercise
-        let tokens = lexer.lex(&chars[..], &*cdfa).unwrap();
+        let tokens = lexer.lex(input, &*cdfa).unwrap();
 
         //verify
         assert_eq!(
@@ -916,8 +913,7 @@ grammar {
 }
         ";
 
-        let input = "a ababab _abab ab_abba_".to_string();
-        let chars: Vec<char> = input.chars().collect();
+        let input = "a ababab _abab ab_abba_";
 
         let lexer = lex::def_lexer();
 
@@ -926,7 +922,7 @@ grammar {
         let (cdfa, _, _) = generate_spec(&parse, SimpleGrammarBuilder::new()).unwrap();
 
         //exercise
-        let tokens = lexer.lex(&chars[..], &*cdfa).unwrap();
+        let tokens = lexer.lex(input, &*cdfa).unwrap();
 
         //verify
         assert_eq!(tokens_string(tokens), "\nkind=ID lexeme=a\nkind=ID lexeme=ababab\nkind=ID lexeme=_abab\nkind=ID lexeme=ab_abba_")
@@ -961,13 +957,12 @@ grammar {
         let parse = tree.unwrap();
         let (cdfa, _, _) = generate_spec(&parse, SimpleGrammarBuilder::new()).unwrap();
 
-        let input = "fdkgdfjgdjglkdjglkdjgljbnhbduhoifjeoigjeoghknhkjdfjgoirjt for if endif elseif somethign eldsfnj hi bob joe here final for fob else if id idhere fobre f ".to_string();
-        let chars: Vec<char> = input.chars().collect();
+        let input = "fdkgdfjgdjglkdjglkdjgljbnhbduhoifjeoigjeoghknhkjdfjgoirjt for if endif elseif somethign eldsfnj hi bob joe here final for fob else if id idhere fobre f ";
 
         let lexer = lex::def_lexer();
 
         //exercise
-        let tokens = lexer.lex(&chars[..], &*cdfa).unwrap();
+        let tokens = lexer.lex(input, &*cdfa).unwrap();
 
         //verify
         assert_eq!(
@@ -1021,14 +1016,13 @@ grammar {
         let parse = tree.unwrap();
         let (cdfa, grammar, _) = generate_spec(&parse, SimpleGrammarBuilder::new()).unwrap();
 
-        let input = "ababaaaba".to_string();
-        let chars: Vec<char> = input.chars().collect();
+        let input = "ababaaaba";
 
         let lexer = lex::def_lexer();
         let parser = parse::def_parser();
 
         //exercise
-        let tokens = lexer.lex(&chars[..], &*cdfa).unwrap();
+        let tokens = lexer.lex(input, &*cdfa).unwrap();
         let tree = parser.parse(tokens, &*grammar).unwrap();
 
         //verify
@@ -1088,14 +1082,13 @@ grammar {
         let (cdfa, grammar, formatter) =
             generate_spec(&parse, SimpleGrammarBuilder::new()).unwrap();
 
-        let input = "abaa".to_string();
-        let chars: Vec<char> = input.chars().collect();
+        let input = "abaa";
 
         let lexer = lex::def_lexer();
         let parser = parse::def_parser();
 
         //exercise
-        let tokens = lexer.lex(&chars[..], &*cdfa).unwrap();
+        let tokens = lexer.lex(input, &*cdfa).unwrap();
         let tree = parser.parse(tokens, &*grammar).unwrap();
         let res = formatter.format(&tree);
 
@@ -1126,8 +1119,7 @@ grammar {
 }
         ";
 
-        let input = "abcdefghijklmnopqrstuvwxyz".to_string();
-        let chars: Vec<char> = input.chars().collect();
+        let input = "abcdefghijklmnopqrstuvwxyz";
 
         let lexer = lex::def_lexer();
         let tree = lang::parse_spec(spec);
@@ -1135,7 +1127,7 @@ grammar {
         let (cdfa, _, _) = generate_spec(&parse, SimpleGrammarBuilder::new()).unwrap();
 
         //exercise
-        let tokens = lexer.lex(&chars[..], &*cdfa).unwrap();
+        let tokens = lexer.lex(input, &*cdfa).unwrap();
 
         //verify
         assert_eq!(
@@ -1188,8 +1180,7 @@ grammar {
 }
         ";
 
-        let input = "!!aaa!!a!49913!a".to_string();
-        let chars: Vec<char> = input.chars().collect();
+        let input = "!!aaa!!a!49913!a";
 
         let lexer = lex::def_lexer();
         let tree = lang::parse_spec(spec);
@@ -1197,7 +1188,7 @@ grammar {
         let (cdfa, _, _) = generate_spec(&parse, SimpleGrammarBuilder::new()).unwrap();
 
         //exercise
-        let tokens = lexer.lex(&chars[..], &*cdfa).unwrap();
+        let tokens = lexer.lex(input, &*cdfa).unwrap();
 
         //verify
         assert_eq!(
@@ -1340,8 +1331,7 @@ grammar {
 }
         ";
 
-        let input = "abca".to_string();
-        let chars: Vec<char> = input.chars().collect();
+        let input = "abca";
 
         let lexer = lex::def_lexer();
         let tree = lang::parse_spec(spec);
@@ -1349,7 +1339,7 @@ grammar {
         let (cdfa, _, _) = generate_spec(&parse, SimpleGrammarBuilder::new()).unwrap();
 
         //exercise
-        let tokens = lexer.lex(&chars[..], &*cdfa).unwrap();
+        let tokens = lexer.lex(input, &*cdfa).unwrap();
 
         //verify
         assert_eq!(
@@ -1387,8 +1377,7 @@ grammar {
 }
         ";
 
-        let input = "acb".to_string();
-        let chars: Vec<char> = input.chars().collect();
+        let input = "acb";
 
         let lexer = lex::def_lexer();
         let tree = lang::parse_spec(spec);
@@ -1396,7 +1385,7 @@ grammar {
         let (cdfa, grammar, _) = generate_spec(&parse, SimpleGrammarBuilder::new()).unwrap();
 
         //exercise
-        let tokens = lexer.lex(&chars[..], &*cdfa).unwrap();
+        let tokens = lexer.lex(input, &*cdfa).unwrap();
         let parse = parse::def_parser().parse(tokens, &*grammar).unwrap();
 
         //verify
@@ -1426,8 +1415,7 @@ grammar {
 }
         ";
 
-        let input = "aaa".to_string();
-        let chars: Vec<char> = input.chars().collect();
+        let input = "aaa";
 
         let lexer = lex::def_lexer();
         let tree = lang::parse_spec(spec);
@@ -1435,7 +1423,7 @@ grammar {
         let (cdfa, grammar, _) = generate_spec(&parse, SimpleGrammarBuilder::new()).unwrap();
 
         //exercise
-        let tokens = lexer.lex(&chars[..], &*cdfa).unwrap();
+        let tokens = lexer.lex(input, &*cdfa).unwrap();
         let parse = parse::def_parser().parse(tokens, &*grammar).unwrap();
 
         //verify
