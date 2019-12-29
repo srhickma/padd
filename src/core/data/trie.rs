@@ -25,6 +25,11 @@ impl<Value> Trie<Value> {
     pub fn search(&self, key: &[u8]) -> Option<&Value> {
         self.root.search(key, 0)
     }
+
+    /// TODO
+    pub fn longest_match(&self, key_stream: &[u8]) -> Option<(&Value, usize)> {
+        self.root.longest_match(key_stream, 0, 0, None)
+    }
 }
 
 /// Wrapper around boxed node.
@@ -132,6 +137,47 @@ impl<Value> Node<Value> {
         };
 
         next_node.search(key_suffix, (key_idx + 1) % 8)
+    }
+
+    /// TODO
+    fn longest_match<'value, 'scope: 'value>(
+        &'scope self,
+        key: &[u8],
+        key_idx: u8,
+        mut length: usize,
+        mut last_match: Option<(&'value Value, usize)>,
+    ) -> Option<(&'value Value, usize)> {
+        if let Some(value) = self.value.as_ref() {
+            last_match = Some((value, length));
+        }
+
+        if key.is_empty() {
+            return last_match;
+        }
+
+        let shift_offset = 7 - key_idx;
+        let mask = 1 << shift_offset;
+        let bit = (key[0] & mask) >> shift_offset;
+
+        let mut key_suffix = key;
+        if key_idx == 7 {
+            key_suffix = &key[1..];
+            length += 1;
+        }
+
+        let next_node = if bit == 1 {
+            match &self.left {
+                Some(left) => left,
+                None => return last_match,
+            }
+        } else {
+            match &self.right {
+                Some(right) => right,
+                None => return last_match,
+            }
+        };
+
+        next_node.longest_match(key_suffix, (key_idx + 1) % 8, length, last_match)
     }
 }
 

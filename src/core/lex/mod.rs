@@ -244,12 +244,8 @@ pub enum TransitionResult<State: Data> {
     Ok(TransitionDestination<State>),
 }
 
+// TODO update comments
 impl<State: Data> TransitionResult<State> {
-    /// Returns a new successful transition result through `transit` traversing one input character.
-    pub fn direct(transit: &Transit<State>) -> Self {
-        Self::ok(transit, 1)
-    }
-
     /// Returns a new successful transition result through `transit` traversing `traversed` input
     /// characters.
     pub fn ok(transit: &Transit<State>, traversed: usize) -> Self {
@@ -266,6 +262,7 @@ impl<State: Data> TransitionResult<State> {
     }
 }
 
+// TODO update comments
 /// Transition Destination: Represents the destination of a successful state transition.
 ///
 /// # Type Parameters
