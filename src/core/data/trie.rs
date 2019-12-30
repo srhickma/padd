@@ -32,6 +32,12 @@ impl<Value> Trie<Value> {
     }
 }
 
+/// TODO
+const MUX_WIDTH: u8 = 4;
+
+/// TODO
+const TREE_WIDTH: usize = 16;
+
 /// Wrapper around boxed node.
 type HeapNode<Value> = Box<Node<Value>>;
 
@@ -50,8 +56,7 @@ fn new_node<Value>() -> HeapNode<Value> {
 ///
 /// TODO
 struct Node<Value> {
-    left: Option<HeapNode<Value>>,
-    right: Option<HeapNode<Value>>,
+    children: [Option<HeapNode<Value>>; TREE_WIDTH],
     value: Option<Value>,
 }
 
@@ -60,8 +65,7 @@ impl<Value> Node<Value> {
     /// Returns a new leaf node with value `value`.
     fn new(value: Option<Value>) -> Self {
         Self {
-            left: None,
-            right: None,
+            children: Default::default(),
             value,
         }
     }
@@ -77,30 +81,23 @@ impl<Value> Node<Value> {
             return Ok(());
         }
 
-        let shift_offset = 7 - key_idx;
-        let mask = 1 << shift_offset;
-        let bit = (key[0] & mask) >> shift_offset;
+        let shift_offset = 8 - MUX_WIDTH - key_idx;
+        let mask = (TREE_WIDTH as u8 - 1) << shift_offset;
+        let mux = ((key[0] & mask) >> shift_offset) as usize;
 
         let mut key_suffix = key;
-        if key_idx == 7 {
+        if key_idx == 8 - MUX_WIDTH {
             key_suffix = &key[1..];
         }
 
-        let next_node = if bit == 1 {
-            if self.left.is_none() {
-                self.left = Some(new_node());
-            }
+        if self.children[mux].is_none() {
+            self.children[mux] = Some(new_node());
+        }
 
-            self.left.as_mut().unwrap()
-        } else {
-            if self.right.is_none() {
-                self.right = Some(new_node());
-            }
-
-            self.right.as_mut().unwrap()
-        };
-
-        next_node.insert(key_suffix, (key_idx + 1) % 8, value)
+        self.children[mux]
+            .as_mut()
+            .unwrap()
+            .insert(key_suffix, (key_idx + MUX_WIDTH) % 8, value)
     }
 
     /// TODO
@@ -115,28 +112,21 @@ impl<Value> Node<Value> {
             return self.value.as_ref();
         }
 
-        let shift_offset = 7 - key_idx;
-        let mask = 1 << shift_offset;
-        let bit = (key[0] & mask) >> shift_offset;
+        let shift_offset = 8 - MUX_WIDTH - key_idx;
+        let mask = (TREE_WIDTH as u8 - 1) << shift_offset;
+        let mux = ((key[0] & mask) >> shift_offset) as usize;
 
         let mut key_suffix = key;
-        if key_idx == 7 {
+        if key_idx == 8 - MUX_WIDTH {
             key_suffix = &key[1..];
         }
 
-        let next_node = if bit == 1 {
-            match &self.left {
-                Some(left) => left,
-                None => return None,
-            }
-        } else {
-            match &self.right {
-                Some(right) => right,
-                None => return None,
-            }
+        let next_node = match &self.children[mux] {
+            Some(node) => node,
+            None => return None,
         };
 
-        next_node.search(key_suffix, (key_idx + 1) % 8)
+        next_node.search(key_suffix, (key_idx + MUX_WIDTH) % 8)
     }
 
     /// TODO
@@ -155,29 +145,26 @@ impl<Value> Node<Value> {
             return last_match;
         }
 
-        let shift_offset = 7 - key_idx;
-        let mask = 1 << shift_offset;
-        let bit = (key[0] & mask) >> shift_offset;
+        let shift_offset = 8 - MUX_WIDTH - key_idx;
+        let mask = (TREE_WIDTH as u8 - 1) << shift_offset;
+        let mux = ((key[0] & mask) >> shift_offset) as usize;
 
         let mut key_suffix = key;
-        if key_idx == 7 {
+        if key_idx == 8 - MUX_WIDTH {
             key_suffix = &key[1..];
             length += 1;
         }
 
-        let next_node = if bit == 1 {
-            match &self.left {
-                Some(left) => left,
-                None => return last_match,
-            }
-        } else {
-            match &self.right {
-                Some(right) => right,
-                None => return last_match,
-            }
+        if self.children[mux].is_none() {
+            return last_match;
+        }
+
+        let next_node = match &self.children[mux] {
+            Some(node) => node,
+            None => return last_match,
         };
 
-        next_node.longest_match(key_suffix, (key_idx + 1) % 8, length, last_match)
+        next_node.longest_match(key_suffix, (key_idx + MUX_WIDTH) % 8, length, last_match)
     }
 }
 
