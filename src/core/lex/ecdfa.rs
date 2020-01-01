@@ -3,7 +3,7 @@ use {
         data::{
             interval::{Bound, Interval, IntervalMap},
             map::{CEHashMap, CEHashMapIterator},
-            trie::Trie,
+            trie::{self, Trie},
             Data,
         },
         lex::{
@@ -398,13 +398,12 @@ impl TransitionTrie {
     }
 
     fn insert_chain(&mut self, chain: &str, transit: Transit<usize>) -> Result<(), CDFAError> {
-        if let Err(err) = self.trie.insert(chain.as_bytes(), transit) {
-            return Err(CDFAError::BuildErr(
+        match self.trie.insert(chain.as_bytes(), transit) {
+            Err(trie::Error::DuplicateErr) => Err(CDFAError::BuildErr(
                 "Transition trie contains duplicate matchers".to_string(),
-            ));
+            )),
+            Ok(_) => Ok(()),
         }
-
-        Ok(())
     }
 
     fn insert_range(

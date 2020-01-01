@@ -99,7 +99,7 @@ impl<Value> Node<Value> {
 
         let (mux, key_suffix, _) = Self::mux_key(key, key_idx);
 
-        self.children[mux].get_or_insert_with(|| new_node()).insert(
+        self.children[mux].get_or_insert_with(new_node).insert(
             key_suffix,
             (key_idx + MUX_WIDTH) % 8,
             value,
