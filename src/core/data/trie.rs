@@ -1,36 +1,40 @@
 use std::{error, fmt};
 
-/// TODO
+/// Trie: A simple trie data structure, supporting generic value types and byte-slice keys.
 pub struct Trie<Value> {
     root: HeapNode<Value>,
 }
 
 impl<Value> Trie<Value> {
-    /// TODO
+    /// Returns a new empty trie.
     pub fn new() -> Self {
         Self { root: new_node() }
     }
 
-    /// TODO
+    /// Inserts `value` at position `key` in the trie, or returns an error if there is already a
+    /// value associated with that key.
     pub fn insert(&mut self, key: &[u8], value: Value) -> Result<(), Error> {
-        self.root.insert(key, 0, value)
+        self.root.insert(KeySeq::from(key), value)
     }
 
-    /// TODO
+    /// Removes the value associated with `key` in the trie, if such a value exists.
     #[allow(dead_code)]
     pub fn remove(&mut self, key: &[u8]) {
-        self.root.remove(key, 0);
+        self.root.remove(KeySeq::from(key));
     }
 
-    /// TODO
+    /// Returns a reference to the value associated with `key` in the trie, or `None` if there is
+    /// no such value.
     #[allow(dead_code)]
     pub fn search(&self, key: &[u8]) -> Option<&Value> {
-        self.root.search(key, 0)
+        self.root.search(KeySeq::from(key))
     }
 
-    /// TODO
-    pub fn longest_match(&self, key_stream: &[u8]) -> Option<(&Value, usize)> {
-        self.root.longest_match(key_stream, 0, 0, None)
+    /// Returns the value associated with the longest prefix of `key` for which a value exists, as
+    /// well as the length of the key associated with the value. `None` is returned if no prefix of
+    /// `key` corresponds to a value in the trie.
+    pub fn longest_match(&self, key: &[u8]) -> Option<(&Value, usize)> {
+        self.root.longest_match(KeySeq::from(key), None)
     }
 }
 
@@ -74,20 +78,7 @@ impl<Value> Node<Value> {
     }
 
     /// TODO
-    fn mux_key(key: &[u8], key_idx: u8) -> (usize, &[u8], bool) {
-        let shift_offset = 8 - MUX_WIDTH - key_idx;
-        let mask = (TREE_WIDTH as u8 - 1) << shift_offset;
-        let mux = ((key[0] & mask) >> shift_offset) as usize;
-
-        if key_idx == 8 - MUX_WIDTH {
-            (mux, &key[1..], true)
-        } else {
-            (mux, key, false)
-        }
-    }
-
-    /// TODO
-    fn insert(&mut self, key: &[u8], key_idx: u8, value: Value) -> Result<(), Error> {
+    fn insert(&mut self, key: KeySeq, value: Value) -> Result<(), Error> {
         if key.is_empty() {
             if self.value.is_some() {
                 return Err(Error::DuplicateErr);
@@ -97,38 +88,30 @@ impl<Value> Node<Value> {
             return Ok(());
         }
 
-        let (mux, key_suffix, _) = Self::mux_key(key, key_idx);
-
-        self.children[mux].get_or_insert_with(new_node).insert(
-            key_suffix,
-            (key_idx + MUX_WIDTH) % 8,
-            value,
-        )
+        self.children[key.mux()]
+            .get_or_insert_with(new_node)
+            .insert(key.next(), value)
     }
 
     /// TODO
-    fn remove(&mut self, key: &[u8], key_idx: u8) {
+    fn remove(&mut self, key: KeySeq) {
         if key.is_empty() {
             self.value = None;
         }
 
-        let (mux, key_suffix, _) = Self::mux_key(key, key_idx);
-
-        if let Some(node) = &mut self.children[mux] {
-            node.remove(key_suffix, (key_idx + MUX_WIDTH) % 8);
+        if let Some(node) = &mut self.children[key.mux()] {
+            node.remove(key.next());
         }
     }
 
     /// TODO
-    fn search(&self, key: &[u8], key_idx: u8) -> Option<&Value> {
+    fn search(&self, key: KeySeq) -> Option<&Value> {
         if key.is_empty() {
             return self.value.as_ref();
         }
 
-        let (mux, key_suffix, _) = Self::mux_key(key, key_idx);
-
-        match &self.children[mux] {
-            Some(node) => node.search(key_suffix, (key_idx + MUX_WIDTH) % 8),
+        match &self.children[key.mux()] {
+            Some(node) => node.search(key.next()),
             None => None,
         }
     }
@@ -136,30 +119,68 @@ impl<Value> Node<Value> {
     /// TODO
     fn longest_match<'value, 'scope: 'value>(
         &'scope self,
-        key: &[u8],
-        key_idx: u8,
-        mut length: usize,
+        key: KeySeq,
         mut last_match: Option<(&'value Value, usize)>,
     ) -> Option<(&'value Value, usize)> {
         if let Some(value) = self.value.as_ref() {
-            last_match = Some((value, length));
+            last_match = Some((value, key.consumed()));
         }
 
         if key.is_empty() {
             return last_match;
         }
 
-        let (mux, key_suffix, advanced) = Self::mux_key(key, key_idx);
-        if advanced {
-            length += 1;
-        }
-
-        match &self.children[mux] {
-            Some(node) => {
-                node.longest_match(key_suffix, (key_idx + MUX_WIDTH) % 8, length, last_match)
-            }
+        match &self.children[key.mux()] {
+            Some(node) => node.longest_match(key.next(), last_match),
             None => last_match,
         }
+    }
+}
+
+/// TODO
+struct KeySeq<'key> {
+    key: &'key [u8],
+    idx: u8,
+    consumed: usize,
+}
+
+impl<'key> From<&'key [u8]> for KeySeq<'key> {
+    fn from(key: &'key [u8]) -> KeySeq<'key> {
+        Self {
+            key,
+            idx: 0,
+            consumed: 0,
+        }
+    }
+}
+
+impl<'key> KeySeq<'key> {
+    /// TODO
+    fn mux(&self) -> usize {
+        let shift_offset = 8 - MUX_WIDTH - self.idx;
+        let mask = (TREE_WIDTH as u8 - 1) << shift_offset;
+        ((self.key[0] & mask) >> shift_offset) as usize
+    }
+
+    /// TODO
+    fn next(mut self) -> Self {
+        if self.idx == 8 - MUX_WIDTH {
+            self.key = &self.key[1..];
+            self.consumed += 1;
+        }
+        self.idx = (self.idx + MUX_WIDTH) % 8;
+
+        self
+    }
+
+    /// Returns the number of bytes of the key consumed so far.
+    fn consumed(&self) -> usize {
+        self.consumed
+    }
+
+    /// Returns true if the key has been entirely consumed, false otherwise.
+    fn is_empty(&self) -> bool {
+        self.key.is_empty()
     }
 }
 
