@@ -198,7 +198,7 @@ impl<'key> KeySeq<'key> {
 /// # Types
 ///
 /// * `DuplicateErr` - indicates that a trie already stores a value for a particular key.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Error {
     DuplicateErr,
 }
@@ -318,7 +318,31 @@ mod tests {
 
     #[test]
     fn insert_duplicate() {
-        // TODO
+        let mut trie: Trie<u32> = Trie::new();
+
+        trie.insert("k1".as_bytes(), 1).unwrap();
+        trie.insert("k2".as_bytes(), 2).unwrap();
+        trie.insert("k3".as_bytes(), 3).unwrap();
+        trie.insert("k4".as_bytes(), 4).unwrap();
+        trie.insert("k5".as_bytes(), 5).unwrap();
+        trie.insert("k6".as_bytes(), 6).unwrap();
+
+        assert_eq!(trie.insert("k1".as_bytes(), 11), Err(Error::DuplicateErr));
+        assert_eq!(trie.insert("k2".as_bytes(), 12), Err(Error::DuplicateErr));
+        assert_eq!(trie.insert("k3".as_bytes(), 13), Err(Error::DuplicateErr));
+        assert_eq!(trie.insert("k4".as_bytes(), 14), Err(Error::DuplicateErr));
+        assert_eq!(trie.insert("k5".as_bytes(), 15), Err(Error::DuplicateErr));
+        assert_eq!(trie.insert("k6".as_bytes(), 16), Err(Error::DuplicateErr));
+
+        assert_eq!(trie.insert("k0".as_bytes(), 0), Ok(()));
+
+        assert_eq!(trie.search("k0".as_bytes()), Some(&0));
+        assert_eq!(trie.search("k1".as_bytes()), Some(&1));
+        assert_eq!(trie.search("k2".as_bytes()), Some(&2));
+        assert_eq!(trie.search("k3".as_bytes()), Some(&3));
+        assert_eq!(trie.search("k4".as_bytes()), Some(&4));
+        assert_eq!(trie.search("k5".as_bytes()), Some(&5));
+        assert_eq!(trie.search("k6".as_bytes()), Some(&6));
     }
 
     #[test]
@@ -333,6 +357,31 @@ mod tests {
 
     #[test]
     fn non_prefix_free() {
+        let mut trie: Trie<u32> = Trie::new();
+
+        trie.insert("abc".as_bytes(), 1).unwrap();
+        trie.insert("abcd".as_bytes(), 2).unwrap();
+        trie.insert("abcdefgh".as_bytes(), 3).unwrap();
+        trie.insert("a".as_bytes(), 4).unwrap();
+        trie.insert("ab".as_bytes(), 5).unwrap();
+        trie.insert("".as_bytes(), 6).unwrap();
+
+        assert_eq!(trie.search("abc".as_bytes()), Some(&1));
+        assert_eq!(trie.search("abcd".as_bytes()), Some(&2));
+        assert_eq!(trie.search("abcdefgh".as_bytes()), Some(&3));
+        assert_eq!(trie.search("a".as_bytes()), Some(&4));
+        assert_eq!(trie.search("ab".as_bytes()), Some(&5));
+        assert_eq!(trie.search("".as_bytes()), Some(&6));
+
+        assert_eq!(trie.search("b".as_bytes()), None);
+        assert_eq!(trie.search("c".as_bytes()), None);
+        assert_eq!(trie.search("abcde".as_bytes()), None);
+        assert_eq!(trie.search("xyz".as_bytes()), None);
+        assert_eq!(trie.search("bc".as_bytes()), None);
+    }
+
+    #[test]
+    fn longest_match() {
         // TODO
     }
 }
