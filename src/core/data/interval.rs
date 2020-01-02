@@ -367,7 +367,7 @@ impl<Key: Bound, Value> Node<Key, Value> {
 ///
 /// # Types
 ///
-/// * `OverlapErr` - Indicates that a key interval being inserted overlaps an existing interval.
+/// * `OverlapErr` - indicates that a key interval being inserted overlaps an existing interval.
 #[derive(Debug)]
 pub enum Error {
     OverlapErr,

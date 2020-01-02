@@ -77,7 +77,7 @@ impl<Value> Node<Value> {
         }
     }
 
-    /// TODO
+    /// Inserts `value` in the sub-trie rooted at this node at `key`.
     fn insert(&mut self, key: KeySeq, value: Value) -> Result<(), Error> {
         if key.is_empty() {
             if self.value.is_some() {
@@ -93,7 +93,7 @@ impl<Value> Node<Value> {
             .insert(key.next(), value)
     }
 
-    /// TODO
+    /// Removes the value associated with `key` in the sub-trie rooted at this node, if one exists.
     fn remove(&mut self, key: KeySeq) {
         if key.is_empty() {
             self.value = None;
@@ -104,7 +104,8 @@ impl<Value> Node<Value> {
         }
     }
 
-    /// TODO
+    /// Returns a reference to the value associated with `key` in the sub-trie rooted at this node,
+    /// or `None` if there is no such value.
     fn search(&self, key: KeySeq) -> Option<&Value> {
         if key.is_empty() {
             return self.value.as_ref();
@@ -116,7 +117,9 @@ impl<Value> Node<Value> {
         }
     }
 
-    /// TODO
+    /// Returns the value associated with the longest prefix of `key` in the sub-trie rooted at this
+    /// node for which a value exists, as well as the length of the key associated with the value.
+    /// `None` is returned if no prefix of `key` corresponds to a value in the sub-trie.
     fn longest_match<'value, 'scope: 'value>(
         &'scope self,
         key: KeySeq,
@@ -137,7 +140,13 @@ impl<Value> Node<Value> {
     }
 }
 
-/// TODO
+/// Key Sequence: Represents a suffix of a trie key.
+///
+/// # Fields
+///
+/// * `key` - a slice of the remaining key bytes.
+/// * `idx` - the index of the first bit of the key suffix in the first byte of the key slice.
+/// * `consumed` - the number of bytes of the original key which have been consumed.
 struct KeySeq<'key> {
     key: &'key [u8],
     idx: u8,
@@ -155,14 +164,14 @@ impl<'key> From<&'key [u8]> for KeySeq<'key> {
 }
 
 impl<'key> KeySeq<'key> {
-    /// TODO
+    /// Returns the next multiplexed child node index corresponding with the key sequence.
     fn mux(&self) -> usize {
         let shift_offset = 8 - MUX_WIDTH - self.idx;
         let mask = (TREE_WIDTH as u8 - 1) << shift_offset;
         ((self.key[0] & mask) >> shift_offset) as usize
     }
 
-    /// TODO
+    /// Consumes the head multiplexing bits of the sequence, and returns the tail key sequence.
     fn next(mut self) -> Self {
         if self.idx == 8 - MUX_WIDTH {
             self.key = &self.key[1..];
@@ -184,7 +193,11 @@ impl<'key> KeySeq<'key> {
     }
 }
 
-/// TODO
+/// Error: Represents an error encountered when using a trie.
+///
+/// # Types
+///
+/// * `DuplicateErr` - indicates that a trie already stores a value for a particular key.
 #[derive(Debug)]
 pub enum Error {
     DuplicateErr,
