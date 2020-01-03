@@ -50,7 +50,7 @@ type HeapNode<Value> = Box<Node<Value>>;
 
 /// Helper function to create `HeapNode` objects (can't implement `new` for type alias).
 fn new_node<Value>() -> HeapNode<Value> {
-    Box::new(Node::new(None))
+    Box::new(Node::new())
 }
 
 /// Node: Represents a tree-node in a trie.
@@ -69,11 +69,11 @@ struct Node<Value> {
 }
 
 impl<Value> Node<Value> {
-    /// Returns a new leaf node with value `value`.
-    fn new(value: Option<Value>) -> Self {
+    /// Returns a new leaf node with no value.
+    fn new() -> Self {
         Self {
             children: Default::default(),
-            value,
+            value: None,
         }
     }
 
@@ -109,10 +109,10 @@ impl<Value> Node<Value> {
             return self.value.as_ref();
         }
 
-        match &self.children[key.mux()] {
-            Some(node) => node.search(key.next()),
-            None => None,
-        }
+        self.children[key.mux()]
+            .as_ref()
+            .map(|node| node.search(key.next()))
+            .flatten()
     }
 
     /// Returns the value associated with the longest prefix of `key` in the sub-trie rooted at this
@@ -131,10 +131,11 @@ impl<Value> Node<Value> {
             return last_match;
         }
 
-        match &self.children[key.mux()] {
-            Some(node) => node.longest_match(key.next(), last_match),
-            None => last_match,
-        }
+        self.children[key.mux()]
+            .as_ref()
+            .map_or(last_match, |node| {
+                node.longest_match(key.next(), last_match)
+            })
     }
 }
 
