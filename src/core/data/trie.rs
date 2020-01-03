@@ -97,9 +97,7 @@ impl<Value> Node<Value> {
     fn remove(&mut self, key: KeySeq) {
         if key.is_empty() {
             self.value = None;
-        }
-
-        if let Some(node) = &mut self.children[key.mux()] {
+        } else if let Some(node) = &mut self.children[key.mux()] {
             node.remove(key.next());
         }
     }
@@ -382,6 +380,33 @@ mod tests {
 
     #[test]
     fn longest_match() {
-        // TODO
+        let mut trie: Trie<u32> = Trie::new();
+
+        trie.insert("abc".as_bytes(), 1).unwrap();
+        trie.insert("abcd".as_bytes(), 2).unwrap();
+        trie.insert("abcdefgh".as_bytes(), 3).unwrap();
+        trie.insert("a".as_bytes(), 4).unwrap();
+        trie.insert("ab".as_bytes(), 5).unwrap();
+        trie.insert("".as_bytes(), 6).unwrap();
+
+        // Longest match behaves the same as search if entire key is matched.
+        assert_eq!(trie.longest_match("abc".as_bytes()), Some((&1, 3)));
+        assert_eq!(trie.longest_match("abcd".as_bytes()), Some((&2, 4)));
+        assert_eq!(trie.longest_match("abcdefgh".as_bytes()), Some((&3, 8)));
+        assert_eq!(trie.longest_match("a".as_bytes()), Some((&4, 1)));
+        assert_eq!(trie.longest_match("ab".as_bytes()), Some((&5, 2)));
+        assert_eq!(trie.longest_match("".as_bytes()), Some((&6, 0)));
+
+        // Longest match behaves differently if only prefix of key is matched.
+        assert_eq!(trie.longest_match("abcdef".as_bytes()), Some((&2, 4)));
+        assert_eq!(trie.longest_match("abcde".as_bytes()), Some((&2, 4)));
+        assert_eq!(trie.longest_match("abcdefghijk".as_bytes()), Some((&3, 8)));
+        assert_eq!(trie.longest_match("az".as_bytes()), Some((&4, 1)));
+        assert_eq!(trie.longest_match("abz".as_bytes()), Some((&5, 2)));
+        assert_eq!(trie.longest_match("z".as_bytes()), Some((&6, 0)));
+
+        // Longest match behaves the same as search if no key prefix can be matched.
+        trie.remove("".as_bytes());
+        assert_eq!(trie.longest_match("z".as_bytes()), None);
     }
 }
