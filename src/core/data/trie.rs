@@ -345,12 +345,52 @@ mod tests {
 
     #[test]
     fn removal() {
-        // TODO
-    }
+        let mut trie: Trie<u32> = Trie::new();
 
-    #[test]
-    fn heavy_usage() {
-        // TODO
+        trie.insert("k1".as_bytes(), 1).unwrap();
+        trie.insert("k2".as_bytes(), 2).unwrap();
+        trie.insert("k3".as_bytes(), 3).unwrap();
+        trie.insert("k4".as_bytes(), 4).unwrap();
+        trie.insert("k5".as_bytes(), 5).unwrap();
+        trie.insert("k6".as_bytes(), 6).unwrap();
+
+        // Can remove some existing values.
+        trie.remove("k1".as_bytes());
+        trie.remove("k4".as_bytes());
+        trie.remove("k5".as_bytes());
+
+        assert_eq!(trie.search("k1".as_bytes()), None);
+        assert_eq!(trie.search("k2".as_bytes()), Some(&2));
+        assert_eq!(trie.search("k3".as_bytes()), Some(&3));
+        assert_eq!(trie.search("k4".as_bytes()), None);
+        assert_eq!(trie.search("k5".as_bytes()), None);
+        assert_eq!(trie.search("k6".as_bytes()), Some(&6));
+
+        // Removal of non-existent values is a no-op.
+        trie.remove("".as_bytes());
+        trie.remove("k0".as_bytes());
+        trie.remove("ab".as_bytes());
+        trie.remove("k21".as_bytes());
+        trie.remove("k1".as_bytes());
+        trie.remove("k5".as_bytes());
+
+        assert_eq!(trie.search("k1".as_bytes()), None);
+        assert_eq!(trie.search("k2".as_bytes()), Some(&2));
+        assert_eq!(trie.search("k3".as_bytes()), Some(&3));
+        assert_eq!(trie.search("k4".as_bytes()), None);
+        assert_eq!(trie.search("k5".as_bytes()), None);
+        assert_eq!(trie.search("k6".as_bytes()), Some(&6));
+
+        // Can re-insert to keys which were removed.
+        trie.insert("k1".as_bytes(), 11).unwrap();
+        trie.insert("k4".as_bytes(), 14).unwrap();
+
+        assert_eq!(trie.search("k1".as_bytes()), Some(&11));
+        assert_eq!(trie.search("k2".as_bytes()), Some(&2));
+        assert_eq!(trie.search("k3".as_bytes()), Some(&3));
+        assert_eq!(trie.search("k4".as_bytes()), Some(&14));
+        assert_eq!(trie.search("k5".as_bytes()), None);
+        assert_eq!(trie.search("k6".as_bytes()), Some(&6));
     }
 
     #[test]
