@@ -1,0 +1,397 @@
+cdfa {
+# TODO(shane) determine prefix ahead of time?
+
+    ubl_0 ^_ -> breaker_start
+        '\n' -> ^LINE
+        _ -> ubl_1;
+    ubl_1
+        '\n' -> ^LINE
+        _ -> ubl_2;
+    ubl_2
+        '\n' -> ^LINE
+        _ -> ubl_3;
+    ubl_3
+        '\n' -> ^LINE
+        _ -> ubl_4;
+    ubl_4
+        '\n' -> ^LINE
+        _ -> ubl_5;
+    ubl_5
+        '\n' -> ^LINE
+        _ -> ubl_6;
+    ubl_6
+        '\n' -> ^LINE
+        _ -> ubl_7;
+    ubl_7
+        '\n' -> ^LINE
+        _ -> ubl_8;
+    ubl_8
+        '\n' -> ^LINE
+        _ -> ubl_9;
+    ubl_9
+        '\n' -> ^LINE
+        _ -> ubl_10;
+    ubl_10
+        '\n' -> ^LINE
+        _ -> ubl_11;
+    ubl_11
+        '\n' -> ^LINE
+        _ -> ubl_12;
+    ubl_12
+        '\n' -> ^LINE
+        _ -> ubl_13;
+    ubl_13
+        '\n' -> ^LINE
+        _ -> ubl_14;
+    ubl_14
+        '\n' -> ^LINE
+        _ -> ubl_15;
+    ubl_15
+        '\n' -> ^LINE
+        _ -> ubl_16;
+    ubl_16
+        '\n' -> ^LINE
+        _ -> ubl_17;
+    ubl_17
+        '\n' -> ^LINE
+        _ -> ubl_18;
+    ubl_18
+        '\n' -> ^LINE
+        _ -> ubl_19;
+    ubl_19
+        '\n' -> ^LINE
+        _ -> ubl_20;
+    ubl_20
+        '\n' -> ^LINE
+        _ -> ubl_21;
+    ubl_21
+        '\n' -> ^LINE
+        _ -> ubl_22;
+    ubl_22
+        '\n' -> ^LINE
+        _ -> ubl_23;
+    ubl_23
+        '\n' -> ^LINE
+        _ -> ubl_24;
+    ubl_24
+        '\n' -> ^LINE
+        _ -> ubl_25;
+    ubl_25
+        '\n' -> ^LINE
+        _ -> ubl_26;
+    ubl_26
+        '\n' -> ^LINE
+        _ -> ubl_27;
+    ubl_27
+        '\n' -> ^LINE
+        _ -> ubl_28;
+    ubl_28
+        '\n' -> ^LINE
+        _ -> ubl_29;
+    ubl_29
+        '\n' -> ^LINE
+        _ -> ubl_30;
+    ubl_30
+        '\n' -> ^LINE
+        _ -> ubl_31;
+    ubl_31
+        '\n' -> ^LINE
+        _ -> ubl_32;
+    ubl_32
+        '\n' -> ^LINE
+        _ -> ubl_33;
+    ubl_33
+        '\n' -> ^LINE
+        _ -> ubl_34;
+    ubl_34
+        '\n' -> ^LINE
+        _ -> ubl_35;
+    ubl_35
+        '\n' -> ^LINE
+        _ -> ubl_36;
+    ubl_36
+        '\n' -> ^LINE
+        _ -> ubl_37;
+    ubl_37
+        '\n' -> ^LINE
+        _ -> ubl_38;
+    ubl_38
+        '\n' -> ^LINE
+        _ -> ubl_39;
+    ubl_39
+        '\n' -> ^LINE
+        _ -> ubl_40;
+    ubl_40
+        '\n' -> ^LINE
+        _ -> ubl_41;
+    ubl_41
+        '\n' -> ^LINE
+        _ -> ubl_42;
+    ubl_42
+        '\n' -> ^LINE
+        _ -> ubl_43;
+    ubl_43
+        '\n' -> ^LINE
+        _ -> ubl_44;
+    ubl_44
+        '\n' -> ^LINE
+        _ -> ubl_45;
+    ubl_45
+        '\n' -> ^LINE
+        _ -> ubl_46;
+    ubl_46
+        '\n' -> ^LINE
+        _ -> ubl_47;
+    ubl_47
+        '\n' -> ^LINE
+        _ -> ubl_48;
+    ubl_48
+        '\n' -> ^LINE
+        _ -> ubl_49;
+    ubl_49
+        '\n' -> ^LINE
+        _ -> ubl_50;
+    ubl_50
+        '\n' -> ^LINE
+        _ -> ubl_51;
+    ubl_51
+        '\n' -> ^LINE
+        _ -> ubl_52;
+    ubl_52
+        '\n' -> ^LINE
+        _ -> ubl_53;
+    ubl_53
+        '\n' -> ^LINE
+        _ -> ubl_54;
+    ubl_54
+        '\n' -> ^LINE
+        _ -> ubl_55;
+    ubl_55
+        '\n' -> ^LINE
+        _ -> ubl_56;
+    ubl_56
+        '\n' -> ^LINE
+        _ -> ubl_57;
+    ubl_57
+        '\n' -> ^LINE
+        _ -> ubl_58;
+    ubl_58
+        '\n' -> ^LINE
+        _ -> ubl_59;
+    ubl_59
+        '\n' -> ^LINE
+        _ -> ubl_60;
+    ubl_60
+        '\n' -> ^LINE
+        _ -> ubl_61;
+    ubl_61
+        '\n' -> ^LINE
+        _ -> ubl_62;
+    ubl_62
+        '\n' -> ^LINE
+        _ -> ubl_63;
+    ubl_63
+        '\n' -> ^LINE
+        _ -> ubl_64;
+    ubl_64
+        '\n' -> ^LINE
+        _ -> ubl_65;
+    ubl_65
+        '\n' -> ^LINE
+        _ -> ubl_66;
+    ubl_66
+        '\n' -> ^LINE
+        _ -> ubl_67;
+    ubl_67
+        '\n' -> ^LINE
+        _ -> ubl_68;
+    ubl_68
+        '\n' -> ^LINE
+        _ -> ubl_69;
+    ubl_69
+        '\n' -> ^LINE
+        _ -> ubl_70;
+    ubl_70
+        '\n' -> ^LINE
+        _ -> ubl_71;
+    ubl_71
+        '\n' -> ^LINE
+        _ -> ubl_72;
+    ubl_72
+        '\n' -> ^LINE
+        _ -> ubl_73;
+    ubl_73
+        '\n' -> ^LINE
+        _ -> ubl_74;
+    ubl_74
+        '\n' -> ^LINE
+        _ -> ubl_75;
+    ubl_75
+        '\n' -> ^LINE
+        _ -> ubl_76;
+    ubl_76
+        '\n' -> ^LINE
+        _ -> ubl_77;
+    ubl_77
+        '\n' -> ^LINE
+        _ -> ubl_78;
+    ubl_78
+        '\n' -> ^LINE
+        _ -> ubl_79;
+    ubl_79
+        '\n' -> ^LINE
+        _ -> ubl_80;
+    ubl_80
+        '\n' -> ^LINE
+        _ -> ubl_81;
+    ubl_81
+        '\n' -> ^LINE
+        _ -> ubl_82;
+    ubl_82
+        '\n' -> ^LINE
+        _ -> ubl_83;
+    ubl_83
+        '\n' -> ^LINE
+        _ -> ubl_84;
+    ubl_84
+        '\n' -> ^LINE
+        _ -> ubl_85;
+    ubl_85
+        '\n' -> ^LINE
+        _ -> ubl_86;
+    ubl_86
+        '\n' -> ^LINE
+        _ -> ubl_87;
+    ubl_87
+        '\n' -> ^LINE
+        _ -> ubl_88;
+    ubl_88
+        '\n' -> ^LINE
+        _ -> ubl_89;
+    ubl_89
+        '\n' -> ^LINE
+        _ -> ubl_90;
+    ubl_90
+        '\n' -> ^LINE
+        _ -> ubl_91;
+    ubl_91
+        '\n' -> ^LINE
+        _ -> ubl_92;
+    ubl_92
+        '\n' -> ^LINE
+        _ -> ubl_93;
+    ubl_93
+        '\n' -> ^LINE
+        _ -> ubl_94;
+    ubl_94
+        '\n' -> ^LINE
+        _ -> ubl_95;
+    ubl_95
+        '\n' -> ^LINE
+        _ -> ubl_96;
+    ubl_96
+        '\n' -> ^LINE
+        _ -> ubl_97;
+    ubl_97
+        '\n' -> ^LINE
+        _ -> ubl_98;
+    ubl_98
+        '\n' -> ^LINE
+        _ -> ubl_99;
+    ubl_99
+        '\n' -> ^LINE
+        _ -> ubl_100;
+    ubl_100
+        '\n' -> ^LINE
+        _ -> ubl_101;
+    ubl_101
+        '\n' -> ^LINE
+        _ -> ubl_102;
+    ubl_102
+        '\n' -> ^LINE
+        _ -> ubl_103;
+    ubl_103
+        '\n' -> ^LINE
+        _ -> ubl_104;
+    ubl_104
+        '\n' -> ^LINE
+        _ -> ubl_105;
+    ubl_105
+        '\n' -> ^LINE
+        _ -> ubl_106;
+    ubl_106
+        '\n' -> ^LINE
+        _ -> ubl_107;
+    ubl_107
+        '\n' -> ^LINE
+        _ -> ubl_108;
+    ubl_108
+        '\n' -> ^LINE
+        _ -> ubl_109;
+    ubl_109
+        '\n' -> ^LINE
+        _ -> ubl_110;
+    ubl_110
+        '\n' -> ^LINE
+        _ -> ubl_111;
+    ubl_111
+        '\n' -> ^LINE
+        _ -> ubl_112;
+    ubl_112
+        '\n' -> ^LINE
+        _ -> ubl_113;
+    ubl_113
+        '\n' -> ^LINE
+        _ -> ubl_114;
+    ubl_114
+        '\n' -> ^LINE
+        _ -> ubl_115;
+    ubl_115
+        '\n' -> ^LINE
+        _ -> ubl_116;
+    ubl_116
+        '\n' -> ^LINE
+        _ -> ubl_117;
+    ubl_117
+        '\n' -> ^LINE
+        _ -> ubl_118;
+    ubl_118
+        '\n' -> ^LINE
+        _ -> ubl_119;
+    ubl_119
+        '\n' -> ^LINE
+        _ -> ubl_120;
+    ubl_120
+        '\n' -> ^LINE
+        _ -> ubl_121;
+    ubl_121
+        '\n' -> ^LINE
+        _ -> fail;
+
+    breaker_start
+        '\n' -> ^LINE_SEGMENT -> ubl_0
+        #'(' -> ^LINE_SEGMENT -> ubl_0
+        ',' -> ^LINE_SEGMENT -> ubl_0
+        _ -> breaker;
+
+    # TODO(shane) need to include prefix in new b
+    breaker
+        '\n' -> ^LINE_SEGMENT -> ubl_0
+        #'(' -> ^LINE_SEGMENT -> ubl_0
+        ',' -> ^LINE_SEGMENT -> ubl_0
+        ')' ->> ^LINE_SEGMENT -> ubl_0
+        _ -> breaker;
+}
+
+grammar {
+    file
+        | {line} `{;indent=    }`
+        |;
+
+    line
+        | LINE
+        | {ls_lem};
+
+    ls_lem
+        | LINE_SEGMENT `{}\n[prefix][indent]`;
+}

@@ -107,6 +107,12 @@ fn tw_only_whitespace() {
     test_fjr("tw_only_whitespace", "trailing_whitespace");
 }
 
+// TODO enable when ready
+// #[test]
+// fn line_breaker_test() {
+//     test_fjr("line_breaker_test", "line_breaker");
+// }
+
 fn test_fjr(case_name: &str, spec_name: &str) {
     //setup
     let fjr = FormatJobRunner::build(&load_spec(spec_name)).unwrap();
