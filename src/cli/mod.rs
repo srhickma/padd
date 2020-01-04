@@ -3,6 +3,7 @@ extern crate yaml_rust;
 
 use self::{clap::App, yaml_rust::yaml::Yaml};
 
+mod configuration;
 mod cmd;
 mod formatter;
 #[macro_use]

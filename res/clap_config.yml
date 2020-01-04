@@ -60,6 +60,23 @@ subcommands:
         - check:
             long: check
             help: Return an error if a file is not already formatted
+  - fmtp:
+      about: Project formatter
+      args: # TODO(shane) just pick one of these!
+        - target:
+            short: t
+            long: target
+            help: Sets a the path to format files under
+            takes_value: true
+            value_name: PATH
+            required: true
+        - config:
+            short: c
+            long: config
+            help: Configuration file
+            takes_value: true
+            possible_values:
+            value_name: CONFIG
   - forget:
       about: Clears all file tracking data
       args:
