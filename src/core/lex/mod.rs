@@ -244,10 +244,9 @@ pub enum TransitionResult<State: Data> {
     Ok(TransitionDestination<State>),
 }
 
-// TODO update comments
 impl<State: Data> TransitionResult<State> {
     /// Returns a new successful transition result through `transit` traversing `traversed` input
-    /// characters.
+    /// bytes.
     pub fn ok(transit: &Transit<State>, traversed: usize) -> Self {
         let consumed = match transit.consumer {
             ConsumerStrategy::All => traversed,
@@ -262,7 +261,6 @@ impl<State: Data> TransitionResult<State> {
     }
 }
 
-// TODO update comments
 /// Transition Destination: Represents the destination of a successful state transition.
 ///
 /// # Type Parameters
@@ -272,7 +270,7 @@ impl<State: Data> TransitionResult<State> {
 /// # Fields
 ///
 /// * `state` - the destination state.
-/// * `consumed` - the amount of input consumed by the transition.
+/// * `consumed` - the number of input bytes consumed by the transition.
 /// * `acceptor_destination` - the optional acceptor destination of the transition, not to be
 /// confused with the possibly different acceptor destination of the destination state.
 pub struct TransitionDestination<State: Data> {
