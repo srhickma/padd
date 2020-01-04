@@ -104,7 +104,7 @@ pub trait CDFABuilder<State: Data, Symbol: GrammarSymbol, CDFAType> {
         &mut self,
         from: &State,
         transit: Transit<State>,
-        on: impl Iterator<Item = char>,
+        on: &str,
     ) -> Result<&mut Self, CDFAError>;
 
     /// Adds range transition `transit` on range [`start`, `end`] from `from`.
@@ -245,13 +245,8 @@ pub enum TransitionResult<State: Data> {
 }
 
 impl<State: Data> TransitionResult<State> {
-    /// Returns a new successful transition result through `transit` traversing one input character.
-    pub fn direct(transit: &Transit<State>) -> Self {
-        Self::ok(transit, 1)
-    }
-
     /// Returns a new successful transition result through `transit` traversing `traversed` input
-    /// characters.
+    /// bytes.
     pub fn ok(transit: &Transit<State>, traversed: usize) -> Self {
         let consumed = match transit.consumer {
             ConsumerStrategy::All => traversed,
@@ -275,7 +270,7 @@ impl<State: Data> TransitionResult<State> {
 /// # Fields
 ///
 /// * `state` - the destination state.
-/// * `consumed` - the amount of input consumed by the transition.
+/// * `consumed` - the number of input bytes consumed by the transition.
 /// * `acceptor_destination` - the optional acceptor destination of the transition, not to be
 /// confused with the possibly different acceptor destination of the destination state.
 pub struct TransitionDestination<State: Data> {

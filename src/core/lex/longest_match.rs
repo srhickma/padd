@@ -98,7 +98,11 @@ impl<State: Data, Symbol: GrammarSymbol> Lexer<State, Symbol> for LongestMatchLe
                     TransitionResult::Ok(dest) => {
                         consumed += dest.consumed;
 
-                        for c in remaining.chars().take(dest.consumed) {
+                        for (index, c) in remaining.char_indices() {
+                            if index >= dest.consumed {
+                                break;
+                            }
+
                             // Update calculation of current character and line.
                             character += 1;
                             if c == '\n' {
@@ -129,11 +133,7 @@ impl<State: Data, Symbol: GrammarSymbol> Lexer<State, Symbol> for LongestMatchLe
 
                         state = dest.state;
 
-                        let next_index = match remaining.char_indices().nth(dest.consumed) {
-                            Some((next_index, _)) => next_index,
-                            None => remaining.len(),
-                        };
-                        remaining = &remaining[next_index..];
+                        remaining = &remaining[dest.consumed..];
                     }
                 }
             }
@@ -181,17 +181,13 @@ impl<State: Data, Symbol: GrammarSymbol> Lexer<State, Symbol> for LongestMatchLe
                     if let Some(kind) = cdfa.tokenize(&state) {
                         tokens.push(Token::leaf(
                             kind,
-                            remaining.chars().take(res.consumed).collect(),
+                            remaining[..res.consumed].chars().collect(),
                         ));
                     }
                 }
             }
 
-            let next_index = match remaining.char_indices().nth(res.consumed) {
-                Some((next_index, _)) => next_index,
-                None => remaining.len(),
-            };
-            remaining = &remaining[next_index..];
+            remaining = &remaining[res.consumed..];
         }
 
         Ok(tokens)

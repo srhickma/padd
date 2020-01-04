@@ -3,6 +3,7 @@ use {
         data::{
             interval::{Bound, Interval, IntervalMap},
             map::{CEHashMap, CEHashMapIterator},
+            trie::{self, Trie},
             Data,
         },
         lex::{
@@ -133,7 +134,7 @@ impl<State: Data, Symbol: GrammarSymbol> CDFABuilder<State, Symbol, EncodedCDFA<
         &mut self,
         from: &State,
         transit: Transit<State>,
-        on: impl Iterator<Item = char>,
+        on: &str,
     ) -> Result<&mut Self, CDFAError> {
         let from_encoded = self.encoder.encode(from);
         let transit_encoded = self.encode_transit(transit);
@@ -141,9 +142,7 @@ impl<State: Data, Symbol: GrammarSymbol> CDFABuilder<State, Symbol, EncodedCDFA<
         {
             let t_trie = self.get_transition_trie(from_encoded);
 
-            let mut chars: Vec<char> = Vec::new();
-            on.for_each(|c| chars.push(c));
-            t_trie.insert_chain(&chars, transit_encoded)?;
+            t_trie.insert_chain(on, transit_encoded)?;
         }
 
         Ok(self)
@@ -244,7 +243,7 @@ impl<'scope, 'state: 'scope, State: 'state + Data, Symbol: 'scope + GrammarSymbo
     pub fn mark_chain(
         &mut self,
         transit: Transit<State>,
-        on: impl Iterator<Item = char>,
+        on: &str,
     ) -> Result<&mut Self, CDFAError> {
         self.ecdfa_builder.mark_chain(self.state, transit, on)?;
         Ok(self)
@@ -325,7 +324,7 @@ impl<Symbol: GrammarSymbol> CDFA<usize, Symbol> for EncodedCDFA<Symbol> {
 }
 
 struct TransitionTrie {
-    root: TransitionNode,
+    trie: Trie<Transit<usize>>,
     ranges: IntervalMap<u32, Transit<usize>>,
     default: Option<Transit<usize>>,
 }
@@ -339,10 +338,7 @@ impl Bound for u32 {
 impl TransitionTrie {
     fn new() -> Self {
         Self {
-            root: TransitionNode {
-                children: HashMap::new(),
-                transit: None,
-            },
+            trie: Trie::new(),
             ranges: IntervalMap::new(),
             default: None,
         }
@@ -354,65 +350,58 @@ impl TransitionTrie {
         }
 
         match self.transition_explicit(input) {
-            TransitionResult::Fail => match self.transition_range(input.chars().next().unwrap()) {
-                TransitionResult::Fail => self.transition_default(),
-                result => result,
-            },
+            TransitionResult::Fail => {
+                let next_char = input.chars().next().unwrap();
+                let byte_length = {
+                    let mut buffer = [0; 4];
+                    next_char.encode_utf8(&mut buffer).len()
+                };
+
+                match self.transition_range(next_char, byte_length) {
+                    TransitionResult::Fail => self.transition_default(byte_length),
+                    result => result,
+                }
+            }
             result => result,
         }
     }
 
     fn transition_explicit(&self, input: &str) -> TransitionResult<usize> {
-        let mut curr: &TransitionNode = &self.root;
-
-        if curr.children.is_empty() {
-            TransitionResult::Fail
-        } else {
-            let mut best_result = TransitionResult::Fail;
-
-            let mut cursor: usize = 0;
-            let mut chars = input.chars();
-            while !curr.leaf() {
-                curr = match chars.next() {
-                    None => return best_result,
-                    Some(c) => match curr.get_child(c) {
-                        None => return best_result,
-                        Some(child) => child,
-                    },
-                };
-
-                cursor += 1;
-
-                if let Some(transit) = &curr.transit {
-                    best_result = TransitionResult::ok(transit, cursor);
-                }
-            }
-
-            best_result
+        match self.trie.longest_match(input.as_bytes()) {
+            None => TransitionResult::Fail,
+            Some((transit, consumed)) => TransitionResult::ok(transit, consumed),
         }
     }
 
-    fn transition_range(&self, input: char) -> TransitionResult<usize> {
+    fn transition_range(&self, input: char, byte_length: usize) -> TransitionResult<usize> {
         let value = input as u32;
         match self.ranges.get(&value) {
             None => TransitionResult::Fail,
-            Some(transit) => TransitionResult::direct(transit),
+            Some(transit) => TransitionResult::ok(transit, byte_length),
         }
     }
 
-    fn transition_default(&self) -> TransitionResult<usize> {
+    fn transition_default(&self, byte_length: usize) -> TransitionResult<usize> {
         match self.default {
             None => TransitionResult::Fail,
-            Some(ref dest) => TransitionResult::direct(dest),
+            Some(ref dest) => TransitionResult::ok(dest, byte_length),
         }
     }
 
     fn insert(&mut self, c: char, transit: Transit<usize>) -> Result<(), CDFAError> {
-        TransitionTrie::insert_internal(c, &mut self.root, true, transit)
+        let mut buffer = [0; 4];
+        let slice = c.encode_utf8(&mut buffer);
+
+        self.insert_chain(slice, transit)
     }
 
-    fn insert_chain(&mut self, chars: &[char], transit: Transit<usize>) -> Result<(), CDFAError> {
-        TransitionTrie::insert_chain_internal(0, &mut self.root, chars, transit)
+    fn insert_chain(&mut self, chain: &str, transit: Transit<usize>) -> Result<(), CDFAError> {
+        match self.trie.insert(chain.as_bytes(), transit) {
+            Err(trie::Error::DuplicateErr) => Err(CDFAError::BuildErr(
+                "Transition trie contains duplicate matchers".to_string(),
+            )),
+            Ok(_) => Ok(()),
+        }
     }
 
     fn insert_range(
@@ -421,46 +410,6 @@ impl TransitionTrie {
         transit: Transit<usize>,
     ) -> Result<(), CDFAError> {
         self.ranges.insert(Interval::from(range), transit)?;
-        Ok(())
-    }
-
-    fn insert_chain_internal(
-        i: usize,
-        node: &mut TransitionNode,
-        chars: &[char],
-        transit: Transit<usize>,
-    ) -> Result<(), CDFAError> {
-        if i == chars.len() {
-            return Ok(());
-        }
-
-        let c = chars[i];
-        TransitionTrie::insert_internal(c, node, i == chars.len() - 1, transit.clone())?;
-        TransitionTrie::insert_chain_internal(i + 1, node.get_child_mut(c).unwrap(), chars, transit)
-    }
-
-    fn insert_internal(
-        c: char,
-        node: &mut TransitionNode,
-        last: bool,
-        transit: Transit<usize>,
-    ) -> Result<(), CDFAError> {
-        if !node.has_child(c) {
-            let child = TransitionNode {
-                children: HashMap::new(),
-                transit: if last { Some(transit) } else { None },
-            };
-            node.add_child(c, child);
-        } else if last {
-            let child = node.get_child_mut(c).unwrap();
-            if child.transit.is_some() {
-                return Err(CDFAError::BuildErr(
-                    "Transition trie contains duplicate matchers".to_string(),
-                ));
-            } else {
-                child.transit = Some(transit);
-            }
-        }
         Ok(())
     }
 
@@ -479,33 +428,6 @@ impl TransitionTrie {
 impl Default for TransitionTrie {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-struct TransitionNode {
-    children: HashMap<char, TransitionNode>,
-    transit: Option<Transit<usize>>,
-}
-
-impl TransitionNode {
-    fn leaf(&self) -> bool {
-        self.children.is_empty()
-    }
-
-    fn get_child(&self, c: char) -> Option<&TransitionNode> {
-        self.children.get(&c)
-    }
-
-    fn get_child_mut(&mut self, c: char) -> Option<&mut TransitionNode> {
-        self.children.get_mut(&c)
-    }
-
-    fn has_child(&self, c: char) -> bool {
-        self.children.contains_key(&c)
-    }
-
-    fn add_child(&mut self, c: char, child: TransitionNode) {
-        self.children.insert(c, child);
     }
 }
 
@@ -813,9 +735,9 @@ RBR <- '}'
             .mark_start(&"start".to_string());
         builder
             .state(&"start".to_string())
-            .mark_chain(Transit::to("four".to_string()), "four".chars())
+            .mark_chain(Transit::to("four".to_string()), "four")
             .unwrap()
-            .mark_chain(Transit::to("five".to_string()), "five".chars())
+            .mark_chain(Transit::to("five".to_string()), "five")
             .unwrap();
         builder
             .accept(&"four".to_string())
@@ -857,7 +779,7 @@ FIVE <- 'five'
             .mark_start(&"start".to_string());
         builder
             .state(&"start".to_string())
-            .mark_chain(Transit::to("FOR".to_string()), "for".chars())
+            .mark_chain(Transit::to("FOR".to_string()), "for")
             .unwrap()
             .default_to(Transit::to("id".to_string()))
             .unwrap();
@@ -1335,9 +1257,9 @@ B <- 'b'
             .state(&S::Start)
             .mark_trans(Transit::to(S::A), 'a')
             .unwrap()
-            .mark_chain(Transit::to(S::AB), "ab".chars())
+            .mark_chain(Transit::to(S::AB), "ab")
             .unwrap()
-            .mark_chain(Transit::to(S::ABC), "abc".chars())
+            .mark_chain(Transit::to(S::ABC), "abc")
             .unwrap();
 
         builder.state(&S::A).accept().tokenize(&"A".to_string());

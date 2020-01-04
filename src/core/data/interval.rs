@@ -233,7 +233,7 @@ impl<Key: Bound, Value> IntervalMap<Key, Value> {
 /// Wrapper around a boxed node.
 type HeapNode<Key, Value> = Box<Node<Key, Value>>;
 
-/// Helper function to create `HeapNode` objects (can implement `new` for type alias).
+/// Helper function to create `HeapNode` objects (can't implement `new` for type alias).
 fn new_node<Key: Bound, Value>(keys: Interval<Key>, value: Value) -> HeapNode<Key, Value> {
     Box::new(Node::new(keys, value))
 }
@@ -256,14 +256,14 @@ fn new_node<Key: Bound, Value>(keys: Interval<Key>, value: Value) -> HeapNode<Ke
 struct Node<Key: Bound, Value> {
     keys: Interval<Key>,
     value: Value,
-    left: Option<Box<Node<Key, Value>>>,
-    right: Option<Box<Node<Key, Value>>>,
+    left: Option<HeapNode<Key, Value>>,
+    right: Option<HeapNode<Key, Value>>,
     max_end: Key,
     height: u32,
 }
 
 impl<Key: Bound, Value> Node<Key, Value> {
-    /// Returns a new leaf `Node` given a key range and a value.
+    /// Returns a new leaf node given a key range and a value.
     ///
     /// # Parameters
     ///
@@ -367,7 +367,7 @@ impl<Key: Bound, Value> Node<Key, Value> {
 ///
 /// # Types
 ///
-/// * `OverlapErr` - Indicates that a key interval being inserted overlaps an existing interval.
+/// * `OverlapErr` - indicates that a key interval being inserted overlaps an existing interval.
 #[derive(Debug)]
 pub enum Error {
     OverlapErr,
