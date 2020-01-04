@@ -134,7 +134,7 @@ impl<State: Data, Symbol: GrammarSymbol> CDFABuilder<State, Symbol, EncodedCDFA<
         &mut self,
         from: &State,
         transit: Transit<State>,
-        on: impl Iterator<Item = char>,
+        on: &str,
     ) -> Result<&mut Self, CDFAError> {
         let from_encoded = self.encoder.encode(from);
         let transit_encoded = self.encode_transit(transit);
@@ -142,9 +142,7 @@ impl<State: Data, Symbol: GrammarSymbol> CDFABuilder<State, Symbol, EncodedCDFA<
         {
             let t_trie = self.get_transition_trie(from_encoded);
 
-            // TODO remove this cloning
-            let on_string: String = on.collect();
-            t_trie.insert_chain(&on_string, transit_encoded)?;
+            t_trie.insert_chain(on, transit_encoded)?;
         }
 
         Ok(self)
@@ -245,7 +243,7 @@ impl<'scope, 'state: 'scope, State: 'state + Data, Symbol: 'scope + GrammarSymbo
     pub fn mark_chain(
         &mut self,
         transit: Transit<State>,
-        on: impl Iterator<Item = char>,
+        on: &str,
     ) -> Result<&mut Self, CDFAError> {
         self.ecdfa_builder.mark_chain(self.state, transit, on)?;
         Ok(self)
@@ -737,9 +735,9 @@ RBR <- '}'
             .mark_start(&"start".to_string());
         builder
             .state(&"start".to_string())
-            .mark_chain(Transit::to("four".to_string()), "four".chars())
+            .mark_chain(Transit::to("four".to_string()), "four")
             .unwrap()
-            .mark_chain(Transit::to("five".to_string()), "five".chars())
+            .mark_chain(Transit::to("five".to_string()), "five")
             .unwrap();
         builder
             .accept(&"four".to_string())
@@ -781,7 +779,7 @@ FIVE <- 'five'
             .mark_start(&"start".to_string());
         builder
             .state(&"start".to_string())
-            .mark_chain(Transit::to("FOR".to_string()), "for".chars())
+            .mark_chain(Transit::to("FOR".to_string()), "for")
             .unwrap()
             .default_to(Transit::to("id".to_string()))
             .unwrap();
@@ -1259,9 +1257,9 @@ B <- 'b'
             .state(&S::Start)
             .mark_trans(Transit::to(S::A), 'a')
             .unwrap()
-            .mark_chain(Transit::to(S::AB), "ab".chars())
+            .mark_chain(Transit::to(S::AB), "ab")
             .unwrap()
-            .mark_chain(Transit::to(S::ABC), "abc".chars())
+            .mark_chain(Transit::to(S::ABC), "abc")
             .unwrap();
 
         builder.state(&S::A).accept().tokenize(&"A".to_string());

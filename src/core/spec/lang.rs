@@ -81,11 +81,11 @@ fn build_spec_ecdfa() -> Result<EncodedCDFA<SpecSymbol>, lex::CDFAError> {
 
     builder
         .state(&S::Start)
-        .mark_chain(Transit::to(S::InjectableTag), "inject".chars())?
-        .mark_chain(Transit::to(S::IgnorableTag), "ignore".chars())?
-        .mark_chain(Transit::to(S::AlphabetTag), "alphabet".chars())?
-        .mark_chain(Transit::to(S::CDFATag), "cdfa".chars())?
-        .mark_chain(Transit::to(S::GrammarTag), "grammar".chars())?
+        .mark_chain(Transit::to(S::InjectableTag), "inject")?
+        .mark_chain(Transit::to(S::IgnorableTag), "ignore")?
+        .mark_chain(Transit::to(S::AlphabetTag), "alphabet")?
+        .mark_chain(Transit::to(S::CDFATag), "cdfa")?
+        .mark_chain(Transit::to(S::GrammarTag), "grammar")?
         .mark_trans(Transit::to(S::Comment), '#')?
         .mark_trans(Transit::to(S::Whitespace), ' ')?
         .mark_trans(Transit::to(S::Whitespace), '\t')?
@@ -163,8 +163,8 @@ fn build_injectable_region(
 
     builder
         .state(&S::InjectablePreAffinity)
-        .mark_chain(Transit::to(S::InjectionAffinity), "left".chars())?
-        .mark_chain(Transit::to(S::InjectionAffinity), "right".chars())?
+        .mark_chain(Transit::to(S::InjectionAffinity), "left")?
+        .mark_chain(Transit::to(S::InjectionAffinity), "right")?
         .mark_trans(Transit::to(S::Comment), '#')?
         .mark_trans(Transit::to(S::Whitespace), ' ')?
         .mark_trans(Transit::to(S::Whitespace), '\t')?
@@ -309,8 +309,8 @@ fn build_cdfa_region(
         .mark_range(Transit::to(S::Id), 'A', 'Z')?
         .mark_range(Transit::to(S::Id), '0', '9')?
         .mark_trans(Transit::to(S::Hat), '^')?
-        .mark_chain(Transit::to(S::Arrow), "->".chars())?
-        .mark_chain(Transit::to(S::Range), "..".chars())?
+        .mark_chain(Transit::to(S::Arrow), "->")?
+        .mark_chain(Transit::to(S::Range), "..")?
         .mark_trans(Transit::to(S::Def), '_')?
         .mark_trans(Transit::to(S::RegionExitBrace), '}')?
         .mark_trans(Transit::to(S::Comment), '#')?

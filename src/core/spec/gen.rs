@@ -441,7 +441,7 @@ where
                     matcher_cleaned.chars().next().unwrap(),
                 )?;
             } else {
-                builder.mark_chain(source, transit_builder.build(), matcher_cleaned.chars())?;
+                builder.mark_chain(source, transit_builder.build(), &matcher_cleaned)?;
             }
         }
     } else {

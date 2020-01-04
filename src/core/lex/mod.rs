@@ -104,7 +104,7 @@ pub trait CDFABuilder<State: Data, Symbol: GrammarSymbol, CDFAType> {
         &mut self,
         from: &State,
         transit: Transit<State>,
-        on: impl Iterator<Item = char>,
+        on: &str,
     ) -> Result<&mut Self, CDFAError>;
 
     /// Adds range transition `transit` on range [`start`, `end`] from `from`.
