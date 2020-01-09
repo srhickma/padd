@@ -16,6 +16,20 @@ use {
     std::{collections::HashMap, ops::RangeInclusive, usize},
 };
 
+/// Encoded CDFA Builder: Builder for encoded CDFAs.
+///
+/// # Type Parameters
+///
+/// * `State` - the input CDFA state type (unencoded).
+/// * `Symbol` - the grammar symbol type produced by the CDFA.
+///
+/// # Fields
+///
+/// * `encoder` - the encoder to use when encoding CDFA states.
+/// * `alphabet` - the optional alphabet restrictions (whitelist) of the CDFA.
+/// * `t_delta` - a map of current states to the tries representing transitions out of those states.
+/// * `tokenizer` - a map of tokenized states to their respective tokens.
+/// * `start` = the start state of the CDFA.
 pub struct EncodedCDFABuilder<State: Data, Symbol: GrammarSymbol> {
     encoder: Encoder<State>,
     alphabet: Option<HashedAlphabet>,
@@ -26,6 +40,7 @@ pub struct EncodedCDFABuilder<State: Data, Symbol: GrammarSymbol> {
 }
 
 impl<State: Data, Symbol: GrammarSymbol> EncodedCDFABuilder<State, Symbol> {
+    /// Returns the transition trie storing transitions out of `from`.
     fn get_transition_trie(&mut self, from: usize) -> &mut TransitionTrie {
         if !self.t_delta.contains(from) {
             self.t_delta.insert(from, TransitionTrie::new());
@@ -33,6 +48,7 @@ impl<State: Data, Symbol: GrammarSymbol> EncodedCDFABuilder<State, Symbol> {
         self.t_delta.get_mut(from).unwrap()
     }
 
+    /// TODO
     pub fn state<'scope, 'state: 'scope>(
         &'scope mut self,
         state: &'state State,
@@ -43,6 +59,7 @@ impl<State: Data, Symbol: GrammarSymbol> EncodedCDFABuilder<State, Symbol> {
         }
     }
 
+    /// TODO
     fn encode_transit(&mut self, transit: Transit<State>) -> Transit<usize> {
         let mut builder = TransitBuilder::to(self.encoder.encode(&transit.dest));
 
