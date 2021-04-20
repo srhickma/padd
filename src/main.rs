@@ -4,6 +4,8 @@ extern crate lazy_static;
 extern crate clap;
 #[macro_use]
 extern crate log;
+#[macro_use]
+extern crate serde;
 extern crate backtrace;
 extern crate padd;
 
